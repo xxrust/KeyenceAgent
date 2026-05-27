@@ -24,6 +24,7 @@ Verified VM baseline:
 - Before UI work, verify a logged-on Windows desktop session exists. `codex-run --transport ui` uses the logged-on user's `InteractiveToken`; it cannot operate KV STUDIO from QGA Session 0 when no interactive user is logged on.
 - Return VM evidence through files under `C:\Users\Public\KVSkillPractice` or `C:\Users\Public\CodexRemoteTasks`, then read them back through QGA/`ps`.
 - Keyboard sequences and clipboard operations are allowed only after the exact target dialog/control has been identified. Do not use global `SendKeys`, typed text, paste, `Enter`, or accelerator fallback when KV STUDIO focus could be in the ladder/program editor.
+- KV STUDIO operation scripts must be checklist-gated. Before launching, restarting, importing, editing variables, compiling, or copying KV STUDIO result text, the script must find a non-empty `CHECKLIST.md` / `kv_operation_checklist.md`, an explicit `-ChecklistPath`, or `KV_STUDIO_OPERATION_CHECKLIST`. If the checklist is missing, the script must fail before initializing UIAutomation or touching KV STUDIO.
 - Before sending any user-validated accelerator such as `Alt+F,R,S`, explicitly verify the foreground window title starts with `KV STUDIO` and matches the intended project. A passing UIA safety scan alone is not enough; accelerators go to the foreground window.
 - Before sending accelerators, prove KV STUDIO is actually restored and foreground, not merely running or visible in the taskbar. If the window is minimized or another window remains foreground, the route is blocked; do not send accelerators.
 - Before sending accelerators, normalize and record keyboard/input state. On this workstation, use a deterministic CapsLock/English-keyboard path for menu accelerator delivery; a Chinese IME state can consume or alter shortcut characters.
@@ -36,9 +37,55 @@ Verified VM baseline:
 - Rebuild variables explicitly after MNM import; imported MNM program bodies can lose variable definitions.
 - Treat successful compile/convert verification as the required gate; a project that fails Ctrl+F2 is not complete.
 
-## 5-Minute Traffic-Light MVP Entrypoint
+## Scaffold-First MVP Workflow
 
-Use this route when the task is to reproduce the traffic-light MVP from skill/knowledge only. This is MVP, not VP: the acceptance target is only a fresh disposable KV STUDIO project that imports one MNM ST program, reconstructs required global/local variables, runs Ctrl+F2 conversion, and copies the conversion result text.
+Use this workflow for new simple KV STUDIO tasks. Do not hard-code the traffic-light program as the automation route. The repeatable route is: generate a scaffold, let the agent edit the scaffold files for the task, then run the one-click scaffold runner against KV STUDIO.
+
+Create a scaffold:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  C:\Users\liangyuhang\.codex\skills\kv-studio-operator\scripts\new_kv_mvp_scaffold.ps1 `
+  -ScaffoldRoot C:\Users\Public\KVSkillPractice\scaffolds\<task-id> `
+  -ProjectName <project-name> `
+  -CpuModel KV-X310 `
+  -ModuleName Main_MVP `
+  -Template Minimal `
+  -TaskSummary '<task summary>'
+```
+
+The scaffold contains:
+
+- `scaffold.json`: manifest with project name, CPU model, local program name, MNM list, and variable TSV paths.
+- `mnm\*.mnm`: mnemonic-list files imported into KV STUDIO. These are the primary program-body handoff files. For ordinary scan-executed user programs, use `;MODULE_TYPE:0`; `;MODULE_TYPE:2` creates a function block and is not a replacement for a scan-executed module.
+- `variables\global_variables.tsv`: global variable rows using the scaffold schema.
+- `variables\local_variables.tsv`: local variable rows using the scaffold schema and the target local program.
+- `TASK.md`: task intent and acceptance notes.
+- `VERSION.md`: project/scaffold version notes.
+- `CHECKLIST.md`: mandatory operation checklist. The one-click runner and all KV STUDIO MVP sub-scripts refuse to operate without this file or an explicit checklist path.
+
+Agent fill rule:
+
+1. Read `scaffold.json`.
+2. Edit `mnm\*.mnm` for the requested PLC behavior.
+3. Edit `variables\global_variables.tsv` and `variables\local_variables.tsv` for required variables.
+4. Update `TASK.md` and `VERSION.md` with implemented behavior, IO mapping, assumptions, and validation target.
+5. Complete or update `CHECKLIST.md` before running any KV STUDIO script.
+6. Run the scaffold through KV STUDIO:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  C:\Users\liangyuhang\.codex\skills\kv-studio-operator\scripts\run_kv_mvp_scaffold.ps1 `
+  -ScaffoldRoot C:\Users\Public\KVSkillPractice\scaffolds\<task-id> `
+  -OutRoot C:\Users\Public\KVSkillPractice\mvp_runs `
+  -TimeoutSeconds 300
+```
+
+The scaffold runner owns the same validated KV STUDIO route as the traffic-light MVP: guarded project creation, MNM import, project-tree placement verification, global-variable paste by first-name `Tab`, local-variable paste by `Tab -> PgDn -> Ctrl+V`, Ctrl+F9 conversion, and conversion-result copy from the verified bottom `SysTreeView32` handle. The result gate is still `mvp_result.json` with `ok=true`, `module_placement\<module>.json` showing the expected category, and copied conversion text containing `转换结果 OK`.
+
+## Traffic-Light Compatibility Entrypoint
+
+Use this compatibility wrapper only when the task is specifically to reproduce the traffic-light MVP from skill/knowledge. The wrapper now creates a `TrafficLight` scaffold and then delegates to `run_kv_mvp_scaffold.ps1`; keep new tasks on the scaffold-first route above.
 
 Run the bundled entrypoint directly; do not reconstruct the workflow from chat history or temporary validation logs:
 
@@ -51,7 +98,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
   -TimeoutSeconds 300
 ```
 
-The entrypoint owns the route:
+The scaffold runner owns the route:
 
 - Creates a disposable KV STUDIO project.
 - Generates a UTF-16LE MNM import file that contains the required Chinese names in comments and uses ASCII executable identifiers for ST parser compatibility.

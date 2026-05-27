@@ -1,12 +1,10 @@
 *
 !.gitignore
-!/bug-repro-validation-loop/
-!/bug-repro-validation-loop/**
 !/keyence-plc-programmer/
 !/keyence-plc-programmer/**
 !/kv-studio-kb-programming/
 !/kv-studio-kb-programming/**
 !/kv-studio-operator/
 !/kv-studio-operator/**
-!/route-governance/
-!/route-governance/**
+**/__pycache__/
+*.pyc

@@ -1,6 +1,7 @@
-param(
+﻿param(
   [string]$ProjectPath = 'C:\Users\Public\KVSkillPractice\Projects\TrafficLightMinST_20260526_MVP5\TrafficLightMinST_20260526_MVP5.kpr',
   [string]$OutDir = 'E:\personal_project\rust_plc\out\traffic_light_min_loop_20260525\validation\159_compile_and_copy_result_bounded',
+  [string]$ChecklistPath = '',
   [int]$WaitSeconds = 40,
   [ValidateSet('CtrlF2','CtrlF9')]
   [string]$ConvertAction = 'CtrlF2'
@@ -8,6 +9,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+
+$checklistGuard = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'assert_kv_operation_checklist.ps1'
+if (-not (Test-Path -LiteralPath $checklistGuard)) { throw "Checklist guard script not found: $checklistGuard" }
+& $checklistGuard -ChecklistPath $ChecklistPath -SearchRoots @($OutDir, $ProjectPath) -OperationName 'compile KV STUDIO project' | Out-Null
 
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
@@ -132,7 +137,7 @@ function Dismiss-ConvertFailureIfPresent {
   for ($i = 0; $i -lt $windows.Count; $i++) {
     $window = $windows[$i]
     $text = Get-WindowTextFlat $window
-    if ($text -like '*转换失败*') {
+    if ($text -like '*杞崲澶辫触*') {
       [KvCompileBoundedWin32]::SetForegroundWindow([IntPtr]$window.Current.NativeWindowHandle) | Out-Null
       Start-Sleep -Milliseconds 100
       [Windows.Forms.SendKeys]::SendWait('{ENTER}')
@@ -190,7 +195,7 @@ try {
   if ($title -notlike 'KV STUDIO*' -or $title -notlike "*$projectNeedle*") {
     throw "KV STUDIO is not foreground on target project before compile. title=$title"
   }
-  if ($title -like '*模拟器*') {
+  if ($title -like '*妯℃嫙鍣?') {
     [Windows.Forms.SendKeys]::SendWait('^{F1}')
     Log 'sent Ctrl+F1 to return from simulator to editor before conversion'
     Start-Sleep -Seconds 2
@@ -218,7 +223,7 @@ try {
     $result = Find-ResultArea $process.Id
     if ($result) {
       $name = [string]$result.Current.Name
-      if ($name -like '*转换结果*' -or $name -like '*Convert*') { break }
+      if ($name -like '*杞崲缁撴灉*' -or $name -like '*Convert*') { break }
     }
   } while ((Get-Date) -lt $deadline)
 
@@ -263,8 +268,8 @@ try {
     ok = $true
     foreground = Get-ForegroundTitle
     clipboard_length = $clip.Length
-    contains_ok = ($clip -like '*转换结果 OK*')
-    contains_ng = ($clip -like '*转换结果 NG*')
+    contains_ok = ($clip -like '*杞崲缁撴灉 OK*')
+    contains_ng = ($clip -like '*杞崲缁撴灉 NG*')
   } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $OutDir 'result.json') -Encoding UTF8
   Log 'done'
 } catch {

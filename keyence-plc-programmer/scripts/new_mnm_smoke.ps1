@@ -23,7 +23,7 @@ if (-not $OutPath) {
 $content = @(
   'DEVICE:60',
   (';MODULE:' + $ModuleName),
-  ';MODULE_TYPE:2',
+  ';MODULE_TYPE:0',
   ('LD ' + $InputDevice),
   ('OUT ' + $OutputDevice),
   'END',

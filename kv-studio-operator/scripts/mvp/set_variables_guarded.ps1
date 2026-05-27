@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory=$true)]
   [string]$ProjectPath,
 
@@ -8,14 +8,22 @@ param(
   [Parameter(Mandatory=$true)]
   [string]$LocalVariablesTsv,
 
+  [string]$LocalProgramName = 'TrafficLight_MVP',
+
   [switch]$SkipGlobal,
   [switch]$KeepVariableEditorOpen,
+
+  [string]$ChecklistPath = '',
 
   [string]$OutDir = ('E:\personal_project\rust_plc\out\traffic_light_min_loop_20260525\validation\set_variables_' + (Get-Date -Format 'yyyyMMdd_HHmmss'))
 )
 
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+
+$checklistGuard = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'assert_kv_operation_checklist.ps1'
+if (-not (Test-Path -LiteralPath $checklistGuard)) { throw "Checklist guard script not found: $checklistGuard" }
+& $checklistGuard -ChecklistPath $ChecklistPath -SearchRoots @($OutDir, $ProjectPath, $GlobalVariablesTsv, $LocalVariablesTsv) -OperationName 'set KV STUDIO variables' | Out-Null
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -386,7 +394,7 @@ function Convert-GlobalRows([string]$Path) {
       ''
       'False'
       'False'
-      '非公开'
+      '闈炲叕寮€'
       'False'
       $row.comment
     ) -join "`t"
@@ -676,20 +684,10 @@ try {
   $localText = Convert-LocalRows $LocalVariablesTsv
   $globalRows = Get-DefinedVariableRows $GlobalVariablesTsv 'global'
   $localRows = Get-DefinedVariableRows $LocalVariablesTsv 'local'
-  $requiredGlobalNames = @(
-    (-join ([char[]](0x542F,0x52A8))),
-    (-join ([char[]](0x7EA2,0x004C,0x0045,0x0044,0x706F))),
-    (-join ([char[]](0x9EC4,0x004C,0x0045,0x0044,0x706F))),
-    (-join ([char[]](0x7EFF,0x004C,0x0045,0x0044,0x706F)))
-  )
-  $requiredLocalNames = @(
-    (-join ([char[]](0x72B6,0x6001))),
-    (-join ([char[]](0x8BA1,0x6570)))
-  )
-  $globalSourceText = [IO.File]::ReadAllText($GlobalVariablesTsv, [Text.Encoding]::Default)
-  $localSourceText = [IO.File]::ReadAllText($LocalVariablesTsv, [Text.Encoding]::Default)
-  Assert-TextContainsNames $globalSourceText $requiredGlobalNames 'global variable source'
-  Assert-TextContainsNames $localSourceText $requiredLocalNames 'local variable source'
+  $definedGlobalNames = @($globalRows | ForEach-Object { [string]$_.name } | Where-Object { $_ })
+  $definedLocalNames = @($localRows | ForEach-Object { [string]$_.name } | Where-Object { $_ })
+  Log "decoded executable global variable rows=$($definedGlobalNames.Count): $($definedGlobalNames -join ',')"
+  Log "decoded executable local variable rows=$($definedLocalNames.Count): $($definedLocalNames -join ',')"
   Set-Content -LiteralPath (Join-Path $OutDir 'global_paste.tsv') -Value $globalText -Encoding UTF8
   Set-Content -LiteralPath (Join-Path $OutDir 'local_paste.tsv') -Value $localText -Encoding UTF8
 
@@ -707,12 +705,12 @@ try {
 
   $form = Get-VariableForm $process.Id
   $form = Select-VariableTabByAid $form '_tabPageLocal' 'local tab'
-  Select-LocalProgram $form 'TrafficLight_MVP'
+  Select-LocalProgram $form $LocalProgramName
   $form = Get-VariableForm $process.Id
   if ($KeepVariableEditorOpen) {
     Save-Shot '00_before_local_repaste.png'
   }
-  Paste-LocalVariablesByTabPgDn $form $localText 'TrafficLight_MVP'
+  Paste-LocalVariablesByTabPgDn $form $localText $LocalProgramName
   Save-Shot '02_after_local_paste.png'
 
   Save-Project $process $projectNeedle
@@ -720,15 +718,19 @@ try {
   Assert-NoKvsModal $process.Id 'after variable save'
   if (-not (Get-VariableForm $process.Id)) { throw 'KvVariableForm disappeared after variable save.' }
 
-  $requiredNames = @('StartIn', 'RedLed', 'YellowLed', 'GreenLed', 'State', 'Count')
+  $requiredNames = @($definedGlobalNames + $definedLocalNames | Where-Object { $_ } | Select-Object -Unique)
   $fileScan = Test-ProjectHasNames $projectRoot $requiredNames
+  if (-not $fileScan.Ok) {
+    throw "Variable definition verification failed after save. Missing names: $($fileScan.Missing -join ', ')"
+  }
   $validation = [pscustomobject]@{
     Ok = $true
-    Basis = 'variable editor route completed without modal; screenshot captured; compile step is authoritative for semantic validation'
+    Basis = 'variable editor route completed without modal; required executable variable names were found in same-run saved project files'
     RequiredNames = $requiredNames
-    LocalPasteRoute = 'local tab -> TrafficLight_MVP -> Tab -> PgDn -> Ctrl+V'
+    VariableDefinitionCheckOk = $fileScan.Ok
+    LocalPasteRoute = "local tab -> $LocalProgramName -> Tab -> PgDn -> Ctrl+V"
     ScreenshotAfterLocalPaste = (Join-Path $OutDir '02_after_local_paste.png')
-    AdvisoryProjectFileScan = $fileScan
+    ProjectFileScan = $fileScan
   }
   $validation | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $OutDir 'variable_persistence_validation.json') -Encoding UTF8
 
@@ -737,6 +739,7 @@ try {
     ProjectPath = $ProjectPath
     ProjectRoot = $projectRoot
     RequiredNames = $requiredNames
+    VariableDefinitionCheckOk = $fileScan.Ok
   } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'set_variables_result.json') -Encoding UTF8
   Log 'done set variables'
 } catch {

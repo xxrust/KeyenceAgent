@@ -9,6 +9,8 @@ description: Design, modify, and validate KEYENCE PLC programs for KV STUDIO. Us
 
 Use this skill for PLC logic and project-structure decisions. Use `kv-studio-operator` for KV STUDIO UI operations, MNM import/export, variable editor work, and compile/error collection. Use `kv-studio-kb-programming` as the Wiki V2 evidence retrieval helper.
 
+For a new simple clean-room task, hand off implementation through the `kv-studio-operator` scaffold-first MVP workflow: create a scaffold, edit `mnm/*.mnm`, `variables/global_variables.tsv`, `variables/local_variables.tsv`, `TASK.md`, and `VERSION.md`, then run `run_kv_mvp_scaffold.ps1`. Treat the traffic-light script as a compatibility example, not as the default programming route.
+
 Default official reference project:
 
 `C:\Users\liangyuhang\Documents\KEYENCE\KVS12G\KVS12\KVS\PROJECT\KVX鏍蜂緥绋嬪簭_v100`
@@ -151,6 +153,7 @@ Read `references/reproduction-gate.md` before claiming a reference reproduction 
 ## MNM Authoring Rules
 
 - Keep MNM edits minimal and structurally consistent with KV STUDIO export style.
+- For ordinary scan-executed user modules, set `;MODULE_TYPE:0`. `;MODULE_TYPE:2` imports as a function block; do not use it for a module that must run under “每次扫描执行型模块”.
 - For MNM imports that contain Chinese names or comments, write the `.mnm` file in the Windows system ANSI code page expected by KV STUDIO on the target machine, normally CP936 on Chinese Windows. Do not rely on terminal display: validate the bytes with `[Text.Encoding]::Default` and require the intended Chinese identifiers to round-trip before import. UTF-8 Chinese MNM is a known failure mode because KV STUDIO can read the file as ANSI and turn identifiers such as `启动`, `红LED灯`, `黄LED灯`, and `绿LED灯` into mojibake.
 - Do not place IEC `VAR ... END_VAR` declaration blocks into executable ST bodies unless Wiki V2 proves KV STUDIO accepts that context.
 - Treat variable declarations as project/editor objects, not inline program text.

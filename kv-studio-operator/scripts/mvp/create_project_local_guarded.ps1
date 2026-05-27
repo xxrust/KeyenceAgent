@@ -10,6 +10,7 @@
   [string]$AdminUser = 'admin',
   [string]$AdminPassword = 'a82701767',
   [string]$OutDir = '',
+  [string]$ChecklistPath = '',
   [int]$TimeoutSeconds = 120,
   [switch]$RestartKvs
 )
@@ -19,6 +20,10 @@ if (-not $OutDir) {
   $OutDir = Join-Path $ProjectRoot ('_create_project_' + (Get-Date -Format 'yyyyMMdd_HHmmss'))
 }
 New-Item -ItemType Directory -Force -Path $OutDir, $ProjectRoot | Out-Null
+
+$checklistGuard = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'assert_kv_operation_checklist.ps1'
+if (-not (Test-Path -LiteralPath $checklistGuard)) { throw "Checklist guard script not found: $checklistGuard" }
+& $checklistGuard -ChecklistPath $ChecklistPath -SearchRoots @($OutDir, $ProjectRoot) -OperationName 'create KV STUDIO project' | Out-Null
 
 function Log([string]$Message) {
   $line = (Get-Date -Format s) + ' ' + $Message
@@ -353,4 +358,3 @@ try {
   $_.Exception.ToString() | Set-Content -LiteralPath (Join-Path $OutDir 'fail.txt') -Encoding UTF8
   exit 1
 }
-

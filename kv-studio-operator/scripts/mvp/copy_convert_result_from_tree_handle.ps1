@@ -1,11 +1,16 @@
-param(
+﻿param(
   [string]$ProjectNeedle = 'TrafficLightMinST_20260526_MVP5',
   [string]$OutDir = 'E:\personal_project\rust_plc\out\traffic_light_min_loop_20260525\validation\177_copy_convert_result_from_tree_handle',
+  [string]$ChecklistPath = '',
   [int]$MaxLookupMs = 1000
 )
 
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+
+$checklistGuard = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'assert_kv_operation_checklist.ps1'
+if (-not (Test-Path -LiteralPath $checklistGuard)) { throw "Checklist guard script not found: $checklistGuard" }
+& $checklistGuard -ChecklistPath $ChecklistPath -SearchRoots @($OutDir) -OperationName 'copy KV STUDIO conversion result' | Out-Null
 
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
