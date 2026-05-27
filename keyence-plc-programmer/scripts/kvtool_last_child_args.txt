@@ -1,0 +1,6 @@
+-NoProfile
+-ExecutionPolicy
+Bypass
+-File
+C:\Users\liangyuhang\.codex\skills\keyence-plc-programmer\scripts\create_project_local.ps1
+

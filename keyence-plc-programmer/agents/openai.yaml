@@ -1,0 +1,4 @@
+interface:
+  display_name: "KEYENCE PLC Programmer"
+  short_description: "Write KEYENCE PLC logic that compiles."
+  default_prompt: "Use this skill to design KEYENCE PLC logic from Wiki V2 and official references, recreate logic through MNM, rebuild variables, and pass KV STUDIO compile validation."

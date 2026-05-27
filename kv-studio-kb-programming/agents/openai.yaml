@@ -1,0 +1,4 @@
+interface:
+  display_name: "KV Studio KB Programming"
+  short_description: "Help program KV STUDIO with local KB guidance"
+  default_prompt: "Use $kv-studio-kb-programming to answer and draft KV STUDIO programs from the local KEYENCE knowledge base."

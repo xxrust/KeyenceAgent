@@ -1,0 +1,137 @@
+﻿{
+    "name":  "keyence-kvstudio-toolkit",
+    "version":  "0.3.0",
+    "created_at":  "2026-05-08",
+    "updated_at":  "2026-05-20",
+    "purpose":  "Centralized reusable helpers for KEYENCE KV STUDIO local/VM code import/export, UI operation, conversion evidence, deterministic evidence review, and five-minute local acceptance.",
+    "entrypoint":  "tools/kvstudio/kvtool.ps1",
+    "stable_commands":  [
+                            {
+                                "command":  "resolve-local",
+                                "script":  "resolve_kvstudio_local.ps1",
+                                "runs_on":  "host-local",
+                                "purpose":  "Resolve local KV STUDIO shortcut/install to the real Kvs.exe before running automation."
+                            },
+                            {
+                                "command":  "create-project-local",
+                                "script":  "create_project_local.ps1",
+                                "runs_on":  "host-local-interactive",
+                                "purpose":  "Create a disposable local KV STUDIO project using Win32/UIAutomation controls, not image recognition."
+                            },
+                            {
+                                "command":  "local-acceptance",
+                                "script":  "local_kvstudio_acceptance.ps1",
+                                "runs_on":  "host-local-interactive",
+                                "purpose":  "Five-minute benchmark runner: create/open project, roundtrip MNM, run conversion evidence collection, and fail on timeout."
+                            },
+                            {
+                                "command":  "doctor",
+                                "script":  "check_vm103_prereqs.ps1",
+                                "runs_on":  "host",
+                                "purpose":  "Check VM/tool prerequisites before touching KV STUDIO."
+                            },
+                            {
+                                "command":  "stage",
+                                "script":  "stage_vm103_script_encoded.ps1",
+                                "runs_on":  "host",
+                                "purpose":  "Stage a local PowerShell script into VM 103."
+                            },
+                            {
+                                "command":  "run-staged",
+                                "script":  "run_vm103_staged_script.ps1",
+                                "runs_on":  "host-to-vm",
+                                "purpose":  "Run a staged VM-side script through the existing VM operator path."
+                            },
+                            {
+                                "command":  "run-interactive",
+                                "script":  "run_vm103_interactive_script_ssh.ps1",
+                                "runs_on":  "host-to-vm-interactive",
+                                "purpose":  "Run a script in the logged-on VM desktop session."
+                            },
+                            {
+                                "command":  "export-mnm",
+                                "script":  "export_mnm.ps1",
+                                "runs_on":  "vm-interactive",
+                                "purpose":  "Drive the KV STUDIO mnemonic-list export route."
+                            },
+                            {
+                                "command":  "import-mnm",
+                                "script":  "import_mnm.ps1",
+                                "runs_on":  "vm-interactive",
+                                "purpose":  "Drive the KV STUDIO mnemonic-list import route. Use -FailOnMissingValidationNeedles for hard failure when expected devices/instructions are absent from post-import evidence."
+                            },
+                            {
+                                "command":  "roundtrip-mnm",
+                                "script":  "roundtrip_mnm.ps1",
+                                "runs_on":  "vm-interactive",
+                                "purpose":  "Hard gate for MNM import/export: import an MNM, export it back, compare executable instruction fingerprints, and fail on mismatch."
+                            },
+                            {
+                                "command":  "convert-collect",
+                                "script":  "convert_collect.ps1",
+                                "runs_on":  "vm-interactive",
+                                "purpose":  "Open a project, run Ctrl+F9, and collect screenshot/UI/clipboard evidence."
+                            },
+                            {
+                                "command":  "collect-visible-errors",
+                                "script":  "collect_visible_convert_errors.ps1",
+                                "runs_on":  "vm-interactive",
+                                "purpose":  "Copy the visible bottom conversion result tree after conversion."
+                            },
+                            {
+                                "command":  "verify-names",
+                                "script":  "verify_project_names.ps1",
+                                "runs_on":  "vm-or-host",
+                                "purpose":  "Search KV project files for expected variables/modules as weak persistence evidence."
+                            },
+                            {
+                                "command":  "validate-isolated-vm-smoke",
+                                "script":  "validate_isolated_vm_smoke.ps1",
+                                "runs_on":  "host-to-vm-qga",
+                                "purpose":  "Verify VM101/102/103 can independently generate a minimal KEYENCE MNM from isolated CODEX_HOME skills and Wiki V2 without memory."
+                            },
+                            {
+                                "command":  "init-evidence-loop",
+                                "script":  "init_evidence_loop.ps1",
+                                "runs_on":  "host-or-vm",
+                                "purpose":  "Create a deterministic git-backed evidence folder with source_snapshot, work, validation, review_inbox, agent_outbox, and HTML audit surfaces."
+                            },
+                            {
+                                "command":  "review-evidence",
+                                "script":  "invoke_evidence_review.ps1",
+                                "runs_on":  "host-or-vm",
+                                "purpose":  "Force git diff capture and independent reviewer-agent audit for the current evidence folder."
+                            },
+                            {
+                                "command":  "watch-evidence",
+                                "script":  "watch_evidence_loop.ps1",
+                                "runs_on":  "host-or-vm",
+                                "purpose":  "Passively watch evidence folders with FileSystemWatcher and trigger review-evidence on file changes."
+                            }
+                        ],
+    "experimental_or_legacy_assets":  [
+                                          "full_local_restore.ps1",
+                                          "restore_local_vars.ps1",
+                                          "import_global_lbl*.ps1",
+                                          "probe_*.ps1",
+                                          "tmp_*",
+                                          "evidence_*",
+                                          "remote_*",
+                                          "vm103_*.png"
+                                      ],
+    "acceptance_gate":  [
+                            "KV STUDIO project opens in the interactive desktop",
+                            "program logic is imported or rebuilt through an accepted route",
+                            "MNM import is followed by MNM export from the same project/module",
+                            "roundtrip_mnm.ps1 reports matching executable instruction fingerprints for LD/LDB/AND/ANB/OUT/SET/RES/END/ENDH",
+                            "variables and data types are registered in a compiler-accepted shape",
+                            "Ctrl+F9/Ctrl+F2 conversion succeeds",
+                            "evidence directory contains screenshot, UI dump, and copied conversion result",
+                            "evidence loop audit.html records review path, execution path, diff artifacts, latest reviewer result, and implementation inbox delivery"
+                        ],
+    "known_limitations":  [
+                              "MNM import without export-and-fingerprint comparison is only process evidence, not acceptance evidence.",
+                              "The isolated VM smoke gate validates skill/tool availability and MNM generation, not full KV STUDIO compile or customer-program correctness.",
+                              "Some older scripts are retained as evidence and must not be treated as stable automation."
+                          ]
+}

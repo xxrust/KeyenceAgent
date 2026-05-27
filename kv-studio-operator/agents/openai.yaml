@@ -1,0 +1,4 @@
+interface:
+  display_name: "KV STUDIO Operator"
+  short_description: "Operate KV STUDIO safely and verify builds."
+  default_prompt: "Use this skill to operate KV STUDIO with keyboard-driven project, MNM, variable, FB import, and compile workflows."
