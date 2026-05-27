@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent Harness Project Standard"
+  short_description: "Build agent projects as harnesses."
+  default_prompt: "Create or revise this agent-driven project so it follows the harness standard: scaffold inputs, hard preflight gates, deterministic runner, same-run artifacts, explicit oracles, structured failures, and repeatable validation."
