@@ -23,7 +23,9 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 $checklistGuard = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'assert_kv_operation_checklist.ps1'
 if (-not (Test-Path -LiteralPath $checklistGuard)) { throw "Checklist guard script not found: $checklistGuard" }
+$global:LASTEXITCODE = 0
 & $checklistGuard -ChecklistPath $ChecklistPath -SearchRoots @($OutDir, $ProjectPath, $GlobalVariablesTsv, $LocalVariablesTsv) -OperationName 'set KV STUDIO variables' | Out-Null
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing

@@ -73,7 +73,10 @@ if ($manifest.checklist) { $manifestChecklist = Resolve-ScaffoldPath ([string]$m
 if (-not $ChecklistPath -and $manifestChecklist) { $ChecklistPath = $manifestChecklist }
 $checklistGuard = Join-Path $scriptRoot 'assert_kv_operation_checklist.ps1'
 if (-not (Test-Path -LiteralPath $checklistGuard)) { throw "Checklist guard script not found: $checklistGuard" }
-$checklistResult = (& $checklistGuard -ChecklistPath $ChecklistPath -SearchRoots @($ScaffoldRoot, $OutRoot) -OperationName 'run KV STUDIO MVP scaffold' | ConvertFrom-Json)
+$global:LASTEXITCODE = 0
+$checklistJson = & $checklistGuard -ChecklistPath $ChecklistPath -SearchRoots @($ScaffoldRoot, $OutRoot) -OperationName 'run KV STUDIO MVP scaffold'
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$checklistResult = ($checklistJson | ConvertFrom-Json)
 $ChecklistPath = [string]$checklistResult.checklist_path
 
 if (-not $ProjectName) { $ProjectName = [string]$manifest.project.name }

@@ -6,6 +6,23 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+function Stop-ChecklistGuard([string]$ErrorCode, [string]$Message, [int]$ExitCode) {
+  $payload = [ordered]@{
+    ok = $false
+    error_code = $ErrorCode
+    operation = $OperationName
+    message = $Message
+    remediation = @(
+      'Create or restore CHECKLIST.md in the scaffold/run tree.',
+      'Or pass -ChecklistPath <path>.',
+      'Or set KV_STUDIO_OPERATION_CHECKLIST=<path>.'
+    )
+  }
+  $json = ($payload | ConvertTo-Json -Depth 4 -Compress)
+  [Console]::Error.WriteLine("KV_CHECKLIST_GUARD_FAILED $json")
+  exit $ExitCode
+}
+
 function Get-ParentChain([string]$Path) {
   $result = @()
   if (-not $Path) { return $result }
@@ -48,18 +65,27 @@ foreach ($candidate in ($candidates | Where-Object { $_ } | Select-Object -Uniqu
 }
 
 if (-not $checklist) {
-  throw "KV STUDIO operation checklist is required before $OperationName. Provide -ChecklistPath, set KV_STUDIO_OPERATION_CHECKLIST, or place CHECKLIST.md above the run/scaffold path."
+  Stop-ChecklistGuard `
+    'KV_CHECKLIST_MISSING' `
+    "KV STUDIO operation checklist is required before $OperationName." `
+    23
 }
 
 $content = [IO.File]::ReadAllText($checklist, [Text.Encoding]::UTF8)
 if ([string]::IsNullOrWhiteSpace($content)) {
-  throw "KV STUDIO operation checklist is empty: $checklist"
+  Stop-ChecklistGuard `
+    'KV_CHECKLIST_EMPTY' `
+    "KV STUDIO operation checklist is empty: $checklist" `
+    24
 }
 
 $requiredTerms = @('Checklist', 'KV STUDIO', 'Steps')
 $missing = @($requiredTerms | Where-Object { -not $content.Contains($_) })
 if ($missing.Count -gt 0) {
-  throw "KV STUDIO operation checklist is missing required section marker(s): $($missing -join ', '). Path=$checklist"
+  Stop-ChecklistGuard `
+    'KV_CHECKLIST_INVALID' `
+    "KV STUDIO operation checklist is missing required section marker(s): $($missing -join ', '). Path=$checklist" `
+    25
 }
 
 [pscustomobject]@{

@@ -22,7 +22,9 @@ New-Item -ItemType Directory -Force -Path $out | Out-Null
 
 $checklistGuard = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'assert_kv_operation_checklist.ps1'
 if (-not (Test-Path -LiteralPath $checklistGuard)) { throw "Checklist guard script not found: $checklistGuard" }
+$global:LASTEXITCODE = 0
 & $checklistGuard -ChecklistPath $ChecklistPath -SearchRoots @($out, $project, $MnmPath) -OperationName 'import MNM into KV STUDIO' | Out-Null
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Set-Content -LiteralPath (Join-Path $out 'bootstrap.log') -Value ((Get-Date -Format s) + ' bootstrap start') -Encoding UTF8
 function Log($m){Add-Content -LiteralPath (Join-Path $out 'run.log') -Value ((Get-Date -Format s)+' '+$m) -Encoding UTF8}
