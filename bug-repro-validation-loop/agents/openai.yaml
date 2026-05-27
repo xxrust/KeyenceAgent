@@ -1,4 +1,0 @@
-interface:
-  display_name: "Bug 复现验证闭环"
-  short_description: "复现、修复并验证 Bug，禁止懒惰归因。"
-  default_prompt: "使用 $bug-repro-validation-loop，沿用户真实触发路径复现问题，证明根因，避免用兜底掩盖未诊断失败，并在汇报前运行自动验证。"
