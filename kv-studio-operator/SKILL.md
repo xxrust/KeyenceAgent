@@ -75,6 +75,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_m
   -TimeoutSeconds 600
 ```
 
+For multi-MNM stages that must prove local variables independently of compile, run the scaffold with `-AuditVariablePersistence`. The runner will close/reopen the variable editor, copy each module's local grid, and match expected local names before compile.
+
 Run repeat gate:
 
 ```powershell
@@ -132,6 +134,7 @@ MNM module type:
 Agents normally call only:
 
 - `scripts\new_kv_mvp_scaffold.ps1`
+- `scripts\new_kv_mvp_multi_mnm_scaffold.ps1`
 - `scripts\validate_kv_mvp_scaffold.ps1`
 - `scripts\run_kv_mvp_scaffold.ps1`
 - `scripts\run_kv_mvp_repeat.ps1`

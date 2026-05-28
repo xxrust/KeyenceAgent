@@ -646,11 +646,6 @@ function Convert-LocalRows([string]$Path) {
     @(
       $row.name
       $row.data_type
-    ) -join "`t"
-    continue
-    @(
-      $row.name
-      $row.data_type
       ''
       'False'
       'False'

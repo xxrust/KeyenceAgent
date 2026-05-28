@@ -7,7 +7,8 @@
   [string]$CpuModel = '',
   [string]$KvsExe = '',
   [string]$ChecklistPath = '',
-  [int]$TimeoutSeconds = 600
+  [int]$TimeoutSeconds = 600,
+  [switch]$AuditVariablePersistence
 )
 
 $ErrorActionPreference = 'Stop'
@@ -453,6 +454,9 @@ try {
     )
     if ($globalVariablesPasted -or [int]$mergedGlobal.executable_global_variable_count -eq 0) {
       $setArgs += '-SkipGlobal'
+    }
+    if ($AuditVariablePersistence) {
+      $setArgs += '-AuditPersistence'
     }
     Invoke-MvpStep "set_variables_$($entry.module_name)" 'set_variables_guarded.ps1' $setArgs
     if ([int]$mergedGlobal.executable_global_variable_count -gt 0) { $globalVariablesPasted = $true }

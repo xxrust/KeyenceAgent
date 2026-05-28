@@ -99,6 +99,7 @@ $contract = [ordered]@{
   script_owned_phase = 'from first KV STUDIO launch through compile result copy'
   public_agent_entrypoints = @(
     'new_kv_mvp_scaffold.ps1',
+    'new_kv_mvp_multi_mnm_scaffold.ps1',
     'validate_kv_mvp_scaffold.ps1',
     'run_kv_mvp_scaffold.ps1',
     'run_kv_mvp_repeat.ps1'
