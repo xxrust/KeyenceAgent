@@ -428,7 +428,7 @@ try {
       '-ProjectSearchRoot', (Join-Path $projectRoot $ProjectName),
       '-ChecklistPath', $ChecklistPath,
       '-SaveAfterImport',
-      '-RestartKvs', '$true'
+      '-RestartKvs', '$false'
     )
     if ($KvsExe) { $importArgs += @('-KvsExe', $KvsExe) }
     Invoke-MvpStep "import_mnm_$($i + 1)" 'import_mnm_guarded.ps1' $importArgs

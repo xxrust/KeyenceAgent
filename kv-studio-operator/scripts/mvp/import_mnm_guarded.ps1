@@ -1602,22 +1602,37 @@ try{
   if(-not (Test-Path -LiteralPath $kvs)){ throw "KvsExe not found: $kvs" }
   if($MnmPath -and -not (Test-Path -LiteralPath $MnmPath)){ throw "MnmPath not found: $MnmPath" }
   AssertMnmChineseEncoding $MnmPath
+  $expectedProjectNeedle=[IO.Path]::GetFileNameWithoutExtension($project)
   if($RestartKvs){
     Get-Process Kvs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
   }
-  $p = Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' } | Select-Object -First 1
+  $p = Get-Process Kvs -ErrorAction SilentlyContinue |
+    Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like ('*'+$expectedProjectNeedle+'*') } |
+    Select-Object -First 1
+  if(-not $p){
+    $p = Get-Process Kvs -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' } |
+      Select-Object -First 1
+  }
   if(-not $p){
     Start-Process -FilePath $kvs -ArgumentList ('"'+$project+'"') | Out-Null
   }
   $deadline=(Get-Date).AddSeconds(90)
-  do {
-    Start-Sleep -Seconds 2
-    $p=Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' } | Select-Object -First 1
-  } while((-not $p) -and (Get-Date) -lt $deadline)
+  while((-not $p) -and (Get-Date) -lt $deadline) {
+    Start-Sleep -Milliseconds 500
+    $p=Get-Process Kvs -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like ('*'+$expectedProjectNeedle+'*') } |
+      Select-Object -First 1
+    if(-not $p){
+      $p=Get-Process Kvs -ErrorAction SilentlyContinue |
+        Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' } |
+        Select-Object -First 1
+    }
+  }
   if(-not $p){ throw 'Kvs visible main window not found after start' }
   [void](ForceKvStudioForeground ([IntPtr]$p.MainWindowHandle))
-  Start-Sleep -Seconds 1
+  Start-Sleep -Milliseconds 150
   [void](ForceKvStudioForeground ([IntPtr]$p.MainWindowHandle))
   if(-not (WaitKvsMainWindowReady 90)){
     throw 'KV STUDIO main window did not become ready.'
@@ -1625,10 +1640,9 @@ try{
   if(-not (WaitKvInteractive 60)){
     throw 'KV STUDIO main window still shows splash/loader; refusing menu route.'
   }
-  $expectedProjectNeedle=[IO.Path]::GetFileNameWithoutExtension($project)
   SetKvGuardTarget ([IntPtr]$p.MainWindowHandle) ('KV STUDIO*'+$expectedProjectNeedle+'*')
   AssertKvStudioForeground 'MNM import startup' $expectedProjectNeedle
-  Start-Sleep -Seconds 2
+  if($RestartKvs){ Start-Sleep -Seconds 2 } else { Start-Sleep -Milliseconds 200 }
   Shot '00_before_import.png'
   DismissInstructionErrorDialogs 'before_import'
   DismissUnitConfigDialogIfPresent 'before_import' | Out-Null
