@@ -9,7 +9,7 @@ param(
   [int]$TimeoutSeconds = 600,
   [switch]$AuditVariablePersistence,
   [ValidateSet('Full','NameType')]
-  [string]$LocalPasteFormat = 'Full',
+  [string]$LocalPasteFormat = 'NameType',
   [int]$RequiredConsecutivePasses = 3,
   [int]$MaxAttempts = 6,
   [int]$StopAfterSameFailureCount = 3

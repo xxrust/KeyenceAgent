@@ -10,7 +10,7 @@
   [int]$TimeoutSeconds = 600,
   [switch]$AuditVariablePersistence,
   [ValidateSet('Full','NameType')]
-  [string]$LocalPasteFormat = 'Full'
+  [string]$LocalPasteFormat = 'NameType'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -528,6 +528,7 @@ try {
       -WorkspaceRoot (Join-Path $artifactRoot 'future_updates') `
       -TaskId 'baseline_source_snapshot' `
       -SeedScaffoldRoot $ScaffoldRoot `
+      -SeedTrust SameRunSkillBaseline `
       -ForceNewSnapshot
     if ($LASTEXITCODE -ne 0) { throw "Baseline source snapshot creation failed for project: $projectPath" }
     $script:baselineSourceSnapshotResult = $baselineJson | ConvertFrom-Json

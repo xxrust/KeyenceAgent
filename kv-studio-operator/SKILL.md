@@ -76,6 +76,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\validate
   -OutDir (Join-Path $ScaffoldRoot '_validation')
 ```
 
+Validate variable definition files directly:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\assert_kv_variable_definitions.ps1" `
+  -TsvPath '<module-global.tsv>','<module-local.tsv>' `
+  -Scope any `
+  -ExpectedOwnerProgram '<module-name>' `
+  -OutPath '<out>\variable_definition_validation.json'
+```
+
 Run scaffold:
 
 ```powershell
@@ -91,8 +101,7 @@ Repair an existing project from a corrected scaffold:
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\new_kv_existing_project_update_workspace.ps1" `
   -ProjectPath '<existing-project.kpr>' `
   -WorkspaceRoot (Join-Path $WorkRoot 'existing_project_updates') `
-  -TaskId '<task-id>' `
-  -SeedScaffoldRoot $ScaffoldRoot
+  -TaskId '<task-id>'
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\assert_kv_existing_project_snapshot.ps1" `
   -ProjectPath '<existing-project.kpr>' `
@@ -105,10 +114,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_m
   -SourceSnapshotManifestPath (Join-Path $WorkRoot 'existing_project_updates\<task-id>\source_snapshot_manifest.json') `
   -OutRoot (Join-Path $WorkRoot 'mvp_repair_runs') `
   -DeleteExistingModulesBeforeImport `
+  -LocalPasteFormat NameType `
   -TimeoutSeconds 600
 ```
 
-For projects not created by this skill, do not use `-SeedScaffoldRoot` as proof. Export current MNM files and variable manifests from the exact project into the workspace snapshot, record inventory evidence, then set `source_snapshot_manifest.json.status` to `ready`. If the project directory hash differs from the last parsed snapshot, the gate fails and a fresh export is required.
+For projects not created by this skill, do not use `-SeedScaffoldRoot` as proof. Export current MNM files and variable manifests from the exact project into the workspace snapshot, record inventory evidence, then set `source_snapshot_manifest.json.status` to `ready`. If the project directory hash differs from the last parsed snapshot, the gate fails and a fresh export is required. `-SeedTrust SameRunSkillBaseline` is reserved for `run_kv_mvp_scaffold.ps1` baseline snapshots produced immediately after that same runner creates and compiles the project.
 
 For multi-MNM stages that must prove local variables independently of compile, run the scaffold with `-AuditVariablePersistence`. The runner will close/reopen the variable editor, copy each module's local grid, and match expected local names before compile.
 
@@ -163,6 +173,7 @@ MNM module type:
 ## Hard Gates
 
 - Checklist gate: every KV STUDIO operation must pass `scripts\assert_kv_operation_checklist.ps1`.
+- Variable definition gate: every generated or edited variable TSV must pass `scripts\assert_kv_variable_definitions.ps1` or the equivalent shared validator before KV STUDIO opens.
 - Existing-project source gate: before modifying an existing `.kpr`, `scripts\assert_kv_existing_project_snapshot.ps1` must prove that the current project fingerprint matches a ready source snapshot containing MNM files, variable manifests, inventory evidence, and an open architecture file.
 - Scaffold gate: an existing scaffold must pass `scripts\validate_kv_mvp_scaffold.ps1` before runner use.
 - UI guard gate: the runner must pass `scripts\assert_kv_mvp_ui_guard_usage.ps1` before touching KV STUDIO.
@@ -180,6 +191,7 @@ Agents normally call only:
 - `scripts\new_kv_mvp_multi_mnm_scaffold.ps1`
 - `scripts\new_kv_existing_project_update_workspace.ps1`
 - `scripts\assert_kv_existing_project_snapshot.ps1`
+- `scripts\assert_kv_variable_definitions.ps1`
 - `scripts\validate_kv_mvp_scaffold.ps1`
 - `scripts\run_kv_mvp_scaffold.ps1`
 - `scripts\run_kv_mvp_repair_existing_project.ps1`
@@ -230,6 +242,7 @@ Common gate codes:
 - `KV_CHECKLIST_MISSING`, `KV_CHECKLIST_EMPTY`, `KV_CHECKLIST_INVALID`
 - `KV_SCAFFOLD_REQUIRED_FILE_MISSING`, `KV_SCAFFOLD_TSV_SCHEMA_INVALID`, `KV_SCAFFOLD_MNM_MODULE_TYPE_MISMATCH`
 - `KV_SOURCE_SNAPSHOT_MANIFEST_MISSING`, `KV_SOURCE_SNAPSHOT_NOT_READY`, `KV_SOURCE_SNAPSHOT_STALE`, `KV_SOURCE_SNAPSHOT_MNM_EMPTY`, `KV_SOURCE_SNAPSHOT_VARIABLES_EMPTY`, `KV_UPDATE_ARCHITECTURE_FILE_MISSING`
+- `KV_VARIABLE_DATA_TYPE_UNSUPPORTED`, `KV_VARIABLE_TSV_SCHEMA_INVALID`, `KV_VARIABLE_NAME_SOFT_DEVICE_CONFLICT`, `KV_VARIABLE_LOCAL_OWNER_MISMATCH`
 - `KV_UI_GUARD_STATIC_VIOLATION`
 - `KV_FOCUS_LOST`, `KV_FOCUS_LOST_TERMINAL`, `KV_MODAL_PRESENT`
 - `KV_VARIABLE_PASTE_NOT_PERSISTED`

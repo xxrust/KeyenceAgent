@@ -13,7 +13,7 @@ param(
   [int]$TimeoutSeconds = 600,
   [switch]$AuditVariablePersistence,
   [ValidateSet('Full','NameType')]
-  [string]$LocalPasteFormat = 'Full',
+  [string]$LocalPasteFormat = 'NameType',
   [switch]$DeleteExistingModulesBeforeImport
 )
 
@@ -350,7 +350,8 @@ try {
       '-LocalProgramName', $entry.module_name,
       '-LocalPasteFormat', $LocalPasteFormat,
       '-ChecklistPath', $ChecklistPath,
-      '-OutDir', $moduleOutDir
+      '-OutDir', $moduleOutDir,
+      '-AppendGlobalVariables'
     )
     if ($globalVariablesPasted -or [int]$mergedGlobal.executable_global_variable_count -eq 0) { $setArgs += '-SkipGlobal' }
     if ($AuditVariablePersistence) {

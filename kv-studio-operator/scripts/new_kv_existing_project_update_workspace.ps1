@@ -7,6 +7,8 @@ param(
 
   [string]$TaskId = ('kv_update_' + (Get-Date -Format 'yyyyMMdd_HHmmss')),
   [string]$SeedScaffoldRoot = '',
+  [ValidateSet('None','SameRunSkillBaseline')]
+  [string]$SeedTrust = 'None',
   [switch]$ForceNewSnapshot
 )
 
@@ -172,7 +174,8 @@ $architecture | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $architectur
 $mnmCount = @(Get-ChildItem -LiteralPath $mnmDir -File -Filter '*.mnm' -ErrorAction SilentlyContinue).Count
 $variableCount = @(Get-ChildItem -LiteralPath $variablesDir -File -Recurse -ErrorAction SilentlyContinue |
   Where-Object { $_.Extension -in @('.tsv', '.csv', '.json') }).Count
-$status = if ($mnmCount -gt 0 -and $variableCount -gt 0) { 'ready' } else { 'export_required' }
+$status = if ($mnmCount -gt 0 -and $variableCount -gt 0 -and $SeedTrust -eq 'SameRunSkillBaseline') { 'ready' } else { 'export_required' }
+$errorCode = if ($status -eq 'ready') { '' } else { 'KV_SOURCE_SNAPSHOT_EXPORT_REQUIRED' }
 
 $manifest = [ordered]@{
   schema_version = 1
@@ -186,7 +189,8 @@ $manifest = [ordered]@{
   project_fingerprint = $fingerprint
   snapshot = [ordered]@{
     path = ConvertTo-RelativePath $taskRoot $snapshotDir
-    basis = if ($SeedScaffoldRoot) { 'seeded_from_scaffold_and_bound_to_current_project_fingerprint' } else { 'fresh_export_required' }
+    basis = if ($SeedTrust -eq 'SameRunSkillBaseline') { 'same_run_skill_baseline_seed_bound_to_current_project_fingerprint' } elseif ($SeedScaffoldRoot) { 'seed_files_present_but_not_trusted_as_current_project_export' } else { 'fresh_export_required' }
+    seed_trust = $SeedTrust
   }
   artifacts = [ordered]@{
     mnm_dir = ConvertTo-RelativePath $taskRoot $mnmDir
@@ -228,6 +232,7 @@ $readme | Set-Content -LiteralPath (Join-Path $taskRoot 'README.md') -Encoding U
 $ok = ($status -eq 'ready')
 $result = [ordered]@{
   ok = $ok
+  error_code = $errorCode
   reused = $false
   status = $status
   task_root = $taskRoot
@@ -236,12 +241,13 @@ $result = [ordered]@{
   source_snapshot_manifest = $manifestPath
   architecture_path = $architecturePath
   seeded_from_scaffold = [bool]$SeedScaffoldRoot
+  seed_trust = $SeedTrust
   mnm_count = $mnmCount
   variable_manifest_count = $variableCount
   message = if ($ok) {
     'Snapshot workspace is ready and bound to the current project fingerprint.'
   } else {
-    'Snapshot workspace created, but current MNM and variable exports are required before updating this project.'
+    'KV_SOURCE_SNAPSHOT_EXPORT_REQUIRED: snapshot workspace created, but current MNM and variable exports are required before updating this project.'
   }
 }
 $result | ConvertTo-Json -Depth 8

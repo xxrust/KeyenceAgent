@@ -18,7 +18,9 @@
 
   [string]$ForbiddenLocalNamesCsv = '',
   [ValidateSet('Full','NameType')]
-  [string]$LocalPasteFormat = 'Full',
+  [string]$LocalPasteFormat = 'NameType',
+
+  [switch]$AppendGlobalVariables,
 
   [string]$ChecklistPath = '',
 
@@ -39,6 +41,11 @@ $sharedUiGuard = Join-Path (Split-Path -Parent $PSCommandPath) 'kv_ui_guard.ps1'
 if (-not (Test-Path -LiteralPath $sharedUiGuard)) { throw "Shared KV UI guard script not found: $sharedUiGuard" }
 . $sharedUiGuard
 Initialize-KvUiGuard -OutDir $OutDir -CheckpointSubdir 'shared_ui_guard_checkpoints'
+
+$operatorScriptRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
+$variableDefinitionLib = Join-Path $operatorScriptRoot 'kv_variable_definition_lib.ps1'
+if (-not (Test-Path -LiteralPath $variableDefinitionLib)) { throw "KV variable definition library not found: $variableDefinitionLib" }
+. $variableDefinitionLib
 
 $checklistGuard = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'assert_kv_operation_checklist.ps1'
 if (-not (Test-Path -LiteralPath $checklistGuard)) { throw "Checklist guard script not found: $checklistGuard" }
@@ -675,12 +682,18 @@ function Get-KvsModalErrorCode([string]$Text) {
   if ($Text -like '*粘贴数据中存在错误*' -or $Text -like '*已跳过部分数据粘贴*') {
     return 'KV_VARIABLE_PASTE_DATA_ERROR'
   }
+  if ($Text -like '*变量名被更改*' -or $Text -like '*要覆盖吗*' -or $Text -like '*粘贴目标*复制源*') {
+    return 'KV_VARIABLE_OVERWRITE_CONFIRMATION'
+  }
   return 'KV_MODAL_PRESENT'
 }
 
 function Assert-NoKvsModalFast([int]$ProcessIdValue, [string]$Stage) {
   foreach ($window in (Get-TopLevelWindowElementsForProcess $ProcessIdValue)) {
-    if ([string]$window.Current.ClassName -eq '#32770' -and [string]$window.Current.Name -eq 'KV STUDIO') {
+    $className = [string]$window.Current.ClassName
+    $windowName = [string]$window.Current.Name
+    $automationId = [string]$window.Current.AutomationId
+    if (($className -eq '#32770' -and $windowName -eq 'KV STUDIO') -or $automationId -eq 'PasteConfirmationForm') {
       $modal = Get-KvsModalEvidence $window $Stage
       $code = Get-KvsModalErrorCode $modal.text
       Fail-Guard $code $Stage "KV STUDIO modal dialog detected at $Stage. text=$($modal.text)" @($modal.dump_path, $modal.text_path)
@@ -725,6 +738,22 @@ function Assert-NoSoftDeviceLikeVariableNames([object[]]$Rows, [string]$Scope, [
     $evidencePath = Join-Path $OutDir "${Scope}_soft_device_like_variable_names.txt"
     Set-Content -LiteralPath $evidencePath -Value ($bad -join "`r`n") -Encoding UTF8
     Fail-Guard 'KV_VARIABLE_NAME_SOFT_DEVICE_CONFLICT' "preflight $Scope variable names" "Variable name(s) look like KV soft-device names and are rejected before paste: $($bad -join ', '). Source=$SourcePath" @($SourcePath, $evidencePath)
+  }
+}
+
+function Assert-KvVariableDefinitionsBeforePaste([object[]]$Rows, [string]$Scope, [string]$SourcePath, [string]$ExpectedOwnerProgram = '') {
+  $errors = @(Get-KvVariableDefinitionErrors -Rows $Rows -Scope $Scope -SourcePath $SourcePath -ExpectedOwnerProgram $ExpectedOwnerProgram)
+  if ($errors.Count -gt 0) {
+    $evidencePath = Join-Path $OutDir "${Scope}_variable_definition_errors.json"
+    [pscustomobject]@{
+      ok = $false
+      source = $SourcePath
+      scope = $Scope
+      supported_type_pattern = Get-KvVariableSupportedTypePatternText
+      errors = $errors
+    } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $evidencePath -Encoding UTF8
+    $first = $errors[0]
+    Fail-Guard ([string]$first.code) "preflight $Scope variable definitions" ([string]$first.message) @($SourcePath, $evidencePath)
   }
 }
 
@@ -781,9 +810,11 @@ function Assert-NoKvsModal([int]$ProcessIdValue, [string]$Stage) {
   )
   for ($i = 0; $i -lt $items.Count; $i++) {
     $item = $items.Item($i)
+    $className = [string]$item.Current.ClassName
+    $windowName = [string]$item.Current.Name
+    $automationId = [string]$item.Current.AutomationId
     if ([string]$item.Current.ControlType.ProgrammaticName -eq 'ControlType.Window' -and
-        [string]$item.Current.ClassName -eq '#32770' -and
-        [string]$item.Current.Name -eq 'KV STUDIO') {
+        (($className -eq '#32770' -and $windowName -eq 'KV STUDIO') -or $automationId -eq 'PasteConfirmationForm')) {
       $modal = Get-KvsModalEvidence $item $Stage
       $code = Get-KvsModalErrorCode $modal.text
       Fail-Guard $code $Stage "KV STUDIO modal dialog detected. text=$($modal.text)" @($modal.dump_path, $modal.text_path)
@@ -918,9 +949,13 @@ function Paste-GlobalVariablesByFirstNameTab($Form, [string]$Text) {
   $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
   $formNow = Invoke-GuardedVariableKeyAction $formNow 'global first-name Tab' '{TAB}' 'Tab to select first global variable name cell' 150
   Log 'sent guarded Tab to select first global variable name cell'
+  if ($AppendGlobalVariables) {
+    $formNow = Invoke-GuardedVariableKeyAction $formNow 'global last-row PgDn' '{PGDN}' 'PgDn to move to last global variable row before append paste' 250
+    Log 'sent guarded PgDn to move to last global variable row for append paste'
+  }
 
   $formNow = Invoke-GuardedVariablePaste $formNow 'global variables Ctrl+V' $Text 'Ctrl+V global variables from first name cell' 300
-  Log "pasted global variables from first name cell text length=$($Text.Length)"
+  Log "pasted global variables text length=$($Text.Length) append=$($AppendGlobalVariables.IsPresent)"
 }
 
 function Paste-LocalVariablesByTabPgDn($Form, [string]$Text, [string]$ProgramName) {
@@ -1030,12 +1065,12 @@ try {
   Set-CapsLockState $true $process.MainWindowHandle "KV STUDIO*$projectNeedle*" 'set variables start'
   Assert-NoDirectInputFast $process.Id 'before variable editing'
 
-  $globalText = Convert-GlobalRows $GlobalVariablesTsv
-  $localText = Convert-LocalRows $LocalVariablesTsv
   $globalRows = Get-DefinedVariableRows $GlobalVariablesTsv 'global'
   $localRows = Get-DefinedVariableRows $LocalVariablesTsv 'local'
-  Assert-NoSoftDeviceLikeVariableNames $globalRows 'global' $GlobalVariablesTsv
-  Assert-NoSoftDeviceLikeVariableNames $localRows 'local' $LocalVariablesTsv
+  Assert-KvVariableDefinitionsBeforePaste $globalRows 'global' $GlobalVariablesTsv
+  Assert-KvVariableDefinitionsBeforePaste $localRows 'local' $LocalVariablesTsv $LocalProgramName
+  $globalText = Convert-GlobalRows $GlobalVariablesTsv
+  $localText = Convert-LocalRows $LocalVariablesTsv
   $definedGlobalNames = @($globalRows | ForEach-Object { [string]$_.name } | Where-Object { $_ })
   $definedLocalNames = @($localRows | ForEach-Object { [string]$_.name } | Where-Object { $_ })
   Log "decoded executable global variable rows=$($definedGlobalNames.Count): $($definedGlobalNames -join ',')"
@@ -1127,6 +1162,7 @@ try {
     GlobalNames = $definedGlobalNames
     LocalNames = $definedLocalNames
     GlobalVariableFileScanOk = $globalFileScan.Ok
+    GlobalPasteRoute = if ($globalRows.Count -gt 0) { if ($AppendGlobalVariables) { 'global tab -> Tab -> PgDn -> Ctrl+V' } else { 'global tab -> Tab -> Ctrl+V' } } else { 'skipped: no executable global variables' }
     LocalVariableValidationBasis = if ($AuditPersistence) { 'guarded close/reopen/copy verification from the KV STUDIO local-variable grid' } else { 'fast mode: local persistence is deferred to compile gate unless AuditPersistence is enabled' }
     LocalReopenClipboardPath = $localReopenClipboardPath
     LocalReopenClipboardContainsExpectedNames = if ($AuditPersistence -and $localRows.Count -gt 0) { $true } else { $null }

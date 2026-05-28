@@ -6,6 +6,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$scriptRoot = Split-Path -Parent $PSCommandPath
+. (Join-Path $scriptRoot 'kv_variable_definition_lib.ps1')
 
 $ModelPath = [IO.Path]::GetFullPath($ModelPath)
 if (-not (Test-Path -LiteralPath $ModelPath -PathType Leaf)) {
@@ -49,6 +51,12 @@ function New-VariableTsv([string]$Scope, [string]$OwnerProgram, [object[]]$Rows,
   foreach ($row in @($Rows)) {
     if (-not $row.name) { throw "Variable row in $OwnerProgram/$Scope is missing name." }
     if (-not $row.data_type) { throw "Variable row $($row.name) in $OwnerProgram/$Scope is missing data_type." }
+    if (Test-KvSoftDeviceLikeVariableName ([string]$row.name)) {
+      throw "Variable row $($row.name) in $OwnerProgram/$Scope looks like a KV soft-device name. Use a normal variable identifier and put device mapping in the device field."
+    }
+    if (-not (Test-KvVariableDataType ([string]$row.data_type))) {
+      throw "Variable row $($row.name) in $OwnerProgram/$Scope has unsupported data_type '$($row.data_type)'. Supported pattern: $(Get-KvVariableSupportedTypePatternText)"
+    }
     $lines += @(
       $Scope
       $(if ($Scope -eq 'local') { $OwnerProgram } else { '' })

@@ -7,6 +7,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$scriptRoot = Split-Path -Parent $PSCommandPath
+. (Join-Path $scriptRoot 'kv_variable_definition_lib.ps1')
 
 if (-not $OutDir) {
   $OutDir = Join-Path $ScaffoldRoot '_validation'
@@ -101,7 +103,24 @@ function Assert-NoSoftDeviceLikeVariableRows([object[]]$Rows, [string]$Scope, [s
   }
 }
 
+function Assert-KvVariableDefinitions([object[]]$Rows, [string]$Scope, [string]$Path, [string]$ExpectedOwnerProgram = '') {
+  $errors = @(Get-KvVariableDefinitionErrors -Rows $Rows -Scope $Scope -SourcePath $Path -ExpectedOwnerProgram $ExpectedOwnerProgram)
+  if ($errors.Count -gt 0) {
+    $evidencePath = Join-Path $OutDir ("variable_definition_errors_{0}_{1}.json" -f $Scope, ([IO.Path]::GetFileNameWithoutExtension($Path)))
+    [pscustomobject]@{
+      ok = $false
+      source = $Path
+      scope = $Scope
+      supported_type_pattern = Get-KvVariableSupportedTypePatternText
+      errors = $errors
+    } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $evidencePath -Encoding UTF8
+    $first = $errors[0]
+    Stop-ScaffoldValidation ([string]$first.code) ([string]$first.message) @($Path, $evidencePath)
+  }
+}
+
 function Get-FileHashText([string]$Path) {
+  if ([string]::IsNullOrWhiteSpace($Path)) { return '' }
   if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return '' }
   (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
 }
@@ -177,8 +196,8 @@ foreach ($entry in $mnmEntries) {
   $localRows = Read-TsvRows $entryLocalTsv $requiredTsvColumns "local variable TSV for $moduleName"
   $definedGlobalRows = @(Get-ExecutableRows $globalRows 'global')
   $definedLocalRows = @(Get-ExecutableRows $localRows 'local')
-  Assert-NoSoftDeviceLikeVariableRows $definedGlobalRows 'global' $entryGlobalTsv
-  Assert-NoSoftDeviceLikeVariableRows $definedLocalRows 'local' $entryLocalTsv
+  Assert-KvVariableDefinitions $definedGlobalRows 'global' $entryGlobalTsv
+  Assert-KvVariableDefinitions $definedLocalRows 'local' $entryLocalTsv $moduleName
   if ($definedLocalRows.Count -eq 0) {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_LOCAL_VARIABLES_EMPTY' "local variable TSV must contain executable local rows for module/program $moduleName." @($entryLocalTsv)
   }
