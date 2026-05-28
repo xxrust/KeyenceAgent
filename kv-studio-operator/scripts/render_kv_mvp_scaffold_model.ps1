@@ -70,7 +70,7 @@ function New-MnmText($Module) {
   $moduleType = if ($null -ne $Module.module_type -and [string]$Module.module_type -ne '') { [int]$Module.module_type } else { 0 }
   $comment = if ($Module.mnm.comment) { [string]$Module.mnm.comment } else { "Generated scan module $moduleName." }
   $instructions = @($Module.mnm.instructions | ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })
-  $stLines = @($Module.mnm.st_lines | ForEach-Object { [string]$_ })
+  $stLines = @($Module.mnm.st_lines | ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })
   if ($instructions.Count -eq 0 -and $stLines.Count -eq 0) { throw "Module $moduleName has neither mnm.instructions nor mnm.st_lines." }
   $lines = @(
     'DEVICE:63'

@@ -115,6 +115,8 @@ function ConvertTo-KvVariableTsvLine {
 function Get-KvVariableDefinitionErrors {
   param(
     [Parameter(Mandatory=$true)]
+    [AllowEmptyCollection()]
+    [AllowNull()]
     [object[]]$Rows,
 
     [ValidateSet('global','local')]
@@ -124,6 +126,7 @@ function Get-KvVariableDefinitionErrors {
     [string]$ExpectedOwnerProgram = ''
   )
 
+  if ($null -eq $Rows) { $Rows = @() }
   $errors = [System.Collections.Generic.List[object]]::new()
   foreach ($row in @($Rows)) {
     if ([string]$row.scope -ne $Scope) { continue }

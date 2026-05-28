@@ -284,7 +284,7 @@ if ($sourceModel) {
         Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' "Generated MNM for $moduleName is missing model instruction: $instruction" @($sourceModelPath, $mnmPath)
       }
     }
-    foreach ($stLine in @($module.mnm.st_lines | ForEach-Object { [string]$_ })) {
+    foreach ($stLine in @($module.mnm.st_lines | ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })) {
       $renderedLine = if ($stLine.StartsWith(';')) { $stLine } else { ';' + $stLine }
       if ($mnmText -notmatch ('(?m)^' + [regex]::Escape($renderedLine) + '\s*$')) {
         Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' "Generated MNM for $moduleName is missing model ST line: $renderedLine" @($sourceModelPath, $mnmPath)
