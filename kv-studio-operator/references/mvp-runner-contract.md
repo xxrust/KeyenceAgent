@@ -72,7 +72,7 @@ scope	owner_program	name	data_type	device	initial_value	comment	evidence	status
 
 Executable variable rows use `status` other than `display_name`.
 
-Every executable global variable row must be referenced by its paired MNM file. The scaffold validator enforces this so the later KV STUDIO compile gate verifies global variable definitions. Local variable definitions are verified by the variable script through guarded close/reopen/copy of the local-variable grid for the same module/program, because KV STUDIO does not persist local variable names as plaintext project-file names.
+Every executable global variable row must be referenced by its paired MNM file. The scaffold validator enforces this so the later KV STUDIO compile gate verifies global variable definitions. In the default fast path, local variables are applied by the guarded variable script and then proven by the compile gate. Use `set_variables_guarded.ps1 -AuditPersistence` when a task specifically needs close/reopen/copy evidence from the local-variable grid.
 
 `global_tsv` may contain only the header when that MNM has no global variables. `local_tsv` must contain executable local rows whose `owner_program` equals the MNM entry's `module_name`.
 

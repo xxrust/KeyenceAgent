@@ -3,6 +3,8 @@
   [string]$OutDir = 'E:\personal_project\rust_plc\out\traffic_light_min_loop_20260525\validation\159_compile_and_copy_result_bounded',
   [string]$ChecklistPath = '',
   [int]$WaitSeconds = 40,
+  [switch]$AuditCompileWait,
+  [switch]$AuditScreenshots,
   [ValidateSet('CtrlF2','CtrlF9')]
   [string]$ConvertAction = 'CtrlF2'
 )
@@ -67,6 +69,10 @@ function Ensure-CapsLockOn {
 
 function Save-Screenshot {
   param([string]$Name)
+  if (-not $AuditScreenshots) {
+    Log "skipped screenshot $Name because AuditScreenshots is disabled"
+    return
+  }
   $bounds = [Windows.Forms.Screen]::PrimaryScreen.Bounds
   $bitmap = [Drawing.Bitmap]::new($bounds.Width, $bounds.Height)
   $graphics = [Drawing.Graphics]::FromImage($bitmap)
@@ -216,30 +222,39 @@ try {
     Log 'sent Ctrl+F2'
   }
 
-  $deadline = (Get-Date).AddSeconds($WaitSeconds)
-  do {
-    Start-Sleep -Milliseconds 500
-    if (Dismiss-ConvertFailureIfPresent $process.Id) { break }
-    $result = Find-ResultArea $process.Id
-    if ($result) {
-      $name = [string]$result.Current.Name
-      if ($name -like '*杞崲缁撴灉*' -or $name -like '*Convert*') { break }
-    }
-  } while ((Get-Date) -lt $deadline)
+  if ($AuditCompileWait) {
+    $deadline = (Get-Date).AddSeconds($WaitSeconds)
+    do {
+      Start-Sleep -Milliseconds 500
+      if (Dismiss-ConvertFailureIfPresent $process.Id) { break }
+      $result = Find-ResultArea $process.Id
+      if ($result) {
+        $name = [string]$result.Current.Name
+        if ($name -like '*杞崲缁撴灉*' -or $name -like '*Convert*') { break }
+      }
+    } while ((Get-Date) -lt $deadline)
+  } else {
+    Start-Sleep -Milliseconds 900
+    Log 'fast compile mode: skipped UIA result-area wait; copy_convert_result step owns compile-result oracle'
+  }
 
   Save-Screenshot '01_after_compile.png'
-  Dismiss-ConvertFailureIfPresent $process.Id | Out-Null
-  $resultArea = Find-ResultArea $process.Id
-  if ($resultArea) {
-    Log 'outputTreeControl1 result area found; text extraction deferred to copy_convert_result_from_tree_handle.ps1'
-  } else {
-    Log 'outputTreeControl1 result area not found; text extraction deferred to copy_convert_result_from_tree_handle.ps1'
+  $resultArea = $null
+  if ($AuditCompileWait) {
+    Dismiss-ConvertFailureIfPresent $process.Id | Out-Null
+    $resultArea = Find-ResultArea $process.Id
+    if ($resultArea) {
+      Log 'outputTreeControl1 result area found; text extraction deferred to copy_convert_result_from_tree_handle.ps1'
+    } else {
+      Log 'outputTreeControl1 result area not found; text extraction deferred to copy_convert_result_from_tree_handle.ps1'
+    }
   }
   [pscustomobject]@{
     ok = $true
     foreground = Get-ForegroundTitle
     result_area_found = [bool]$resultArea
     text_extraction_deferred = $true
+    audit_compile_wait = [bool]$AuditCompileWait
   } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $OutDir 'result.json') -Encoding UTF8
   Log 'done'
   return

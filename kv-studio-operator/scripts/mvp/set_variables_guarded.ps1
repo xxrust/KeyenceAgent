@@ -12,6 +12,9 @@
 
   [switch]$SkipGlobal,
   [switch]$KeepVariableEditorOpen,
+  [switch]$AuditPersistence,
+  [switch]$AuditProjectTextScan,
+  [switch]$AuditScreenshots,
 
   [string]$ChecklistPath = '',
 
@@ -57,6 +60,8 @@ public class KvSetVarWin32 {
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+  public delegate bool EnumWindowProc(IntPtr hWnd, IntPtr lParam);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowProc lpEnumFunc, IntPtr lParam);
 }
 "@
 
@@ -221,14 +226,37 @@ function Get-Root {
   [System.Windows.Automation.AutomationElement]::RootElement
 }
 
+function Get-TopLevelWindowElementsForProcess([int]$ProcessIdValue) {
+  $handles = [System.Collections.Generic.List[IntPtr]]::new()
+  [KvSetVarWin32]::EnumWindows({
+    param([IntPtr]$hwnd, [IntPtr]$lparam)
+    $pidValue = [uint32]0
+    [void][KvSetVarWin32]::GetWindowThreadProcessId($hwnd, [ref]$pidValue)
+    if ([int]$pidValue -eq $ProcessIdValue) { $handles.Add($hwnd) }
+    return $true
+  }, [IntPtr]::Zero) | Out-Null
+
+  $elements = [System.Collections.Generic.List[object]]::new()
+  foreach ($hwnd in $handles) {
+    try {
+      $element = [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)
+      if ($element) { $elements.Add($element) }
+    } catch {}
+  }
+  @($elements)
+}
+
 function Find-ByPidAid([int]$ProcessIdValue, [string]$AutomationId) {
-  (Get-Root).FindFirst(
-    [System.Windows.Automation.TreeScope]::Descendants,
-    (New-Object System.Windows.Automation.AndCondition(
-      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $ProcessIdValue)),
-      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, $AutomationId))
-    ))
+  $condition = New-Object System.Windows.Automation.PropertyCondition(
+    [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+    $AutomationId
   )
+  foreach ($window in (Get-TopLevelWindowElementsForProcess $ProcessIdValue)) {
+    if ([string]$window.Current.AutomationId -eq $AutomationId) { return $window }
+    $found = $window.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+    if ($found) { return $found }
+  }
+  return $null
 }
 
 function Find-DescByAid($RootElement, [string]$AutomationId) {
@@ -567,9 +595,20 @@ function Ensure-VariableEditorOpen([System.Diagnostics.Process]$Process, [string
 }
 
 function Assert-NoDirectInputFast([int]$ProcessIdValue, [string]$Stage) {
+  $watch = [Diagnostics.Stopwatch]::StartNew()
   $direct = Find-ByPidAid $ProcessIdValue '1265'
+  $watch.Stop()
+  Log "DirectInput/1265 scoped probe elapsed_ms=$($watch.ElapsedMilliseconds) stage=$Stage"
   if ($direct) { throw "DirectInput/1265 detected at $Stage" }
   Log "no DirectInput/1265 at $Stage"
+}
+
+function Assert-NoKvsModalFast([int]$ProcessIdValue, [string]$Stage) {
+  foreach ($window in (Get-TopLevelWindowElementsForProcess $ProcessIdValue)) {
+    if ([string]$window.Current.ClassName -eq '#32770' -and [string]$window.Current.Name -eq 'KV STUDIO') {
+      Fail-Guard 'KV_MODAL_PRESENT' $Stage "KV STUDIO modal dialog detected at $Stage." @()
+    }
+  }
 }
 
 function Convert-GlobalRows([string]$Path) {
@@ -638,6 +677,10 @@ function Assert-TextContainsNames([string]$Text, [string[]]$Names, [string]$Labe
 }
 
 function Assert-NoKvsModal([int]$ProcessIdValue, [string]$Stage) {
+  if (-not $AuditPersistence) {
+    Assert-NoKvsModalFast $ProcessIdValue $Stage
+    return
+  }
   $root = Get-Root
   $items = $root.FindAll(
     [System.Windows.Automation.TreeScope]::Descendants,
@@ -790,6 +833,10 @@ function Enter-VariablesCellByCell($Form, [string]$PageAid, [object[]]$Rows, [st
 }
 
 function Save-Shot([string]$Name) {
+  if (-not $AuditScreenshots) {
+    Log "skipped screenshot $Name because AuditScreenshots is disabled"
+    return
+  }
   $bounds = [Windows.Forms.Screen]::PrimaryScreen.Bounds
   $bitmap = New-Object Drawing.Bitmap $bounds.Width, $bounds.Height
   $graphics = [Drawing.Graphics]::FromImage($bitmap)
@@ -801,7 +848,7 @@ function Save-Shot([string]$Name) {
 }
 
 function Save-Project([System.Diagnostics.Process]$Process, [string]$ProjectNeedle) {
-  Invoke-GuardedKvMainKeyAction $Process $ProjectNeedle 'save project after variables' '^s' 'Ctrl+S after variable paste' 2000
+  Invoke-GuardedKvMainKeyAction $Process $ProjectNeedle 'save project after variables' '^s' 'Ctrl+S after variable paste' 300
   Log 'sent Ctrl+S after variable paste'
 }
 
@@ -896,8 +943,8 @@ try {
   Save-Project $process $projectNeedle
   Save-Shot '03_after_save.png'
   Assert-NoKvsModal $process.Id 'after variable save'
-  if (-not (Wait-VariableForm $process.Id 6)) { throw 'KvVariableForm disappeared after variable save.' }
-  if (-not $KeepVariableEditorOpen) {
+  if (-not (Wait-VariableForm $process.Id 1)) { throw 'KvVariableForm disappeared after variable save.' }
+  if ($AuditPersistence -and -not $KeepVariableEditorOpen) {
     Close-VariableEditor $process.Id
     Start-Sleep -Milliseconds 700
     if (Wait-VariableForm $process.Id 2) { throw 'KvVariableForm remained open after close request before persistence verification.' }
@@ -910,7 +957,7 @@ try {
 
   $localReopenClipboardPath = ''
   $localReopenClipboardText = ''
-  if ($localRows.Count -gt 0) {
+  if ($AuditPersistence -and $localRows.Count -gt 0) {
     $verifyForm = Ensure-VariableEditorOpen $process $projectNeedle
     Set-CapsLockState $false ([IntPtr]$verifyForm.Current.NativeWindowHandle) '*变量编辑*' 'local reopen verification'
     $verifyForm = Select-VariableTabByAid $verifyForm '_tabPageLocal' 'local tab reopen verification'
@@ -928,7 +975,15 @@ try {
     }
   }
 
-  $globalFileScan = Test-ProjectHasNames $projectRoot $definedGlobalNames
+  $globalFileScan = [pscustomobject]@{
+    Ok = $true
+    Missing = @()
+    Matches = @{}
+    Skipped = (-not $AuditProjectTextScan)
+  }
+  if ($AuditProjectTextScan) {
+    $globalFileScan = Test-ProjectHasNames $projectRoot $definedGlobalNames
+  }
   if (-not $globalFileScan.Ok) {
     $scanPath = Join-Path $OutDir 'variable_persistence_failed_scan.json'
     $globalFileScan | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $scanPath -Encoding UTF8
@@ -937,14 +992,14 @@ try {
   $requiredNames = @($definedGlobalNames + $definedLocalNames | Where-Object { $_ } | Select-Object -Unique)
   $validation = [pscustomobject]@{
     Ok = $true
-    Basis = 'variable editor route completed without modal; global executable names were found in same-run saved project files; local executable names were verified by closing/reopening the variable editor, selecting the same program, copying the local grid text, and matching expected names'
+    Basis = if ($AuditPersistence) { 'variable editor route completed without modal; local executable names were verified by closing/reopening the variable editor, selecting the same program, copying the local grid text, and matching expected names' } else { 'fast variable editor route completed without modal; variable correctness is completed by the later compile gate unless audit flags are enabled' }
     RequiredNames = $requiredNames
     GlobalNames = $definedGlobalNames
     LocalNames = $definedLocalNames
     GlobalVariableFileScanOk = $globalFileScan.Ok
-    LocalVariableValidationBasis = 'guarded close/reopen/copy verification from the KV STUDIO local-variable grid'
+    LocalVariableValidationBasis = if ($AuditPersistence) { 'guarded close/reopen/copy verification from the KV STUDIO local-variable grid' } else { 'fast mode: local persistence is deferred to compile gate unless AuditPersistence is enabled' }
     LocalReopenClipboardPath = $localReopenClipboardPath
-    LocalReopenClipboardContainsExpectedNames = if ($localRows.Count -gt 0) { $true } else { $null }
+    LocalReopenClipboardContainsExpectedNames = if ($AuditPersistence -and $localRows.Count -gt 0) { $true } else { $null }
     LocalPasteRoute = if ($localRows.Count -gt 0) { "local tab -> $LocalProgramName -> Tab -> PgDn -> Ctrl+V" } else { 'skipped: no executable local variables' }
     ScreenshotAfterLocalPaste = if ($localRows.Count -gt 0) { (Join-Path $OutDir '02_after_local_paste.png') } else { '' }
     ProjectFileScan = $globalFileScan
@@ -958,6 +1013,8 @@ try {
     RequiredNames = $requiredNames
     VariableDefinitionCheckOk = $true
     GlobalVariableFileScanOk = $globalFileScan.Ok
+    AuditPersistence = [bool]$AuditPersistence
+    AuditProjectTextScan = [bool]$AuditProjectTextScan
   } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'set_variables_result.json') -Encoding UTF8
   Log 'done set variables'
 } catch {

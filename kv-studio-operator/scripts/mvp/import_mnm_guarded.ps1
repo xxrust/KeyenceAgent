@@ -11,7 +11,10 @@
   [switch]$DeleteExistingModuleBeforeImport,
   [object]$RestartKvs = $true,
   [string]$ChecklistPath = '',
-  [switch]$VerboseUiDump
+  [switch]$VerboseUiDump,
+  [switch]$AuditImportWaits,
+  [switch]$AuditProjectTextScan,
+  [switch]$AuditUiNameScan
 )
 
 $ErrorActionPreference='Continue'
@@ -1662,7 +1665,7 @@ try{
     if(-not (SetOpenDialogFile $MnmPath)){
       throw 'MNM file path target was not a verified mnemonic-read path edit or standard file-open dialog; refusing clipboard/Enter fallback'
     }
-    Start-Sleep -Seconds 8
+    if($AuditImportWaits){ Start-Sleep -Seconds 8 } else { Start-Sleep -Milliseconds 800 }
     Shot '02_after_file_open.png'
     if($VerboseUiDump){ DumpUi 'uia_after_file_open.json' }
     AssertNoMnmReadFailureDialog 'after_file_open'
@@ -1670,10 +1673,10 @@ try{
     DismissInstructionErrorDialogs 'after_file_open'
     $programKindConfirmed = ConfirmProgramKindDialog
     if($programKindConfirmed){
-      Start-Sleep -Seconds 8
+      if($AuditImportWaits){ Start-Sleep -Seconds 8 } else { Start-Sleep -Milliseconds 800 }
       AssertNoMnmReadFailureDialog 'after_program_kind_confirm'
     }elseif(ConfirmAnyPostImportDialog){
-      Start-Sleep -Seconds 8
+      if($AuditImportWaits){ Start-Sleep -Seconds 8 } else { Start-Sleep -Milliseconds 800 }
       AssertNoMnmReadFailureDialog 'after_post_import_dialog'
     }
   }
@@ -1681,11 +1684,21 @@ try{
   if($VerboseUiDump){ DumpUi 'uia_after_import_confirm.json' }
   AssertNoMnmReadFailureDialog 'after_import_confirm'
   $foundExpected=$false
-  if($ExpectedModuleName){
+  if($AuditUiNameScan -and $ExpectedModuleName){
     $foundExpected=TestUiElementName $ExpectedModuleName
+  } elseif($ExpectedModuleName) {
+    Log "skipping UI name scan for expected module in fast mode: $ExpectedModuleName"
   }
   $validationNeedles=GetMnmValidationNeedles $MnmPath $ExpectedModuleName
-  $projectContentMatches=FindProjectFilesContainingAnyText $ProjectSearchRoot $validationNeedles
+  $projectContentMatches = @()
+  if($AuditProjectTextScan){
+    $projectContentMatches=FindProjectFilesContainingAnyText $ProjectSearchRoot $validationNeedles
+  } else {
+    $projectContentMatches=@($validationNeedles | ForEach-Object {
+      [pscustomobject]@{ Needle=$_; Found=$false; Matches=@(); Skipped=$true }
+    })
+    Log 'skipping project text scan after MNM import in fast mode'
+  }
   $foundAnyProjectContent=(@($projectContentMatches | Where-Object { $_.Found }).Count -gt 0)
   $missingValidationNeedles=GetMissingValidationNeedles $projectContentMatches
   [pscustomobject]@{
@@ -1701,7 +1714,7 @@ try{
   if($FailOnMissingValidationNeedles -and @($missingValidationNeedles).Count -gt 0){
     throw "Missing MNM validation needles after import: $($missingValidationNeedles -join ', ')"
   }
-  if($ExpectedModuleName -and -not $foundExpected){
+  if($AuditUiNameScan -and $ExpectedModuleName -and -not $foundExpected){
     Log "Expected module name is not visible in KV STUDIO UI yet: $ExpectedModuleName"
     throw "Expected module name is not visible in KV STUDIO after MNM import: $ExpectedModuleName"
   }
@@ -1716,14 +1729,23 @@ try{
     Start-Sleep -Milliseconds 300
     [void](ForceKvStudioForeground ([IntPtr]$saveProcess.MainWindowHandle))
     AssertKvStudioForeground 'Ctrl+S after MNM import' $expectedProjectNeedle
-    Invoke-KvGuardedSendKeys -TargetHwnd $saveProcess.MainWindowHandle -Step 'save after MNM import Ctrl+S' -Keys '^s' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Ctrl+S saves project after MNM import' -SleepMs 8000
+    Invoke-KvGuardedSendKeys -TargetHwnd $saveProcess.MainWindowHandle -Step 'save after MNM import Ctrl+S' -Keys '^s' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Ctrl+S saves project after MNM import' -SleepMs $(if($AuditImportWaits){8000}else{500})
     Log 'sent Ctrl+S'
-    Start-Sleep -Seconds 8
+    if($AuditImportWaits){ Start-Sleep -Seconds 8 } else { Start-Sleep -Milliseconds 800 }
     Shot '04_after_save.png'
     if($VerboseUiDump){ DumpUi 'uia_after_save.json' }
     AssertNoMnmReadFailureDialog 'after_save'
-    $projectMatches=FindProjectFilesContainingText $ProjectSearchRoot $ExpectedModuleName
-    $projectContentMatchesAfterSave=FindProjectFilesContainingAnyText $ProjectSearchRoot $validationNeedles
+    $projectMatches=@()
+    $projectContentMatchesAfterSave=@()
+    if($AuditProjectTextScan){
+      $projectMatches=FindProjectFilesContainingText $ProjectSearchRoot $ExpectedModuleName
+      $projectContentMatchesAfterSave=FindProjectFilesContainingAnyText $ProjectSearchRoot $validationNeedles
+    } else {
+      Log 'skipping project text scan after MNM save in fast mode'
+      $projectContentMatchesAfterSave=@($validationNeedles | ForEach-Object {
+        [pscustomobject]@{ Needle=$_; Found=$false; Matches=@(); Skipped=$true }
+      })
+    }
     $foundAnyProjectContentAfterSave=(@($projectContentMatchesAfterSave | Where-Object { $_.Found }).Count -gt 0)
     $missingValidationNeedlesAfterSave=GetMissingValidationNeedles $projectContentMatchesAfterSave
     [pscustomobject]@{

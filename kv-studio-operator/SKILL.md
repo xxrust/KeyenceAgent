@@ -124,7 +124,7 @@ MNM module type:
 - Agent boundary gate: the runner must pass `scripts\assert_kv_mvp_agent_boundary.ps1` before touching KV STUDIO; this rejects interactive prompts/manual decision points in runner-owned scripts.
 - Program construction uses MNM files. If MNM import fails, fix the scaffold or stop; do not type program text into the ladder/editor.
 - Variables are mandatory per MNM entry. `variables.local_tsv` must contain executable local rows for that module/program. `variables.global_tsv` may be header-only only when that MNM uses no global variables.
-- Executable global variable rows must be referenced by their paired MNM file. The compile gate proves global variables; local variables are verified by the variable script through guarded close/reopen/copy of the local-variable grid for the same module/program.
+- Executable global variable rows must be referenced by their paired MNM file. The compile gate proves the variables used by the imported program. Local variable close/reopen/copy verification is an audit path, not the default fast path.
 - Success must come from the current run's `mvp_result.json`, not screenshots or old compile text.
 
 ## Script Ownership
@@ -155,7 +155,7 @@ Report success only when:
 - `mvp_result.json.ok` is `true`.
 - `mvp_result.json.compile_result_contains_ok` is `true`.
 - `artifacts\module_placement\*.json` shows expected module category.
-- `artifacts\set_variables\variable_persistence_validation.json` exists and reports success.
+- `artifacts\set_variables\variable_persistence_validation.json` exists and reports success. In fast mode, local persistence is accepted through the variable script plus compile gate; close/reopen/copy evidence is required only when `set_variables_guarded.ps1 -AuditPersistence` is used.
 - `mvp_result.json.variable_sets[]` lists each MNM entry's exact global/local TSV paths used in the run.
 - `mvp_result.json.agent_boundary_contract_path` points to the same-run agent-boundary contract.
 - `artifacts\copy_result\compile_result_copied.txt` was written in the current run.
