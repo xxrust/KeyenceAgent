@@ -61,7 +61,7 @@ Current MNM acceptance boundary:
 - Do not implement by renaming the official reference project.
 - Do not import the whole official reference program as the answer.
 - Importing official FBs/function blocks is allowed only when they remain official and unmodified.
-- For reproduction, bugfix, optimization, or modification of an existing KV STUDIO project, first open that exact source project in KV STUDIO and export a fresh text snapshot before analyzing or changing logic. Do not trust stale local `.mnm`, `.csv`, `.lbl`, or sidecar extracts as current unless they were exported in the current task run.
+- For reproduction, bugfix, optimization, or modification of an existing KV STUDIO project, first bind the exact `.kpr` to a current source snapshot through `kv-studio-operator\scripts\new_kv_existing_project_update_workspace.ps1` and `kv-studio-operator\scripts\assert_kv_existing_project_snapshot.ps1`. Do not trust stale local `.mnm`, `.csv`, `.lbl`, or sidecar extracts as current unless the snapshot manifest is `ready` and its project fingerprint matches the current project directory.
 - The fresh source snapshot must include exported MNM program bodies for every relevant program/FB/module, variable manifests, module/program inventory, unit/device evidence, and compile/export evidence. If export is blocked, stop and report the export blocker; do not downgrade silently to structure-only reconstruction.
 - Put exported MNM, variable manifests, module inventory, evidence reports, and generated/repaired sources under a task-specific git working tree before editing. Every source snapshot and every generated fix must be diffable and recoverable by git.
 - Program modules other than official FBs must be created, edited, or imported through MNM.

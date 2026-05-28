@@ -9,6 +9,7 @@ param(
   [string]$ProjectName = '',
   [string]$KvsExe = '',
   [string]$ChecklistPath = '',
+  [string]$SourceSnapshotManifestPath = '',
   [int]$TimeoutSeconds = 600,
   [switch]$AuditVariablePersistence,
   [ValidateSet('Full','NameType')]
@@ -206,7 +207,27 @@ $artifactRoot = Join-Path $runRoot 'artifacts'
 $scaffoldArtifactRoot = Join-Path $artifactRoot 'scaffold'
 $reportPath = Join-Path $runRoot 'repair_result.json'
 $agentBoundaryContractPath = ''
+$sourceSnapshotGateResult = $null
 New-Item -ItemType Directory -Force -Path $runRoot, $artifactRoot, $scaffoldArtifactRoot | Out-Null
+
+$script:currentStep = 'assert_existing_project_source_snapshot'
+if (-not $SourceSnapshotManifestPath) {
+  $snapshotCandidates = @(
+    (Join-Path $ScaffoldRoot 'source_snapshot_manifest.json'),
+    (Join-Path $ScaffoldRoot 'architecture\source_snapshot_manifest.json')
+  )
+  foreach ($candidate in $snapshotCandidates) {
+    if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+      $SourceSnapshotManifestPath = $candidate
+      break
+    }
+  }
+}
+$snapshotGate = Join-Path $scriptRoot 'assert_kv_existing_project_snapshot.ps1'
+if (-not (Test-Path -LiteralPath $snapshotGate -PathType Leaf)) { throw "Existing-project snapshot gate script not found: $snapshotGate" }
+$sourceSnapshotGateJson = & $snapshotGate -ProjectPath $ProjectPath -SnapshotManifestPath $SourceSnapshotManifestPath -OutDir (Join-Path $artifactRoot 'source_snapshot_gate')
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$sourceSnapshotGateResult = $sourceSnapshotGateJson | ConvertFrom-Json
 
 $scaffoldValidator = Join-Path $scriptRoot 'validate_kv_mvp_scaffold.ps1'
 $script:currentStep = 'validate_scaffold'
@@ -276,6 +297,8 @@ function Write-RepairResult([bool]$Ok, [string]$Status, [string]$Message = '') {
     scaffold_manifest = $manifestPath
     project_name = $ProjectName
     project_path = $ProjectPath
+    source_snapshot_manifest = $SourceSnapshotManifestPath
+    source_snapshot_gate = $sourceSnapshotGateResult
     agent_allowed_phases = @('prepare_repair_scaffold_before_kv_studio_opens', 'verify_same_run_artifacts_after_runner_exits')
     script_owned_phase = 'from first KV STUDIO launch through compile result copy'
     agent_boundary_contract_path = $agentBoundaryContractPath

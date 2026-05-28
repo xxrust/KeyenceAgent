@@ -20,6 +20,7 @@ $mvpScriptRoot = Join-Path $scriptRoot 'mvp'
 $steps = [System.Collections.Generic.List[object]]::new()
 $script:currentStep = 'init'
 $script:lastFailure = $null
+$script:baselineSourceSnapshotResult = $null
 
 function New-Cn([int[]]$CodePoints) {
   -join ($CodePoints | ForEach-Object { [char]$_ })
@@ -328,6 +329,7 @@ function Write-MvpResult([bool]$Ok, [string]$Status, [string]$Message = '') {
     project_name = $ProjectName
     cpu_model = $CpuModel
     project_path = (Join-Path (Join-Path $projectRoot $ProjectName) ($ProjectName + '.kpr'))
+    baseline_source_snapshot = $script:baselineSourceSnapshotResult
     agent_allowed_phases = @(
       'prepare_scaffold_before_kv_studio_opens',
       'verify_same_run_artifacts_after_runner_exits'
@@ -516,6 +518,19 @@ try {
   $okNeedle = (New-Cn @(0x8F6C,0x6362,0x7ED3,0x679C)) + ' OK'
   if (-not $copyText.Contains($okNeedle)) {
     throw 'Copied compile result does not contain the OK conversion result.'
+  }
+  $baselineWorkspaceScript = Join-Path $scriptRoot 'new_kv_existing_project_update_workspace.ps1'
+  if (Test-Path -LiteralPath $baselineWorkspaceScript -PathType Leaf) {
+    $script:currentStep = 'write_baseline_source_snapshot'
+    $projectPath = Join-Path (Join-Path $projectRoot $ProjectName) ($ProjectName + '.kpr')
+    $baselineJson = & $baselineWorkspaceScript `
+      -ProjectPath $projectPath `
+      -WorkspaceRoot (Join-Path $artifactRoot 'future_updates') `
+      -TaskId 'baseline_source_snapshot' `
+      -SeedScaffoldRoot $ScaffoldRoot `
+      -ForceNewSnapshot
+    if ($LASTEXITCODE -ne 0) { throw "Baseline source snapshot creation failed for project: $projectPath" }
+    $script:baselineSourceSnapshotResult = $baselineJson | ConvertFrom-Json
   }
   Write-MvpResult $true 'pass' ''
   exit 0

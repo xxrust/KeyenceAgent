@@ -35,6 +35,16 @@ Use this route for new simple KV STUDIO projects:
 | Prove repeatability | `scripts\run_kv_mvp_repeat.ps1` | `repeat_result.json.ok=true` after 3 consecutive passes | Any failed attempt resets consecutive pass count |
 | Report | Read current-run artifacts | Report result path and evidence paths | Do not use old run artifacts |
 
+Use this route for existing project updates, including user-requested feature additions to a `.kpr`:
+
+| Step | Command | Pass condition | Stop condition |
+| --- | --- | --- | --- |
+| Create/update workspace | `scripts\new_kv_existing_project_update_workspace.ps1` | `source_snapshot_manifest.json.status=ready` | `KV_SOURCE_SNAPSHOT_EXPORT_REQUIRED` or script exits nonzero |
+| Verify current source snapshot | `scripts\assert_kv_existing_project_snapshot.ps1` | `existing_project_snapshot_gate.json.ok=true` and project fingerprint matches | `KV_SOURCE_SNAPSHOT_STALE`, missing MNM, missing variable manifest, or missing architecture file |
+| Edit update scaffold | Agent edits scaffold/model files before KV STUDIO opens | Logic and variables are derived from the verified snapshot plus task request | Snapshot is stale or architecture intent is ambiguous |
+| Run existing-project update | `scripts\run_kv_mvp_repair_existing_project.ps1 -SourceSnapshotManifestPath <manifest>` | `repair_result.json.ok=true` and source snapshot gate is included in result | Any child step fails |
+| Verify | Read same-run artifacts | Compile text contains `转换结果 OK` and result references the snapshot manifest | Do not use old exports or old compile text |
+
 Agent participation boundary:
 
 - Before KV STUDIO opens, the agent may create/edit scaffold files, run validation, and start `run_kv_mvp_scaffold.ps1`, `run_kv_mvp_repair_existing_project.ps1`, or `run_kv_mvp_repeat.ps1`.
@@ -78,13 +88,27 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_m
 Repair an existing project from a corrected scaffold:
 
 ```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\new_kv_existing_project_update_workspace.ps1" `
+  -ProjectPath '<existing-project.kpr>' `
+  -WorkspaceRoot (Join-Path $WorkRoot 'existing_project_updates') `
+  -TaskId '<task-id>' `
+  -SeedScaffoldRoot $ScaffoldRoot
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\assert_kv_existing_project_snapshot.ps1" `
+  -ProjectPath '<existing-project.kpr>' `
+  -SnapshotManifestPath (Join-Path $WorkRoot 'existing_project_updates\<task-id>\source_snapshot_manifest.json') `
+  -OutDir (Join-Path $WorkRoot 'existing_project_updates\<task-id>\validation\source_snapshot_gate')
+
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_mvp_repair_existing_project.ps1" `
   -ProjectPath '<existing-project.kpr>' `
   -ScaffoldRoot $ScaffoldRoot `
+  -SourceSnapshotManifestPath (Join-Path $WorkRoot 'existing_project_updates\<task-id>\source_snapshot_manifest.json') `
   -OutRoot (Join-Path $WorkRoot 'mvp_repair_runs') `
   -DeleteExistingModulesBeforeImport `
   -TimeoutSeconds 600
 ```
+
+For projects not created by this skill, do not use `-SeedScaffoldRoot` as proof. Export current MNM files and variable manifests from the exact project into the workspace snapshot, record inventory evidence, then set `source_snapshot_manifest.json.status` to `ready`. If the project directory hash differs from the last parsed snapshot, the gate fails and a fresh export is required.
 
 For multi-MNM stages that must prove local variables independently of compile, run the scaffold with `-AuditVariablePersistence`. The runner will close/reopen the variable editor, copy each module's local grid, and match expected local names before compile.
 
@@ -111,6 +135,7 @@ Edit only scaffold source files before running KV STUDIO:
 - `mnm\*.mnm`
 - `scaffold.json.mnm_files[].variables.global_tsv`
 - `scaffold.json.mnm_files[].variables.local_tsv`
+- `architecture\*.json` for open-ended project/update configuration such as source snapshot binding, IO map, unit map, safety notes, acceptance, and future categories.
 - `TASK.md`
 - `VERSION.md`
 - `CHECKLIST.md`
@@ -138,6 +163,7 @@ MNM module type:
 ## Hard Gates
 
 - Checklist gate: every KV STUDIO operation must pass `scripts\assert_kv_operation_checklist.ps1`.
+- Existing-project source gate: before modifying an existing `.kpr`, `scripts\assert_kv_existing_project_snapshot.ps1` must prove that the current project fingerprint matches a ready source snapshot containing MNM files, variable manifests, inventory evidence, and an open architecture file.
 - Scaffold gate: an existing scaffold must pass `scripts\validate_kv_mvp_scaffold.ps1` before runner use.
 - UI guard gate: the runner must pass `scripts\assert_kv_mvp_ui_guard_usage.ps1` before touching KV STUDIO.
 - Agent boundary gate: the runner must pass `scripts\assert_kv_mvp_agent_boundary.ps1` before touching KV STUDIO; this rejects interactive prompts/manual decision points in runner-owned scripts.
@@ -152,6 +178,8 @@ Agents normally call only:
 
 - `scripts\new_kv_mvp_scaffold.ps1`
 - `scripts\new_kv_mvp_multi_mnm_scaffold.ps1`
+- `scripts\new_kv_existing_project_update_workspace.ps1`
+- `scripts\assert_kv_existing_project_snapshot.ps1`
 - `scripts\validate_kv_mvp_scaffold.ps1`
 - `scripts\run_kv_mvp_scaffold.ps1`
 - `scripts\run_kv_mvp_repair_existing_project.ps1`
@@ -178,10 +206,13 @@ Report success only when:
 - `artifacts\module_placement\*.json` shows expected module category.
 - `artifacts\set_variables\variable_persistence_validation.json` exists and reports success. In fast mode, local persistence is accepted through the variable script plus compile gate; close/reopen/copy evidence is required only when `set_variables_guarded.ps1 -AuditPersistence` is used.
 - `mvp_result.json.variable_sets[]` lists each MNM entry's exact global/local TSV paths used in the run.
+- `mvp_result.json.baseline_source_snapshot.source_snapshot_manifest` points to a reusable source snapshot for future updates when the project fingerprint still matches.
 - `mvp_result.json.agent_boundary_contract_path` points to the same-run agent-boundary contract.
 - `artifacts\copy_result\compile_result_copied.txt` was written in the current run.
 
 Report repeatable MVP success only when `run_kv_mvp_repeat.ps1` writes `repeat_result.json.ok=true` and `repeat_result.json.consecutive_passes` is at least `3`. A failed attempt resets the consecutive pass counter to `0`; do not count non-consecutive passes. If the same failure signature appears three times, the repeat runner stops for route review.
+
+Report existing-project update success only when `repair_result.json.ok=true`, `repair_result.json.source_snapshot_gate.ok=true`, and `repair_result.json.source_snapshot_gate.project_fingerprint.hash` matches the current project snapshot gate result. If the snapshot gate is missing from the repair result, the update is not accepted.
 
 For artifact layout and JSON fields, read `references\mvp-runner-contract.md`.
 
@@ -198,6 +229,7 @@ Common gate codes:
 
 - `KV_CHECKLIST_MISSING`, `KV_CHECKLIST_EMPTY`, `KV_CHECKLIST_INVALID`
 - `KV_SCAFFOLD_REQUIRED_FILE_MISSING`, `KV_SCAFFOLD_TSV_SCHEMA_INVALID`, `KV_SCAFFOLD_MNM_MODULE_TYPE_MISMATCH`
+- `KV_SOURCE_SNAPSHOT_MANIFEST_MISSING`, `KV_SOURCE_SNAPSHOT_NOT_READY`, `KV_SOURCE_SNAPSHOT_STALE`, `KV_SOURCE_SNAPSHOT_MNM_EMPTY`, `KV_SOURCE_SNAPSHOT_VARIABLES_EMPTY`, `KV_UPDATE_ARCHITECTURE_FILE_MISSING`
 - `KV_UI_GUARD_STATIC_VIOLATION`
 - `KV_FOCUS_LOST`, `KV_FOCUS_LOST_TERMINAL`, `KV_MODAL_PRESENT`
 - `KV_VARIABLE_PASTE_NOT_PERSISTED`
