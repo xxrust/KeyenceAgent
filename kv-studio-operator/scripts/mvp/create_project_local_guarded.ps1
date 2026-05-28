@@ -284,6 +284,25 @@ function Restore-KvStudioForeground {
   Assert-KvStudioForeground $Action
 }
 
+function Wait-ProjectSaveSettled([string]$ProjectPath, [string]$ProjectName, [int]$Seconds = 8) {
+  $deadline = (Get-Date).AddSeconds($Seconds)
+  do {
+    $process = Get-Process Kvs -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' } |
+      Select-Object -First 1
+    $title = if ($process) { $process.MainWindowTitle } else { '' }
+    $fileExists = Test-Path -LiteralPath $ProjectPath
+    $savedTitle = $title -and ($title -like "*$ProjectName*") -and ($title -notmatch ([regex]::Escape($ProjectName) + '\s+\*'))
+    if ($fileExists -and $savedTitle) {
+      Log "project save settled title=$title path=$ProjectPath"
+      return $true
+    }
+    Start-Sleep -Milliseconds 200
+  } while ((Get-Date) -lt $deadline)
+  Log "project save settle wait timed out path_exists=$(Test-Path -LiteralPath $ProjectPath)"
+  return $false
+}
+
 try {
   $startedAt = Get-Date
   Log "start create_project_local ProjectName=$ProjectName ProjectRoot=$ProjectRoot CpuModel=$CpuModel KvsExe=$KvsExe"
@@ -342,16 +361,18 @@ try {
     Log 'unit configuration prompt not present'
   }
 
+  $projectPath = Join-Path (Join-Path $ProjectRoot $ProjectName) ($ProjectName + '.kpr')
   Start-Sleep -Seconds 2
   $process = Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
   if ($process -and $process.MainWindowHandle -ne 0) {
     [KvWin32]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
     Assert-KvStudioForeground 'Ctrl+S'
-    Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'save created project Ctrl+S' -Keys '^s' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+S saves created project' -SleepMs 2000
-    Start-Sleep -Seconds 2
+    Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'save created project Ctrl+S' -Keys '^s' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+S saves created project' -SleepMs 300
+    if (-not (Wait-ProjectSaveSettled $projectPath $ProjectName 8)) {
+      Start-Sleep -Seconds 2
+    }
   }
 
-  $projectPath = Join-Path (Join-Path $ProjectRoot $ProjectName) ($ProjectName + '.kpr')
   $found = $null
   if (Test-Path -LiteralPath $projectPath) {
     $found = $projectPath
