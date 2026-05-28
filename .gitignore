@@ -1,6 +1,8 @@
 *
 !.gitignore
 !/README.md
+!/README.zh-CN.md
+!/README.ja.md
 !/docs/
 !/docs/**
 !/keyence-plc-programmer/
