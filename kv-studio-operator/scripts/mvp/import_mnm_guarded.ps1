@@ -538,7 +538,7 @@ function FindProjectModuleTreeItem([string]$moduleName){
   for($i=0;$i -lt $items.Count;$i++){
     $item=$items.Item($i)
     $name=[string]$item.Current.Name
-    if($name -eq $moduleName -or $name -like ($moduleName+' *') -or $name -like ('*'+$moduleName+'*')){
+    if($name -eq $moduleName -or $name -match ('^' + [regex]::Escape($moduleName) + '\s+\[\d+\]$')){
       return $item
     }
   }
@@ -571,7 +571,35 @@ function ConfirmDeleteDialogIfPresent(){
   return $false
 }
 function RemoveProjectModuleIfPresent([string]$moduleName){
-  throw 'RemoveProjectModuleIfPresent is disabled for MVP MNM import.'
+  if(-not $moduleName){ return $false }
+  $item=FindProjectModuleTreeItem $moduleName
+  if(-not $item){
+    Log ('project module not present before delete: '+$moduleName)
+    return $true
+  }
+  $name=[string]$item.Current.Name
+  try{
+    $select=$item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)
+    $select.Select()
+    Log ('selected project module for delete '+$name)
+  }catch{
+    ClickAutomationElementCenter $item ('project module delete select '+$name)
+    Log ('clicked project module for delete '+$name)
+  }
+  Start-Sleep -Milliseconds 250
+  try{ $item.SetFocus() }catch{}
+  Invoke-KvGuardedSendKeys -TargetHwnd $script:KvGuardTargetHwnd -Step ('delete existing module '+$name) -Keys '{DELETE}' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Delete selected existing project module before MNM repair import' -SleepMs 700
+  if(-not (ConfirmDeleteDialogIfPresent)){
+    Log ('delete confirmation dialog not found for '+$name)
+  }
+  Start-Sleep -Seconds 2
+  $remaining=FindProjectModuleTreeItem $moduleName
+  if($remaining){
+    Log ('project module remained after delete attempt: '+[string]$remaining.Current.Name)
+    return $false
+  }
+  Log ('deleted existing project module before MNM import: '+$name)
+  return $true
 }
 function RenameProjectModuleIfPresent([string]$moduleName){
   throw 'RenameProjectModuleIfPresent is disabled for MVP MNM import.'

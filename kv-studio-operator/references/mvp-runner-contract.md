@@ -1,6 +1,6 @@
 # Scaffold Runner Contract
 
-Read this file when diagnosing `run_kv_mvp_scaffold.ps1`, interpreting `mvp_result.json`, or extending the scaffold runner.
+Read this file when diagnosing `run_kv_mvp_scaffold.ps1`, `run_kv_mvp_repair_existing_project.ps1`, interpreting result JSON, or extending the scaffold runner.
 
 ## Terms
 
@@ -22,7 +22,7 @@ The agent participates in two phases only:
 
 The interval from first KV STUDIO launch through compile-result copy is script-owned. The agent must not inspect the live KV STUDIO UI, decide the next UI action, paste values, click/type, or continue a failed in-window state manually. If a runner step fails, repair scaffold/script inputs from artifacts and start a fresh runner command.
 
-Before touching KV STUDIO, `run_kv_mvp_scaffold.ps1` runs `assert_kv_mvp_agent_boundary.ps1`. The gate writes:
+Before touching KV STUDIO, `run_kv_mvp_scaffold.ps1` and `run_kv_mvp_repair_existing_project.ps1` run `assert_kv_mvp_agent_boundary.ps1`. The gate writes:
 
 ```text
 <RunRoot>\artifacts\agent_boundary\agent_boundary_contract.json
@@ -117,6 +117,14 @@ Required evidence directories:
 - `<RunRoot>\artifacts\variables`
 - `<RunRoot>\artifacts\compile_convert`
 - `<RunRoot>\artifacts\copy_result`
+
+Existing-project repair uses the same scaffold, variable, compile, and copy evidence directories, but writes:
+
+```text
+<RepairRunRoot>\repair_result.json
+```
+
+Success requires `repair_result.json.ok=true`, `compile_result_contains_ok=true`, the corrected MNM files listed under `mnm_files[]`, and the current-run copied conversion text under `artifacts\copy_result`.
 
 Failure action:
 

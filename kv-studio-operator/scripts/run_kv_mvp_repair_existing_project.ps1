@@ -1,0 +1,388 @@
+param(
+  [Parameter(Mandatory=$true)]
+  [string]$ProjectPath,
+
+  [Parameter(Mandatory=$true)]
+  [string]$ScaffoldRoot,
+
+  [string]$OutRoot = 'C:\Users\Public\KVSkillPractice\mvp_repair_runs',
+  [string]$ProjectName = '',
+  [string]$KvsExe = '',
+  [string]$ChecklistPath = '',
+  [int]$TimeoutSeconds = 600,
+  [switch]$AuditVariablePersistence,
+  [ValidateSet('Full','NameType')]
+  [string]$LocalPasteFormat = 'Full',
+  [switch]$DeleteExistingModulesBeforeImport
+)
+
+$ErrorActionPreference = 'Stop'
+$start = Get-Date
+$scriptRoot = Split-Path -Parent $PSCommandPath
+$mvpScriptRoot = Join-Path $scriptRoot 'mvp'
+$steps = [System.Collections.Generic.List[object]]::new()
+$script:currentStep = 'init'
+$script:lastFailure = $null
+
+function New-Cn([int[]]$CodePoints) {
+  -join ($CodePoints | ForEach-Object { [char]$_ })
+}
+
+function Resolve-ScaffoldPath([string]$RelativePath) {
+  if ([IO.Path]::IsPathRooted($RelativePath)) { return [IO.Path]::GetFullPath($RelativePath) }
+  return [IO.Path]::GetFullPath((Join-Path $ScaffoldRoot $RelativePath))
+}
+
+function Read-VariableRows([string]$Path) {
+  if (-not (Test-Path -LiteralPath $Path)) { throw "Variable TSV not found: $Path" }
+  $text = [IO.File]::ReadAllText($Path, [Text.Encoding]::Default)
+  if ([string]::IsNullOrWhiteSpace($text)) { throw "Variable TSV is empty: $Path" }
+  @($text | ConvertFrom-Csv -Delimiter "`t")
+}
+
+function Get-ExecutableVariableRows([string]$Path, [string]$Scope) {
+  @(Read-VariableRows $Path | Where-Object { $_.scope -eq $Scope -and $_.status -ne 'display_name' -and $_.name })
+}
+
+function Get-ExecutableVariableNames([string]$Path, [string]$Scope) {
+  @((Get-ExecutableVariableRows $Path $Scope) | ForEach-Object { [string]$_.name } | Where-Object { $_ } | Select-Object -Unique)
+}
+
+function New-MergedGlobalVariablesTsv([object[]]$Entries, [string]$OutDir) {
+  $header = 'scope' + "`t" + 'owner_program' + "`t" + 'name' + "`t" + 'data_type' + "`t" + 'device' + "`t" + 'initial_value' + "`t" + 'comment' + "`t" + 'evidence' + "`t" + 'status'
+  $byName = [ordered]@{}
+  foreach ($entry in $Entries) {
+    foreach ($row in (Get-ExecutableVariableRows $entry.global_tsv 'global')) {
+      $name = [string]$row.name
+      $signature = @([string]$row.data_type, [string]$row.device, [string]$row.initial_value) -join "`t"
+      if ($byName.Contains($name) -and $byName[$name].signature -ne $signature) {
+        throw "Global variable conflict while merging per-MNM variable sets. name=$name first=$($byName[$name].source) second=$($entry.global_tsv)"
+      }
+      if (-not $byName.Contains($name)) {
+        $byName[$name] = [pscustomobject]@{ signature = $signature; source = $entry.global_tsv; row = $row }
+      }
+    }
+  }
+  New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+  $path = Join-Path $OutDir 'global_variables_merged.tsv'
+  $lines = @($header)
+  foreach ($item in $byName.Values) {
+    $row = $item.row
+    $lines += @(
+      [string]$row.scope
+      [string]$row.owner_program
+      [string]$row.name
+      [string]$row.data_type
+      [string]$row.device
+      [string]$row.initial_value
+      [string]$row.comment
+      [string]$row.evidence
+      [string]$row.status
+    ) -join "`t"
+  }
+  [IO.File]::WriteAllText($path, (($lines -join "`r`n") + "`r`n"), [Text.Encoding]::Default)
+  [pscustomobject]@{
+    path = $path
+    executable_global_variable_count = $byName.Count
+    source_files = @($Entries | ForEach-Object { $_.global_tsv } | Select-Object -Unique)
+  }
+}
+
+function Get-ElapsedSeconds {
+  [math]::Round(((Get-Date) - $start).TotalSeconds, 3)
+}
+
+function Assert-TimeBudget([string]$Stage) {
+  $elapsed = ((Get-Date) - $start).TotalSeconds
+  if ($elapsed -gt $TimeoutSeconds) {
+    throw "MVP repair time budget exceeded at ${Stage}: $([math]::Round($elapsed, 3))s > ${TimeoutSeconds}s"
+  }
+}
+
+function Get-ArgumentValue([string[]]$Arguments, [string]$Name) {
+  for ($i = 0; $i -lt $Arguments.Count; $i++) {
+    if ($Arguments[$i] -eq $Name -and ($i + 1) -lt $Arguments.Count) { return $Arguments[$i + 1] }
+  }
+  return ''
+}
+
+function Read-JsonFileIfPossible([string]$Path) {
+  if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+  try { return (Get-Content -Raw -LiteralPath $Path -Encoding UTF8 | ConvertFrom-Json) } catch { return $null }
+}
+
+function Get-StepFailureSummary([string]$Name, [string[]]$Arguments, [int]$ExitCode) {
+  $outDir = Get-ArgumentValue $Arguments '-OutDir'
+  $summary = [ordered]@{
+    step = $Name
+    exit_code = $ExitCode
+    out_dir = $outDir
+    error_code = ''
+    child_result_path = ''
+    checkpoint_path = ''
+    fail_text_path = ''
+    evidence = @()
+    message = ''
+  }
+  if (-not $outDir -or -not (Test-Path -LiteralPath $outDir -PathType Container)) { return [pscustomobject]$summary }
+  $resultFile = Get-ChildItem -LiteralPath $outDir -File -Filter '*result.json' -Recurse -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+  if ($resultFile) {
+    $summary.child_result_path = $resultFile.FullName
+    $summary.evidence += $resultFile.FullName
+    $child = Read-JsonFileIfPossible $resultFile.FullName
+    if ($child) {
+      if ($child.error_code) { $summary.error_code = [string]$child.error_code }
+      if ($child.message) { $summary.message = [string]$child.message }
+      if ($child.evidence) { $summary.evidence += @($child.evidence | ForEach-Object { [string]$_ }) }
+    }
+  }
+  $checkpoint = Get-ChildItem -LiteralPath $outDir -File -Filter '*failed.json' -Recurse -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+  if ($checkpoint) {
+    $summary.checkpoint_path = $checkpoint.FullName
+    $summary.evidence += $checkpoint.FullName
+  }
+  $failText = Join-Path $outDir 'fail.txt'
+  if (Test-Path -LiteralPath $failText -PathType Leaf) {
+    $summary.fail_text_path = $failText
+    $summary.evidence += $failText
+    if (-not $summary.message) {
+      try { $summary.message = ([IO.File]::ReadAllText($failText, [Text.Encoding]::UTF8)).Trim() } catch {}
+    }
+  }
+  if (-not $summary.error_code) { $summary.error_code = 'KV_MVP_REPAIR_STEP_FAILED' }
+  $summary.evidence = @($summary.evidence | Where-Object { $_ } | Select-Object -Unique)
+  return [pscustomobject]$summary
+}
+
+function Invoke-MvpStep([string]$Name, [string]$ScriptName, [string[]]$Arguments) {
+  Assert-TimeBudget "before $Name"
+  $script:currentStep = $Name
+  $scriptPath = Join-Path $mvpScriptRoot $ScriptName
+  if (-not (Test-Path -LiteralPath $scriptPath)) { throw "Required MVP script is missing: $scriptPath" }
+  $stepStart = Get-Date
+  $command = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath) + $Arguments
+  & powershell @command
+  $exit = $LASTEXITCODE
+  $elapsed = [math]::Round(((Get-Date) - $stepStart).TotalSeconds, 3)
+  $steps.Add([pscustomobject]@{ name = $Name; script = $scriptPath; exit_code = $exit; elapsed_seconds = $elapsed })
+  if ($exit -ne 0) {
+    $script:lastFailure = Get-StepFailureSummary $Name $Arguments $exit
+    throw "MVP repair step failed: $Name exit_code=$exit"
+  }
+  Assert-TimeBudget "after $Name"
+}
+
+$ProjectPath = [IO.Path]::GetFullPath($ProjectPath)
+if (-not (Test-Path -LiteralPath $ProjectPath -PathType Leaf)) { throw "ProjectPath not found: $ProjectPath" }
+$ScaffoldRoot = [IO.Path]::GetFullPath($ScaffoldRoot)
+$manifestPath = Join-Path $ScaffoldRoot 'scaffold.json'
+if (-not (Test-Path -LiteralPath $manifestPath)) { throw "scaffold.json not found: $manifestPath" }
+$manifest = Get-Content -Raw -LiteralPath $manifestPath -Encoding UTF8 | ConvertFrom-Json
+if ([int]$manifest.schema_version -ne 2 -or [string]$manifest.variables.schema -ne 'per_mnm') {
+  throw 'Unsupported scaffold variable schema. Use schema_version=2 and variables.schema=per_mnm.'
+}
+
+if (-not $ProjectName) {
+  if ($manifest.project.name) { $ProjectName = [string]$manifest.project.name } else { $ProjectName = [IO.Path]::GetFileNameWithoutExtension($ProjectPath) }
+}
+
+$manifestChecklist = ''
+if ($manifest.checklist) { $manifestChecklist = Resolve-ScaffoldPath ([string]$manifest.checklist) }
+if (-not $ChecklistPath -and $manifestChecklist) { $ChecklistPath = $manifestChecklist }
+$checklistGuard = Join-Path $scriptRoot 'assert_kv_operation_checklist.ps1'
+if (-not (Test-Path -LiteralPath $checklistGuard)) { throw "Checklist guard script not found: $checklistGuard" }
+$global:LASTEXITCODE = 0
+$checklistJson = & $checklistGuard -ChecklistPath $ChecklistPath -SearchRoots @($ScaffoldRoot, $OutRoot, $ProjectPath) -OperationName 'repair existing KV STUDIO MVP project'
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$checklistResult = ($checklistJson | ConvertFrom-Json)
+$ChecklistPath = [string]$checklistResult.checklist_path
+
+$runRoot = Join-Path $OutRoot $ProjectName
+$artifactRoot = Join-Path $runRoot 'artifacts'
+$scaffoldArtifactRoot = Join-Path $artifactRoot 'scaffold'
+$reportPath = Join-Path $runRoot 'repair_result.json'
+$agentBoundaryContractPath = ''
+New-Item -ItemType Directory -Force -Path $runRoot, $artifactRoot, $scaffoldArtifactRoot | Out-Null
+
+$scaffoldValidator = Join-Path $scriptRoot 'validate_kv_mvp_scaffold.ps1'
+$script:currentStep = 'validate_scaffold'
+& $scaffoldValidator -ScaffoldRoot $ScaffoldRoot -ChecklistPath $ChecklistPath -OutDir (Join-Path $artifactRoot 'scaffold_validation') | Out-Null
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+$uiGuardUsageCheck = Join-Path $scriptRoot 'assert_kv_mvp_ui_guard_usage.ps1'
+$script:currentStep = 'assert_ui_guard_usage'
+& $uiGuardUsageCheck -ScriptsRoot $mvpScriptRoot -OutDir (Join-Path $artifactRoot 'ui_guard_usage') | Out-Null
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+$agentBoundaryCheck = Join-Path $scriptRoot 'assert_kv_mvp_agent_boundary.ps1'
+$script:currentStep = 'assert_agent_boundary'
+$agentBoundaryJson = & $agentBoundaryCheck -ScriptsRoot $scriptRoot -MvpScriptsRoot $mvpScriptRoot -OutDir (Join-Path $artifactRoot 'agent_boundary')
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$agentBoundaryResult = ($agentBoundaryJson | ConvertFrom-Json)
+$agentBoundaryContractPath = [string]$agentBoundaryResult.contract_path
+
+$mnmEntries = @($manifest.mnm_files)
+if ($mnmEntries.Count -eq 0) { throw 'scaffold.json must contain at least one mnm_files entry.' }
+$resolvedMnmFiles = @()
+foreach ($entry in $mnmEntries) {
+  $mnmPath = Resolve-ScaffoldPath ([string]$entry.path)
+  if (-not (Test-Path -LiteralPath $mnmPath)) { throw "MNM file not found: $mnmPath" }
+  $moduleName = [string]$entry.module_name
+  if (-not $moduleName) { $moduleName = [IO.Path]::GetFileNameWithoutExtension($mnmPath) }
+  $moduleType = if ($null -ne $entry.module_type -and [string]$entry.module_type -ne '') { [int]$entry.module_type } else { 0 }
+  if (-not $entry.variables -or -not $entry.variables.global_tsv -or -not $entry.variables.local_tsv) {
+    throw "MNM entry $moduleName must define variables.global_tsv and variables.local_tsv."
+  }
+  $entryGlobalTsv = Resolve-ScaffoldPath ([string]$entry.variables.global_tsv)
+  $entryLocalTsv = Resolve-ScaffoldPath ([string]$entry.variables.local_tsv)
+  if (-not (Test-Path -LiteralPath $entryGlobalTsv)) { throw "Global variable TSV not found for ${moduleName}: $entryGlobalTsv" }
+  if (-not (Test-Path -LiteralPath $entryLocalTsv)) { throw "Local variable TSV not found for ${moduleName}: $entryLocalTsv" }
+  $resolvedMnmFiles += [pscustomobject]@{
+    path = $mnmPath
+    module_name = $moduleName
+    module_type = $moduleType
+    global_tsv = $entryGlobalTsv
+    local_tsv = $entryLocalTsv
+  }
+}
+
+Get-ChildItem -LiteralPath $ScaffoldRoot -Force | ForEach-Object {
+  Copy-Item -LiteralPath $_.FullName -Destination $scaffoldArtifactRoot -Recurse -Force
+}
+$variableArtifactDir = Join-Path $artifactRoot 'variables'
+$mergedGlobal = New-MergedGlobalVariablesTsv $resolvedMnmFiles $variableArtifactDir
+
+function Write-RepairResult([bool]$Ok, [string]$Status, [string]$Message = '') {
+  $compileResultPath = Join-Path (Join-Path $artifactRoot 'copy_result') 'compile_result_copied.txt'
+  $compileText = ''
+  if (Test-Path -LiteralPath $compileResultPath) {
+    $compileText = [IO.File]::ReadAllText($compileResultPath, [Text.Encoding]::UTF8)
+  }
+  $okNeedle = (New-Cn @(0x8F6C,0x6362,0x7ED3,0x679C)) + ' OK'
+  $ngNeedle = (New-Cn @(0x8F6C,0x6362,0x7ED3,0x679C)) + ' NG'
+  [ordered]@{
+    ok = $Ok
+    status = $Status
+    message = $Message
+    elapsed_seconds = Get-ElapsedSeconds
+    timeout_seconds = $TimeoutSeconds
+    checklist_path = $ChecklistPath
+    current_step = $script:currentStep
+    scaffold_root = $ScaffoldRoot
+    scaffold_manifest = $manifestPath
+    project_name = $ProjectName
+    project_path = $ProjectPath
+    agent_allowed_phases = @('prepare_repair_scaffold_before_kv_studio_opens', 'verify_same_run_artifacts_after_runner_exits')
+    script_owned_phase = 'from first KV STUDIO launch through compile result copy'
+    agent_boundary_contract_path = $agentBoundaryContractPath
+    mnm_files = @($resolvedMnmFiles)
+    merged_global_variables_tsv = $mergedGlobal.path
+    variable_sets = @($resolvedMnmFiles | ForEach-Object {
+      [pscustomobject]@{ module_name = $_.module_name; global_tsv = $_.global_tsv; local_tsv = $_.local_tsv }
+    })
+    compile_result_path = $compileResultPath
+    compile_result_contains_ok = ($compileText.Contains($okNeedle))
+    compile_result_contains_ng = ($compileText.Contains($ngNeedle))
+    compile_result_length = $compileText.Length
+    error_code = if ($script:lastFailure -and $script:lastFailure.error_code) { [string]$script:lastFailure.error_code } elseif (-not $Ok) { 'KV_MVP_REPAIR_FAILED' } else { '' }
+    failure = $script:lastFailure
+    steps = @($steps)
+  } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding UTF8
+}
+
+try {
+  for ($i = 0; $i -lt $resolvedMnmFiles.Count; $i++) {
+    $entry = $resolvedMnmFiles[$i]
+    $importArgs = @(
+      '-MnmPath', $entry.path,
+      '-ProjectPath', $ProjectPath,
+      '-OutDir', (Join-Path $artifactRoot ("import_mnm_$($i + 1)")),
+      '-ExpectedModuleName', $entry.module_name,
+      '-ProjectSearchRoot', (Split-Path -Parent $ProjectPath),
+      '-ChecklistPath', $ChecklistPath,
+      '-SaveAfterImport',
+      '-RestartKvs', $(if ($i -eq 0) { '$true' } else { '$false' })
+    )
+    if ($DeleteExistingModulesBeforeImport) { $importArgs += '-DeleteExistingModuleBeforeImport' }
+    if ($KvsExe) { $importArgs += @('-KvsExe', $KvsExe) }
+    Invoke-MvpStep "repair_import_mnm_$($i + 1)" 'import_mnm_guarded.ps1' $importArgs
+  }
+
+  $setVariablesRoot = Join-Path $artifactRoot 'set_variables'
+  New-Item -ItemType Directory -Force -Path $setVariablesRoot | Out-Null
+  $globalVariablesPasted = $false
+  $setVariableSummaries = @()
+  for ($i = 0; $i -lt $resolvedMnmFiles.Count; $i++) {
+    $entry = $resolvedMnmFiles[$i]
+    $safeModule = ($entry.module_name -replace '[^A-Za-z0-9_.-]+', '_')
+    $moduleOutDir = Join-Path $setVariablesRoot ('module_{0:D2}_{1}' -f ($i + 1), $safeModule)
+    $setArgs = @(
+      '-ProjectPath', $ProjectPath,
+      '-GlobalVariablesTsv', $mergedGlobal.path,
+      '-LocalVariablesTsv', $entry.local_tsv,
+      '-LocalProgramName', $entry.module_name,
+      '-LocalPasteFormat', $LocalPasteFormat,
+      '-ChecklistPath', $ChecklistPath,
+      '-OutDir', $moduleOutDir
+    )
+    if ($globalVariablesPasted -or [int]$mergedGlobal.executable_global_variable_count -eq 0) { $setArgs += '-SkipGlobal' }
+    if ($AuditVariablePersistence) {
+      $setArgs += '-AuditPersistence'
+      $forbiddenLocalNames = @()
+      for ($j = 0; $j -lt $resolvedMnmFiles.Count; $j++) {
+        if ($j -eq $i) { continue }
+        $forbiddenLocalNames += @(Get-ExecutableVariableNames $resolvedMnmFiles[$j].local_tsv 'local')
+      }
+      $forbiddenLocalNames = @($forbiddenLocalNames | Where-Object { $_ } | Select-Object -Unique)
+      if ($forbiddenLocalNames.Count -gt 0) { $setArgs += @('-ForbiddenLocalNamesCsv', ($forbiddenLocalNames -join ',')) }
+    }
+    Invoke-MvpStep "repair_set_variables_$($entry.module_name)" 'set_variables_guarded.ps1' $setArgs
+    if ([int]$mergedGlobal.executable_global_variable_count -gt 0) { $globalVariablesPasted = $true }
+    $setVariableSummaries += [pscustomobject]@{
+      module_name = $entry.module_name
+      global_pasted_in_this_step = (-not ($setArgs -contains '-SkipGlobal'))
+      local_tsv = $entry.local_tsv
+      result_path = (Join-Path $moduleOutDir 'set_variables_result.json')
+      validation_path = (Join-Path $moduleOutDir 'variable_persistence_validation.json')
+      ok = (Test-Path -LiteralPath (Join-Path $moduleOutDir 'set_variables_result.json'))
+    }
+  }
+  [pscustomobject]@{
+    Ok = $true
+    Basis = 'repair runner applied merged globals once and each MNM local variable TSV to its own module/program'
+    MergedGlobalVariablesTsv = $mergedGlobal.path
+    ExecutableGlobalVariableCount = $mergedGlobal.executable_global_variable_count
+    ModuleResults = $setVariableSummaries
+  } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $setVariablesRoot 'variable_persistence_validation.json') -Encoding UTF8
+
+  Invoke-MvpStep 'repair_compile_convert' 'compile_and_copy_result_bounded.ps1' @(
+    '-ProjectPath', $ProjectPath,
+    '-OutDir', (Join-Path $artifactRoot 'compile_convert'),
+    '-WaitSeconds', '40',
+    '-ChecklistPath', $ChecklistPath,
+    '-ConvertAction', 'CtrlF9'
+  )
+
+  Invoke-MvpStep 'repair_copy_convert_result' 'copy_convert_result_from_tree_handle.ps1' @(
+    '-ProjectNeedle', $ProjectName,
+    '-OutDir', (Join-Path $artifactRoot 'copy_result'),
+    '-ChecklistPath', $ChecklistPath,
+    '-MaxLookupMs', '1000'
+  )
+
+  $compileResultPath = Join-Path (Join-Path $artifactRoot 'copy_result') 'compile_result_copied.txt'
+  $copyText = [IO.File]::ReadAllText($compileResultPath, [Text.Encoding]::UTF8)
+  $okNeedle = (New-Cn @(0x8F6C,0x6362,0x7ED3,0x679C)) + ' OK'
+  if (-not $copyText.Contains($okNeedle)) {
+    throw 'Copied compile result does not contain the OK conversion result.'
+  }
+  Write-RepairResult $true 'pass' ''
+  exit 0
+} catch {
+  Write-RepairResult $false 'fail' $_.Exception.ToString()
+  exit 1
+}

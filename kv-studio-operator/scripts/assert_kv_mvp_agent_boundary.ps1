@@ -4,6 +4,7 @@ param(
   [string]$OutDir = '',
   [string[]]$ScriptNames = @(
     'run_kv_mvp_scaffold.ps1',
+    'run_kv_mvp_repair_existing_project.ps1',
     'run_kv_mvp_repeat.ps1',
     'mvp/create_project_local_guarded.ps1',
     'mvp/import_mnm_guarded.ps1',
@@ -102,6 +103,7 @@ $contract = [ordered]@{
     'new_kv_mvp_multi_mnm_scaffold.ps1',
     'validate_kv_mvp_scaffold.ps1',
     'run_kv_mvp_scaffold.ps1',
+    'run_kv_mvp_repair_existing_project.ps1',
     'run_kv_mvp_repeat.ps1'
   )
   runner_owned_scripts = $ScriptNames

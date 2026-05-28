@@ -211,7 +211,7 @@ function Set-CapsLockState([bool]$Enabled, [IntPtr]$TargetHwnd, [string]$Expecte
 }
 
 function Restore-KvForeground([System.Diagnostics.Process]$Process, [string]$ProjectNeedle, [string]$Action) {
-  [KvSetVarWin32]::ShowWindow($Process.MainWindowHandle, 3) | Out-Null
+  [KvSetVarWin32]::ShowWindow($Process.MainWindowHandle, 9) | Out-Null
   for ($i = 1; $i -le 10; $i++) {
     if ([KvSetVarWin32]::IsIconic($Process.MainWindowHandle)) {
       [KvSetVarWin32]::ShowWindow($Process.MainWindowHandle, 9) | Out-Null
@@ -594,6 +594,7 @@ function Invoke-GuardedVariablePaste($Form, [string]$Step, [string]$Text, [strin
     Fail-Guard 'KV_VARIABLE_CHECKPOINT_FAILED' $Step 'Paste text is empty; guarded paste refused before touching clipboard.' @()
   }
   Invoke-KvGuardedClipboardPaste -TargetHwnd ([IntPtr]$Form.Current.NativeWindowHandle) -Step $Step -Text $Text -ExpectedTitleLike '*变量编辑*' -SleepMs $SleepMs
+  Assert-NoKvsModal $script:ProcessIdForVariables "$Step paste result"
   return (Wait-VariableForm $script:ProcessIdForVariables 6)
 }
 
@@ -633,10 +634,56 @@ function Assert-NoDirectInputFast([int]$ProcessIdValue, [string]$Stage) {
   Log "no DirectInput/1265 at $Stage"
 }
 
+function Get-KvsModalEvidence($Window, [string]$Stage) {
+  $safeStage = Convert-SafeFileName $Stage
+  if ($safeStage.Length -gt 80) { $safeStage = $safeStage.Substring(0, 80).Trim('_') }
+  if ([string]::IsNullOrWhiteSpace($safeStage)) { $safeStage = 'modal' }
+
+  $children = $Window.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+  $text = [System.Text.StringBuilder]::new()
+  $items = @()
+  for ($j = 0; $j -lt $children.Count; $j++) {
+    $child = $children.Item($j)
+    $name = [string]$child.Current.Name
+    if ($name) { [void]$text.Append($name + "`n") }
+    $items += [pscustomobject]@{
+      name = $name
+      automation_id = [string]$child.Current.AutomationId
+      control_type = [string]$child.Current.ControlType.ProgrammaticName
+      class_name = [string]$child.Current.ClassName
+    }
+  }
+  $modalText = $text.ToString().Trim()
+  $dumpPath = Join-Path $OutDir "modal_at_$safeStage.json"
+  $textPath = Join-Path $OutDir "modal_text_$safeStage.txt"
+  [pscustomobject]@{
+    stage = $Stage
+    title = [string]$Window.Current.Name
+    class_name = [string]$Window.Current.ClassName
+    text = $modalText
+    items = $items
+  } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $dumpPath -Encoding UTF8
+  Set-Content -LiteralPath $textPath -Value $modalText -Encoding UTF8
+  [pscustomobject]@{
+    text = $modalText
+    dump_path = $dumpPath
+    text_path = $textPath
+  }
+}
+
+function Get-KvsModalErrorCode([string]$Text) {
+  if ($Text -like '*粘贴数据中存在错误*' -or $Text -like '*已跳过部分数据粘贴*') {
+    return 'KV_VARIABLE_PASTE_DATA_ERROR'
+  }
+  return 'KV_MODAL_PRESENT'
+}
+
 function Assert-NoKvsModalFast([int]$ProcessIdValue, [string]$Stage) {
   foreach ($window in (Get-TopLevelWindowElementsForProcess $ProcessIdValue)) {
     if ([string]$window.Current.ClassName -eq '#32770' -and [string]$window.Current.Name -eq 'KV STUDIO') {
-      Fail-Guard 'KV_MODAL_PRESENT' $Stage "KV STUDIO modal dialog detected at $Stage." @()
+      $modal = Get-KvsModalEvidence $window $Stage
+      $code = Get-KvsModalErrorCode $modal.text
+      Fail-Guard $code $Stage "KV STUDIO modal dialog detected at $Stage. text=$($modal.text)" @($modal.dump_path, $modal.text_path)
     }
   }
 }
@@ -665,6 +712,20 @@ function Convert-GlobalRows([string]$Path) {
     ) -join "`t"
   }
   ($lines -join "`r`n") + "`r`n"
+}
+
+function Test-SoftDeviceLikeVariableName([string]$Name) {
+  if ([string]::IsNullOrWhiteSpace($Name)) { return $false }
+  return ($Name -match '^(X|Y|R|MR|LR|CR|B|VB|DM|EM|FM|ZF|W|TM|TC|TS|CM|CC|CS|T|C)\d+([._][A-Za-z0-9]+)?$')
+}
+
+function Assert-NoSoftDeviceLikeVariableNames([object[]]$Rows, [string]$Scope, [string]$SourcePath) {
+  $bad = @($Rows | Where-Object { Test-SoftDeviceLikeVariableName ([string]$_.name) } | ForEach-Object { [string]$_.name } | Select-Object -Unique)
+  if ($bad.Count -gt 0) {
+    $evidencePath = Join-Path $OutDir "${Scope}_soft_device_like_variable_names.txt"
+    Set-Content -LiteralPath $evidencePath -Value ($bad -join "`r`n") -Encoding UTF8
+    Fail-Guard 'KV_VARIABLE_NAME_SOFT_DEVICE_CONFLICT' "preflight $Scope variable names" "Variable name(s) look like KV soft-device names and are rejected before paste: $($bad -join ', '). Source=$SourcePath" @($SourcePath, $evidencePath)
+  }
 }
 
 function Convert-LocalRows([string]$Path) {
@@ -723,17 +784,9 @@ function Assert-NoKvsModal([int]$ProcessIdValue, [string]$Stage) {
     if ([string]$item.Current.ControlType.ProgrammaticName -eq 'ControlType.Window' -and
         [string]$item.Current.ClassName -eq '#32770' -and
         [string]$item.Current.Name -eq 'KV STUDIO') {
-      $dumpName = "modal_at_$($Stage).json"
-      Write-VariableFormDump (Get-VariableForm $ProcessIdValue) $dumpName
-      $text = [System.Text.StringBuilder]::new()
-      $children = $item.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
-      for ($j = 0; $j -lt $children.Count; $j++) {
-        $name = [string]$children.Item($j).Current.Name
-        if ($name) { [void]$text.Append($name + "`n") }
-      }
-      $textPath = Join-Path $OutDir "modal_text_$($Stage).txt"
-      Set-Content -LiteralPath $textPath -Value $text.ToString() -Encoding UTF8
-      Fail-Guard 'KV_MODAL_PRESENT' $Stage "KV STUDIO modal dialog detected. text=$($text.ToString().Trim())" @((Join-Path $OutDir $dumpName), $textPath)
+      $modal = Get-KvsModalEvidence $item $Stage
+      $code = Get-KvsModalErrorCode $modal.text
+      Fail-Guard $code $Stage "KV STUDIO modal dialog detected. text=$($modal.text)" @($modal.dump_path, $modal.text_path)
     }
   }
 }
@@ -981,6 +1034,8 @@ try {
   $localText = Convert-LocalRows $LocalVariablesTsv
   $globalRows = Get-DefinedVariableRows $GlobalVariablesTsv 'global'
   $localRows = Get-DefinedVariableRows $LocalVariablesTsv 'local'
+  Assert-NoSoftDeviceLikeVariableNames $globalRows 'global' $GlobalVariablesTsv
+  Assert-NoSoftDeviceLikeVariableNames $localRows 'local' $LocalVariablesTsv
   $definedGlobalNames = @($globalRows | ForEach-Object { [string]$_.name } | Where-Object { $_ })
   $definedLocalNames = @($localRows | ForEach-Object { [string]$_.name } | Where-Object { $_ })
   Log "decoded executable global variable rows=$($definedGlobalNames.Count): $($definedGlobalNames -join ',')"

@@ -89,6 +89,18 @@ function Test-MnmReferencesName([string]$Text, [string]$Name) {
   return [regex]::IsMatch($Text, $pattern)
 }
 
+function Test-SoftDeviceLikeVariableName([string]$Name) {
+  if ([string]::IsNullOrWhiteSpace($Name)) { return $false }
+  return ($Name -match '^(X|Y|R|MR|LR|CR|B|VB|DM|EM|FM|ZF|W|TM|TC|TS|CM|CC|CS|T|C)\d+([._][A-Za-z0-9]+)?$')
+}
+
+function Assert-NoSoftDeviceLikeVariableRows([object[]]$Rows, [string]$Scope, [string]$Path) {
+  $bad = @($Rows | Where-Object { Test-SoftDeviceLikeVariableName ([string]$_.name) } | ForEach-Object { [string]$_.name } | Select-Object -Unique)
+  if ($bad.Count -gt 0) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_VARIABLE_NAME_SOFT_DEVICE_CONFLICT' "$Scope variable name(s) look like KV soft-device names and will be rejected by KV STUDIO variable paste: $($bad -join ', ')" @($Path)
+  }
+}
+
 function Get-FileHashText([string]$Path) {
   if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return '' }
   (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
@@ -165,6 +177,8 @@ foreach ($entry in $mnmEntries) {
   $localRows = Read-TsvRows $entryLocalTsv $requiredTsvColumns "local variable TSV for $moduleName"
   $definedGlobalRows = @(Get-ExecutableRows $globalRows 'global')
   $definedLocalRows = @(Get-ExecutableRows $localRows 'local')
+  Assert-NoSoftDeviceLikeVariableRows $definedGlobalRows 'global' $entryGlobalTsv
+  Assert-NoSoftDeviceLikeVariableRows $definedLocalRows 'local' $entryLocalTsv
   if ($definedLocalRows.Count -eq 0) {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_LOCAL_VARIABLES_EMPTY' "local variable TSV must contain executable local rows for module/program $moduleName." @($entryLocalTsv)
   }
@@ -249,6 +263,12 @@ if ($sourceModel) {
     foreach ($instruction in @($module.mnm.instructions | ForEach-Object { [string]$_ } | Where-Object { $_ })) {
       if ($mnmText -notmatch ('(?m)^' + [regex]::Escape($instruction) + '\s*$')) {
         Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' "Generated MNM for $moduleName is missing model instruction: $instruction" @($sourceModelPath, $mnmPath)
+      }
+    }
+    foreach ($stLine in @($module.mnm.st_lines | ForEach-Object { [string]$_ })) {
+      $renderedLine = if ($stLine.StartsWith(';')) { $stLine } else { ';' + $stLine }
+      if ($mnmText -notmatch ('(?m)^' + [regex]::Escape($renderedLine) + '\s*$')) {
+        Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' "Generated MNM for $moduleName is missing model ST line: $renderedLine" @($sourceModelPath, $mnmPath)
       }
     }
   }

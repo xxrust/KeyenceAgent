@@ -156,7 +156,7 @@ function Assert-KvUiForegroundHwnd {
 
   if ($AllowSingleRecovery) {
     $recoveryPath = Write-KvUiGuardCheckpoint -Step $Step -Status 'recovery_before' -Action 'restore foreground once' -Expected @{ hwnd = $ExpectedHwnd.ToInt64(); title_like = $ExpectedTitleLike } -Before $before -ErrorCode (Get-KvUiGuardForegroundErrorCode $before $ExpectedHwnd) -Message 'Foreground did not match target; attempting one controlled recovery.'
-    [KvSharedUiGuardWin32]::ShowWindow($ExpectedHwnd, 3) | Out-Null
+    [KvSharedUiGuardWin32]::ShowWindow($ExpectedHwnd, 9) | Out-Null
     [KvSharedUiGuardWin32]::SetForegroundWindow($ExpectedHwnd) | Out-Null
     Start-Sleep -Milliseconds 180
     $afterRecovery = Get-KvForegroundSnapshot

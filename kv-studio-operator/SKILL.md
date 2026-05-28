@@ -19,7 +19,7 @@ Set these paths before running commands:
 Terms:
 
 - `Scaffold`: source files that define one KV STUDIO project task.
-- `Runner`: `scripts\run_kv_mvp_scaffold.ps1`; it owns KV STUDIO operation.
+- `Runner`: `scripts\run_kv_mvp_scaffold.ps1` for fresh projects or `scripts\run_kv_mvp_repair_existing_project.ps1` for existing project repair; the runner owns KV STUDIO operation.
 - `Same-run artifact`: evidence written under the current runner output directory during the current command.
 
 ## Route
@@ -37,7 +37,7 @@ Use this route for new simple KV STUDIO projects:
 
 Agent participation boundary:
 
-- Before KV STUDIO opens, the agent may create/edit scaffold files, run validation, and start `run_kv_mvp_scaffold.ps1` or `run_kv_mvp_repeat.ps1`.
+- Before KV STUDIO opens, the agent may create/edit scaffold files, run validation, and start `run_kv_mvp_scaffold.ps1`, `run_kv_mvp_repair_existing_project.ps1`, or `run_kv_mvp_repeat.ps1`.
 - From the first KV STUDIO launch through compile-result copy, operation is script-owned. The agent must not inspect the live UI, decide the next UI action, paste into KV STUDIO, click, type, or call child MVP scripts as a normal path.
 - After the runner exits, the agent may verify only same-run artifacts such as `mvp_result.json`, `repeat_result.json`, copied compile text, variable persistence JSON, and guard checkpoints.
 - If the runner fails, diagnose from result JSON and artifacts first. Any further KV STUDIO operation must start as a fresh runner command after scaffold/script repair, not as an in-window manual continuation.
@@ -72,6 +72,17 @@ Run scaffold:
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_mvp_scaffold.ps1" `
   -ScaffoldRoot $ScaffoldRoot `
   -OutRoot (Join-Path $WorkRoot 'mvp_runs') `
+  -TimeoutSeconds 600
+```
+
+Repair an existing project from a corrected scaffold:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_mvp_repair_existing_project.ps1" `
+  -ProjectPath '<existing-project.kpr>' `
+  -ScaffoldRoot $ScaffoldRoot `
+  -OutRoot (Join-Path $WorkRoot 'mvp_repair_runs') `
+  -DeleteExistingModulesBeforeImport `
   -TimeoutSeconds 600
 ```
 
@@ -143,6 +154,7 @@ Agents normally call only:
 - `scripts\new_kv_mvp_multi_mnm_scaffold.ps1`
 - `scripts\validate_kv_mvp_scaffold.ps1`
 - `scripts\run_kv_mvp_scaffold.ps1`
+- `scripts\run_kv_mvp_repair_existing_project.ps1`
 - `scripts\run_kv_mvp_repeat.ps1`
 
 Child scripts under `scripts\mvp\` are runner-owned. Call them directly only when diagnosing a failed runner step.
