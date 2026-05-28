@@ -96,6 +96,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_m
 
 Edit only scaffold source files before running KV STUDIO:
 
+- `scaffold.model.json` when present. This is the source of truth for structured scaffolds.
 - `mnm\*.mnm`
 - `scaffold.json.mnm_files[].variables.global_tsv`
 - `scaffold.json.mnm_files[].variables.local_tsv`
@@ -104,6 +105,8 @@ Edit only scaffold source files before running KV STUDIO:
 - `CHECKLIST.md`
 
 Do not hand-edit generated runner artifacts.
+
+For structured scaffolds, edit `scaffold.model.json` first and then run `scripts\render_kv_mvp_scaffold_model.ps1`. Treat generated MNM and TSV files as KV STUDIO adapter artifacts. Edit generated MNM/TSV directly only for diagnosis or for legacy scaffolds without `scaffold.model.json`.
 
 Variable files are per MNM/module. Do not assume one project-level `variables\global_variables.tsv` or `variables\local_variables.tsv`. For each `scaffold.json.mnm_files[]` entry, edit the MNM file named by `path`, then edit that entry's paired `variables.global_tsv` and `variables.local_tsv`.
 

@@ -89,6 +89,11 @@ function Test-MnmReferencesName([string]$Text, [string]$Name) {
   return [regex]::IsMatch($Text, $pattern)
 }
 
+function Get-FileHashText([string]$Path) {
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return '' }
+  (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+}
+
 if (-not (Test-Path -LiteralPath $ScaffoldRoot -PathType Container)) {
   Stop-ScaffoldValidation 'KV_SCAFFOLD_ROOT_MISSING' "ScaffoldRoot not found: $ScaffoldRoot"
 }
@@ -110,6 +115,21 @@ if ([int]$manifest.schema_version -ne 2) {
 }
 if ([string]$manifest.variables.schema -ne 'per_mnm') {
   Stop-ScaffoldValidation 'KV_SCAFFOLD_VARIABLE_SCHEMA_INVALID' 'scaffold.json variables.schema must be per_mnm. Top-level variables.global_tsv/local_tsv is not authoritative.' @($manifestPath)
+}
+
+$sourceModelPath = ''
+$sourceModel = $null
+if ($manifest.source_model) {
+  $sourceModelPath = Resolve-ScaffoldPath ([string]$manifest.source_model)
+  Assert-File $sourceModelPath 'scaffold source model'
+  try {
+    $sourceModel = Get-Content -Raw -LiteralPath $sourceModelPath -Encoding UTF8 | ConvertFrom-Json
+  } catch {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_INVALID_JSON' "scaffold.model.json is not valid JSON: $($_.Exception.Message)" @($sourceModelPath)
+  }
+  if ([int]$sourceModel.schema_version -ne 1) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_SCHEMA_UNSUPPORTED' 'scaffold.model.json must use schema_version=1.' @($sourceModelPath)
+  }
 }
 
 $mnmEntries = @($manifest.mnm_files)
@@ -198,6 +218,42 @@ foreach ($entry in $mnmEntries) {
   }
 }
 
+if ($sourceModel) {
+  $modelModules = @($sourceModel.modules)
+  if ($modelModules.Count -ne $mnmEntries.Count) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' "scaffold.model.json module count does not match scaffold.json mnm_files count. model=$($modelModules.Count) manifest=$($mnmEntries.Count)" @($sourceModelPath, $manifestPath)
+  }
+  foreach ($module in $modelModules) {
+    $moduleName = [string]$module.name
+    $entry = @($mnmEntries | Where-Object { [string]$_.module_name -eq $moduleName } | Select-Object -First 1)
+    if ($entry.Count -eq 0) {
+      Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' "Module from scaffold.model.json is missing from scaffold.json: $moduleName" @($sourceModelPath, $manifestPath)
+    }
+    $entryObj = $entry[0]
+    $mnmPath = Resolve-ScaffoldPath ([string]$entryObj.path)
+    $entryGlobalTsv = Resolve-ScaffoldPath ([string]$entryObj.variables.global_tsv)
+    $entryLocalTsv = Resolve-ScaffoldPath ([string]$entryObj.variables.local_tsv)
+    $globalRows = Read-TsvRows $entryGlobalTsv $requiredTsvColumns "global variable TSV for $moduleName model check"
+    $localRows = Read-TsvRows $entryLocalTsv $requiredTsvColumns "local variable TSV for $moduleName model check"
+    $actualGlobals = @(Get-ExecutableRows $globalRows 'global' | ForEach-Object { [string]$_.name } | Sort-Object)
+    $expectedGlobals = @(@($module.variables.global) | ForEach-Object { [string]$_.name } | Sort-Object)
+    $actualLocals = @(Get-ExecutableRows $localRows 'local' | ForEach-Object { [string]$_.name } | Sort-Object)
+    $expectedLocals = @(@($module.variables.local) | ForEach-Object { [string]$_.name } | Sort-Object)
+    if ((Compare-Object $expectedGlobals $actualGlobals).Count -gt 0) {
+      Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' "Generated global TSV for $moduleName does not match scaffold.model.json variable names." @($sourceModelPath, $entryGlobalTsv)
+    }
+    if ((Compare-Object $expectedLocals $actualLocals).Count -gt 0) {
+      Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' "Generated local TSV for $moduleName does not match scaffold.model.json variable names." @($sourceModelPath, $entryLocalTsv)
+    }
+    $mnmText = [Text.Encoding]::Unicode.GetString([IO.File]::ReadAllBytes($mnmPath))
+    foreach ($instruction in @($module.mnm.instructions | ForEach-Object { [string]$_ } | Where-Object { $_ })) {
+      if ($mnmText -notmatch ('(?m)^' + [regex]::Escape($instruction) + '\s*$')) {
+        Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' "Generated MNM for $moduleName is missing model instruction: $instruction" @($sourceModelPath, $mnmPath)
+      }
+    }
+  }
+}
+
 $payload = [ordered]@{
   ok = $true
   operation = 'validate KV MVP scaffold'
@@ -208,6 +264,8 @@ $payload = [ordered]@{
   cpu_model = [string]$manifest.project.cpu_model
   local_program = [string]$manifest.project.local_program
   variable_schema = 'per_mnm'
+  source_model = $sourceModelPath
+  source_model_hash = Get-FileHashText $sourceModelPath
   variable_sets = $variableSetChecks
   executable_global_variable_count = $globalDefinitions.Count
   executable_local_variable_count = @($variableSetChecks | ForEach-Object { $_.executable_local_variable_count } | Measure-Object -Sum).Sum
