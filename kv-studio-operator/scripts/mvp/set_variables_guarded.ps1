@@ -800,7 +800,7 @@ function Paste-GlobalVariablesByFirstNameTab($Form, [string]$Text) {
   $formNow = Invoke-GuardedVariableKeyAction $formNow 'global first-name Tab' '{TAB}' 'Tab to select first global variable name cell' 150
   Log 'sent guarded Tab to select first global variable name cell'
 
-  $formNow = Invoke-GuardedVariablePaste $formNow 'global variables Ctrl+V' $Text 'Ctrl+V global variables from first name cell' 900
+  $formNow = Invoke-GuardedVariablePaste $formNow 'global variables Ctrl+V' $Text 'Ctrl+V global variables from first name cell' 300
   Log "pasted global variables from first name cell text length=$($Text.Length)"
 }
 
@@ -824,7 +824,7 @@ function Paste-LocalVariablesByTabPgDn($Form, [string]$Text, [string]$ProgramNam
   $formNow = Invoke-GuardedVariableKeyAction $formNow 'local last-row PgDn' '{PGDN}' 'PgDn to move to last local variable row' 250
   Log 'sent guarded PgDn to move to last local variable row'
 
-  $formNow = Invoke-GuardedVariablePaste $formNow 'local variables Ctrl+V' $Text 'Ctrl+V local variables by Tab/PgDn route' 800
+  $formNow = Invoke-GuardedVariablePaste $formNow 'local variables Ctrl+V' $Text 'Ctrl+V local variables by Tab/PgDn route' 300
   Log "pasted local variables by Tab/PgDn route text length=$($Text.Length)"
 }
 
