@@ -1,5 +1,8 @@
 *
 !.gitignore
+!/README.md
+!/docs/
+!/docs/**
 !/keyence-plc-programmer/
 !/keyence-plc-programmer/**
 !/kv-studio-kb-programming/
