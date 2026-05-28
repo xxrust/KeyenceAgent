@@ -1,291 +1,188 @@
 ---
 name: kv-studio-operator
-description: Operate KEYENCE KV STUDIO from Codex or a Windows editor VM. Use when the task requires creating KV STUDIO projects, selecting CPU/unit configuration, exporting or importing mnemonic list MNM files, importing official FB/function block libraries, editing global/local variables through the variable editor, running Ctrl+F2 compile/convert verification, or collecting KV STUDIO error text without relying on mouse clicks.
+description: Operate KEYENCE KV STUDIO from Codex or a Windows editor VM. Use when the task requires creating KV STUDIO projects, importing/exporting MNM mnemonic lists, editing global/local variables, compiling/converting, copying KV STUDIO result text, or running the scaffold runner workflow for a disposable PLC project.
 ---
 
 # KV STUDIO Operator
 
-## Scope
+## Contract
 
-Use this skill for KV STUDIO UI and project-operation work. Pair it with `keyence-plc-programmer` when logic must be designed or modified, and with `plc-editor-cluster-access` / `windows-vm-codex-operator` when work happens on one of the Windows editor VMs.
+Use scripts, not ad hoc UI operation.
 
-Verified VM baseline:
+Set these paths before running commands:
 
-- KV STUDIO Ver.12G launcher: `C:\Program Files (x86)\KEYENCE\KVS12G\KvsLauncher.exe`
-- KV STUDIO Ver.12G main executable: `C:\Program Files (x86)\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe`
-- On the current local workstation, the Start Menu shortcut resolves to `D:\KEYENCE\KVS12G\KvsLauncher.exe`, with the main executable at `D:\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe`. Do not hard-code `C:\Program Files (x86)`; resolve the Start Menu shortcut or use `keyence-plc-programmer\scripts\resolve_kvstudio_local.ps1` before launching KV STUDIO.
-- Observed version: `12.40.0.0`
-- Start Menu shortcut: `C:\ProgramData\Microsoft\Windows\Start Menu\Programs\KEYENCE KV STUDIO Ver.12G\KV STUDIO Ver.12G.lnk`
+- `SkillRoot`: this skill directory.
+- `WorkRoot`: disposable working directory, normally `C:\Users\Public\KVSkillPractice`.
+- `ScaffoldRoot`: one task's scaffold directory under `WorkRoot\scaffolds`.
+- `OutRoot`: runner output directory under `WorkRoot\mvp_runs`.
 
-## Operating Rules
+Terms:
 
-- Reserve an idle Windows editor VM before touching KV STUDIO in a VM.
-- For UI work in a VM, prefer `windows-vm-codex-operator` with `codex-run --transport ui`; do not rely on noVNC except as a slow visual fallback.
-- Before UI work, verify a logged-on Windows desktop session exists. `codex-run --transport ui` uses the logged-on user's `InteractiveToken`; it cannot operate KV STUDIO from QGA Session 0 when no interactive user is logged on.
-- Return VM evidence through files under `C:\Users\Public\KVSkillPractice` or `C:\Users\Public\CodexRemoteTasks`, then read them back through QGA/`ps`.
-- Keyboard sequences and clipboard operations are allowed only after the exact target dialog/control has been identified. Do not use global `SendKeys`, typed text, paste, `Enter`, or accelerator fallback when KV STUDIO focus could be in the ladder/program editor.
-- KV STUDIO operation scripts must be checklist-gated. Before launching, restarting, importing, editing variables, compiling, or copying KV STUDIO result text, the script must find a non-empty `CHECKLIST.md` / `kv_operation_checklist.md`, an explicit `-ChecklistPath`, or `KV_STUDIO_OPERATION_CHECKLIST`. If the checklist is missing, the script must fail before initializing UIAutomation or touching KV STUDIO.
-- Before sending any user-validated accelerator such as `Alt+F,R,S`, explicitly verify the foreground window title starts with `KV STUDIO` and matches the intended project. A passing UIA safety scan alone is not enough; accelerators go to the foreground window.
-- Before sending accelerators, prove KV STUDIO is actually restored and foreground, not merely running or visible in the taskbar. If the window is minimized or another window remains foreground, the route is blocked; do not send accelerators.
-- Before sending accelerators, normalize and record keyboard/input state. On this workstation, use a deterministic CapsLock/English-keyboard path for menu accelerator delivery; a Chinese IME state can consume or alter shortcut characters.
-- Before any script sends keyboard input or clicks a generic OK/Insert/Overwrite control, run `scripts/assert_kvstudio_ui_safe.ps1` or perform an equivalent UIA guard check. If the ladder edit inline bar (`覆盖(O)`, `插入(I)`, `取消(C)`) is visible in the editor area, it is not an MNM import confirmation. Immediately verify KV STUDIO is foreground, invoke the identified `取消(C)` button through UIA `InvokePattern`, record evidence, and stop the current workflow for root-cause analysis. `Alt+C` is not a deterministic automation recovery unless the target control focus has been proven in that run. A KV STUDIO modal message such as `未输入任何内容。` is also a fail-closed state.
-- Do not create the ladder inline edit bar as part of recovery or probing. The root cause observed on 2026-05-26 was treating AutomationId `1265` as an MNM file-path field; the same edit control belongs to the ladder inline edit bar. Writing an MNM path there creates the hazardous input state. MNM import scripts must require a verified standard file-open dialog or a separately proven MNM picker. If that dialog is absent, fail and close the bad KV STUDIO state.
-- UI automation must fail closed: if the expected export/import/file dialog is not found by class/name/control identity, write a failure report and exit. Never fall back to typing into the active window.
-- User-validated accelerator workflows from `C:\Users\liangyuhang\Documents\Obsidian Vault\KV_Agent操作指南.md` are authoritative. Use them first when their preconditions are satisfied. If you do not use one, record the exact missing precondition, interference, or timing evidence; do not silently replace it with a slower UIA/menu-click path.
-- Prefer MNM export/edit/import for program changes; use direct UI editing only when MNM import cannot express the change.
-- Import official FBs/modules only from the official project/package path chosen for the task; do not import whole user program logic as a shortcut.
-- Rebuild variables explicitly after MNM import; imported MNM program bodies can lose variable definitions.
-- Treat successful compile/convert verification as the required gate; a project that fails Ctrl+F2 is not complete.
+- `Scaffold`: source files that define one KV STUDIO project task.
+- `Runner`: `scripts\run_kv_mvp_scaffold.ps1`; it owns KV STUDIO operation.
+- `Same-run artifact`: evidence written under the current runner output directory during the current command.
 
-## Scaffold-First MVP Workflow
+## Route
 
-Use this workflow for new simple KV STUDIO tasks. Do not hard-code the traffic-light program as the automation route. The repeatable route is: generate a scaffold, let the agent edit the scaffold files for the task, then run the one-click scaffold runner against KV STUDIO.
+Use this route for new simple KV STUDIO projects:
 
-Create a scaffold:
+| Step | Command | Pass condition | Stop condition |
+| --- | --- | --- | --- |
+| Create scaffold | `scripts\new_kv_mvp_scaffold.ps1` | `scaffold.json` and `CHECKLIST.md` exist | Script exits nonzero |
+| Edit scaffold | Agent edits scaffold files only | Each MNM and its paired variable TSVs, task notes, version notes reflect the task | Required files missing or ambiguous |
+| Validate scaffold | `scripts\validate_kv_mvp_scaffold.ps1` | `scaffold_validation.json.ok=true` | Any `KV_SCAFFOLD_*` or checklist error |
+| Run KV STUDIO | `scripts\run_kv_mvp_scaffold.ps1` | `mvp_result.json.ok=true` | Any child step fails |
+| Prove repeatability | `scripts\run_kv_mvp_repeat.ps1` | `repeat_result.json.ok=true` after 3 consecutive passes | Any failed attempt resets consecutive pass count |
+| Report | Read current-run artifacts | Report result path and evidence paths | Do not use old run artifacts |
+
+Agent participation boundary:
+
+- Before KV STUDIO opens, the agent may create/edit scaffold files, run validation, and start `run_kv_mvp_scaffold.ps1` or `run_kv_mvp_repeat.ps1`.
+- From the first KV STUDIO launch through compile-result copy, operation is script-owned. The agent must not inspect the live UI, decide the next UI action, paste into KV STUDIO, click, type, or call child MVP scripts as a normal path.
+- After the runner exits, the agent may verify only same-run artifacts such as `mvp_result.json`, `repeat_result.json`, copied compile text, variable persistence JSON, and guard checkpoints.
+- If the runner fails, diagnose from result JSON and artifacts first. Any further KV STUDIO operation must start as a fresh runner command after scaffold/script repair, not as an in-window manual continuation.
+
+Create scaffold:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File `
-  C:\Users\liangyuhang\.codex\skills\kv-studio-operator\scripts\new_kv_mvp_scaffold.ps1 `
-  -ScaffoldRoot C:\Users\Public\KVSkillPractice\scaffolds\<task-id> `
-  -ProjectName <project-name> `
+$SkillRoot = '<path-to-kv-studio-operator-skill>'
+$WorkRoot = 'C:\Users\Public\KVSkillPractice'
+$ScaffoldRoot = Join-Path $WorkRoot 'scaffolds\<task-id>'
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\new_kv_mvp_scaffold.ps1" `
+  -ScaffoldRoot $ScaffoldRoot `
+  -ProjectName '<project-name>' `
   -CpuModel KV-X310 `
   -ModuleName Main_MVP `
   -Template Minimal `
   -TaskSummary '<task summary>'
 ```
 
-The scaffold contains:
-
-- `scaffold.json`: manifest with project name, CPU model, local program name, MNM list, and variable TSV paths.
-- `mnm\*.mnm`: mnemonic-list files imported into KV STUDIO. These are the primary program-body handoff files. For ordinary scan-executed user programs, use `;MODULE_TYPE:0`; `;MODULE_TYPE:2` creates a function block and is not a replacement for a scan-executed module.
-- `variables\global_variables.tsv`: global variable rows using the scaffold schema.
-- `variables\local_variables.tsv`: local variable rows using the scaffold schema and the target local program.
-- `TASK.md`: task intent and acceptance notes.
-- `VERSION.md`: project/scaffold version notes.
-- `CHECKLIST.md`: mandatory operation checklist. The one-click runner and all KV STUDIO MVP sub-scripts refuse to operate without this file or an explicit checklist path.
-
-Agent fill rule:
-
-1. Read `scaffold.json`.
-2. Edit `mnm\*.mnm` for the requested PLC behavior.
-3. Edit `variables\global_variables.tsv` and `variables\local_variables.tsv` for required variables.
-4. Update `TASK.md` and `VERSION.md` with implemented behavior, IO mapping, assumptions, and validation target.
-5. Complete or update `CHECKLIST.md` before running any KV STUDIO script.
-6. Run the scaffold through KV STUDIO:
+Validate scaffold:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File `
-  C:\Users\liangyuhang\.codex\skills\kv-studio-operator\scripts\run_kv_mvp_scaffold.ps1 `
-  -ScaffoldRoot C:\Users\Public\KVSkillPractice\scaffolds\<task-id> `
-  -OutRoot C:\Users\Public\KVSkillPractice\mvp_runs `
-  -TimeoutSeconds 300
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\validate_kv_mvp_scaffold.ps1" `
+  -ScaffoldRoot $ScaffoldRoot `
+  -OutDir (Join-Path $ScaffoldRoot '_validation')
 ```
 
-The scaffold runner owns the same validated KV STUDIO route as the traffic-light MVP: guarded project creation, MNM import, project-tree placement verification, global-variable paste by first-name `Tab`, local-variable paste by `Tab -> PgDn -> Ctrl+V`, Ctrl+F9 conversion, and conversion-result copy from the verified bottom `SysTreeView32` handle. The result gate is still `mvp_result.json` with `ok=true`, `module_placement\<module>.json` showing the expected category, and copied conversion text containing `转换结果 OK`.
-
-## Traffic-Light Compatibility Entrypoint
-
-Use this compatibility wrapper only when the task is specifically to reproduce the traffic-light MVP from skill/knowledge. The wrapper now creates a `TrafficLight` scaffold and then delegates to `run_kv_mvp_scaffold.ps1`; keep new tasks on the scaffold-first route above.
-
-Run the bundled entrypoint directly; do not reconstruct the workflow from chat history or temporary validation logs:
+Run scaffold:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File `
-  C:\Users\liangyuhang\.codex\skills\kv-studio-operator\scripts\run_traffic_light_mvp.ps1 `
-  -OutRoot C:\Users\Public\KVSkillPractice\mvp_runs `
-  -ProjectName TrafficLightMVP_<timestamp> `
-  -CpuModel KV-X310 `
-  -TimeoutSeconds 300
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_mvp_scaffold.ps1" `
+  -ScaffoldRoot $ScaffoldRoot `
+  -OutRoot (Join-Path $WorkRoot 'mvp_runs') `
+  -TimeoutSeconds 600
 ```
 
-The scaffold runner owns the route:
-
-- Creates a disposable KV STUDIO project.
-- Generates a UTF-16LE MNM import file that contains the required Chinese names in comments and uses ASCII executable identifiers for ST parser compatibility.
-- Imports the MNM file; it must never type program text into the ladder/program editor.
-- Opens the MNM read/import command first by the user-validated `Alt+F,R,R` route. If foreground/project/input-state preconditions are proven but no standard file-open dialog appears, the bundled script may invoke the same File-menu MNM read command through UIA menu patterns. This is a controlled route correction, not permission to click coordinates or type into the editor.
-- Reconstructs global variables and local variables with their different table shapes.
-- Runs Ctrl+F2 conversion.
-- Copies the bottom conversion-result tree through the verified Win32 child HWND to UIA TreeItem route.
-
-Required output contract:
-
-- `mvp_result.json`: primary pass/fail artifact. `ok` must be `true`, `elapsed_seconds` must be `<= 300`, and `compile_result_contains_ok` must be `true`.
-- `artifacts\copy_result\compile_result_copied.txt`: copied KV STUDIO conversion result. It must contain `转换结果 OK`.
-- `artifacts\artifact_encoding_check.json`: confirms MNM/variable artifacts contain the required Chinese names before import.
-
-Failure criteria:
-
-- More than 300 seconds elapsed.
-- KV STUDIO was not opened and operated.
-- Any direct editor text entry or ladder inline edit bar route was used.
-- The copied result text is missing, stale, coordinate-derived without same-run verification, or lacks `转换结果 OK`.
-- The route depends on task-local process logs such as `E:\personal_project\rust_plc\out\...` instead of bundled skill scripts.
-
-## Project Creation Workflow
-
-1. Start KV STUDIO and use `Ctrl+N` for a new project.
-2. Confirm the modal window titled `新建项目` appears.
-3. Fill the project name in the `项目名(&N)` edit field.
-4. Press `Tab` to reach `支持的机型(&K)`; use arrow keys to choose the requested model.
-5. Press `Tab` to reach `位置(&P)`; enter the target directory.
-6. Press `Tab` twice to reach `注释(&C)`; enter the project note if needed.
-7. Press `Tab` three times to focus `OK`, then press `Enter`.
-8. In administrator settings, keep `admin` unless the task requires another user.
-9. Enter the password twice. Default local test password: `a82701767`.
-10. For custom passwords, enforce 8-64 characters. Use `Alt+E` to disable user authentication and `Alt+S` to disable the two-character-class requirement only when the user requests that policy.
-11. Complete unit configuration deliberately; do not guess module families or slots when the task depends on hardware mapping.
-
-Unit configuration prompt rule:
-
-- The dialog titled `确认单元配置设定` has fixed access keys: `Alt+N` selects `否(N)` and closes the dialog; `Alt+Y` selects `是(Y)` and opens the unit editor.
-- For minimal programming/MNM/variable/compile validation where unit configuration is not part of the task, use `Alt+N` only after proving this exact dialog title and class `#32770` are foreground. Do not search generic buttons or treat an arbitrary `#32770` as a file dialog.
-- Use `Alt+Y` only when the current task explicitly requires entering the unit editor.
-
-Verified new-project dialog controls include:
-
-- `项目名(&N)` edit field
-- `支持的机型(&K)` combo box
-- `位置(&P)` edit field
-- `参照(&S)...` button
-- `注释(&C)` edit field
-- `OK` and `取消`
-
-On the tested VM, the default project location was `C:\Users\posen\Documents\KEYENCE\KVS12G\KVS12\KVS\PROJECT`; override it to a disposable task folder such as `C:\Users\Public\KVSkillPractice\Projects\<task-name>` during validation.
-
-## VM Data Return Workflow
-
-Use this pattern instead of noVNC for slow tunnels:
+Run repeat gate:
 
 ```powershell
-python "$env:USERPROFILE\.codex\skills\windows-vm-codex-operator\scripts\windows_vm_operator.py" ps --vmid 103 --holder-id codex-kv-skill-validation --require-reserved -- "(Get-CimInstance Win32_ComputerSystem).UserName; query user"
-python "$env:USERPROFILE\.codex\skills\windows-vm-codex-operator\scripts\windows_vm_operator.py" codex-run --vmid 103 --holder-id codex-kv-skill-validation --transport ui --workdir "C:\Windows\Temp" --prompt "Operate KV STUDIO and write reports/screenshots under C:\Users\Public\KVSkillPractice."
-python "$env:USERPROFILE\.codex\skills\windows-vm-codex-operator\scripts\windows_vm_operator.py" ps --vmid 103 --holder-id codex-kv-skill-validation --require-reserved -- "Get-ChildItem C:\Users\Public\KVSkillPractice -Recurse"
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_mvp_repeat.ps1" `
+  -ScaffoldRoot $ScaffoldRoot `
+  -OutRoot (Join-Path $WorkRoot 'mvp_repeat_runs') `
+  -RequiredConsecutivePasses 3 `
+  -MaxAttempts 6 `
+  -StopAfterSameFailureCount 3 `
+  -TimeoutSeconds 600
 ```
 
-If the first command shows no logged-on user, stop and perform the VM login/unlock step first. Do not try to drive KV STUDIO through QGA-only Codex; QGA can retrieve files and run shell commands but cannot see the interactive desktop.
+## Scaffold Files
 
-For multi-VM validation, do not write all reports to the same flat directory. Assign each VM its own artifact root:
+Edit only scaffold source files before running KV STUDIO:
+
+- `mnm\*.mnm`
+- `scaffold.json.mnm_files[].variables.global_tsv`
+- `scaffold.json.mnm_files[].variables.local_tsv`
+- `TASK.md`
+- `VERSION.md`
+- `CHECKLIST.md`
+
+Do not hand-edit generated runner artifacts.
+
+Variable files are per MNM/module. Do not assume one project-level `variables\global_variables.tsv` or `variables\local_variables.tsv`. For each `scaffold.json.mnm_files[]` entry, edit the MNM file named by `path`, then edit that entry's paired `variables.global_tsv` and `variables.local_tsv`.
+
+Minimum TSV header:
 
 ```text
-C:\Users\Public\KVSkillPractice\vm-101\<task-id>\
-C:\Users\Public\KVSkillPractice\vm-102\<task-id>\
-C:\Users\Public\KVSkillPractice\vm-103\<task-id>\
+scope	owner_program	name	data_type	device	initial_value	comment	evidence	status
 ```
 
-Use all running idle editor VMs for independent slices:
+Executable variable rows use `status` other than `display_name`.
 
-- VM `101`: disposable project creation, administrator settings, safe CPU selection, and `Ctrl+F2` compile smoke test.
-- VM `102`: MNM export/import, import-dialog behavior, and variable editor paste/reconstruction tests. Do not reserve it long-term for noVNC; use noVNC only for short login/unlock if required.
-- VM `103`: official FB import path, official-reference comparison, and compile-error collection.
+MNM module type:
 
-Each VM-side prompt must include its own VM id, task id, target project path, evidence path, and "do not modify user projects" constraint. Retrieve results through QGA/`ps`; noVNC screenshots are fallback evidence only.
+- `;MODULE_TYPE:0` means scan-executed program/module.
+- `;MODULE_TYPE:2` means function block.
+- The value in each MNM file must match `scaffold.json.mnm_files[].module_type`.
 
-Verified smoke-test evidence:
+## Hard Gates
 
-- VM `103` UI transport returned `UI_CODEX_USER=PLC-EDITOR-03\posen`.
-- The VM-side task wrote `C:\Users\Public\KVSkillPractice\ui_transport_smoke.md`.
-- It reported the interactive desktop was accessible and KV STUDIO was intentionally not opened.
+- Checklist gate: every KV STUDIO operation must pass `scripts\assert_kv_operation_checklist.ps1`.
+- Scaffold gate: an existing scaffold must pass `scripts\validate_kv_mvp_scaffold.ps1` before runner use.
+- UI guard gate: the runner must pass `scripts\assert_kv_mvp_ui_guard_usage.ps1` before touching KV STUDIO.
+- Agent boundary gate: the runner must pass `scripts\assert_kv_mvp_agent_boundary.ps1` before touching KV STUDIO; this rejects interactive prompts/manual decision points in runner-owned scripts.
+- Program construction uses MNM files. If MNM import fails, fix the scaffold or stop; do not type program text into the ladder/editor.
+- Variables are mandatory per MNM entry. `variables.local_tsv` must contain executable local rows for that module/program. `variables.global_tsv` may be header-only only when that MNM uses no global variables.
+- Executable global variable rows must be referenced by their paired MNM file. The compile gate proves global variables; local variables are verified by the variable script through guarded close/reopen/copy of the local-variable grid for the same module/program.
+- Success must come from the current run's `mvp_result.json`, not screenshots or old compile text.
 
-Verified compile smoke evidence:
+## Script Ownership
 
-- VM `103` created disposable project `C:\Users\Public\KVSkillPractice\Projects\CodexUiCompileSmoke`.
-- Selected/default CPU model was `KV-X550`.
-- `Ctrl+F2` compile/convert produced no visible error dialog and updated `PlcSended.dky`.
-- PASS report: `C:\Users\Public\KVSkillPractice\compile_smoke_report.md`.
-- Screenshots were written under `C:\Users\Public\KVSkillPractice\screens`.
-- This smoke test proves project creation and compile gating only; it does not prove official reference-program reproduction, MNM import/export, official FB-only import, or variable reconstruction.
+Agents normally call only:
 
-Require the VM-side agent to write:
+- `scripts\new_kv_mvp_scaffold.ps1`
+- `scripts\validate_kv_mvp_scaffold.ps1`
+- `scripts\run_kv_mvp_scaffold.ps1`
+- `scripts\run_kv_mvp_repeat.ps1`
 
-- Markdown report with exact steps and pass/fail status.
-- Screenshots under `C:\Users\Public\KVSkillPractice\screens` when visual state matters.
-- Copied KV STUDIO error text or compile logs when validation fails.
+Child scripts under `scripts\mvp\` are runner-owned. Call them directly only when diagnosing a failed runner step.
 
-## MNM Export And Import
+All global keyboard, mouse, menu accelerator, and paste operations must be implemented through `scripts\mvp\kv_ui_guard.ps1`. Read `references\ui-guard-contract.md` only when modifying or diagnosing UI guard behavior.
 
-Export mnemonic list:
+When KV STUDIO is open, agent reasoning is outside the control loop. The runner must carry all ordered steps, waits, focus checks, recovery hypotheses, and stop conditions. Agent verification resumes only after the runner exits and writes result artifacts.
 
-Preconditions: KV STUDIO main project window is foreground, no ladder inline edit bar is visible, no modal error dialog is visible, and `scripts/assert_kvstudio_ui_safe.ps1` passes.
+## Result Contract
 
-1. Use the user-validated accelerator path: `Alt+F`, `R`, `S`.
-2. Confirm the foreground window is the expected comment-type dialog titled `选择注释类型`; this dialog is not a failure.
-3. Press `Down` once so the comment type becomes `注释1`.
-4. Press `Enter`; a directory picker/file-list window opens for the MNM export folder. This picker/list is an expected workflow state, not a failure dialog.
-5. If this path fails, first verify preconditions, timing, active window, and external interference. Do not conclude the accelerator path is wrong without evidence.
-6. Select the export folder from the picker/list only after proving the picker window/control identity by UIA or equivalent structured evidence.
-7. Folder selection still needs a separately validated deterministic method; do not type into the ladder editor or use coordinate fallback.
+Primary result:
 
-Import modified mnemonic list:
+```text
+<OutRoot>\<ProjectName>\mvp_result.json
+```
 
-1. Prepare edited `.mnm` files outside KV STUDIO.
-2. If the MNM contains Chinese variable names or comments, store the import file as the Windows system ANSI code page used by KV STUDIO on the target machine, normally CP936 on Chinese Windows. Verify by reading the bytes with `[Text.Encoding]::Default`: names such as `启动`, `红LED灯`, `黄LED灯`, and `绿LED灯` must round-trip before import. A UTF-8-only MNM can display correctly in terminals while importing as mojibake in KV STUDIO.
-3. Use the user-validated accelerator path: `Alt+F`, `R`, `R`.
-4. Select the folder and file only through a validated deterministic picker method. A valid method must prove a standard file-open dialog or a specific MNM picker before setting the path. AutomationId `1265` alone is forbidden because it aliases the ladder inline edit bar.
-5. Import the MNM into the target program/module.
-6. Recreate global and local variables before validating.
+Report success only when:
 
-## Official FB Import
+- `mvp_result.json.ok` is `true`.
+- `mvp_result.json.compile_result_contains_ok` is `true`.
+- `artifacts\module_placement\*.json` shows expected module category.
+- `artifacts\set_variables\variable_persistence_validation.json` exists and reports success.
+- `mvp_result.json.variable_sets[]` lists each MNM entry's exact global/local TSV paths used in the run.
+- `mvp_result.json.agent_boundary_contract_path` points to the same-run agent-boundary contract.
+- `artifacts\copy_result\compile_result_copied.txt` was written in the current run.
 
-Use this only for official FB/function block resources that should remain unmodified.
+Report repeatable MVP success only when `run_kv_mvp_repeat.ps1` writes `repeat_result.json.ok=true` and `repeat_result.json.consecutive_passes` is at least `3`. A failed attempt resets the consecutive pass counter to `0`; do not count non-consecutive passes. If the same failure signature appears three times, the repeat runner stops for route review.
 
-1. Use `Alt+F`, `I`, `M`.
-2. Select the official program/package directory.
-3. Select `All.pregx`.
-4. Use arrow keys and `Space` to select only the official FBs/modules allowed by the task.
-5. Press `Tab` three times to focus `OK`, then `Enter`.
+For artifact layout and JSON fields, read `references\mvp-runner-contract.md`.
 
-Do not use this path to import an entire official reference program as the implementation.
+## Failure Reporting
 
-## Variable Editor Workflow
+If a command exits nonzero, stop and report:
 
-1. Use `Alt+V`, then `L` to open variable editing.
-2. The default focus is usually the global variable group-name cell.
-3. Paste prepared global variable rows from a text/table source.
-4. Use `Ctrl+Tab` to switch to local variables.
-5. Use arrow keys to choose the target program, then paste local variables for that program.
-6. After MNM import, verify every referenced variable, FB instance, structure, array, and data type exists in the correct global/local scope.
+- Stable error code from stderr or result JSON.
+- Current step.
+- Evidence path.
+- Next concrete repair action.
 
-Read `references/variable-editor.md` before large variable reconstruction.
+Common gate codes:
 
-Verified KV STUDIO variable-table paste columns:
+- `KV_CHECKLIST_MISSING`, `KV_CHECKLIST_EMPTY`, `KV_CHECKLIST_INVALID`
+- `KV_SCAFFOLD_REQUIRED_FILE_MISSING`, `KV_SCAFFOLD_TSV_SCHEMA_INVALID`, `KV_SCAFFOLD_MNM_MODULE_TYPE_MISMATCH`
+- `KV_UI_GUARD_STATIC_VIOLATION`
+- `KV_FOCUS_LOST`, `KV_FOCUS_LOST_TERMINAL`, `KV_MODAL_PRESENT`
+- `KV_VARIABLE_PASTE_NOT_PERSISTED`
 
-- Global variable rows are not the same shape as local variable rows. Do not reuse a global TSV row for local variables.
-- Global variable paste order: `group name`, `variable name`, `data type`, `assignment target`, `value`, `retain`, `constant`, `OPC UA`, `file export`, `comment 1`, then additional comment columns.
-- Example global row shape: `(Default)`, `StartIn`, `BOOL`, `R000`, blank value, `False`, `False`, `非公开`, `False`, `Input IO Start`.
-- Local variable paste order: `variable name`, `data type`, `value`, `retain`, `constant`, `file export`, `comment 1`, then additional comment columns.
-- Example local row shape: `statu`, `UINT`, blank value, `False`, `False`, `False`, then comments/blanks.
-- Each program can contain default local variables that cannot be modified. Add user variables on valid blank rows for the selected program; if a paste confirmation says a variable name will be overwritten, cancel and fail the route.
-- Modal gate: when any KV STUDIO popup is present, the only permitted automation is a popup-specific classifier/handler. Do not run variable-edit, import, compile, close-window, or save scripts on top of an unresolved popup. For a `粘贴数据中存在错误，已跳过部分数据粘贴。` popup, press `确定/OK`, then analyze the current variable table against the intended TSV before any further action.
+## References
 
-## Compile And Error Collection
-
-1. Run compile/convert verification with `Ctrl+F2`.
-2. After every compile/convert attempt, whether success or failure, copy the compile/edit result area text as evidence. The simple manual-equivalent path is: verify the result/error area, select/right-click it, choose copy, then save clipboard text. Do not report compile success or failure without this copied text or an explicitly recorded reason it could not be copied.
-3. Determine pass/fail from KV STUDIO state, status text, exported logs, or copied error text. Screenshots are acceptable during exploration, but repeatable validation should use scriptable text/log evidence when possible.
-4. If a conversion failure dialog appears, press `Enter` to close it.
-5. Focus the error window containing `转换` / conversion messages.
-6. Right-click any error row and press `C` to copy all error messages.
-7. Use the copied messages to fix MNM and variables, then re-import and rerun `Ctrl+F2`.
-
-Stable conversion-result copy route:
-
-- For automation closure, prefer direct result-tree extraction over coordinate right-click. The verified fast route is:
-  1. Resolve the visible KV STUDIO main window for the target project.
-  2. Enumerate child HWNDs under that main window with Win32 `EnumChildWindows`.
-  3. Select the visible `SysTreeView32` child nearest the bottom of the KV window; this is the conversion result tree.
-  4. Create an AutomationElement from that tree HWND only, then read descendant `TreeItem.Name` values.
-  5. Join non-empty TreeItem names with CRLF, write them to `compile_result_copied.txt`, and set the clipboard to the same text.
-  6. Verify lookup time is under 1000 ms, clipboard is non-empty, and text contains `转换结果 OK` or the expected NG diagnostic.
-- Do not use stale coordinates for the result tree. Re-verify the tree HWND and TreeItem text in the same run before claiming copied evidence.
-- A successful validated run on 2026-05-26 used `copy_convert_result_from_tree_handle.ps1`: lookup 531 ms, 7 lines, clipboard length 299, `contains_ok=true`, `contains_ng=false`.
-
-## Completion Gate
-
-Before reporting success:
-
-- Confirm the correct project, CPU/model, unit configuration, and imported FB set.
-- Confirm program logic was imported or edited as MNM, not by renaming or wholesale importing the official reference program.
-- Confirm variables were reconstructed in KV STUDIO.
-- Confirm Ctrl+F2 compile/convert passes.
-- Record the exact evidence used: VM id or local machine, project path, changed/imported MNM files, imported official FBs, variable source, and compile result.
+- `references\ui-guard-contract.md`: read when changing or diagnosing guarded UI input.
+- `references\mvp-runner-contract.md`: read when interpreting runner artifacts or result schema.
+- `references\variable-editor.md`: read when changing variable TSV schema or diagnosing variable editor paste.

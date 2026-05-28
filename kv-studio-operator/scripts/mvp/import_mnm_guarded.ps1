@@ -48,6 +48,10 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+$sharedUiGuard = Join-Path (Split-Path -Parent $PSCommandPath) 'kv_ui_guard.ps1'
+if (-not (Test-Path -LiteralPath $sharedUiGuard)) { throw "Shared KV UI guard script not found: $sharedUiGuard" }
+. $sharedUiGuard
+Initialize-KvUiGuard -OutDir $out -CheckpointSubdir 'shared_ui_guard_checkpoints'
 Add-Type @"
 using System;using System.Runtime.InteropServices;
 public class W{
@@ -72,11 +76,27 @@ public class W{
 public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 }
 "@
+$script:KvGuardTargetHwnd = [IntPtr]::Zero
+$script:KvGuardExpectedTitleLike = 'KV STUDIO*'
+function SetKvGuardTarget([IntPtr]$hwnd, [string]$titleLike){
+  $script:KvGuardTargetHwnd = $hwnd
+  if($titleLike){ $script:KvGuardExpectedTitleLike = $titleLike }
+}
+function GetElementGuardHwnd($element){
+  try{
+    $current=$element
+    $walker=[System.Windows.Automation.TreeWalker]::ControlViewWalker
+    while($current){
+      if($current.Current.ControlType.ProgrammaticName -eq 'ControlType.Window' -and [int64]$current.Current.NativeWindowHandle -ne 0){
+        return [IntPtr]$current.Current.NativeWindowHandle
+      }
+      $current=$walker.GetParent($current)
+    }
+  }catch{}
+  return $script:KvGuardTargetHwnd
+}
 function SendVkTap([byte]$vk){
-  [W]::keybd_event($vk,0,0,0)
-  Start-Sleep -Milliseconds 40
-  [W]::keybd_event($vk,0,0x0002,0)
-  Start-Sleep -Milliseconds 80
+  Invoke-KvGuardedVkTap -TargetHwnd $script:KvGuardTargetHwnd -Step ('MNM import VK tap '+$vk) -Vk $vk -ExpectedTitleLike $script:KvGuardExpectedTitleLike -SleepMs 80
 }
 function TestCapsLockOn(){
   return (([W]::GetKeyState(0x14) -band 0x0001) -ne 0)
@@ -95,14 +115,7 @@ function SetCapsLockState([bool]$enabled){
   }
 }
 function SendAltLetter([byte]$vk){
-  [W]::keybd_event(0x12,0,0,0)
-  Start-Sleep -Milliseconds 40
-  [W]::keybd_event($vk,0,0,0)
-  Start-Sleep -Milliseconds 40
-  [W]::keybd_event($vk,0,0x0002,0)
-  Start-Sleep -Milliseconds 40
-  [W]::keybd_event(0x12,0,0x0002,0)
-  Start-Sleep -Milliseconds 120
+  Invoke-KvGuardedAltVk -TargetHwnd $script:KvGuardTargetHwnd -Step ('MNM import Alt+VK '+$vk) -Vk $vk -ExpectedTitleLike $script:KvGuardExpectedTitleLike -SleepMs 120
 }
 function Shot($n){try{$b=[Windows.Forms.Screen]::PrimaryScreen.Bounds;$bmp=New-Object Drawing.Bitmap $b.Width,$b.Height;$g=[Drawing.Graphics]::FromImage($bmp);$g.CopyFromScreen(0,0,0,0,$bmp.Size);$bmp.Save((Join-Path $out $n));$g.Dispose();$bmp.Dispose();Log "shot $n"}catch{Log ('shot err '+$_.Exception.Message)}}
 function TestKvSplashVisible(){
@@ -195,11 +208,7 @@ function AssertKvStudioForeground([string]$action, [string]$projectNeedle=''){
   }
 }
 function ClickPoint([int]$x, [int]$y, [string]$label){
-  [W]::SetCursorPos($x,$y) | Out-Null
-  Start-Sleep -Milliseconds 150
-  [W]::mouse_event(0x0002,0,0,0,0)
-  Start-Sleep -Milliseconds 80
-  [W]::mouse_event(0x0004,0,0,0,0)
+  Invoke-KvGuardedMouseClick -TargetHwnd $script:KvGuardTargetHwnd -Step ('MNM import click '+$label) -X $x -Y $y -ExpectedTitleLike $script:KvGuardExpectedTitleLike -SleepMs 120
   Log ('clicked '+$label+' '+$x+','+$y)
 }
 function ClickAutomationElementCenter($element, [string]$label){
@@ -209,22 +218,15 @@ function ClickAutomationElementCenter($element, [string]$label){
   $rect=$element.Current.BoundingRectangle
   $cx=[int]($rect.Left + ($rect.Width / 2))
   $cy=[int]($rect.Top + ($rect.Height / 2))
+  $oldHwnd=$script:KvGuardTargetHwnd
+  $oldTitle=$script:KvGuardExpectedTitleLike
+  $target=GetElementGuardHwnd $element
+  if($target -ne [IntPtr]::Zero){ SetKvGuardTarget $target '*' }
   ClickPoint $cx $cy $label
+  SetKvGuardTarget $oldHwnd $oldTitle
 }
 function DoubleClickAutomationElementCenter($element, [string]$label){
   throw ('Unsafe double-click blocked: '+$label)
-  $rect=$element.Current.BoundingRectangle
-  $cx=[int]($rect.Left + ($rect.Width / 2))
-  $cy=[int]($rect.Top + ($rect.Height / 2))
-  [W]::SetCursorPos($cx,$cy) | Out-Null
-  Start-Sleep -Milliseconds 120
-  for($i=0;$i -lt 2;$i++){
-    [W]::mouse_event(0x0002,0,0,0,0)
-    Start-Sleep -Milliseconds 60
-    [W]::mouse_event(0x0004,0,0,0,0)
-    Start-Sleep -Milliseconds 90
-  }
-  Log ('double-clicked '+$label+' '+$cx+','+$cy)
 }
 function ClickRectCenter($rect, [string]$label){
   $cx=[int]($rect.Left + ($rect.Width / 2))
@@ -506,7 +508,7 @@ function OpenProjectModuleEditor([string]$moduleName){
         DoubleClickAutomationElementCenter $item ('project module '+$name)
       }
       try{
-        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        Invoke-KvGuardedSendKeys -TargetHwnd $script:KvGuardTargetHwnd -Step ('open project module Enter '+$name) -Keys '{ENTER}' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Enter opens selected project module' -SleepMs 2000
         Log ('sent Enter to open project module '+$name)
       }catch{
         Log ('Enter open project module failed '+$name+': '+$_.Exception.Message)
@@ -567,62 +569,9 @@ function ConfirmDeleteDialogIfPresent(){
 }
 function RemoveProjectModuleIfPresent([string]$moduleName){
   throw 'RemoveProjectModuleIfPresent is disabled for MVP MNM import.'
-  $item=FindProjectModuleTreeItem $moduleName
-  if(-not $item){
-    Log ('delete-before-import skipped; module not present: '+$moduleName)
-    return $true
-  }
-  try{
-    $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
-  }catch{
-    ClickAutomationElementCenter $item ('select module for delete '+$moduleName)
-  }
-  Start-Sleep -Milliseconds 500
-  [System.Windows.Forms.SendKeys]::SendWait('{DELETE}')
-  Log ('sent Delete for existing module '+$moduleName)
-  if(-not (ConfirmDeleteDialogIfPresent)){
-    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
-    Log 'sent Enter for delete confirmation fallback'
-    Start-Sleep -Seconds 2
-  }
-  $remaining=FindProjectModuleTreeItem $moduleName
-  if($remaining){
-    Log ('module still visible after delete attempt: '+$moduleName)
-    return $false
-  }
-  Log ('deleted existing module before MNM import: '+$moduleName)
-  return $true
 }
 function RenameProjectModuleIfPresent([string]$moduleName){
   throw 'RenameProjectModuleIfPresent is disabled for MVP MNM import.'
-  $item=FindProjectModuleTreeItem $moduleName
-  if(-not $item){
-    Log ('rename-before-import skipped; module not present: '+$moduleName)
-    return $true
-  }
-  $newName=('CodexOld_' + (Get-Date -Format 'HHmmss'))
-  try{
-    $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
-  }catch{
-    ClickAutomationElementCenter $item ('select module for rename '+$moduleName)
-  }
-  Start-Sleep -Milliseconds 500
-  [System.Windows.Forms.SendKeys]::SendWait('{F2}')
-  Start-Sleep -Milliseconds 500
-  [System.Windows.Forms.Clipboard]::SetText($newName)
-  [System.Windows.Forms.SendKeys]::SendWait('^a')
-  Start-Sleep -Milliseconds 100
-  [System.Windows.Forms.SendKeys]::SendWait('^v')
-  Start-Sleep -Milliseconds 100
-  [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
-  Log ('attempted rename existing module '+$moduleName+' to '+$newName)
-  Start-Sleep -Seconds 3
-  if(FindProjectModuleTreeItem $moduleName){
-    Log ('module still visible after rename attempt: '+$moduleName)
-    return $false
-  }
-  Log ('renamed existing module before MNM import: '+$moduleName+' -> '+$newName)
-  return $true
 }
 function InvokeProgramNewMenu(){
   $root=[System.Windows.Automation.AutomationElement]::RootElement
@@ -644,12 +593,12 @@ function InvokeProgramNewMenu(){
         $programMenu.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
         Log 'invoked program menu by UIA'
       }catch{
-        [System.Windows.Forms.SendKeys]::SendWait('%m')
+        Invoke-KvGuardedSendKeys -TargetHwnd $script:KvGuardTargetHwnd -Step 'open program menu Alt+M fallback' -Keys '%m' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Alt+M opens program menu fallback' -SleepMs 700
         Log 'opened program menu by Alt+M fallback'
       }
     }
   }else{
-    [System.Windows.Forms.SendKeys]::SendWait('%m')
+    Invoke-KvGuardedSendKeys -TargetHwnd $script:KvGuardTargetHwnd -Step 'open program menu Alt+M fallback no UIA' -Keys '%m' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Alt+M opens program menu fallback' -SleepMs 700
     Log 'opened program menu by Alt+M fallback; UIA menu not found'
   }
   Start-Sleep -Milliseconds 700
@@ -674,57 +623,6 @@ function InvokeProgramNewMenu(){
 }
 function CreatePlaceholderModule(){
   throw 'CreatePlaceholderModule is disabled for MVP MNM import.'
-  $name=('CodexKeep_' + (Get-Date -Format 'HHmmss'))
-  if(-not (InvokeProgramNewMenu)){
-    Log 'failed to invoke program new menu'
-    return $false
-  }
-  $root=[System.Windows.Automation.AutomationElement]::RootElement
-  $deadline=(Get-Date).AddSeconds(10)
-  do{
-    $windows=$root.FindAll(
-      [System.Windows.Automation.TreeScope]::Children,
-      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Window))
-    )
-    for($w=0;$w -lt $windows.Count;$w++){
-      $window=$windows.Item($w)
-      if($window.Current.Name -notlike '*新建程序*'){ continue }
-      $edits=$window.FindAll(
-        [System.Windows.Automation.TreeScope]::Descendants,
-        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Edit))
-      )
-      if($edits.Count -gt 0){
-        try{
-          $edits.Item(0).GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($name)
-        }catch{
-          ClickAutomationElementCenter $edits.Item(0) 'new program name edit'
-          [System.Windows.Forms.Clipboard]::SetText($name)
-          [System.Windows.Forms.SendKeys]::SendWait('^a')
-          [System.Windows.Forms.SendKeys]::SendWait('^v')
-        }
-      }
-      $buttons=$window.FindAll(
-        [System.Windows.Automation.TreeScope]::Descendants,
-        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Button))
-      )
-      for($i=0;$i -lt $buttons.Count;$i++){
-        $button=$buttons.Item($i)
-        if($button.Current.Name -eq 'OK'){
-          try{
-            $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-          }catch{
-            ClickAutomationElementCenter $button 'new program OK'
-          }
-          Log ('created placeholder module '+$name)
-          Start-Sleep -Seconds 3
-          return ($null -ne (FindProjectModuleTreeItem $name))
-        }
-      }
-    }
-    Start-Sleep -Milliseconds 300
-  }while((Get-Date) -lt $deadline)
-  Log 'new program dialog not completed'
-  return $false
 }
 function FindMnemonicReadChoiceButton([bool]$PreferOverwrite){
   $root=[System.Windows.Automation.AutomationElement]::RootElement
@@ -903,7 +801,7 @@ function TestHasPatternName($element, [string]$patternText){
   return $false
 }
 function OpenFileMenuByUia(){
-  [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+  Invoke-KvGuardedSendKeys -TargetHwnd $script:KvGuardTargetHwnd -Step 'close transient menu before UIA file menu' -Keys '{ESC}' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Esc closes transient menu before UIA file-menu route' -SleepMs 200
   Start-Sleep -Milliseconds 200
   $items=@(GetVisibleMenuItems)
   $topMenuItems=@()
@@ -1052,8 +950,8 @@ function InvokeMnemonicImportMenuByUia(){
 function InvokeMnemonicImportMenu(){
   AssertKvStudioForeground 'Alt+F,R,R mnemonic import route'
   SetCapsLockState $true
-  [System.Windows.Forms.SendKeys]::SendWait('%frr')
-  Log 'sent Alt+F,R,R by System.Windows.Forms.SendKeys'
+  Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $script:KvGuardTargetHwnd -Step 'MNM import Alt+F,R,R' -Keys '%frr' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -SuccessTitleLike @('打开','KV STUDIO*') -Action 'Alt+F,R,R opens MNM read dialog' -SleepMs 300
+  Log 'sent Alt+F,R,R by shared UI guard'
   if(-not (WaitForStandardOpenDialog 3000)){
     SaveVisibleTopWindowSnapshot 'top_windows_after_sendkeys_alt_f_r_r_no_open_dialog.json'
     throw 'Alt+F,R,R via SendKeys did not expose a verified standard MNM file-open dialog; refusing inline editor path'
@@ -1130,8 +1028,72 @@ function SetInlineMnemonicReadFile([string]$path){
   Log 'inline AutomationId=1265 path entry is disabled: it aliases the ladder inline edit bar and can create editor input.'
   return $false
 }
+function SetOpenDialogFileByVerifiedDialogHandle([string]$path){
+  $path=[IO.Path]::GetFullPath($path)
+  $deadline=(Get-Date).AddSeconds(20)
+  do{
+    $nativeDialog=GetStandardOpenDialogByWin32
+    if(-not $nativeDialog){
+      Start-Sleep -Milliseconds 200
+      continue
+    }
+    try{
+      $root=[System.Windows.Automation.AutomationElement]::RootElement
+      $dialog=$root.FindFirst(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NativeWindowHandleProperty,[int]$nativeDialog.Hwnd))
+      )
+      if(-not $dialog){
+        Log ('verified open dialog hwnd not found in UIA tree hwnd='+$nativeDialog.Hwnd)
+        Start-Sleep -Milliseconds 200
+        continue
+      }
+      $openButton=$dialog.FindFirst(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        (New-Object System.Windows.Automation.AndCondition(
+          (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty,'1')),
+          (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Button))
+        ))
+      )
+      $fileNameEdit=$dialog.FindFirst(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty,'1148'))
+      )
+      if(-not $openButton -or -not $fileNameEdit){
+        Log ('verified open dialog missing filename edit or open button hwnd='+$nativeDialog.Hwnd)
+        Start-Sleep -Milliseconds 200
+        continue
+      }
+      $valuePattern=$fileNameEdit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+      $valuePattern.SetValue($path)
+      Log ('set verified open dialog filename by ValuePattern hwnd='+$nativeDialog.Hwnd)
+      Start-Sleep -Milliseconds 200
+      $invokePattern=$openButton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
+      $invokePattern.Invoke()
+      Log ('invoked verified open dialog Open button by InvokePattern hwnd='+$nativeDialog.Hwnd)
+      $closedDeadline=(Get-Date).AddSeconds(4)
+      do{
+        Start-Sleep -Milliseconds 100
+        if(-not (GetStandardOpenDialogByWin32)){
+          Log 'verified standard open dialog closed after ValuePattern/Open invoke'
+          return $true
+        }
+      }while((Get-Date) -lt $closedDeadline)
+      SaveVisibleTopWindowSnapshot 'top_windows_open_dialog_not_closed_after_valuepattern_open.json'
+      throw 'Open dialog did not close after ValuePattern/Open invoke; refusing to assume MNM file was accepted'
+    }catch{
+      Log ('verified open dialog ValuePattern path failed: '+$_.Exception.Message)
+      Start-Sleep -Milliseconds 300
+    }
+  }while((Get-Date) -lt $deadline)
+  Log 'verified standard open dialog handle path did not complete'
+  return $false
+}
 function SetOpenDialogFile([string]$path){
   if(SetInlineMnemonicReadFile $path){
+    return $true
+  }
+  if(SetOpenDialogFileByVerifiedDialogHandle $path){
     return $true
   }
   if(SetOpenDialogFileByUia $path){
@@ -1263,15 +1225,12 @@ function SetOpenDialogFileByUia([string]$path){
           throw ('Open dialog is not foreground before filename keyboard submission. Foreground='+$fg.Title)
         }
         try{
-          [System.Windows.Forms.Clipboard]::SetText($path)
-          [System.Windows.Forms.SendKeys]::SendWait('%n')
-          Start-Sleep -Milliseconds 150
-          [System.Windows.Forms.SendKeys]::SendWait('^a')
-          Start-Sleep -Milliseconds 80
-          [System.Windows.Forms.SendKeys]::SendWait('^v')
-          Start-Sleep -Milliseconds 150
+          $dialogHwnd=[IntPtr]$dialog.Current.NativeWindowHandle
+          Invoke-KvGuardedSendKeys -TargetHwnd $dialogHwnd -Step 'open dialog filename Alt+N' -Keys '%n' -ExpectedTitleLike '*' -Action 'Alt+N focuses filename field' -SleepMs 150
+          Invoke-KvGuardedSendKeys -TargetHwnd $dialogHwnd -Step 'open dialog filename Ctrl+A' -Keys '^a' -ExpectedTitleLike '*' -Action 'Ctrl+A selects filename field text' -SleepMs 80
+          Invoke-KvGuardedClipboardPaste -TargetHwnd $dialogHwnd -Step 'open dialog filename Ctrl+V' -Text $path -ExpectedTitleLike '*' -SleepMs 150
           Log 'set open dialog filename by foreground Alt+N clipboard path'
-          [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+          Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $dialogHwnd -Step 'open dialog submit Enter' -Keys '{ENTER}' -ExpectedTitleLike '*' -SuccessTitleLike @('选择程序种类','KV STUDIO*') -Action 'Enter submits verified open dialog' -SleepMs 500
           Log 'submitted open dialog by foreground Enter key'
         }catch{
           throw ('Open dialog foreground filename keyboard submission failed: '+$_.Exception.Message)
@@ -1471,7 +1430,7 @@ function DismissUnitConfigDialogIfPresent([string]$stage){
       $text | Set-Content -LiteralPath (Join-Path $out ("unit_config_dialog_$($stage -replace '[^A-Za-z0-9_.-]','_').txt")) -Encoding UTF8
       [W]::SetForegroundWindow([IntPtr]$dialog.Current.NativeWindowHandle) | Out-Null
       Start-Sleep -Milliseconds 200
-      [System.Windows.Forms.SendKeys]::SendWait('%n')
+      Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd ([IntPtr]$dialog.Current.NativeWindowHandle) -Step ('dismiss unit config Alt+N '+$stage) -Keys '%n' -ExpectedTitleLike '*' -SuccessTitleLike 'KV STUDIO*' -Action 'Alt+N selects No in unit configuration prompt' -SleepMs 2000
       Log ('dismissed unit-configuration prompt with Alt+N stage='+$stage)
       Start-Sleep -Seconds 2
       return $true
@@ -1664,6 +1623,7 @@ try{
     throw 'KV STUDIO main window still shows splash/loader; refusing menu route.'
   }
   $expectedProjectNeedle=[IO.Path]::GetFileNameWithoutExtension($project)
+  SetKvGuardTarget ([IntPtr]$p.MainWindowHandle) ('KV STUDIO*'+$expectedProjectNeedle+'*')
   AssertKvStudioForeground 'MNM import startup' $expectedProjectNeedle
   Start-Sleep -Seconds 2
   Shot '00_before_import.png'
@@ -1756,7 +1716,7 @@ try{
     Start-Sleep -Milliseconds 300
     [void](ForceKvStudioForeground ([IntPtr]$saveProcess.MainWindowHandle))
     AssertKvStudioForeground 'Ctrl+S after MNM import' $expectedProjectNeedle
-    [System.Windows.Forms.SendKeys]::SendWait('^s')
+    Invoke-KvGuardedSendKeys -TargetHwnd $saveProcess.MainWindowHandle -Step 'save after MNM import Ctrl+S' -Keys '^s' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Ctrl+S saves project after MNM import' -SleepMs 8000
     Log 'sent Ctrl+S'
     Start-Sleep -Seconds 8
     Shot '04_after_save.png'

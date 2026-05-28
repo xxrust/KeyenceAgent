@@ -1,4 +1,4 @@
 interface:
   display_name: "KV STUDIO Operator"
-  short_description: "Operate KV STUDIO safely and verify builds."
-  default_prompt: "Use this skill to operate KV STUDIO with keyboard-driven project, MNM, variable, FB import, and compile workflows."
+  short_description: "Run KV STUDIO through scaffold, guard, and artifact gates."
+  default_prompt: "Use this skill to create or validate a KV STUDIO scaffold, run the guarded scaffold runner, and report same-run artifacts."

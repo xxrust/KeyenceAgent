@@ -20,6 +20,10 @@ Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+$sharedUiGuard = Join-Path (Split-Path -Parent $PSCommandPath) 'kv_ui_guard.ps1'
+if (-not (Test-Path -LiteralPath $sharedUiGuard)) { throw "Shared KV UI guard script not found: $sharedUiGuard" }
+. $sharedUiGuard
+Initialize-KvUiGuard -OutDir $OutDir -CheckpointSubdir 'shared_ui_guard_checkpoints'
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
@@ -49,18 +53,13 @@ function Get-ForegroundTitle {
   $text.ToString()
 }
 
-function Tap-Vk {
-  param([byte]$Vk)
-  [KvCompileBoundedWin32]::keybd_event($Vk, 0, 0, 0)
-  Start-Sleep -Milliseconds 30
-  [KvCompileBoundedWin32]::keybd_event($Vk, 0, 2, 0)
-  Start-Sleep -Milliseconds 70
-}
-
 function Ensure-CapsLockOn {
+  param([IntPtr]$TargetHwnd, [string]$ExpectedTitleLike)
   $before = (([KvCompileBoundedWin32]::GetKeyState(0x14) -band 1) -ne 0)
   Log "CapsLock before=$before"
-  if (-not $before) { Tap-Vk 0x14 }
+  if (-not $before) {
+    Invoke-KvGuardedVkTap -TargetHwnd $TargetHwnd -Step 'compile CapsLock normalization' -Vk 0x14 -ExpectedTitleLike $ExpectedTitleLike -SleepMs 70
+  }
   $after = (([KvCompileBoundedWin32]::GetKeyState(0x14) -band 1) -ne 0)
   Log "CapsLock after=$after"
   if (-not $after) { throw 'CapsLock normalization failed.' }
@@ -142,7 +141,7 @@ function Dismiss-ConvertFailureIfPresent {
     if ($text -like '*杞崲澶辫触*') {
       [KvCompileBoundedWin32]::SetForegroundWindow([IntPtr]$window.Current.NativeWindowHandle) | Out-Null
       Start-Sleep -Milliseconds 100
-      [Windows.Forms.SendKeys]::SendWait('{ENTER}')
+      Invoke-KvGuardedSendKeys -TargetHwnd ([IntPtr]$window.Current.NativeWindowHandle) -Step 'dismiss conversion failure dialog Enter' -Keys '{ENTER}' -ExpectedTitleLike '*' -Action 'Enter dismisses conversion failure dialog' -SleepMs 500
       Start-Sleep -Milliseconds 500
       Log 'dismissed conversion failure dialog with Enter'
       return $true
@@ -198,9 +197,8 @@ try {
     throw "KV STUDIO is not foreground on target project before compile. title=$title"
   }
   if ($title -like '*妯℃嫙鍣?') {
-    [Windows.Forms.SendKeys]::SendWait('^{F1}')
+    Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'return from simulator Ctrl+F1' -Keys '^{F1}' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -Action 'Ctrl+F1 returns from simulator to editor' -SleepMs 2000
     Log 'sent Ctrl+F1 to return from simulator to editor before conversion'
-    Start-Sleep -Seconds 2
     $title = Get-ForegroundTitle
     Log "foreground after Ctrl+F1 title=$title"
     if ($title -notlike 'KV STUDIO*' -or $title -notlike "*$projectNeedle*") {
@@ -208,13 +206,13 @@ try {
     }
   }
 
-  Ensure-CapsLockOn
+  Ensure-CapsLockOn $process.MainWindowHandle "KV STUDIO*$projectNeedle*"
   Save-Screenshot '00_before_compile.png'
   if ($ConvertAction -eq 'CtrlF9') {
-    [Windows.Forms.SendKeys]::SendWait('^{F9}')
+    Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'compile convert Ctrl+F9' -Keys '^{F9}' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -Action 'Ctrl+F9 compile/convert' -SleepMs 300
     Log 'sent Ctrl+F9'
   } else {
-    [Windows.Forms.SendKeys]::SendWait('^{F2}')
+    Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'compile convert Ctrl+F2' -Keys '^{F2}' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -Action 'Ctrl+F2 compile/convert' -SleepMs 300
     Log 'sent Ctrl+F2'
   }
 
@@ -245,35 +243,6 @@ try {
   } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $OutDir 'result.json') -Encoding UTF8
   Log 'done'
   return
-  if (-not $resultArea) { throw 'outputTreeControl1 result area was not found.' }
-  $rect = $resultArea.Current.BoundingRectangle
-  if ($rect.Width -lt 100 -or $rect.Height -lt 20 -or [double]::IsInfinity($rect.Left) -or [double]::IsInfinity($rect.Top)) {
-    throw "Invalid result area rectangle: $($rect.Left),$($rect.Top),$($rect.Width),$($rect.Height)"
-  }
-  $x = [int]($rect.Left + [Math]::Min(80, $rect.Width / 2))
-  $y = [int]($rect.Top + [Math]::Min(24, $rect.Height / 2))
-  Log "right-click result area at $x,$y rect=$($rect.Left),$($rect.Top),$($rect.Width),$($rect.Height)"
-  [Windows.Forms.Clipboard]::Clear()
-  [KvCompileBoundedWin32]::SetCursorPos($x, $y) | Out-Null
-  [KvCompileBoundedWin32]::mouse_event(0x0008, 0, 0, 0, 0)
-  Start-Sleep -Milliseconds 40
-  [KvCompileBoundedWin32]::mouse_event(0x0010, 0, 0, 0, 0)
-  Start-Sleep -Milliseconds 250
-  [Windows.Forms.SendKeys]::SendWait('c')
-  Start-Sleep -Milliseconds 800
-  $clip = [Windows.Forms.Clipboard]::GetText()
-  Set-Content -LiteralPath (Join-Path $OutDir 'compile_result_copied.txt') -Value $clip -Encoding UTF8
-  Log "clipboard length=$($clip.Length)"
-  if ($clip.Length -eq 0) { throw 'Right-click copy from result area produced empty clipboard.' }
-
-  [pscustomobject]@{
-    ok = $true
-    foreground = Get-ForegroundTitle
-    clipboard_length = $clip.Length
-    contains_ok = ($clip -like '*杞崲缁撴灉 OK*')
-    contains_ng = ($clip -like '*杞崲缁撴灉 NG*')
-  } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $OutDir 'result.json') -Encoding UTF8
-  Log 'done'
 } catch {
   Log ('ERROR ' + $_.Exception.ToString())
   $_.Exception.ToString() | Set-Content -LiteralPath (Join-Path $OutDir 'fail.txt') -Encoding UTF8

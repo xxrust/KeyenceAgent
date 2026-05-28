@@ -49,6 +49,10 @@ if (-not (Test-Path -LiteralPath $KvsExe)) { throw "KvsExe not found: $KvsExe" }
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+$sharedUiGuard = Join-Path (Split-Path -Parent $PSCommandPath) 'kv_ui_guard.ps1'
+if (-not (Test-Path -LiteralPath $sharedUiGuard)) { throw "Shared KV UI guard script not found: $sharedUiGuard" }
+. $sharedUiGuard
+Initialize-KvUiGuard -OutDir $OutDir -CheckpointSubdir 'shared_ui_guard_checkpoints'
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
@@ -63,6 +67,7 @@ public class KvWin32 {
   [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
   [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, string lParam);
   [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
 }
@@ -101,6 +106,32 @@ function Find-ElementByAutomationId([string]$AutomationId, [int]$Seconds = 10) {
   do {
     $element = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
     if ($element) { return $element }
+    Start-Sleep -Milliseconds 200
+  } while ((Get-Date) -lt $deadline)
+  return $null
+}
+
+function Find-ChildByAutomationId($RootElement, [string]$AutomationId) {
+  if (-not $RootElement) { return $null }
+  $condition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, $AutomationId)
+  return $RootElement.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+}
+
+function Find-NewProjectDialog([int]$Seconds = 30) {
+  $newProjectTitle = [string]::Concat([char[]]@(0x65B0,0x5EFA,0x9879,0x76EE))
+  $deadline = (Get-Date).AddSeconds($Seconds)
+  do {
+    $hwnd = [KvWin32]::FindWindow('#32770', $newProjectTitle)
+    if ($hwnd -ne [IntPtr]::Zero) {
+      $dialog = [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)
+      $title = [string]$dialog.Current.Name
+      $projectNameEdit = Find-ChildByAutomationId $dialog '1000'
+      $cpuCombo = Find-ChildByAutomationId $dialog '1002'
+      if ($projectNameEdit -and $cpuCombo -and ($title -eq $newProjectTitle -or $title.Contains($newProjectTitle))) {
+        Log "found new project dialog by hwnd=$hwnd title=$title"
+        return $dialog
+      }
+    }
     Start-Sleep -Milliseconds 200
   } while ((Get-Date) -lt $deadline)
   return $null
@@ -154,7 +185,7 @@ function Dismiss-UnitConfigPromptNoByAltN([int]$Seconds = 8) {
       if (-not $title.Contains($titleNeedle)) { continue }
       [KvWin32]::SetForegroundWindow([IntPtr]$dialog.Current.NativeWindowHandle) | Out-Null
       Start-Sleep -Milliseconds 200
-      [System.Windows.Forms.SendKeys]::SendWait('%n')
+      Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd ([IntPtr]$dialog.Current.NativeWindowHandle) -Step 'dismiss unit configuration prompt Alt+N' -Keys '%n' -ExpectedTitleLike "*$titleNeedle*" -SuccessTitleLike 'KV STUDIO*' -Action 'Alt+N selects No in unit configuration prompt' -SleepMs 500
       Log 'answered unit configuration prompt with Alt+N'
       return $true
     }
@@ -239,20 +270,10 @@ function Restore-KvStudioForeground {
     [System.Diagnostics.Process]$Process,
     [string]$Action
   )
-  $shell = New-Object -ComObject WScript.Shell
-  try {
-    [void]$shell.AppActivate($Process.Id)
-    Start-Sleep -Milliseconds 300
-  } catch {
-    Log ("AppActivate by PID failed for ${Action}: " + $_.Exception.Message)
-  }
   for ($try = 1; $try -le 20; $try++) {
     $latest = Get-KvStudioMainProcess 1
     if ($latest) { $Process = $latest }
     [void](Force-KvStudioForeground ([IntPtr]$Process.MainWindowHandle))
-    if (($try % 4) -eq 0) {
-      try { [void]$shell.AppActivate('KV STUDIO') } catch {}
-    }
     Start-Sleep -Milliseconds 250
     $fg = Get-ForegroundTitle
     Log ("foreground restore ${Action}: try=$try hwnd=$($fg.Hwnd) title=$($fg.Title)")
@@ -291,12 +312,14 @@ try {
 
   Log 'send Ctrl+N'
   Assert-KvStudioForeground 'Ctrl+N'
-  [System.Windows.Forms.SendKeys]::SendWait('^n')
-  $projectNameControl = Find-ElementByAutomationId '1000' 12
-  if (-not $projectNameControl) {
+  Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'create project Ctrl+N' -Keys '^n' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+N opens new project dialog' -SleepMs 200
+  $newProjectDialog = Find-NewProjectDialog 45
+  if (-not $newProjectDialog) {
     Save-Uia 'fail_no_new_project_dialog.json'
     throw 'New project dialog did not open'
   }
+  [KvWin32]::SetForegroundWindow([IntPtr]$newProjectDialog.Current.NativeWindowHandle) | Out-Null
+  Start-Sleep -Milliseconds 200
 
   Set-TextById '1000' $ProjectName
   Select-ComboById '1002' $CpuModel
@@ -324,7 +347,7 @@ try {
   if ($process -and $process.MainWindowHandle -ne 0) {
     [KvWin32]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
     Assert-KvStudioForeground 'Ctrl+S'
-    [System.Windows.Forms.SendKeys]::SendWait('^s')
+    Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'save created project Ctrl+S' -Keys '^s' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+S saves created project' -SleepMs 2000
     Start-Sleep -Seconds 2
   }
 

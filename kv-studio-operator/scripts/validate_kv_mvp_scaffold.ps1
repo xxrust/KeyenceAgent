@@ -1,0 +1,218 @@
+param(
+  [Parameter(Mandatory=$true)]
+  [string]$ScaffoldRoot,
+
+  [string]$ChecklistPath = '',
+  [string]$OutDir = ''
+)
+
+$ErrorActionPreference = 'Stop'
+
+if (-not $OutDir) {
+  $OutDir = Join-Path $ScaffoldRoot '_validation'
+}
+
+$ScaffoldRoot = [IO.Path]::GetFullPath($ScaffoldRoot)
+$OutDir = [IO.Path]::GetFullPath($OutDir)
+New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+
+function Write-ValidationResult([object]$Payload) {
+  $path = Join-Path $OutDir 'scaffold_validation.json'
+  $Payload | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $path -Encoding UTF8
+  return $path
+}
+
+function Stop-ScaffoldValidation([string]$ErrorCode, [string]$Message, [string[]]$Evidence = @(), [int]$ExitCode = 41) {
+  $payload = [ordered]@{
+    ok = $false
+    error_code = $ErrorCode
+    operation = 'validate KV MVP scaffold'
+    scaffold_root = $ScaffoldRoot
+    message = $Message
+    evidence = $Evidence
+    remediation = @(
+      'Regenerate the scaffold with scripts/new_kv_mvp_scaffold.ps1, or repair the listed file.',
+      'Do not run KV STUDIO until scaffold_validation.json reports ok=true.'
+    )
+  }
+  $resultPath = Write-ValidationResult $payload
+  $payload.evidence = @($Evidence + $resultPath)
+  [Console]::Error.WriteLine('KV_SCAFFOLD_VALIDATION_FAILED ' + (($payload | ConvertTo-Json -Depth 8 -Compress)))
+  exit $ExitCode
+}
+
+function Resolve-ScaffoldPath([string]$RelativePath) {
+  if ([string]::IsNullOrWhiteSpace($RelativePath)) { return '' }
+  if ([IO.Path]::IsPathRooted($RelativePath)) { return [IO.Path]::GetFullPath($RelativePath) }
+  return [IO.Path]::GetFullPath((Join-Path $ScaffoldRoot $RelativePath))
+}
+
+function Assert-File([string]$Path, [string]$Label) {
+  if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_REQUIRED_FILE_MISSING' "$Label not found: $Path"
+  }
+}
+
+function Read-TsvRows([string]$Path, [string[]]$RequiredColumns, [string]$Label) {
+  Assert-File $Path $Label
+  $text = [IO.File]::ReadAllText($Path, [Text.Encoding]::Default)
+  if ([string]::IsNullOrWhiteSpace($text)) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_TSV_EMPTY' "$Label is empty: $Path"
+  }
+  $firstLine = @($text -split "(`r`n|`n|`r)" | Where-Object { $_ -ne '' } | Select-Object -First 1)
+  if ($firstLine.Count -eq 0) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_TSV_EMPTY' "$Label has no TSV header: $Path"
+  }
+  $headers = @([string]$firstLine[0] -split "`t")
+  $missing = @($RequiredColumns | Where-Object { $headers -notcontains $_ })
+  if ($missing.Count -gt 0) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_TSV_SCHEMA_INVALID' "$Label missing required column(s): $($missing -join ', '). Path=$Path"
+  }
+  $rows = @($text | ConvertFrom-Csv -Delimiter "`t")
+  return $rows
+}
+
+function Get-ExecutableRows([object[]]$Rows, [string]$Scope) {
+  @($Rows | Where-Object { $_.scope -eq $Scope -and $_.status -ne 'display_name' -and $_.name })
+}
+
+function Get-MnmModuleTypeFromText([string]$Text) {
+  foreach ($line in ($Text -split "(`r`n|`n|`r)")) {
+    if ($line -match '^;MODULE_TYPE:(\d+)\s*$') { return [int]$matches[1] }
+  }
+  return $null
+}
+
+function Test-MnmReferencesName([string]$Text, [string]$Name) {
+  if ([string]::IsNullOrWhiteSpace($Name)) { return $false }
+  $pattern = '(?<![A-Za-z0-9_])' + [regex]::Escape($Name) + '(?![A-Za-z0-9_])'
+  return [regex]::IsMatch($Text, $pattern)
+}
+
+if (-not (Test-Path -LiteralPath $ScaffoldRoot -PathType Container)) {
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_ROOT_MISSING' "ScaffoldRoot not found: $ScaffoldRoot"
+}
+
+$manifestPath = Join-Path $ScaffoldRoot 'scaffold.json'
+Assert-File $manifestPath 'scaffold.json'
+
+try {
+  $manifest = Get-Content -Raw -LiteralPath $manifestPath -Encoding UTF8 | ConvertFrom-Json
+} catch {
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_MANIFEST_INVALID_JSON' "scaffold.json is not valid JSON: $($_.Exception.Message)" @($manifestPath)
+}
+
+if (-not $manifest.project.name) { Stop-ScaffoldValidation 'KV_SCAFFOLD_MANIFEST_MISSING_FIELD' 'scaffold.json missing project.name' @($manifestPath) }
+if (-not $manifest.project.cpu_model) { Stop-ScaffoldValidation 'KV_SCAFFOLD_MANIFEST_MISSING_FIELD' 'scaffold.json missing project.cpu_model' @($manifestPath) }
+if (-not $manifest.project.local_program) { Stop-ScaffoldValidation 'KV_SCAFFOLD_MANIFEST_MISSING_FIELD' 'scaffold.json missing project.local_program' @($manifestPath) }
+if ([int]$manifest.schema_version -ne 2) {
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_SCHEMA_UNSUPPORTED' 'scaffold.json must use schema_version=2 with per-MNM variable files.' @($manifestPath)
+}
+if ([string]$manifest.variables.schema -ne 'per_mnm') {
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_VARIABLE_SCHEMA_INVALID' 'scaffold.json variables.schema must be per_mnm. Top-level variables.global_tsv/local_tsv is not authoritative.' @($manifestPath)
+}
+
+$mnmEntries = @($manifest.mnm_files)
+if ($mnmEntries.Count -eq 0) {
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_LIST_EMPTY' 'scaffold.json must contain at least one mnm_files entry.' @($manifestPath)
+}
+
+$checklistGuard = Join-Path (Split-Path -Parent $PSCommandPath) 'assert_kv_operation_checklist.ps1'
+if (-not (Test-Path -LiteralPath $checklistGuard)) {
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_VALIDATOR_INTERNAL_ERROR' "Checklist guard script not found: $checklistGuard"
+}
+$global:LASTEXITCODE = 0
+$checklistJson = & $checklistGuard -ChecklistPath $ChecklistPath -SearchRoots @($ScaffoldRoot) -OperationName 'validate KV MVP scaffold'
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$checklistResult = $checklistJson | ConvertFrom-Json
+
+$requiredTsvColumns = @('scope','owner_program','name','data_type','device','initial_value','comment','evidence','status')
+
+$mnmChecks = @()
+$variableSetChecks = @()
+$globalDefinitions = @{}
+foreach ($entry in $mnmEntries) {
+  $mnmPath = Resolve-ScaffoldPath ([string]$entry.path)
+  Assert-File $mnmPath 'MNM file'
+  $moduleName = [string]$entry.module_name
+  if (-not $moduleName) { $moduleName = [IO.Path]::GetFileNameWithoutExtension($mnmPath) }
+  if (-not $entry.variables -or -not $entry.variables.global_tsv -or -not $entry.variables.local_tsv) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_VARIABLE_SET_MISSING' "MNM entry must define variables.global_tsv and variables.local_tsv. module=$moduleName" @($manifestPath)
+  }
+  $entryGlobalTsv = Resolve-ScaffoldPath ([string]$entry.variables.global_tsv)
+  $entryLocalTsv = Resolve-ScaffoldPath ([string]$entry.variables.local_tsv)
+  $globalRows = Read-TsvRows $entryGlobalTsv $requiredTsvColumns "global variable TSV for $moduleName"
+  $localRows = Read-TsvRows $entryLocalTsv $requiredTsvColumns "local variable TSV for $moduleName"
+  $definedGlobalRows = @(Get-ExecutableRows $globalRows 'global')
+  $definedLocalRows = @(Get-ExecutableRows $localRows 'local')
+  if ($definedLocalRows.Count -eq 0) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_LOCAL_VARIABLES_EMPTY' "local variable TSV must contain executable local rows for module/program $moduleName." @($entryLocalTsv)
+  }
+  $wrongOwnerRows = @($definedLocalRows | Where-Object { [string]$_.owner_program -ne $moduleName })
+  if ($wrongOwnerRows.Count -gt 0) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_LOCAL_OWNER_MISMATCH' "local variable rows must use owner_program=$moduleName. Wrong rows: $($wrongOwnerRows.name -join ', ')" @($entryLocalTsv)
+  }
+  foreach ($row in $definedGlobalRows) {
+    $name = [string]$row.name
+    $signature = @([string]$row.data_type, [string]$row.device, [string]$row.initial_value) -join "`t"
+    if ($globalDefinitions.ContainsKey($name) -and $globalDefinitions[$name] -ne $signature) {
+      Stop-ScaffoldValidation 'KV_SCAFFOLD_GLOBAL_VARIABLE_CONFLICT' "Global variable $name has conflicting definitions across MNM variable sets." @($entryGlobalTsv)
+    }
+    $globalDefinitions[$name] = $signature
+  }
+  $bytes = [IO.File]::ReadAllBytes($mnmPath)
+  $hasBom = ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE)
+  if (-not $hasBom) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_ENCODING_INVALID' "MNM file must be UTF-16LE with BOM: $mnmPath" @($mnmPath)
+  }
+  $text = [Text.Encoding]::Unicode.GetString($bytes)
+  $actualModuleType = Get-MnmModuleTypeFromText $text
+  if ($null -eq $actualModuleType) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_MODULE_TYPE_MISSING' "MNM file missing ;MODULE_TYPE:<n>: $mnmPath" @($mnmPath)
+  }
+  $expectedModuleType = if ($null -ne $entry.module_type -and [string]$entry.module_type -ne '') { [int]$entry.module_type } else { 0 }
+  if ($actualModuleType -ne $expectedModuleType) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_MODULE_TYPE_MISMATCH' "MNM ;MODULE_TYPE does not match scaffold.json. file=$mnmPath expected=$expectedModuleType actual=$actualModuleType" @($manifestPath, $mnmPath)
+  }
+  if ($actualModuleType -ne 0 -and $actualModuleType -ne 2) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_MODULE_TYPE_UNSUPPORTED' "Unsupported MODULE_TYPE=$actualModuleType in $mnmPath. Use 0 for scan-executed modules or 2 for function blocks." @($mnmPath)
+  }
+  $referencedNames = @($definedGlobalRows | ForEach-Object { [string]$_.name } | Where-Object { $_ } | Select-Object -Unique)
+  $unreferencedNames = @($referencedNames | Where-Object { -not (Test-MnmReferencesName $text $_) })
+  if ($unreferencedNames.Count -gt 0) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_GLOBAL_VARIABLE_NOT_REFERENCED_BY_MNM' "Executable global variable rows must be referenced by their MNM file so the compile gate proves global variable definitions. Missing MNM references: $($unreferencedNames -join ', ')" @($mnmPath, $entryGlobalTsv)
+  }
+  $mnmChecks += [pscustomobject]@{
+    path = $mnmPath
+    module_name = $moduleName
+    module_type = $actualModuleType
+    utf16le_bom = $hasBom
+    referenced_executable_global_variable_count = $referencedNames.Count
+  }
+  $variableSetChecks += [pscustomobject]@{
+    module_name = $moduleName
+    global_tsv = $entryGlobalTsv
+    local_tsv = $entryLocalTsv
+    executable_global_variable_count = $definedGlobalRows.Count
+    executable_local_variable_count = $definedLocalRows.Count
+  }
+}
+
+$payload = [ordered]@{
+  ok = $true
+  operation = 'validate KV MVP scaffold'
+  scaffold_root = $ScaffoldRoot
+  manifest = $manifestPath
+  checklist_path = [string]$checklistResult.checklist_path
+  project_name = [string]$manifest.project.name
+  cpu_model = [string]$manifest.project.cpu_model
+  local_program = [string]$manifest.project.local_program
+  variable_schema = 'per_mnm'
+  variable_sets = $variableSetChecks
+  executable_global_variable_count = $globalDefinitions.Count
+  executable_local_variable_count = @($variableSetChecks | ForEach-Object { $_.executable_local_variable_count } | Measure-Object -Sum).Sum
+  mnm_files = $mnmChecks
+}
+$resultPath = Write-ValidationResult $payload
+$payload.result_path = $resultPath
+$payload | ConvertTo-Json -Depth 8

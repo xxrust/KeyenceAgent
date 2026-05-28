@@ -15,7 +15,8 @@ $ErrorActionPreference = 'Stop'
 $ScaffoldRoot = [IO.Path]::GetFullPath($ScaffoldRoot)
 $mnmDir = Join-Path $ScaffoldRoot 'mnm'
 $varDir = Join-Path $ScaffoldRoot 'variables'
-New-Item -ItemType Directory -Force -Path $ScaffoldRoot, $mnmDir, $varDir | Out-Null
+$moduleVarDir = Join-Path $varDir $ModuleName
+New-Item -ItemType Directory -Force -Path $ScaffoldRoot, $mnmDir, $varDir, $moduleVarDir | Out-Null
 
 function Write-Text([string]$Path, [string]$Text, [Text.Encoding]$Encoding) {
   [IO.File]::WriteAllText($Path, $Text, $Encoding)
@@ -26,8 +27,8 @@ function New-Cn([int[]]$CodePoints) {
 }
 
 $mnmPath = Join-Path $mnmDir ($ModuleName + '.mnm')
-$globalTsv = Join-Path $varDir 'global_variables.tsv'
-$localTsv = Join-Path $varDir 'local_variables.tsv'
+$globalTsv = Join-Path $moduleVarDir 'global_variables.tsv'
+$localTsv = Join-Path $moduleVarDir 'local_variables.tsv'
 
 if ($Template -eq 'TrafficLight') {
   $cnStart = New-Cn @(0x542F,0x52A8)
@@ -117,23 +118,23 @@ local	$ModuleName	$cnCount	INT		0	Local display name requested by task.	scaffold
 DEVICE:63
 ;MODULE:$ModuleName
 ;MODULE_TYPE:0
-; Minimal scaffold program. Replace these mnemonics for the task.
-LD R000
-OUT R500
+; Minimal BOOL scaffold program. Replace these mnemonics for the task.
+LD G_Input
+OUT G_Output
 END
 ENDH
 "@.TrimStart()
 
   $globalText = @"
 scope	owner_program	name	data_type	device	initial_value	comment	evidence	status
-global		G_Input	INT		0	Generic global input placeholder.	scaffold	defined
-global		G_Output	INT		0	Generic global output placeholder.	scaffold	defined
+global		G_Input	BOOL		FALSE	Generic global input placeholder.	scaffold	defined
+global		G_Output	BOOL		FALSE	Generic global output placeholder.	scaffold	defined
 "@
 
   $localText = @"
 scope	owner_program	name	data_type	device	initial_value	comment	evidence	status
-local	$ModuleName	Work	INT		0	Generic local working value.	scaffold	defined
-local	$ModuleName	Result	INT		0	Generic local result value.	scaffold	defined
+local	$ModuleName	Work	BOOL		FALSE	Generic local working bit.	scaffold	defined
+local	$ModuleName	Result	BOOL		FALSE	Generic local result bit.	scaffold	defined
 "@
 }
 
@@ -142,20 +143,20 @@ Write-Text $globalTsv $globalText ([Text.Encoding]::Default)
 Write-Text $localTsv $localText ([Text.Encoding]::Default)
 
 $manifest = [ordered]@{
-  schema_version = 1
+  schema_version = 2
   project = [ordered]@{
     name = $ProjectName
     cpu_model = $CpuModel
     local_program = $ModuleName
   }
   version = [ordered]@{
-    scaffold_version = '1.0.0'
+    scaffold_version = '2.0.0'
     created_at = (Get-Date).ToString('s')
     template = $Template
   }
   task = [ordered]@{
     summary = $TaskSummary
-    agent_fill_rule = 'Edit mnm/*.mnm, variables/global_variables.tsv, variables/local_variables.tsv, TASK.md, and VERSION.md before running KV STUDIO.'
+    agent_fill_rule = 'For every mnm_files[] entry, edit that MNM file and its paired variables.global_tsv / variables.local_tsv before running KV STUDIO.'
   }
   checklist = 'CHECKLIST.md'
   mnm_files = @(
@@ -164,12 +165,21 @@ $manifest = [ordered]@{
       module_name = $ModuleName
       module_type = 0
       encoding = 'UTF-16LE'
+      variables = [ordered]@{
+        global_tsv = ('variables/' + $ModuleName + '/global_variables.tsv')
+        local_tsv = ('variables/' + $ModuleName + '/local_variables.tsv')
+      }
     }
   )
   variables = [ordered]@{
-    global_tsv = 'variables/global_variables.tsv'
-    local_tsv = 'variables/local_variables.tsv'
-    local_program = $ModuleName
+    schema = 'per_mnm'
+    sets = @(
+      [ordered]@{
+        module_name = $ModuleName
+        global_tsv = ('variables/' + $ModuleName + '/global_variables.tsv')
+        local_tsv = ('variables/' + $ModuleName + '/local_variables.tsv')
+      }
+    )
     encoding = 'system-default ANSI'
   }
 }
@@ -182,7 +192,7 @@ $versionText = @"
 Project: $ProjectName
 CPU: $CpuModel
 Primary module: $ModuleName
-Scaffold version: 1.0.0
+Scaffold version: 2.0.0
 Template: $Template
 
 ## Change Notes
@@ -201,7 +211,7 @@ $TaskSummary
 
 1. Read scaffold.json.
 2. Edit mnm/*.mnm for program logic.
-3. Edit variables/global_variables.tsv and variables/local_variables.tsv for required variables.
+3. Edit each module's paired variables/<module>/global_variables.tsv and variables/<module>/local_variables.tsv.
 4. Update TASK.md and VERSION.md with the implemented behavior and version note.
 5. Run run_kv_mvp_scaffold.ps1 against this scaffold.
 "@
@@ -218,10 +228,11 @@ Template: $Template
 ## Steps
 
 - [ ] Confirm this scaffold is disposable or explicitly approved for KV STUDIO operation.
-- [ ] Confirm `scaffold.json` project name, CPU model, module name, and MNM file list.
-- [ ] Confirm every `mnm/*.mnm` file has the intended `;MODULE_TYPE` and program body.
-- [ ] Confirm `variables/global_variables.tsv` contains all required global executable variables.
-- [ ] Confirm `variables/local_variables.tsv` contains all required local executable variables for `$ModuleName`.
+- [ ] Confirm scaffold.json project name, CPU model, module name, and MNM file list.
+- [ ] Confirm every mnm/*.mnm file has the intended ;MODULE_TYPE and program body.
+- [ ] Confirm every mnm_files[] entry has a paired variables.global_tsv and variables.local_tsv.
+- [ ] Confirm each module's global TSV contains the global variables required by that MNM module, or only the TSV header when that module has no global variables.
+- [ ] Confirm each module's local TSV contains executable local variables for that module/program.
 - [ ] Confirm local variables are intended for the module/program that KV STUDIO will show in the local-variable selector.
 - [ ] Confirm the acceptance gate includes module placement, variable definition verification, and copied conversion result text.
 - [ ] Confirm no operation will type program text directly into the ladder/program editor.
@@ -242,6 +253,11 @@ Set-Content -LiteralPath (Join-Path $ScaffoldRoot 'CHECKLIST.md') -Value $checkl
   manifest = (Join-Path $ScaffoldRoot 'scaffold.json')
   checklist = (Join-Path $ScaffoldRoot 'CHECKLIST.md')
   mnm_files = @($mnmPath)
-  global_variables_tsv = $globalTsv
-  local_variables_tsv = $localTsv
+  variable_sets = @(
+    [pscustomobject]@{
+      module_name = $ModuleName
+      global_tsv = $globalTsv
+      local_tsv = $localTsv
+    }
+  )
 } | ConvertTo-Json -Depth 4

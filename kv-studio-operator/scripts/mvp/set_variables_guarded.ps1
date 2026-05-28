@@ -20,6 +20,17 @@
 
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+$script:CheckpointDir = Join-Path $OutDir 'checkpoints'
+New-Item -ItemType Directory -Force -Path $script:CheckpointDir | Out-Null
+$script:CheckpointSeq = 0
+$script:LastErrorCode = ''
+$script:LastErrorStep = ''
+$script:LastErrorEvidence = @()
+
+$sharedUiGuard = Join-Path (Split-Path -Parent $PSCommandPath) 'kv_ui_guard.ps1'
+if (-not (Test-Path -LiteralPath $sharedUiGuard)) { throw "Shared KV UI guard script not found: $sharedUiGuard" }
+. $sharedUiGuard
+Initialize-KvUiGuard -OutDir $OutDir -CheckpointSubdir 'shared_ui_guard_checkpoints'
 
 $checklistGuard = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'assert_kv_operation_checklist.ps1'
 if (-not (Test-Path -LiteralPath $checklistGuard)) { throw "Checklist guard script not found: $checklistGuard" }
@@ -44,6 +55,8 @@ public class KvSetVarWin32 {
   [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);
   [DllImport("user32.dll")] public static extern void mouse_event(int dwFlags, int dx, int dy, int dwData, int dwExtraInfo);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 }
 "@
 
@@ -65,33 +78,121 @@ function Get-ForegroundTitle {
   [pscustomobject]@{ Hwnd = $hwnd; Title = $builder.ToString() }
 }
 
-function Send-VkTap([byte]$Vk) {
-  [KvSetVarWin32]::keybd_event($Vk, 0, 0, 0)
-  Start-Sleep -Milliseconds 35
-  [KvSetVarWin32]::keybd_event($Vk, 0, 2, 0)
-  Start-Sleep -Milliseconds 70
+function Get-ForegroundSnapshot {
+  $hwnd = [KvSetVarWin32]::GetForegroundWindow()
+  $titleBuilder = New-Object System.Text.StringBuilder 512
+  $classBuilder = New-Object System.Text.StringBuilder 256
+  [void][KvSetVarWin32]::GetWindowText($hwnd, $titleBuilder, $titleBuilder.Capacity)
+  [void][KvSetVarWin32]::GetClassName($hwnd, $classBuilder, $classBuilder.Capacity)
+  $pidValue = [uint32]0
+  [void][KvSetVarWin32]::GetWindowThreadProcessId($hwnd, [ref]$pidValue)
+  $processName = ''
+  if ($pidValue -gt 0) {
+    try { $processName = (Get-Process -Id ([int]$pidValue) -ErrorAction Stop).ProcessName } catch { $processName = '' }
+  }
+  [pscustomobject]@{
+    hwnd = $hwnd.ToInt64()
+    title = $titleBuilder.ToString()
+    class_name = $classBuilder.ToString()
+    process_id = [int]$pidValue
+    process_name = $processName
+  }
 }
 
-function Send-AltLetter([byte]$Vk) {
-  [KvSetVarWin32]::keybd_event(0x12, 0, 0, 0)
-  Start-Sleep -Milliseconds 35
-  [KvSetVarWin32]::keybd_event($Vk, 0, 0, 0)
-  Start-Sleep -Milliseconds 35
-  [KvSetVarWin32]::keybd_event($Vk, 0, 2, 0)
-  Start-Sleep -Milliseconds 35
-  [KvSetVarWin32]::keybd_event(0x12, 0, 2, 0)
-  Start-Sleep -Milliseconds 100
+function Get-VariableFormSnapshot($Form) {
+  if (-not $Form) { return $null }
+  $rect = $Form.Current.BoundingRectangle
+  [pscustomobject]@{
+    hwnd = ([IntPtr]$Form.Current.NativeWindowHandle).ToInt64()
+    title = [string]$Form.Current.Name
+    automation_id = [string]$Form.Current.AutomationId
+    control_type = [string]$Form.Current.ControlType.ProgrammaticName
+    class_name = [string]$Form.Current.ClassName
+    process_id = [int]$Form.Current.ProcessId
+    is_enabled = [bool]$Form.Current.IsEnabled
+    is_offscreen = [bool]$Form.Current.IsOffscreen
+    bounds = [pscustomobject]@{
+      x = [int]$rect.X
+      y = [int]$rect.Y
+      width = [int]$rect.Width
+      height = [int]$rect.Height
+    }
+  }
+}
+
+function Convert-SafeFileName([string]$Value) {
+  $safe = $Value -replace '[^A-Za-z0-9_.-]+', '_'
+  if ([string]::IsNullOrWhiteSpace($safe)) { return 'step' }
+  return $safe.Trim('_')
+}
+
+function Write-StepCheckpoint(
+  [string]$Step,
+  [string]$Status,
+  [string]$Action,
+  $Form,
+  $Before,
+  $After,
+  [string]$ErrorCode = '',
+  [string]$Message = '',
+  [string[]]$Evidence = @()
+) {
+  $script:CheckpointSeq += 1
+  $fileName = ('{0:D3}_{1}_{2}.json' -f $script:CheckpointSeq, (Convert-SafeFileName $Step), (Convert-SafeFileName $Status))
+  $path = Join-Path $script:CheckpointDir $fileName
+  $payload = [ordered]@{
+    timestamp = (Get-Date).ToString('o')
+    step = $Step
+    status = $Status
+    action = $Action
+    expected_window = 'KV STUDIO variable editor KvVariableForm'
+    target = Get-VariableFormSnapshot $Form
+    foreground_before = $Before
+    foreground_after = $After
+    error_code = $ErrorCode
+    message = $Message
+    evidence = $Evidence
+  }
+  $payload | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $path -Encoding UTF8
+  Log "checkpoint $Status step=$Step path=$path code=$ErrorCode"
+  return $path
+}
+
+function Classify-ForegroundMismatch($Snapshot, [IntPtr]$TargetHwnd) {
+  if (-not $Snapshot) { return 'KV_FOCUS_LOST' }
+  if ($Snapshot.hwnd -eq $TargetHwnd.ToInt64()) { return '' }
+  $name = [string]$Snapshot.process_name
+  $title = [string]$Snapshot.title
+  if ($name -match '^(powershell|pwsh|WindowsTerminal|cmd|conhost)$') { return 'KV_FOCUS_LOST_TERMINAL' }
+  if ($title -eq 'KV STUDIO' -or $title -like 'KV STUDIO*') { return 'KV_VARIABLE_FORM_NOT_FOREGROUND' }
+  if ($Snapshot.class_name -eq '#32770') { return 'KV_MODAL_PRESENT' }
+  return 'KV_FOCUS_LOST'
+}
+
+function Fail-Guard([string]$ErrorCode, [string]$Step, [string]$Message, [string[]]$Evidence = @()) {
+  $script:LastErrorCode = $ErrorCode
+  $script:LastErrorStep = $Step
+  $script:LastErrorEvidence = $Evidence
+  throw "[$ErrorCode] $Message"
+}
+
+function Send-VkTap([byte]$Vk, [IntPtr]$TargetHwnd, [string]$ExpectedTitleLike, [string]$Step) {
+  Invoke-KvGuardedVkTap -TargetHwnd $TargetHwnd -Step $Step -Vk $Vk -ExpectedTitleLike $ExpectedTitleLike -SleepMs 70
+}
+
+function Send-AltLetter([byte]$Vk, [IntPtr]$TargetHwnd, [string]$ExpectedTitleLike, [string]$Step) {
+  Invoke-KvGuardedAltVk -TargetHwnd $TargetHwnd -Step $Step -Vk $Vk -ExpectedTitleLike $ExpectedTitleLike -SleepMs 100
 }
 
 function Test-CapsLockOn {
   (([KvSetVarWin32]::GetKeyState(0x14) -band 1) -ne 0)
 }
 
-function Set-CapsLockState([bool]$Enabled) {
+function Set-CapsLockState([bool]$Enabled, [IntPtr]$TargetHwnd, [string]$ExpectedTitleLike, [string]$StepPrefix) {
   $current = Test-CapsLockOn
   Log "CapsLock before accelerator normalization=$current"
   if ($current -ne $Enabled) {
-    Send-VkTap 0x14
+    Send-VkTap 0x14 $TargetHwnd $ExpectedTitleLike "$StepPrefix CapsLock"
     Start-Sleep -Milliseconds 80
   }
   $after = Test-CapsLockOn
@@ -100,13 +201,11 @@ function Set-CapsLockState([bool]$Enabled) {
 }
 
 function Restore-KvForeground([System.Diagnostics.Process]$Process, [string]$ProjectNeedle, [string]$Action) {
-  $shell = New-Object -ComObject WScript.Shell
   [KvSetVarWin32]::ShowWindow($Process.MainWindowHandle, 3) | Out-Null
   for ($i = 1; $i -le 10; $i++) {
     if ([KvSetVarWin32]::IsIconic($Process.MainWindowHandle)) {
       [KvSetVarWin32]::ShowWindow($Process.MainWindowHandle, 9) | Out-Null
     }
-    [void]$shell.AppActivate($Process.Id)
     [KvSetVarWin32]::SetForegroundWindow($Process.MainWindowHandle) | Out-Null
     Start-Sleep -Milliseconds 100
     $fg = Get-ForegroundTitle
@@ -285,8 +384,8 @@ function Select-VariableTabByAid($Form, [string]$TabAid, [string]$Label) {
         $tabItem = Find-TabItemByAutomationIdOrName $formForDump $TabAid $fallbackNames
         if ($tabItem) { break }
       }
-      [System.Windows.Forms.SendKeys]::SendWait('^{TAB}')
-      Log "cycled variable editor tab by Ctrl+Tab while looking for $Label"
+      $formForDump = Invoke-GuardedVariableKeyAction $formForDump "cycle variable tab for $Label" '^{TAB}' "Ctrl+Tab while looking for $Label" 250
+      Log "cycled variable editor tab by guarded Ctrl+Tab while looking for $Label"
     }
     Start-Sleep -Milliseconds 250
   } while ((Get-Date) -lt $deadline)
@@ -358,13 +457,108 @@ function Get-VariableForm([int]$ProcessIdValue) {
   Find-ByPidAid $ProcessIdValue 'KvVariableForm'
 }
 
+function Wait-VariableForm([int]$ProcessIdValue, [int]$Seconds = 6) {
+  $deadline = (Get-Date).AddSeconds($Seconds)
+  do {
+    $form = Get-VariableForm $ProcessIdValue
+    if ($form) { return $form }
+    Start-Sleep -Milliseconds 200
+  } while ((Get-Date) -lt $deadline)
+  return $null
+}
+
+function Bring-VariableFormForeground($Form, [string]$Label) {
+  if (-not $Form) { throw "KvVariableForm missing before foreground restore for $Label." }
+  $hwnd = [IntPtr]$Form.Current.NativeWindowHandle
+  if ($hwnd -eq [IntPtr]::Zero) { throw "KvVariableForm has no native window handle before $Label." }
+  [KvSetVarWin32]::ShowWindow($hwnd, 3) | Out-Null
+  [KvSetVarWin32]::SetForegroundWindow($hwnd) | Out-Null
+  Start-Sleep -Milliseconds 180
+  $fg = Get-ForegroundTitle
+  Log "foreground variable form ${Label}: hwnd=$($fg.Hwnd) title=$($fg.Title)"
+  if ($fg.Title -notlike '*变量编辑*') {
+    throw "KvVariableForm is not foreground before $Label. title=$($fg.Title)"
+  }
+}
+
+function Assert-VariableFormForeground($Form, [string]$Step, [switch]$AllowSingleRecovery) {
+  if (-not $Form) {
+    $path = Write-StepCheckpoint $Step 'failed' 'assert variable form exists' $null (Get-ForegroundSnapshot) $null 'KV_VARIABLE_FORM_NOT_FOREGROUND' 'KvVariableForm is missing before guarded input.' @()
+    Fail-Guard 'KV_VARIABLE_FORM_NOT_FOREGROUND' $Step 'KvVariableForm is missing before guarded input.' @($path)
+  }
+  $targetHwnd = [IntPtr]$Form.Current.NativeWindowHandle
+  if ($targetHwnd -eq [IntPtr]::Zero) {
+    $path = Write-StepCheckpoint $Step 'failed' 'assert variable form hwnd' $Form (Get-ForegroundSnapshot) $null 'KV_VARIABLE_FORM_NOT_FOREGROUND' 'KvVariableForm has no native window handle.' @()
+    Fail-Guard 'KV_VARIABLE_FORM_NOT_FOREGROUND' $Step 'KvVariableForm has no native window handle.' @($path)
+  }
+
+  $before = Get-ForegroundSnapshot
+  if ($before.hwnd -eq $targetHwnd.ToInt64()) { return $before }
+
+  if ($AllowSingleRecovery) {
+    $recoveryPath = Write-StepCheckpoint $Step 'recovery_before' 'restore variable editor foreground once' $Form $before $null (Classify-ForegroundMismatch $before $targetHwnd) 'Foreground was not KvVariableForm; attempting one controlled recovery.' @()
+    [KvSetVarWin32]::ShowWindow($targetHwnd, 3) | Out-Null
+    [KvSetVarWin32]::SetForegroundWindow($targetHwnd) | Out-Null
+    Start-Sleep -Milliseconds 180
+    $afterRecovery = Get-ForegroundSnapshot
+    if ($afterRecovery.hwnd -eq $targetHwnd.ToInt64()) {
+      Write-StepCheckpoint $Step 'recovery_after' 'restore variable editor foreground once' $Form $before $afterRecovery '' 'Foreground recovery succeeded.' @($recoveryPath) | Out-Null
+      return $afterRecovery
+    }
+    $code = Classify-ForegroundMismatch $afterRecovery $targetHwnd
+    $failurePath = Write-StepCheckpoint $Step 'failed' 'assert variable editor foreground' $Form $before $afterRecovery $code 'Foreground recovery failed; guarded keyboard/mouse input was not sent.' @($recoveryPath)
+    Fail-Guard $code $Step "Foreground is not KvVariableForm after recovery. hwnd=$($afterRecovery.hwnd) title=$($afterRecovery.title) process=$($afterRecovery.process_name)" @($recoveryPath, $failurePath)
+  }
+
+  $code = Classify-ForegroundMismatch $before $targetHwnd
+  $path = Write-StepCheckpoint $Step 'failed' 'assert variable editor foreground' $Form $before $null $code 'Foreground is not KvVariableForm and recovery was disabled.' @()
+  Fail-Guard $code $Step "Foreground is not KvVariableForm. hwnd=$($before.hwnd) title=$($before.title) process=$($before.process_name)" @($path)
+}
+
+function Invoke-GuardedVariableKeyAction($Form, [string]$Step, [string]$Keys, [string]$Description, [int]$SleepMs = 150) {
+  $before = Assert-VariableFormForeground $Form $Step -AllowSingleRecovery
+  $beforePath = Write-StepCheckpoint $Step 'before' $Description $Form $before $null '' 'Precondition passed; target variable editor owns foreground.' @()
+  Invoke-KvGuardedSendKeys -TargetHwnd ([IntPtr]$Form.Current.NativeWindowHandle) -Step $Step -Keys $Keys -ExpectedTitleLike '*变量编辑*' -Action $Description -SleepMs $SleepMs
+  $formAfter = Wait-VariableForm $script:ProcessIdForVariables 6
+  if (-not $formAfter) {
+    $after = Get-ForegroundSnapshot
+    $failurePath = Write-StepCheckpoint $Step 'failed' $Description $Form $before $after 'KV_VARIABLE_FORM_NOT_FOREGROUND' 'KvVariableForm disappeared after guarded key action.' @($beforePath)
+    Fail-Guard 'KV_VARIABLE_FORM_NOT_FOREGROUND' $Step 'KvVariableForm disappeared after guarded key action.' @($beforePath, $failurePath)
+  }
+  Assert-NoKvsModal $script:ProcessIdForVariables "$Step after key action"
+  $after = Assert-VariableFormForeground $formAfter "$Step postcondition" -AllowSingleRecovery
+  Write-StepCheckpoint $Step 'after' $Description $formAfter $before $after '' 'Postcondition passed; variable editor still owns foreground.' @($beforePath) | Out-Null
+  return $formAfter
+}
+
+function Invoke-GuardedVariablePaste($Form, [string]$Step, [string]$Text, [string]$Description, [int]$SleepMs = 800) {
+  if ([string]::IsNullOrWhiteSpace($Text)) {
+    Fail-Guard 'KV_VARIABLE_CHECKPOINT_FAILED' $Step 'Paste text is empty; guarded paste refused before touching clipboard.' @()
+  }
+  Invoke-KvGuardedClipboardPaste -TargetHwnd ([IntPtr]$Form.Current.NativeWindowHandle) -Step $Step -Text $Text -ExpectedTitleLike '*变量编辑*' -SleepMs $SleepMs
+  return (Wait-VariableForm $script:ProcessIdForVariables 6)
+}
+
+function Invoke-GuardedKvMainKeyAction([System.Diagnostics.Process]$Process, [string]$ProjectNeedle, [string]$Step, [string]$Keys, [string]$Description, [int]$SleepMs = 500) {
+  Restore-KvForeground $Process $ProjectNeedle $Step
+  $before = Get-ForegroundSnapshot
+  $beforePath = Write-StepCheckpoint $Step 'before' $Description $null $before $null '' 'Precondition passed; KV STUDIO main window owns foreground.' @()
+  if ($before.title -notlike 'KV STUDIO*' -or $before.title -notlike "*$ProjectNeedle*") {
+    $path = Write-StepCheckpoint $Step 'failed' $Description $null $before $null 'KV_FOCUS_LOST' 'KV STUDIO main window is not foreground before guarded key action.' @($beforePath)
+    Fail-Guard 'KV_FOCUS_LOST' $Step "KV STUDIO main window is not foreground before guarded key action. title=$($before.title)" @($beforePath, $path)
+  }
+  Invoke-KvGuardedSendKeys -TargetHwnd $Process.MainWindowHandle -Step $Step -Keys $Keys -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action $Description -SleepMs $SleepMs
+  $after = Get-ForegroundSnapshot
+  Write-StepCheckpoint $Step 'after' $Description $null $before $after '' 'Guarded KV STUDIO main key action completed.' @($beforePath) | Out-Null
+}
+
 function Ensure-VariableEditorOpen([System.Diagnostics.Process]$Process, [string]$ProjectNeedle) {
   $form = Get-VariableForm $Process.Id
   if ($form) { return $form }
   Restore-KvForeground $Process $ProjectNeedle 'open variable editor'
-  Send-AltLetter 0x56
+  Send-AltLetter 0x56 $Process.MainWindowHandle "KV STUDIO*$ProjectNeedle*" 'open variable editor Alt+V'
   Log 'sent Alt+V'
-  Send-VkTap 0x4C
+  Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $Process.MainWindowHandle -Step 'open variable editor L' -Keys 'l' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -SuccessTitleLike '*变量编辑*' -Action 'L opens the variable editor from the View menu' -SleepMs 700
   Log 'sent L after Alt+V'
   Start-Sleep -Milliseconds 700
   $form = Get-VariableForm $Process.Id
@@ -454,15 +648,17 @@ function Assert-NoKvsModal([int]$ProcessIdValue, [string]$Stage) {
     if ([string]$item.Current.ControlType.ProgrammaticName -eq 'ControlType.Window' -and
         [string]$item.Current.ClassName -eq '#32770' -and
         [string]$item.Current.Name -eq 'KV STUDIO') {
-      Write-VariableFormDump (Get-VariableForm $ProcessIdValue) ("modal_at_$($Stage).json")
+      $dumpName = "modal_at_$($Stage).json"
+      Write-VariableFormDump (Get-VariableForm $ProcessIdValue) $dumpName
       $text = [System.Text.StringBuilder]::new()
       $children = $item.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
       for ($j = 0; $j -lt $children.Count; $j++) {
         $name = [string]$children.Item($j).Current.Name
         if ($name) { [void]$text.Append($name + "`n") }
       }
-      Set-Content -LiteralPath (Join-Path $OutDir "modal_text_$($Stage).txt") -Value $text.ToString() -Encoding UTF8
-      throw "KV STUDIO modal dialog detected at $Stage. text=$($text.ToString().Trim())"
+      $textPath = Join-Path $OutDir "modal_text_$($Stage).txt"
+      Set-Content -LiteralPath $textPath -Value $text.ToString() -Encoding UTF8
+      Fail-Guard 'KV_MODAL_PRESENT' $Stage "KV STUDIO modal dialog detected. text=$($text.ToString().Trim())" @((Join-Path $OutDir $dumpName), $textPath)
     }
   }
 }
@@ -476,6 +672,8 @@ function Escape-SendKeysText([string]$Text) {
 }
 
 function Focus-VariableGridArea($Form, [string]$PageAid, [string]$Label) {
+  $focusStep = "$Label grid focus"
+  $before = Assert-VariableFormForeground $Form $focusStep -AllowSingleRecovery
   $grid = Find-DescByAid $Form '_grid'
   if ($grid) {
     $grid.SetFocus()
@@ -484,13 +682,10 @@ function Focus-VariableGridArea($Form, [string]$PageAid, [string]$Label) {
     $xOffset = if ($Label -like 'global*') { 110 } else { 70 }
     $x = [int]($rect.X + $xOffset)
     $y = [int]($rect.Y + 30)
-    [KvSetVarWin32]::SetCursorPos($x, $y) | Out-Null
-    Start-Sleep -Milliseconds 60
-    [KvSetVarWin32]::mouse_event(0x0002, 0, 0, 0, 0)
-    Start-Sleep -Milliseconds 40
-    [KvSetVarWin32]::mouse_event(0x0004, 0, 0, 0, 0)
+    Invoke-KvGuardedMouseClick -TargetHwnd ([IntPtr]$Form.Current.NativeWindowHandle) -Step "$focusStep grid click" -X $x -Y $y -ExpectedTitleLike '*变量编辑*' -SleepMs 100
     Log "focused $Label by verified _grid cell click x=$x y=$y"
-    Start-Sleep -Milliseconds 100
+    $after = Assert-VariableFormForeground $Form "$focusStep postcondition" -AllowSingleRecovery
+    Write-StepCheckpoint $focusStep 'after' "UIA SetFocus plus verified grid mouse click x=$x y=$y" $Form $before $after '' 'Variable grid focus completed.' @() | Out-Null
     return
   }
   $page = Find-VariablePagePane $Form $PageAid
@@ -500,23 +695,55 @@ function Focus-VariableGridArea($Form, [string]$PageAid, [string]$Label) {
   if ($rect.Width -lt 300 -or $rect.Height -lt 180) { throw "Variable page $PageAid has invalid grid bounds for $Label." }
   $x = [int]($rect.X + 32)
   $y = [int]($rect.Y + 86)
-  [KvSetVarWin32]::SetCursorPos($x, $y) | Out-Null
-  Start-Sleep -Milliseconds 60
-  [KvSetVarWin32]::mouse_event(0x0002, 0, 0, 0, 0)
-  Start-Sleep -Milliseconds 40
-  [KvSetVarWin32]::mouse_event(0x0004, 0, 0, 0, 0)
+  Invoke-KvGuardedMouseClick -TargetHwnd ([IntPtr]$Form.Current.NativeWindowHandle) -Step "$focusStep page click" -X $x -Y $y -ExpectedTitleLike '*变量编辑*' -SleepMs 100
   Log "focused $Label by verified variable page grid coordinate x=$x y=$y page=$PageAid"
-  Start-Sleep -Milliseconds 100
+  $after = Assert-VariableFormForeground $Form "$focusStep postcondition" -AllowSingleRecovery
+  Write-StepCheckpoint $focusStep 'after' "UIA SetFocus plus verified page mouse click x=$x y=$y" $Form $before $after '' 'Variable page focus completed.' @() | Out-Null
 }
 
 function Paste-IntoVerifiedGrid($Form, [string]$PageAid, [string]$Text, [string]$Label) {
   $grid = Find-DescByAid $Form '_grid'
   if (-not $grid) { Log "Variable grid _grid not exposed for $Label; using verified page focus path." }
   Focus-VariableGridArea $Form $PageAid $Label
-  [System.Windows.Forms.Clipboard]::SetText($Text)
-  [System.Windows.Forms.SendKeys]::SendWait('^v')
+  Invoke-GuardedVariablePaste $Form "$Label verified grid paste" $Text "Ctrl+V into verified variable grid for $Label" 700 | Out-Null
   Log "pasted $Label text length=$($Text.Length) into verified variable grid"
-  Start-Sleep -Milliseconds 700
+}
+
+function Get-ClipboardTextAfterCopy([string]$Sentinel, [int]$Seconds = 4) {
+  $deadline = (Get-Date).AddSeconds($Seconds)
+  do {
+    Start-Sleep -Milliseconds 200
+    try {
+      $text = [Windows.Forms.Clipboard]::GetText()
+      if ($text -and $text -ne $Sentinel) { return $text }
+    } catch {
+      Log "clipboard read retry after copy: $($_.Exception.Message)"
+    }
+  } while ((Get-Date) -lt $deadline)
+  return ''
+}
+
+function Copy-VariableGridText($Form, [string]$PageAid, [string]$Label) {
+  $sentinel = '__KV_VARIABLE_GRID_COPY_SENTINEL__'
+  Invoke-KvGuardedClipboardSetText -TargetHwnd ([IntPtr]$Form.Current.NativeWindowHandle) -Step "$Label sentinel clipboard set" -Text $sentinel -ExpectedTitleLike '*变量编辑*'
+  Focus-VariableGridArea $Form $PageAid $Label
+  $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
+  $formNow = Invoke-GuardedVariableKeyAction $formNow "$Label Ctrl+A" '^a' "Ctrl+A selects $Label variable grid text" 200
+  $formNow = Invoke-GuardedVariableKeyAction $formNow "$Label Ctrl+C" '^c' "Ctrl+C copies $Label variable grid text" 300
+  $text = Get-ClipboardTextAfterCopy $sentinel 5
+  if ([string]::IsNullOrWhiteSpace($text)) {
+    Fail-Guard 'KV_VARIABLE_GRID_COPY_EMPTY' "$Label copy verification" "Variable grid copy returned empty text for $Label." @()
+  }
+  Log "copied $Label grid text length=$($text.Length)"
+  return $text
+}
+
+function Assert-NamesInCopiedText([string]$Text, [string[]]$Names, [string]$Label, [string]$EvidencePath) {
+  $missing = @($Names | Where-Object { $_ -and -not $Text.Contains($_) })
+  if ($missing.Count -gt 0) {
+    Fail-Guard 'KV_LOCAL_VARIABLE_REOPEN_VERIFICATION_FAILED' "$Label copied-text verification" "$Label copied text is missing expected variable name(s): $($missing -join ', ')" @($EvidencePath)
+  }
+  Log "$Label copied-text verification passed: $($Names -join ',')"
 }
 
 function Paste-GlobalVariablesByFirstNameTab($Form, [string]$Text) {
@@ -526,18 +753,12 @@ function Paste-GlobalVariablesByFirstNameTab($Form, [string]$Text) {
   if (-not (Test-VariablePageSelected $formNow '_tabPageGlobal')) { throw 'Global variable page is not selected before paste.' }
 
   Focus-VariableGridArea $formNow '_tabPageGlobal' 'global variables'
-  [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
-  Start-Sleep -Milliseconds 150
-  Log 'sent Tab to select first global variable name cell'
-  Assert-NoKvsModal $script:ProcessIdForVariables 'global after Tab'
-  if (-not (Get-VariableForm $script:ProcessIdForVariables)) { throw 'KvVariableForm disappeared after global Tab.' }
+  $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
+  $formNow = Invoke-GuardedVariableKeyAction $formNow 'global first-name Tab' '{TAB}' 'Tab to select first global variable name cell' 150
+  Log 'sent guarded Tab to select first global variable name cell'
 
-  [System.Windows.Forms.Clipboard]::SetText($Text)
-  [System.Windows.Forms.SendKeys]::SendWait('^v')
-  Start-Sleep -Milliseconds 900
+  $formNow = Invoke-GuardedVariablePaste $formNow 'global variables Ctrl+V' $Text 'Ctrl+V global variables from first name cell' 900
   Log "pasted global variables from first name cell text length=$($Text.Length)"
-  Assert-NoKvsModal $script:ProcessIdForVariables 'global after paste'
-  if (-not (Get-VariableForm $script:ProcessIdForVariables)) { throw 'KvVariableForm disappeared after global paste.' }
 }
 
 function Paste-LocalVariablesByTabPgDn($Form, [string]$Text, [string]$ProgramName) {
@@ -550,67 +771,22 @@ function Paste-LocalVariablesByTabPgDn($Form, [string]$Text, [string]$ProgramNam
   if (-not $formNow) { throw 'KvVariableForm missing after selecting local program.' }
   $combo = Find-DescByAid $formNow '_comboBoxModuleName'
   if (-not $combo) { throw 'Local variable program combo missing before Tab/PgDn paste.' }
+  Assert-VariableFormForeground $formNow 'local program combo focus' -AllowSingleRecovery | Out-Null
   $combo.SetFocus()
   Log "focused local program combo before user-specified Tab/PgDn route program=$ProgramName"
 
-  [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
-  Start-Sleep -Milliseconds 150
-  Log 'sent Tab to select first local variable name cell'
-  Assert-NoKvsModal $script:ProcessIdForVariables 'local after Tab'
-  if (-not (Get-VariableForm $script:ProcessIdForVariables)) { throw 'KvVariableForm disappeared after local Tab.' }
+  $formNow = Invoke-GuardedVariableKeyAction $formNow 'local first-name Tab' '{TAB}' 'Tab to select first local variable name cell' 150
+  Log 'sent guarded Tab to select first local variable name cell'
 
-  [System.Windows.Forms.SendKeys]::SendWait('{PGDN}')
-  Start-Sleep -Milliseconds 250
-  Log 'sent PgDn to move to last local variable row'
-  Assert-NoKvsModal $script:ProcessIdForVariables 'local after PgDn'
-  if (-not (Get-VariableForm $script:ProcessIdForVariables)) { throw 'KvVariableForm disappeared after local PgDn.' }
+  $formNow = Invoke-GuardedVariableKeyAction $formNow 'local last-row PgDn' '{PGDN}' 'PgDn to move to last local variable row' 250
+  Log 'sent guarded PgDn to move to last local variable row'
 
-  [System.Windows.Forms.Clipboard]::SetText($Text)
-  [System.Windows.Forms.SendKeys]::SendWait('^v')
-  Start-Sleep -Milliseconds 800
+  $formNow = Invoke-GuardedVariablePaste $formNow 'local variables Ctrl+V' $Text 'Ctrl+V local variables by Tab/PgDn route' 800
   Log "pasted local variables by Tab/PgDn route text length=$($Text.Length)"
-  Assert-NoKvsModal $script:ProcessIdForVariables 'local after paste'
-  if (-not (Get-VariableForm $script:ProcessIdForVariables)) { throw 'KvVariableForm disappeared after local paste.' }
 }
 
 function Enter-VariablesCellByCell($Form, [string]$PageAid, [object[]]$Rows, [string[]]$Columns, [string]$Label) {
-  if ($Rows.Count -eq 0) { throw "No variable rows to enter for $Label." }
-  Focus-VariableGridArea $Form $PageAid $Label
-  if ($PageAid -eq '_tabPageGlobal') {
-    [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
-    Start-Sleep -Milliseconds 120
-    Log "moved global variable focus from group name to variable name by Tab"
-  }
-  for ($r = 0; $r -lt $Rows.Count; $r++) {
-    $row = $Rows[$r]
-    for ($c = 0; $c -lt $Columns.Count; $c++) {
-      $column = $Columns[$c]
-      $value = [string]$row.$column
-      if ($value.Length -gt 0) {
-        [System.Windows.Forms.SendKeys]::SendWait((Escape-SendKeysText $value))
-        Start-Sleep -Milliseconds 60
-      }
-      if ($c -lt ($Columns.Count - 1)) {
-        [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
-        Start-Sleep -Milliseconds 70
-      }
-    }
-    if ($PageAid -eq '_tabPageGlobal') {
-      [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
-      Start-Sleep -Milliseconds 80
-      [System.Windows.Forms.SendKeys]::SendWait('{HOME}')
-      Start-Sleep -Milliseconds 80
-      [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
-      Start-Sleep -Milliseconds 80
-      [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
-      Start-Sleep -Milliseconds 120
-    } else {
-      [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
-      Start-Sleep -Milliseconds 120
-    }
-    Assert-NoKvsModal $script:ProcessIdForVariables "$Label row $($r + 1)"
-    Log "entered $Label row $($r + 1): $($row.name)"
-  }
+  Fail-Guard 'KV_UNSAFE_ROUTE_DISABLED' "$Label cell-by-cell entry" 'Cell-by-cell SendKeys route is disabled. Use guarded paste route with foreground checkpoints.' @()
 }
 
 function Save-Shot([string]$Name) {
@@ -625,10 +801,8 @@ function Save-Shot([string]$Name) {
 }
 
 function Save-Project([System.Diagnostics.Process]$Process, [string]$ProjectNeedle) {
-  Restore-KvForeground $Process $ProjectNeedle 'Ctrl+S after variable paste'
-  [System.Windows.Forms.SendKeys]::SendWait('^s')
+  Invoke-GuardedKvMainKeyAction $Process $ProjectNeedle 'save project after variables' '^s' 'Ctrl+S after variable paste' 2000
   Log 'sent Ctrl+S after variable paste'
-  Start-Sleep -Seconds 2
 }
 
 function Close-VariableEditor([int]$ProcessIdValue) {
@@ -679,7 +853,7 @@ try {
   if (-not $process) { throw 'No visible KV STUDIO process.' }
   $script:ProcessIdForVariables = $process.Id
   Restore-KvForeground $process $projectNeedle 'set variables start'
-  Set-CapsLockState $true
+  Set-CapsLockState $true $process.MainWindowHandle "KV STUDIO*$projectNeedle*" 'set variables start'
   Assert-NoDirectInputFast $process.Id 'before variable editing'
 
   $globalText = Convert-GlobalRows $GlobalVariablesTsv
@@ -694,7 +868,7 @@ try {
   Set-Content -LiteralPath (Join-Path $OutDir 'local_paste.tsv') -Value $localText -Encoding UTF8
 
   $form = Ensure-VariableEditorOpen $process $projectNeedle
-  Set-CapsLockState $false
+  Set-CapsLockState $false ([IntPtr]$form.Current.NativeWindowHandle) '*变量编辑*' 'variable editor opened'
   if ($SkipGlobal) {
     Log 'skipping global variable entry by parameter'
   } elseif ($globalRows.Count -gt 0) {
@@ -705,34 +879,75 @@ try {
     Log 'no executable global variables to enter'
   }
 
-  $form = Get-VariableForm $process.Id
-  $form = Select-VariableTabByAid $form '_tabPageLocal' 'local tab'
-  Select-LocalProgram $form $LocalProgramName
-  $form = Get-VariableForm $process.Id
-  if ($KeepVariableEditorOpen) {
-    Save-Shot '00_before_local_repaste.png'
+  if ($localRows.Count -gt 0) {
+    $form = Get-VariableForm $process.Id
+    $form = Select-VariableTabByAid $form '_tabPageLocal' 'local tab'
+    Select-LocalProgram $form $LocalProgramName
+    $form = Get-VariableForm $process.Id
+    if ($KeepVariableEditorOpen) {
+      Save-Shot '00_before_local_repaste.png'
+    }
+    Paste-LocalVariablesByTabPgDn $form $localText $LocalProgramName
+    Save-Shot '02_after_local_paste.png'
+  } else {
+    Log 'no executable local variables to enter'
   }
-  Paste-LocalVariablesByTabPgDn $form $localText $LocalProgramName
-  Save-Shot '02_after_local_paste.png'
 
   Save-Project $process $projectNeedle
   Save-Shot '03_after_save.png'
   Assert-NoKvsModal $process.Id 'after variable save'
-  if (-not (Get-VariableForm $process.Id)) { throw 'KvVariableForm disappeared after variable save.' }
-
-  $requiredNames = @($definedGlobalNames + $definedLocalNames | Where-Object { $_ } | Select-Object -Unique)
-  $fileScan = Test-ProjectHasNames $projectRoot $requiredNames
-  if (-not $fileScan.Ok) {
-    throw "Variable definition verification failed after save. Missing names: $($fileScan.Missing -join ', ')"
+  if (-not (Wait-VariableForm $process.Id 6)) { throw 'KvVariableForm disappeared after variable save.' }
+  if (-not $KeepVariableEditorOpen) {
+    Close-VariableEditor $process.Id
+    Start-Sleep -Milliseconds 700
+    if (Wait-VariableForm $process.Id 2) { throw 'KvVariableForm remained open after close request before persistence verification.' }
+    Save-Project $process $projectNeedle
+    Save-Shot '04_after_variable_editor_close_and_save.png'
+    Assert-NoKvsModal $process.Id 'after variable editor close and save'
+  } else {
+    Log 'keeping variable editor open by parameter; persistence verification will scan with editor still open'
   }
+
+  $localReopenClipboardPath = ''
+  $localReopenClipboardText = ''
+  if ($localRows.Count -gt 0) {
+    $verifyForm = Ensure-VariableEditorOpen $process $projectNeedle
+    Set-CapsLockState $false ([IntPtr]$verifyForm.Current.NativeWindowHandle) '*变量编辑*' 'local reopen verification'
+    $verifyForm = Select-VariableTabByAid $verifyForm '_tabPageLocal' 'local tab reopen verification'
+    Select-LocalProgram $verifyForm $LocalProgramName
+    $verifyForm = Get-VariableForm $process.Id
+    $localReopenClipboardText = Copy-VariableGridText $verifyForm '_tabPageLocal' 'local variables reopen verification'
+    $localReopenClipboardPath = Join-Path $OutDir 'local_variables_reopen_clipboard.txt'
+    Set-Content -LiteralPath $localReopenClipboardPath -Value $localReopenClipboardText -Encoding UTF8
+    Assert-NamesInCopiedText $localReopenClipboardText $definedLocalNames 'local variables after close/reopen' $localReopenClipboardPath
+    Save-Shot '05_after_local_reopen_verification.png'
+    if (-not $KeepVariableEditorOpen) {
+      Close-VariableEditor $process.Id
+      Start-Sleep -Milliseconds 500
+      Save-Project $process $projectNeedle
+    }
+  }
+
+  $globalFileScan = Test-ProjectHasNames $projectRoot $definedGlobalNames
+  if (-not $globalFileScan.Ok) {
+    $scanPath = Join-Path $OutDir 'variable_persistence_failed_scan.json'
+    $globalFileScan | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $scanPath -Encoding UTF8
+    Fail-Guard 'KV_GLOBAL_VARIABLE_PASTE_NOT_PERSISTED' 'variable persistence verification' "Global variable definition verification failed after save. Missing names: $($globalFileScan.Missing -join ', ')" @($scanPath)
+  }
+  $requiredNames = @($definedGlobalNames + $definedLocalNames | Where-Object { $_ } | Select-Object -Unique)
   $validation = [pscustomobject]@{
     Ok = $true
-    Basis = 'variable editor route completed without modal; required executable variable names were found in same-run saved project files'
+    Basis = 'variable editor route completed without modal; global executable names were found in same-run saved project files; local executable names were verified by closing/reopening the variable editor, selecting the same program, copying the local grid text, and matching expected names'
     RequiredNames = $requiredNames
-    VariableDefinitionCheckOk = $fileScan.Ok
-    LocalPasteRoute = "local tab -> $LocalProgramName -> Tab -> PgDn -> Ctrl+V"
-    ScreenshotAfterLocalPaste = (Join-Path $OutDir '02_after_local_paste.png')
-    ProjectFileScan = $fileScan
+    GlobalNames = $definedGlobalNames
+    LocalNames = $definedLocalNames
+    GlobalVariableFileScanOk = $globalFileScan.Ok
+    LocalVariableValidationBasis = 'guarded close/reopen/copy verification from the KV STUDIO local-variable grid'
+    LocalReopenClipboardPath = $localReopenClipboardPath
+    LocalReopenClipboardContainsExpectedNames = if ($localRows.Count -gt 0) { $true } else { $null }
+    LocalPasteRoute = if ($localRows.Count -gt 0) { "local tab -> $LocalProgramName -> Tab -> PgDn -> Ctrl+V" } else { 'skipped: no executable local variables' }
+    ScreenshotAfterLocalPaste = if ($localRows.Count -gt 0) { (Join-Path $OutDir '02_after_local_paste.png') } else { '' }
+    ProjectFileScan = $globalFileScan
   }
   $validation | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $OutDir 'variable_persistence_validation.json') -Encoding UTF8
 
@@ -741,11 +956,27 @@ try {
     ProjectPath = $ProjectPath
     ProjectRoot = $projectRoot
     RequiredNames = $requiredNames
-    VariableDefinitionCheckOk = $fileScan.Ok
+    VariableDefinitionCheckOk = $true
+    GlobalVariableFileScanOk = $globalFileScan.Ok
   } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'set_variables_result.json') -Encoding UTF8
   Log 'done set variables'
 } catch {
   Log ('ERROR ' + $_.Exception.ToString())
   $_.Exception.ToString() | Set-Content -LiteralPath (Join-Path $OutDir 'fail.txt') -Encoding UTF8
+  $errorCode = if ($script:LastErrorCode) { $script:LastErrorCode } else { 'KV_VARIABLE_STEP_FAILED' }
+  $currentStep = if ($script:LastErrorStep) { $script:LastErrorStep } else { 'set_variables' }
+  [pscustomobject]@{
+    ok = $false
+    error_code = $errorCode
+    operation = 'set KV STUDIO variables'
+    current_step = $currentStep
+    message = $_.Exception.Message
+    evidence = @($script:LastErrorEvidence + @((Join-Path $OutDir 'fail.txt')) | Where-Object { $_ })
+    remediation = @(
+      'Do not send any keyboard input until the checkpoint foreground_before.hwnd equals the KvVariableForm target hwnd.',
+      'Inspect checkpoints under artifacts/set_variables/checkpoints to identify the foreground owner.',
+      'If foreground recovery failed, close interfering modal/window or restart from the previous safe harness checkpoint.'
+    )
+  } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'set_variables_result.json') -Encoding UTF8
   exit 1
 }
