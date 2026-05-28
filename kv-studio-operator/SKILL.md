@@ -77,12 +77,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_m
 
 For multi-MNM stages that must prove local variables independently of compile, run the scaffold with `-AuditVariablePersistence`. The runner will close/reopen the variable editor, copy each module's local grid, and match expected local names before compile.
 
+Multi-MNM local-variable proof requires per-module first-column isolation: the copied local grid for module A must contain A's local names with their expected data types in the first two columns, and must not contain any other module's local names in the first column. The normal local paste route is: select local tab, select the target local program, focus the local program combo, send `Tab`, send `PgDn`, then paste the full local variable rows. If an audit copy is taken before paste, the script must refocus the local program combo before sending `Tab`.
+
 Run repeat gate:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_mvp_repeat.ps1" `
   -ScaffoldRoot $ScaffoldRoot `
   -OutRoot (Join-Path $WorkRoot 'mvp_repeat_runs') `
+  -AuditVariablePersistence `
   -RequiredConsecutivePasses 3 `
   -MaxAttempts 6 `
   -StopAfterSameFailureCount 3 `

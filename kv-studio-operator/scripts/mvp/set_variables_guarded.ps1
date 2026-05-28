@@ -16,6 +16,10 @@
   [switch]$AuditProjectTextScan,
   [switch]$AuditScreenshots,
 
+  [string]$ForbiddenLocalNamesCsv = '',
+  [ValidateSet('Full','NameType')]
+  [string]$LocalPasteFormat = 'Full',
+
   [string]$ChecklistPath = '',
 
   [string]$OutDir = ('E:\personal_project\rust_plc\out\traffic_light_min_loop_20260525\validation\set_variables_' + (Get-Date -Format 'yyyyMMdd_HHmmss'))
@@ -29,6 +33,7 @@ $script:CheckpointSeq = 0
 $script:LastErrorCode = ''
 $script:LastErrorStep = ''
 $script:LastErrorEvidence = @()
+$script:ForbiddenLocalNames = @($ForbiddenLocalNamesCsv -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 
 $sharedUiGuard = Join-Path (Split-Path -Parent $PSCommandPath) 'kv_ui_guard.ps1'
 if (-not (Test-Path -LiteralPath $sharedUiGuard)) { throw "Shared KV UI guard script not found: $sharedUiGuard" }
@@ -438,47 +443,72 @@ function Select-VariableTabByAid($Form, [string]$TabAid, [string]$Label) {
   return $form2
 }
 
-function Select-LocalProgram($Form, [string]$ProgramName) {
-  $combo = Find-DescByAid $Form '_comboBoxModuleName'
-  if (-not $combo) { throw 'Local variable program combo _comboBoxModuleName missing.' }
+function Get-LocalProgramComboValue($Combo) {
   $valueObj = $null
-  $current = $combo.Current.Name
-  if ($combo.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$valueObj)) {
-    $current = $valueObj.Current.Value
+  if ($Combo.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$valueObj)) {
+    return [string]$valueObj.Current.Value
   }
-  Log "local program combo current value=$current"
-  if ($current -eq $ProgramName) { return }
+  return [string]$Combo.Current.Name
+}
 
+function Get-LocalProgramOptions($Form, $Combo) {
   $expandObj = $null
-  if (-not $combo.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$expandObj)) {
+  if (-not $Combo.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$expandObj)) {
     throw 'Local variable program combo does not expose ExpandCollapsePattern.'
   }
   $expandObj.Expand()
   Start-Sleep -Milliseconds 250
 
   $form2 = Get-VariableForm $script:ProcessIdForVariables
+  if (-not $form2) { throw 'KvVariableForm disappeared while expanding local program combo.' }
   $items = $form2.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
-  $target = $null
+  $options = [System.Collections.Generic.List[string]]::new()
   for ($i = 0; $i -lt $items.Count; $i++) {
     $item = $items.Item($i)
-    if ([string]$item.Current.Name -eq $ProgramName -and [string]$item.Current.ControlType.ProgrammaticName -eq 'ControlType.ListItem') {
-      $target = $item
-      break
-    }
+    if ([string]$item.Current.ControlType.ProgrammaticName -ne 'ControlType.ListItem') { continue }
+    $name = [string]$item.Current.Name
+    if ($name -and -not $options.Contains($name)) { $options.Add($name) }
   }
-  if (-not $target) { throw "Local variable target program $ProgramName was not found in combo list." }
-  Invoke-Or-Select $target "local program $ProgramName"
+  @($options)
+}
+
+function Select-LocalProgram($Form, [string]$ProgramName) {
+  $combo = Find-DescByAid $Form '_comboBoxModuleName'
+  if (-not $combo) { throw 'Local variable program combo _comboBoxModuleName missing.' }
+  $current = Get-LocalProgramComboValue $combo
+  Log "local program combo current value=$current"
+  if ($current -eq $ProgramName) { return }
+
+  $before = Assert-VariableFormForeground $Form "local program $ProgramName keyboard selection precondition" -AllowSingleRecovery
+  $combo.SetFocus()
+  $options = @(Get-LocalProgramOptions $Form $combo)
+  $targetIndex = [Array]::IndexOf([string[]]$options, $ProgramName)
+  if ($targetIndex -lt 0) { throw "Local variable target program $ProgramName was not found in combo list. options=$($options -join ',')" }
+  $keys = '{HOME}'
+  for ($i = 0; $i -lt $targetIndex; $i++) { $keys += '{DOWN}' }
+  $keys += '{ENTER}'
+  Write-StepCheckpoint "local program $ProgramName keyboard selection" 'before' "keyboard select local program with Home/Down/Enter options=$($options -join ',')" $Form $before $null '' 'Local program combo is focused and expanded.' @() | Out-Null
+  $formAfterKeys = Invoke-GuardedVariableKeyAction $Form "local program $ProgramName keyboard select" $keys "Keyboard select local program $ProgramName from combo index $targetIndex" 350
   Start-Sleep -Milliseconds 250
 
-  $form3 = Get-VariableForm $script:ProcessIdForVariables
+  $form3 = if ($formAfterKeys) { $formAfterKeys } else { Get-VariableForm $script:ProcessIdForVariables }
   $combo2 = Find-DescByAid $form3 '_comboBoxModuleName'
-  $actual = $combo2.Current.Name
-  $valueObj2 = $null
-  if ($combo2.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$valueObj2)) {
-    $actual = $valueObj2.Current.Value
-  }
+  $actual = Get-LocalProgramComboValue $combo2
   if ($actual -ne $ProgramName) { throw "Local program selection verification failed. expected=$ProgramName actual=$actual" }
-  Log "verified local program selection=$ProgramName"
+  Log "verified local program selection by guarded keyboard=$ProgramName"
+}
+
+function Focus-LocalProgramCombo($Form, [string]$ProgramName, [string]$Label) {
+  $combo = Find-DescByAid $Form '_comboBoxModuleName'
+  if (-not $combo) { throw "Local variable program combo _comboBoxModuleName missing before $Label." }
+  $actual = Get-LocalProgramComboValue $combo
+  if ($actual -ne $ProgramName) { throw "Local program combo value mismatch before $Label. expected=$ProgramName actual=$actual" }
+  $before = Assert-VariableFormForeground $Form "$Label local program combo focus" -AllowSingleRecovery
+  $combo.SetFocus()
+  Start-Sleep -Milliseconds 120
+  $after = Assert-VariableFormForeground $Form "$Label local program combo focus postcondition" -AllowSingleRecovery
+  Write-StepCheckpoint "$Label local program combo focus" 'after' "UIA SetFocus on local program combo before keyboard Tab/PgDn route" $Form $before $after '' 'Local program combo focus completed.' @() | Out-Null
+  Log "focused local program combo for keyboard Tab/PgDn route program=$ProgramName label=$Label"
 }
 
 function Get-VariableForm([int]$ProcessIdValue) {
@@ -643,6 +673,13 @@ function Convert-LocalRows([string]$Path) {
   $lines = foreach ($row in $rows) {
     if ($row.scope -ne 'local') { continue }
     if ($row.status -eq 'display_name') { continue }
+    if ($LocalPasteFormat -eq 'NameType') {
+      @(
+        $row.name
+        $row.data_type
+      ) -join "`t"
+      continue
+    }
     @(
       $row.name
       $row.data_type
@@ -776,12 +813,46 @@ function Copy-VariableGridText($Form, [string]$PageAid, [string]$Label) {
   return $text
 }
 
-function Assert-NamesInCopiedText([string]$Text, [string[]]$Names, [string]$Label, [string]$EvidencePath) {
-  $missing = @($Names | Where-Object { $_ -and -not $Text.Contains($_) })
-  if ($missing.Count -gt 0) {
-    Fail-Guard 'KV_LOCAL_VARIABLE_REOPEN_VERIFICATION_FAILED' "$Label copied-text verification" "$Label copied text is missing expected variable name(s): $($missing -join ', ')" @($EvidencePath)
+function Get-CopiedVariableRows([string]$Text) {
+  $rows = [System.Collections.Generic.List[object]]::new()
+  foreach ($line in @($Text -split "\r?\n")) {
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+    $columns = @($line -split "`t", -1)
+    $rows.Add([pscustomobject]@{
+      name = if ($columns.Count -gt 0) { [string]$columns[0] } else { '' }
+      data_type = if ($columns.Count -gt 1) { [string]$columns[1] } else { '' }
+      columns = $columns
+      raw = $line
+    })
   }
-  Log "$Label copied-text verification passed: $($Names -join ',')"
+  @($rows)
+}
+
+function Assert-ExpectedVariableRowsInCopiedText([string]$Text, [object[]]$ExpectedRows, [string]$Label, [string]$EvidencePath) {
+  $copiedRows = @(Get-CopiedVariableRows $Text)
+  $missing = @()
+  foreach ($expected in @($ExpectedRows)) {
+    $expectedName = [string]$expected.name
+    $expectedType = [string]$expected.data_type
+    if (-not $expectedName) { continue }
+    $match = @($copiedRows | Where-Object { $_.name -eq $expectedName -and $_.data_type -eq $expectedType })
+    if ($match.Count -eq 0) { $missing += "$expectedName/$expectedType" }
+  }
+  if ($missing.Count -gt 0) {
+    Fail-Guard 'KV_LOCAL_VARIABLE_REOPEN_VERIFICATION_FAILED' "$Label copied-text verification" "$Label copied text is missing expected variable name/type row(s) in the first two columns: $($missing -join ', ')" @($EvidencePath)
+  }
+  Log "$Label copied-text first-column verification passed: $(@($ExpectedRows | ForEach-Object { [string]$_.name }) -join ',')"
+}
+
+function Assert-NameColumnNotInCopiedText([string]$Text, [string[]]$Names, [string]$Label, [string]$EvidencePath) {
+  $copiedNames = @(Get-CopiedVariableRows $Text | ForEach-Object { [string]$_.name } | Where-Object { $_ })
+  $present = @($Names | Where-Object { $_ -and ($copiedNames -contains $_) })
+  if ($present.Count -gt 0) {
+    Fail-Guard 'KV_LOCAL_VARIABLE_SCOPE_CONTAMINATED' "$Label copied-text isolation verification" "$Label copied name column contains variable name(s) that belong to another local variable set: $($present -join ', ')" @($EvidencePath)
+  }
+  if ($Names.Count -gt 0) {
+    Log "$Label copied-text name-column isolation verification passed; absent names: $($Names -join ',')"
+  }
 }
 
 function Paste-GlobalVariablesByFirstNameTab($Form, [string]$Text) {
@@ -807,11 +878,19 @@ function Paste-LocalVariablesByTabPgDn($Form, [string]$Text, [string]$ProgramNam
   Select-LocalProgram $formNow $ProgramName
   $formNow = Get-VariableForm $script:ProcessIdForVariables
   if (-not $formNow) { throw 'KvVariableForm missing after selecting local program.' }
-  $combo = Find-DescByAid $formNow '_comboBoxModuleName'
-  if (-not $combo) { throw 'Local variable program combo missing before Tab/PgDn paste.' }
-  Assert-VariableFormForeground $formNow 'local program combo focus' -AllowSingleRecovery | Out-Null
-  $combo.SetFocus()
-  Log "focused local program combo before user-specified Tab/PgDn route program=$ProgramName"
+
+  if ($script:ForbiddenLocalNames.Count -gt 0) {
+    $prePasteClipboardText = Copy-VariableGridText $formNow '_tabPageLocal' "local variables $ProgramName pre-paste isolation"
+    $prePasteClipboardPath = Join-Path $OutDir 'local_variables_pre_paste_clipboard.txt'
+    Set-Content -LiteralPath $prePasteClipboardPath -Value $prePasteClipboardText -Encoding UTF8
+    Assert-NameColumnNotInCopiedText $prePasteClipboardText $script:ForbiddenLocalNames "local variables $ProgramName before paste" $prePasteClipboardPath
+    $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
+    if (-not $formNow) { throw 'KvVariableForm missing after local pre-paste isolation copy.' }
+  }
+
+  Focus-LocalProgramCombo $formNow $ProgramName "local variables $ProgramName"
+  $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
+  if (-not $formNow) { throw 'KvVariableForm missing after focusing local program combo for local paste.' }
 
   $formNow = Invoke-GuardedVariableKeyAction $formNow 'local first-name Tab' '{TAB}' 'Tab to select first local variable name cell' 150
   Log 'sent guarded Tab to select first local variable name cell'
@@ -961,7 +1040,8 @@ try {
     $localReopenClipboardText = Copy-VariableGridText $verifyForm '_tabPageLocal' 'local variables reopen verification'
     $localReopenClipboardPath = Join-Path $OutDir 'local_variables_reopen_clipboard.txt'
     Set-Content -LiteralPath $localReopenClipboardPath -Value $localReopenClipboardText -Encoding UTF8
-    Assert-NamesInCopiedText $localReopenClipboardText $definedLocalNames 'local variables after close/reopen' $localReopenClipboardPath
+    Assert-ExpectedVariableRowsInCopiedText $localReopenClipboardText $localRows 'local variables after close/reopen' $localReopenClipboardPath
+    Assert-NameColumnNotInCopiedText $localReopenClipboardText $script:ForbiddenLocalNames 'local variables after close/reopen' $localReopenClipboardPath
     Save-Shot '05_after_local_reopen_verification.png'
     if (-not $KeepVariableEditorOpen) {
       Close-VariableEditor $process.Id
@@ -995,6 +1075,8 @@ try {
     LocalVariableValidationBasis = if ($AuditPersistence) { 'guarded close/reopen/copy verification from the KV STUDIO local-variable grid' } else { 'fast mode: local persistence is deferred to compile gate unless AuditPersistence is enabled' }
     LocalReopenClipboardPath = $localReopenClipboardPath
     LocalReopenClipboardContainsExpectedNames = if ($AuditPersistence -and $localRows.Count -gt 0) { $true } else { $null }
+    ForbiddenLocalNames = @($script:ForbiddenLocalNames)
+    LocalReopenClipboardExcludesForbiddenNames = if ($AuditPersistence -and $script:ForbiddenLocalNames.Count -gt 0) { $true } else { $null }
     LocalPasteRoute = if ($localRows.Count -gt 0) { "local tab -> $LocalProgramName -> Tab -> PgDn -> Ctrl+V" } else { 'skipped: no executable local variables' }
     ScreenshotAfterLocalPaste = if ($localRows.Count -gt 0) { (Join-Path $OutDir '02_after_local_paste.png') } else { '' }
     ProjectFileScan = $globalFileScan

@@ -7,6 +7,9 @@ param(
   [string]$KvsExe = '',
   [string]$ChecklistPath = '',
   [int]$TimeoutSeconds = 600,
+  [switch]$AuditVariablePersistence,
+  [ValidateSet('Full','NameType')]
+  [string]$LocalPasteFormat = 'Full',
   [int]$RequiredConsecutivePasses = 3,
   [int]$MaxAttempts = 6,
   [int]$StopAfterSameFailureCount = 3
@@ -48,6 +51,8 @@ for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
   )
   if ($KvsExe) { $args += @('-KvsExe', $KvsExe) }
   if ($ChecklistPath) { $args += @('-ChecklistPath', $ChecklistPath) }
+  if ($AuditVariablePersistence) { $args += '-AuditVariablePersistence' }
+  $args += @('-LocalPasteFormat', $LocalPasteFormat)
 
   $attemptStart = Get-Date
   & powershell @args

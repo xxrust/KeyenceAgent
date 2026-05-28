@@ -8,7 +8,9 @@
   [string]$KvsExe = '',
   [string]$ChecklistPath = '',
   [int]$TimeoutSeconds = 600,
-  [switch]$AuditVariablePersistence
+  [switch]$AuditVariablePersistence,
+  [ValidateSet('Full','NameType')]
+  [string]$LocalPasteFormat = 'Full'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -81,6 +83,10 @@ function New-MergedGlobalVariablesTsv([object[]]$Entries, [string]$OutDir) {
     executable_global_variable_count = $byName.Count
     source_files = @($Entries | ForEach-Object { $_.global_tsv } | Select-Object -Unique)
   }
+}
+
+function Get-ExecutableVariableNames([string]$Path, [string]$Scope) {
+  @((Get-ExecutableVariableRows $Path $Scope) | ForEach-Object { [string]$_.name } | Where-Object { $_ } | Select-Object -Unique)
 }
 
 function Get-ElapsedSeconds {
@@ -449,6 +455,7 @@ try {
       '-GlobalVariablesTsv', $mergedGlobal.path,
       '-LocalVariablesTsv', $entry.local_tsv,
       '-LocalProgramName', $entry.module_name,
+      '-LocalPasteFormat', $LocalPasteFormat,
       '-ChecklistPath', $ChecklistPath,
       '-OutDir', $moduleOutDir
     )
@@ -457,6 +464,15 @@ try {
     }
     if ($AuditVariablePersistence) {
       $setArgs += '-AuditPersistence'
+      $forbiddenLocalNames = @()
+      for ($j = 0; $j -lt $resolvedMnmFiles.Count; $j++) {
+        if ($j -eq $i) { continue }
+        $forbiddenLocalNames += @(Get-ExecutableVariableNames $resolvedMnmFiles[$j].local_tsv 'local')
+      }
+      $forbiddenLocalNames = @($forbiddenLocalNames | Where-Object { $_ } | Select-Object -Unique)
+      if ($forbiddenLocalNames.Count -gt 0) {
+        $setArgs += @('-ForbiddenLocalNamesCsv', ($forbiddenLocalNames -join ','))
+      }
     }
     Invoke-MvpStep "set_variables_$($entry.module_name)" 'set_variables_guarded.ps1' $setArgs
     if ([int]$mergedGlobal.executable_global_variable_count -gt 0) { $globalVariablesPasted = $true }
