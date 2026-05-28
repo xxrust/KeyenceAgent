@@ -49,25 +49,17 @@ function Write-Text([string]$Path, [string]$Text, [Text.Encoding]$Encoding) {
 function New-VariableTsv([string]$Scope, [string]$OwnerProgram, [object[]]$Rows, [string]$Evidence) {
   $lines = @('scope' + "`t" + 'owner_program' + "`t" + 'name' + "`t" + 'data_type' + "`t" + 'device' + "`t" + 'initial_value' + "`t" + 'comment' + "`t" + 'evidence' + "`t" + 'status')
   foreach ($row in @($Rows)) {
-    if (-not $row.name) { throw "Variable row in $OwnerProgram/$Scope is missing name." }
-    if (-not $row.data_type) { throw "Variable row $($row.name) in $OwnerProgram/$Scope is missing data_type." }
-    if (Test-KvSoftDeviceLikeVariableName ([string]$row.name)) {
-      throw "Variable row $($row.name) in $OwnerProgram/$Scope looks like a KV soft-device name. Use a normal variable identifier and put device mapping in the device field."
-    }
-    if (-not (Test-KvVariableDataType ([string]$row.data_type))) {
-      throw "Variable row $($row.name) in $OwnerProgram/$Scope has unsupported data_type '$($row.data_type)'. Supported pattern: $(Get-KvVariableSupportedTypePatternText)"
-    }
-    $lines += @(
-      $Scope
-      $(if ($Scope -eq 'local') { $OwnerProgram } else { '' })
-      [string]$row.name
-      [string]$row.data_type
-      [string]$row.device
-      $(if ($null -ne $row.initial_value) { [string]$row.initial_value } else { 'FALSE' })
-      [string]$row.comment
-      $Evidence
-      $(if ($row.status) { [string]$row.status } else { 'defined' })
-    ) -join "`t"
+    $definition = New-KvVariableDefinition `
+      -Scope $Scope `
+      -OwnerProgram $OwnerProgram `
+      -Name ([string]$row.name) `
+      -DataType ([string]$row.data_type) `
+      -Device ([string]$row.device) `
+      -InitialValue $(if ($null -ne $row.initial_value) { [string]$row.initial_value } else { 'FALSE' }) `
+      -Comment ([string]$row.comment) `
+      -Evidence $Evidence `
+      -Status $(if ($row.status) { [string]$row.status } else { 'defined' })
+    $lines += ConvertTo-KvVariableTsvLine $definition
   }
   return ($lines -join "`r`n") + "`r`n"
 }

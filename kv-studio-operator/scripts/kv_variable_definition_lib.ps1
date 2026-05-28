@@ -52,6 +52,66 @@ function Test-KvSoftDeviceLikeVariableName([string]$Name) {
   return ($Name -match '^(X|Y|R|MR|LR|CR|B|VB|DM|EM|FM|ZF|W|TM|TC|TS|CM|CC|CS|T|C)\d+([._][A-Za-z0-9]+)?$')
 }
 
+function New-KvVariableDefinition {
+  param(
+    [ValidateSet('global','local')]
+    [string]$Scope,
+
+    [string]$OwnerProgram = '',
+
+    [Parameter(Mandatory=$true)]
+    [string]$Name,
+
+    [Parameter(Mandatory=$true)]
+    [string]$DataType,
+
+    [string]$Device = '',
+    [string]$InitialValue = '',
+    [string]$Comment = '',
+    [string]$Evidence = '',
+    [string]$Status = 'defined'
+  )
+
+  $definition = [pscustomobject]@{
+    scope = $Scope
+    owner_program = if ($Scope -eq 'local') { ([string]$OwnerProgram).Trim() } else { '' }
+    name = ([string]$Name).Trim()
+    data_type = ([string]$DataType).Trim()
+    device = ([string]$Device).Trim()
+    initial_value = [string]$InitialValue
+    comment = [string]$Comment
+    evidence = [string]$Evidence
+    status = if ($Status) { [string]$Status } else { 'defined' }
+  }
+
+  $errors = @(Get-KvVariableDefinitionErrors -Rows @($definition) -Scope $Scope -ExpectedOwnerProgram $definition.owner_program)
+  if ($errors.Count -gt 0) {
+    $first = $errors[0]
+    throw "$($first.code): $($first.message) name=$($definition.name) data_type=$($definition.data_type) supported=$(Get-KvVariableSupportedTypePatternText)"
+  }
+
+  return $definition
+}
+
+function ConvertTo-KvVariableTsvLine {
+  param(
+    [Parameter(Mandatory=$true)]
+    [object]$Definition
+  )
+
+  @(
+    [string]$Definition.scope
+    [string]$Definition.owner_program
+    [string]$Definition.name
+    [string]$Definition.data_type
+    [string]$Definition.device
+    [string]$Definition.initial_value
+    [string]$Definition.comment
+    [string]$Definition.evidence
+    [string]$Definition.status
+  ) -join "`t"
+}
+
 function Get-KvVariableDefinitionErrors {
   param(
     [Parameter(Mandatory=$true)]
@@ -105,6 +165,17 @@ function Get-KvVariableDefinitionErrors {
         source = $SourcePath
         supported = Get-KvVariableSupportedTypePatternText
         message = 'Variable data_type is outside the current script-supported KEYENCE type grammar.'
+      })
+    }
+
+    if ($Scope -eq 'local' -and -not $ownerProgram) {
+      $errors.Add([pscustomobject]@{
+        code = 'KV_VARIABLE_LOCAL_OWNER_MISSING'
+        scope = $Scope
+        name = $name
+        data_type = $dataType
+        source = $SourcePath
+        message = 'Local variable owner_program is required.'
       })
     }
 
