@@ -84,7 +84,7 @@ The MNM file must contain:
 ;MODULE_TYPE:0
 ```
 
-Use `0` for ordinary scan-executed modules. Use `2` only when the task explicitly needs a function block. `scaffold.json.mnm_files[].module_type` must match the MNM file.
+Use `0` for ordinary scan-executed modules. The current MVP runner rejects `2` with `KV_SCAFFOLD_FB_SUPPORT_INCOMPLETE`; function-block support needs its own contract for FB definition, FB instance variables, call points, instance scope, import order, and compile-error classification. `scaffold.json.mnm_files[].module_type` must match the MNM file.
 
 ## Runner Result
 

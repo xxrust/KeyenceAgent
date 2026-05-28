@@ -159,15 +159,89 @@ function Get-StepFailureSummary([string]$Name, [string[]]$Arguments, [int]$ExitC
   return [pscustomobject]$summary
 }
 
+function Test-StepResultOk([string]$OutDir) {
+  if (-not $OutDir -or -not (Test-Path -LiteralPath $OutDir -PathType Container)) { return $true }
+  $failText = Join-Path $OutDir 'fail.txt'
+  $resultFile = Get-ChildItem -LiteralPath $OutDir -File -Filter '*result.json' -Recurse -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+  if (-not $resultFile) { return -not (Test-Path -LiteralPath $failText -PathType Leaf) }
+  $child = Read-JsonFileIfPossible $resultFile.FullName
+  if ($null -eq $child -or $null -eq $child.ok) { return $true }
+  return ([bool]$child.ok)
+}
+
+function Stop-ProcessTree([int]$ProcessIdValue) {
+  $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$ProcessIdValue" -ErrorAction SilentlyContinue)
+  foreach ($child in $children) {
+    Stop-ProcessTree ([int]$child.ProcessId)
+  }
+  $process = Get-Process -Id $ProcessIdValue -ErrorAction SilentlyContinue
+  if ($process) {
+    Stop-Process -Id $ProcessIdValue -Force -ErrorAction SilentlyContinue
+  }
+}
+
+function Get-StepTimeoutSeconds([string[]]$Arguments) {
+  $remaining = [math]::Max(1, [int]($TimeoutSeconds - ((Get-Date) - $start).TotalSeconds))
+  $waitValue = Get-ArgumentValue $Arguments '-WaitSeconds'
+  if ($waitValue -match '^\d+$') {
+    return [math]::Min($remaining, ([int]$waitValue + 30))
+  }
+  return $remaining
+}
+
 function Invoke-MvpStep([string]$Name, [string]$ScriptName, [string[]]$Arguments) {
   Assert-TimeBudget "before $Name"
   $script:currentStep = $Name
   $scriptPath = Join-Path $mvpScriptRoot $ScriptName
   if (-not (Test-Path -LiteralPath $scriptPath)) { throw "Required MVP script is missing: $scriptPath" }
   $stepStart = Get-Date
+  $outDir = Get-ArgumentValue $Arguments '-OutDir'
+  if ($outDir) { New-Item -ItemType Directory -Force -Path $outDir | Out-Null }
+  $stdoutPath = if ($outDir) { Join-Path $outDir 'runner_child_stdout.txt' } else { Join-Path $artifactRoot ("${Name}_stdout.txt") }
+  $stderrPath = if ($outDir) { Join-Path $outDir 'runner_child_stderr.txt' } else { Join-Path $artifactRoot ("${Name}_stderr.txt") }
   $command = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath) + $Arguments
-  & powershell @command
-  $exit = $LASTEXITCODE
+  $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $command -NoNewWindow -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+  $stepTimeoutSeconds = Get-StepTimeoutSeconds $Arguments
+  $deadline = (Get-Date).AddSeconds($stepTimeoutSeconds)
+  $timedOut = $false
+  while (-not $process.HasExited) {
+    Start-Sleep -Milliseconds 250
+    if ((Get-Date) -ge $deadline) {
+      $timedOut = $true
+      Stop-ProcessTree $process.Id
+      break
+    }
+  }
+  if ($timedOut) {
+    $elapsed = [math]::Round(((Get-Date) - $stepStart).TotalSeconds, 3)
+    $timeoutPayload = [ordered]@{
+      ok = $false
+      error_code = 'KV_MVP_STEP_TIMEOUT'
+      step = $Name
+      script = $scriptPath
+      elapsed_seconds = $elapsed
+      step_timeout_seconds = $stepTimeoutSeconds
+      stdout_path = $stdoutPath
+      stderr_path = $stderrPath
+      message = "MVP repair child step timed out and its process tree was terminated: $Name"
+    }
+    if ($outDir) {
+      $timeoutPath = Join-Path $outDir 'timeout_result.json'
+      $timeoutPayload | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $timeoutPath -Encoding UTF8
+      $timeoutPayload.message | Set-Content -LiteralPath (Join-Path $outDir 'fail.txt') -Encoding UTF8
+    }
+    $steps.Add([pscustomobject]@{ name = $Name; script = $scriptPath; exit_code = -2; elapsed_seconds = $elapsed; timeout = $true; step_timeout_seconds = $stepTimeoutSeconds })
+    $script:lastFailure = Get-StepFailureSummary $Name $Arguments -2
+    $script:lastFailure.error_code = 'KV_MVP_STEP_TIMEOUT'
+    if (-not $script:lastFailure.message) { $script:lastFailure.message = $timeoutPayload.message }
+    if ($outDir) { $script:lastFailure.evidence += (Join-Path $outDir 'timeout_result.json') }
+    throw "MVP repair step timed out: $Name elapsed=${elapsed}s timeout=${stepTimeoutSeconds}s"
+  }
+  $process.WaitForExit()
+  $exit = [int]$process.ExitCode
+  if ($exit -eq 0 -and -not (Test-StepResultOk $outDir)) { $exit = 1 }
   $elapsed = [math]::Round(((Get-Date) - $stepStart).TotalSeconds, 3)
   $steps.Add([pscustomobject]@{ name = $Name; script = $scriptPath; exit_code = $exit; elapsed_seconds = $elapsed })
   if ($exit -ne 0) {
@@ -190,6 +264,7 @@ if ([int]$manifest.schema_version -ne 2 -or [string]$manifest.variables.schema -
 if (-not $ProjectName) {
   if ($manifest.project.name) { $ProjectName = [string]$manifest.project.name } else { $ProjectName = [IO.Path]::GetFileNameWithoutExtension($ProjectPath) }
 }
+$ProjectNeedleName = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
 
 $manifestChecklist = ''
 if ($manifest.checklist) { $manifestChecklist = Resolve-ScaffoldPath ([string]$manifest.checklist) }
@@ -208,6 +283,8 @@ $scaffoldArtifactRoot = Join-Path $artifactRoot 'scaffold'
 $reportPath = Join-Path $runRoot 'repair_result.json'
 $agentBoundaryContractPath = ''
 $sourceSnapshotGateResult = $null
+$changePlanPath = Join-Path $artifactRoot 'change_plan.json'
+$regressionEvidencePath = Join-Path $artifactRoot 'regression_evidence.json'
 New-Item -ItemType Directory -Force -Path $runRoot, $artifactRoot, $scaffoldArtifactRoot | Out-Null
 
 $script:currentStep = 'assert_existing_project_source_snapshot'
@@ -277,6 +354,46 @@ Get-ChildItem -LiteralPath $ScaffoldRoot -Force | ForEach-Object {
 $variableArtifactDir = Join-Path $artifactRoot 'variables'
 $mergedGlobal = New-MergedGlobalVariablesTsv $resolvedMnmFiles $variableArtifactDir
 
+$sourceSnapshotBefore = [ordered]@{
+  manifest = $SourceSnapshotManifestPath
+  gate_result_path = Join-Path (Join-Path $artifactRoot 'source_snapshot_gate') 'existing_project_snapshot_gate.json'
+  fingerprint_hash = [string]$sourceSnapshotGateResult.project_fingerprint.hash
+  mnm_count = [int]$sourceSnapshotGateResult.mnm_count
+  variable_manifest_count = [int]$sourceSnapshotGateResult.variable_manifest_count
+  architecture_path = [string]$sourceSnapshotGateResult.architecture_path
+}
+$changePlan = [ordered]@{
+  ok = $true
+  schema_version = 1
+  operation = 'existing_project_update'
+  project_path = $ProjectPath
+  source_snapshot_before = $sourceSnapshotBefore
+  scaffold_after = [ordered]@{
+    root = $ScaffoldRoot
+    manifest = $manifestPath
+    mnm_files = @($resolvedMnmFiles | ForEach-Object {
+      [ordered]@{
+        module_name = [string]$_.module_name
+        module_type = [int]$_.module_type
+        mnm_path = [string]$_.path
+        global_tsv = [string]$_.global_tsv
+        local_tsv = [string]$_.local_tsv
+        global_variable_names = @(Get-ExecutableVariableNames $_.global_tsv 'global')
+        local_variable_names = @(Get-ExecutableVariableNames $_.local_tsv 'local')
+      }
+    })
+    merged_global_variables_tsv = $mergedGlobal.path
+  }
+  apply_plan = @(
+    'Import every scaffold MNM into the existing project.',
+    'Optionally delete an existing module with the same name before import when requested.',
+    'Apply merged global variables once, then apply each module local variable TSV to its owning local program.',
+    'Run bounded KV STUDIO compile/convert and copy the conversion result text.',
+    'Accept only same-run compile OK and source snapshot gate evidence.'
+  )
+}
+$changePlan | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $changePlanPath -Encoding UTF8
+
 function Write-RepairResult([bool]$Ok, [string]$Status, [string]$Message = '') {
   $compileResultPath = Join-Path (Join-Path $artifactRoot 'copy_result') 'compile_result_copied.txt'
   $compileText = ''
@@ -299,6 +416,8 @@ function Write-RepairResult([bool]$Ok, [string]$Status, [string]$Message = '') {
     project_path = $ProjectPath
     source_snapshot_manifest = $SourceSnapshotManifestPath
     source_snapshot_gate = $sourceSnapshotGateResult
+    change_plan_path = $changePlanPath
+    regression_evidence_path = if (Test-Path -LiteralPath $regressionEvidencePath -PathType Leaf) { $regressionEvidencePath } else { '' }
     agent_allowed_phases = @('prepare_repair_scaffold_before_kv_studio_opens', 'verify_same_run_artifacts_after_runner_exits')
     script_owned_phase = 'from first KV STUDIO launch through compile result copy'
     agent_boundary_contract_path = $agentBoundaryContractPath
@@ -392,18 +511,38 @@ try {
   )
 
   Invoke-MvpStep 'repair_copy_convert_result' 'copy_convert_result_from_tree_handle.ps1' @(
-    '-ProjectNeedle', $ProjectName,
+    '-ProjectNeedle', $ProjectNeedleName,
     '-OutDir', (Join-Path $artifactRoot 'copy_result'),
     '-ChecklistPath', $ChecklistPath,
     '-MaxLookupMs', '1000'
   )
 
   $compileResultPath = Join-Path (Join-Path $artifactRoot 'copy_result') 'compile_result_copied.txt'
+  if (-not (Test-Path -LiteralPath $compileResultPath -PathType Leaf)) {
+    throw "Copied compile result file is missing: $compileResultPath"
+  }
   $copyText = [IO.File]::ReadAllText($compileResultPath, [Text.Encoding]::UTF8)
   $okNeedle = (New-Cn @(0x8F6C,0x6362,0x7ED3,0x679C)) + ' OK'
   if (-not $copyText.Contains($okNeedle)) {
     throw 'Copied compile result does not contain the OK conversion result.'
   }
+  [ordered]@{
+    ok = $true
+    operation = 'existing_project_update_regression'
+    project_path = $ProjectPath
+    source_snapshot_gate = $sourceSnapshotBefore
+    change_plan_path = $changePlanPath
+    compile_result_path = $compileResultPath
+    compile_result_contains_ok = $true
+    steps = @($steps)
+    variable_sets = @($resolvedMnmFiles | ForEach-Object {
+      [ordered]@{
+        module_name = [string]$_.module_name
+        global_tsv = [string]$_.global_tsv
+        local_tsv = [string]$_.local_tsv
+      }
+    })
+  } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $regressionEvidencePath -Encoding UTF8
   Write-RepairResult $true 'pass' ''
   exit 0
 } catch {

@@ -146,6 +146,21 @@ try {
   $ngNeedle = (-join ([char[]](0x8F6C,0x6362,0x7ED3,0x679C))) + ' NG'
   $clipboard = [Windows.Forms.Clipboard]::GetText()
   if ([string]::IsNullOrWhiteSpace($clipboard)) { throw 'Clipboard verification failed: clipboard is empty after setting result text.' }
+  if ($text.Contains($ngNeedle)) {
+    [pscustomobject]@{
+      ok = $false
+      error_code = 'KV_COMPILE_RESULT_NG'
+      message = 'KV STUDIO conversion result is NG.'
+      route = 'win32_child_hwnd_to_uia_treeitem_to_clipboard'
+      lookup_ms = $lookupWatch.ElapsedMilliseconds
+      line_count = $lines.Count
+      clipboard_length = $clipboard.Length
+      contains_ok = $text.Contains($okNeedle)
+      contains_ng = $true
+      compile_result_path = (Join-Path $OutDir 'compile_result_copied.txt')
+    } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'result.json') -Encoding UTF8
+    throw 'KV_COMPILE_RESULT_NG: KV STUDIO conversion result is NG. See compile_result_copied.txt.'
+  }
   if (-not $clipboard.Contains($okNeedle)) { throw "Clipboard verification failed: clipboard does not contain expected OK marker: $okNeedle" }
   if (-not $text.Contains($okNeedle)) { throw "Copied text does not contain expected OK marker: $okNeedle" }
 

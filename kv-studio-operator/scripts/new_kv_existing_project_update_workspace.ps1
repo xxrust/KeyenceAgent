@@ -7,7 +7,7 @@ param(
 
   [string]$TaskId = ('kv_update_' + (Get-Date -Format 'yyyyMMdd_HHmmss')),
   [string]$SeedScaffoldRoot = '',
-  [ValidateSet('None','SameRunSkillBaseline')]
+  [ValidateSet('None','SameRunSkillBaseline','ControlledScaffoldSnapshot')]
   [string]$SeedTrust = 'None',
   [switch]$ForceNewSnapshot
 )
@@ -174,7 +174,8 @@ $architecture | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $architectur
 $mnmCount = @(Get-ChildItem -LiteralPath $mnmDir -File -Filter '*.mnm' -ErrorAction SilentlyContinue).Count
 $variableCount = @(Get-ChildItem -LiteralPath $variablesDir -File -Recurse -ErrorAction SilentlyContinue |
   Where-Object { $_.Extension -in @('.tsv', '.csv', '.json') }).Count
-$status = if ($mnmCount -gt 0 -and $variableCount -gt 0 -and $SeedTrust -eq 'SameRunSkillBaseline') { 'ready' } else { 'export_required' }
+$trustedSeed = ($SeedTrust -eq 'SameRunSkillBaseline' -or $SeedTrust -eq 'ControlledScaffoldSnapshot')
+$status = if ($mnmCount -gt 0 -and $variableCount -gt 0 -and $trustedSeed) { 'ready' } else { 'export_required' }
 $errorCode = if ($status -eq 'ready') { '' } else { 'KV_SOURCE_SNAPSHOT_EXPORT_REQUIRED' }
 
 $manifest = [ordered]@{
@@ -189,7 +190,15 @@ $manifest = [ordered]@{
   project_fingerprint = $fingerprint
   snapshot = [ordered]@{
     path = ConvertTo-RelativePath $taskRoot $snapshotDir
-    basis = if ($SeedTrust -eq 'SameRunSkillBaseline') { 'same_run_skill_baseline_seed_bound_to_current_project_fingerprint' } elseif ($SeedScaffoldRoot) { 'seed_files_present_but_not_trusted_as_current_project_export' } else { 'fresh_export_required' }
+    basis = if ($SeedTrust -eq 'SameRunSkillBaseline') {
+      'same_run_skill_baseline_seed_bound_to_current_project_fingerprint'
+    } elseif ($SeedTrust -eq 'ControlledScaffoldSnapshot') {
+      'controlled_scaffold_snapshot_bound_to_current_project_fingerprint'
+    } elseif ($SeedScaffoldRoot) {
+      'seed_files_present_but_not_trusted_as_current_project_export'
+    } else {
+      'fresh_export_required'
+    }
     seed_trust = $SeedTrust
   }
   artifacts = [ordered]@{

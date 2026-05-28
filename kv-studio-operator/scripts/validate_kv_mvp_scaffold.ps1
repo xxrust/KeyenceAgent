@@ -230,6 +230,12 @@ foreach ($entry in $mnmEntries) {
   if ($actualModuleType -ne 0 -and $actualModuleType -ne 2) {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_MODULE_TYPE_UNSUPPORTED' "Unsupported MODULE_TYPE=$actualModuleType in $mnmPath. Use 0 for scan-executed modules or 2 for function blocks." @($mnmPath)
   }
+  if ($actualModuleType -eq 2) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_FB_SUPPORT_INCOMPLETE' "Function-block import is not accepted by the current MVP runner. MODULE_TYPE:2 requires a separate FB contract covering FB definition, FB instance variables, call sites, instance scope, import order, and compile-error classification before KV STUDIO operation is allowed. File=$mnmPath" @($mnmPath, $manifestPath)
+  }
+  if ($actualModuleType -eq 0 -and $text -notmatch '(?m)^ENDH\s*$') {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_ENDH_MISSING' "Scan-executed MNM must contain ENDH so KV STUDIO conversion can complete: $mnmPath" @($mnmPath)
+  }
   $referencedNames = @($definedGlobalRows | ForEach-Object { [string]$_.name } | Where-Object { $_ } | Select-Object -Unique)
   $unreferencedNames = @($referencedNames | Where-Object { -not (Test-MnmReferencesName $text $_) })
   if ($unreferencedNames.Count -gt 0) {

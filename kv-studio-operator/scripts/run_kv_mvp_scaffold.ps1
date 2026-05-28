@@ -170,6 +170,38 @@ function Get-StepFailureSummary([string]$Name, [string[]]$Arguments, [int]$ExitC
   return [pscustomobject]$summary
 }
 
+function Test-StepResultOk([string]$OutDir) {
+  if (-not $OutDir -or -not (Test-Path -LiteralPath $OutDir -PathType Container)) { return $true }
+  $failText = Join-Path $OutDir 'fail.txt'
+  $resultFile = Get-ChildItem -LiteralPath $OutDir -File -Filter '*result.json' -Recurse -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+  if (-not $resultFile) { return -not (Test-Path -LiteralPath $failText -PathType Leaf) }
+  $child = Read-JsonFileIfPossible $resultFile.FullName
+  if ($null -eq $child -or $null -eq $child.ok) { return $true }
+  return ([bool]$child.ok)
+}
+
+function Stop-ProcessTree([int]$ProcessIdValue) {
+  $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$ProcessIdValue" -ErrorAction SilentlyContinue)
+  foreach ($child in $children) {
+    Stop-ProcessTree ([int]$child.ProcessId)
+  }
+  $process = Get-Process -Id $ProcessIdValue -ErrorAction SilentlyContinue
+  if ($process) {
+    Stop-Process -Id $ProcessIdValue -Force -ErrorAction SilentlyContinue
+  }
+}
+
+function Get-StepTimeoutSeconds([string[]]$Arguments) {
+  $remaining = [math]::Max(1, [int]($TimeoutSeconds - ((Get-Date) - $start).TotalSeconds))
+  $waitValue = Get-ArgumentValue $Arguments '-WaitSeconds'
+  if ($waitValue -match '^\d+$') {
+    return [math]::Min($remaining, ([int]$waitValue + 30))
+  }
+  return $remaining
+}
+
 function Invoke-MvpStep([string]$Name, [string]$ScriptName, [string[]]$Arguments) {
   Assert-TimeBudget "before $Name"
   $script:currentStep = $Name
@@ -178,9 +210,58 @@ function Invoke-MvpStep([string]$Name, [string]$ScriptName, [string[]]$Arguments
     throw "Required MVP script is missing: $scriptPath"
   }
   $stepStart = Get-Date
+  $outDir = Get-ArgumentValue $Arguments '-OutDir'
+  if ($outDir) { New-Item -ItemType Directory -Force -Path $outDir | Out-Null }
+  $stdoutPath = if ($outDir) { Join-Path $outDir 'runner_child_stdout.txt' } else { Join-Path $artifactRoot ("${Name}_stdout.txt") }
+  $stderrPath = if ($outDir) { Join-Path $outDir 'runner_child_stderr.txt' } else { Join-Path $artifactRoot ("${Name}_stderr.txt") }
   $command = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath) + $Arguments
-  & powershell @command
-  $exit = $LASTEXITCODE
+  $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $command -NoNewWindow -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+  $stepTimeoutSeconds = Get-StepTimeoutSeconds $Arguments
+  $deadline = (Get-Date).AddSeconds($stepTimeoutSeconds)
+  $timedOut = $false
+  while (-not $process.HasExited) {
+    Start-Sleep -Milliseconds 250
+    if ((Get-Date) -ge $deadline) {
+      $timedOut = $true
+      Stop-ProcessTree $process.Id
+      break
+    }
+  }
+  if ($timedOut) {
+    $elapsed = [math]::Round(((Get-Date) - $stepStart).TotalSeconds, 3)
+    $timeoutPayload = [ordered]@{
+      ok = $false
+      error_code = 'KV_MVP_STEP_TIMEOUT'
+      step = $Name
+      script = $scriptPath
+      elapsed_seconds = $elapsed
+      step_timeout_seconds = $stepTimeoutSeconds
+      stdout_path = $stdoutPath
+      stderr_path = $stderrPath
+      message = "MVP child step timed out and its process tree was terminated: $Name"
+    }
+    if ($outDir) {
+      $timeoutPath = Join-Path $outDir 'timeout_result.json'
+      $timeoutPayload | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $timeoutPath -Encoding UTF8
+      $timeoutPayload.message | Set-Content -LiteralPath (Join-Path $outDir 'fail.txt') -Encoding UTF8
+    }
+    $steps.Add([pscustomobject]@{
+      name = $Name
+      script = $scriptPath
+      exit_code = -2
+      elapsed_seconds = $elapsed
+      timeout = $true
+      step_timeout_seconds = $stepTimeoutSeconds
+    })
+    $script:lastFailure = Get-StepFailureSummary $Name $Arguments -2
+    $script:lastFailure.error_code = 'KV_MVP_STEP_TIMEOUT'
+    if (-not $script:lastFailure.message) { $script:lastFailure.message = $timeoutPayload.message }
+    if ($outDir) { $script:lastFailure.evidence += (Join-Path $outDir 'timeout_result.json') }
+    throw "MVP step timed out: $Name elapsed=${elapsed}s timeout=${stepTimeoutSeconds}s"
+  }
+  $process.WaitForExit()
+  $exit = [int]$process.ExitCode
+  if ($exit -eq 0 -and -not (Test-StepResultOk $outDir)) { $exit = 1 }
   $elapsed = [math]::Round(((Get-Date) - $stepStart).TotalSeconds, 3)
   $steps.Add([pscustomobject]@{
     name = $Name
@@ -514,6 +595,9 @@ try {
   )
 
   $compileResultPath = Join-Path (Join-Path $artifactRoot 'copy_result') 'compile_result_copied.txt'
+  if (-not (Test-Path -LiteralPath $compileResultPath -PathType Leaf)) {
+    throw "Copied compile result file is missing: $compileResultPath"
+  }
   $copyText = [IO.File]::ReadAllText($compileResultPath, [Text.Encoding]::UTF8)
   $okNeedle = (New-Cn @(0x8F6C,0x6362,0x7ED3,0x679C)) + ' OK'
   if (-not $copyText.Contains($okNeedle)) {

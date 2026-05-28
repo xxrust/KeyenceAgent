@@ -35,6 +35,17 @@ $consecutive = 0
 $failureCounts = @{}
 $startedAt = Get-Date
 
+function Stop-ProcessTree([int]$ProcessIdValue) {
+  $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$ProcessIdValue" -ErrorAction SilentlyContinue)
+  foreach ($child in $children) {
+    Stop-ProcessTree ([int]$child.ProcessId)
+  }
+  $process = Get-Process -Id $ProcessIdValue -ErrorAction SilentlyContinue
+  if ($process) {
+    Stop-Process -Id $ProcessIdValue -Force -ErrorAction SilentlyContinue
+  }
+}
+
 for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
   $attemptName = ('{0}_R{1:D2}' -f $ProjectNamePrefix, $attempt)
   $attemptOutRoot = Join-Path $OutRoot ('attempt_{0:D2}' -f $attempt)
@@ -55,8 +66,38 @@ for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
   $args += @('-LocalPasteFormat', $LocalPasteFormat)
 
   $attemptStart = Get-Date
-  & powershell @args
-  $exitCode = $LASTEXITCODE
+  $stdoutPath = Join-Path $attemptOutRoot 'runner_stdout.txt'
+  $stderrPath = Join-Path $attemptOutRoot 'runner_stderr.txt'
+  $attemptTimeoutSeconds = [math]::Max(1, $TimeoutSeconds + 15)
+  $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $args -NoNewWindow -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+  $deadline = (Get-Date).AddSeconds($attemptTimeoutSeconds)
+  $timedOut = $false
+  while (-not $process.HasExited) {
+    Start-Sleep -Milliseconds 250
+    if ((Get-Date) -ge $deadline) {
+      $timedOut = $true
+      Stop-ProcessTree $process.Id
+      break
+    }
+  }
+  if ($timedOut) {
+    $exitCode = -2
+    [ordered]@{
+      ok = $false
+      error_code = 'KV_MVP_REPEAT_ATTEMPT_TIMEOUT'
+      attempt = $attempt
+      project_name = $attemptName
+      elapsed_seconds = [math]::Round(((Get-Date) - $attemptStart).TotalSeconds, 3)
+      attempt_timeout_seconds = $attemptTimeoutSeconds
+      runner_timeout_seconds = $TimeoutSeconds
+      stdout_path = $stdoutPath
+      stderr_path = $stderrPath
+      message = 'Repeat attempt timed out; runner process tree was terminated.'
+    } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $attemptOutRoot 'timeout_result.json') -Encoding UTF8
+  } else {
+    $process.WaitForExit()
+    $exitCode = [int]$process.ExitCode
+  }
   $elapsed = [math]::Round(((Get-Date) - $attemptStart).TotalSeconds, 3)
 
   $resultPath = Join-Path (Join-Path $attemptOutRoot $attemptName) 'mvp_result.json'
@@ -81,8 +122,8 @@ for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
   $sameFailureCount = 0
   if (-not $pass) {
     $failureSignature = @(
-      if ($result -and $result.current_step) { [string]$result.current_step } else { 'unknown_step' }
-      if ($result -and $result.error_code) { [string]$result.error_code } else { 'unknown_error' }
+      if ($timedOut) { 'repeat_attempt' } elseif ($result -and $result.current_step) { [string]$result.current_step } else { 'unknown_step' }
+      if ($timedOut) { 'KV_MVP_REPEAT_ATTEMPT_TIMEOUT' } elseif ($result -and $result.error_code) { [string]$result.error_code } else { 'unknown_error' }
     ) -join ':'
     if (-not $failureCounts.ContainsKey($failureSignature)) { $failureCounts[$failureSignature] = 0 }
     $failureCounts[$failureSignature] = [int]$failureCounts[$failureSignature] + 1
@@ -96,9 +137,14 @@ for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
     pass = [bool]$pass
     consecutive_after_attempt = $consecutive
     elapsed_seconds = $elapsed
+    timed_out = [bool]$timedOut
+    attempt_timeout_seconds = $attemptTimeoutSeconds
+    stdout_path = $stdoutPath
+    stderr_path = $stderrPath
+    timeout_result_path = if ($timedOut) { Join-Path $attemptOutRoot 'timeout_result.json' } else { '' }
     result_path = $resultPath
-    error_code = if ($result -and $result.error_code) { [string]$result.error_code } else { '' }
-    current_step = if ($result -and $result.current_step) { [string]$result.current_step } else { '' }
+    error_code = if ($timedOut) { 'KV_MVP_REPEAT_ATTEMPT_TIMEOUT' } elseif ($result -and $result.error_code) { [string]$result.error_code } else { '' }
+    current_step = if ($timedOut) { 'repeat_attempt' } elseif ($result -and $result.current_step) { [string]$result.current_step } else { '' }
     compile_result_path = $compilePath
     set_variable_validation_path = $setVariableValidation
     failure_signature = $failureSignature

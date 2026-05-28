@@ -167,8 +167,9 @@ Executable variable rows use `status` other than `display_name`.
 MNM module type:
 
 - `;MODULE_TYPE:0` means scan-executed program/module.
-- `;MODULE_TYPE:2` means function block.
-- The value in each MNM file must match `scaffold.json.mnm_files[].module_type`.
+- `;MODULE_TYPE:2` means function block, but the current MVP runner rejects it with `KV_SCAFFOLD_FB_SUPPORT_INCOMPLETE`.
+- Function-block support requires a separate contract for FB definition, FB instance variables, call points, instance scope, import order, and compile-error classification before KV STUDIO operation.
+- The value in each MNM file must match `scaffold.json.mnm_files[].module_type`; use `0` for the supported MVP path.
 
 ## Hard Gates
 
@@ -241,6 +242,7 @@ Common gate codes:
 
 - `KV_CHECKLIST_MISSING`, `KV_CHECKLIST_EMPTY`, `KV_CHECKLIST_INVALID`
 - `KV_SCAFFOLD_REQUIRED_FILE_MISSING`, `KV_SCAFFOLD_TSV_SCHEMA_INVALID`, `KV_SCAFFOLD_MNM_MODULE_TYPE_MISMATCH`
+- `KV_SCAFFOLD_FB_SUPPORT_INCOMPLETE`
 - `KV_SOURCE_SNAPSHOT_MANIFEST_MISSING`, `KV_SOURCE_SNAPSHOT_NOT_READY`, `KV_SOURCE_SNAPSHOT_STALE`, `KV_SOURCE_SNAPSHOT_MNM_EMPTY`, `KV_SOURCE_SNAPSHOT_VARIABLES_EMPTY`, `KV_UPDATE_ARCHITECTURE_FILE_MISSING`
 - `KV_VARIABLE_DATA_TYPE_UNSUPPORTED`, `KV_VARIABLE_TSV_SCHEMA_INVALID`, `KV_VARIABLE_NAME_SOFT_DEVICE_CONFLICT`, `KV_VARIABLE_LOCAL_OWNER_MISSING`, `KV_VARIABLE_LOCAL_OWNER_MISMATCH`
 - `KV_UI_GUARD_STATIC_VIOLATION`
