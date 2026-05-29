@@ -7,8 +7,9 @@
 
   [string]$CpuModel = 'KV-X550',
   [string]$KvsExe = '',
-  [string]$AdminUser = 'admin',
-  [string]$AdminPassword = 'a82701767',
+  [string]$AdminUser = '',
+  [string]$AdminPassword = '',
+  [string]$AdminCredentialPath = '',
   [string]$OutDir = '',
   [string]$ChecklistPath = '',
   [int]$TimeoutSeconds = 120,
@@ -29,8 +30,64 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 function Log([string]$Message) {
   $line = (Get-Date -Format s) + ' ' + $Message
-  Add-Content -LiteralPath (Join-Path $OutDir 'run.log') -Value $line -Encoding UTF8
+  [IO.File]::AppendAllText((Join-Path $OutDir 'run.log'), $line + [Environment]::NewLine, [Text.Encoding]::UTF8)
   Write-Host $line
+}
+
+function Get-DefaultAdminCredentialPath {
+  $appData = [Environment]::GetFolderPath('ApplicationData')
+  if ([string]::IsNullOrWhiteSpace($appData)) { throw 'KV admin credential path cannot be resolved: APPDATA is empty.' }
+  return (Join-Path $appData 'Codex\kv-studio-operator\credentials.xml')
+}
+
+function Resolve-KvAdminCredential {
+  param(
+    [string]$ExplicitUser,
+    [string]$ExplicitPassword,
+    [string]$CredentialPath
+  )
+
+  if (-not [string]::IsNullOrWhiteSpace($ExplicitUser) -or -not [string]::IsNullOrWhiteSpace($ExplicitPassword)) {
+    if ([string]::IsNullOrWhiteSpace($ExplicitUser) -or [string]::IsNullOrWhiteSpace($ExplicitPassword)) {
+      throw 'KV admin credential is incomplete: both -AdminUser and -AdminPassword are required when either is supplied.'
+    }
+    return [pscustomobject]@{ User = $ExplicitUser; Password = $ExplicitPassword; Source = 'command_line' }
+  }
+
+  $envUser = [Environment]::GetEnvironmentVariable('KV_STUDIO_ADMIN_USER', 'Process')
+  if ([string]::IsNullOrWhiteSpace($envUser)) { $envUser = [Environment]::GetEnvironmentVariable('KV_STUDIO_ADMIN_USER', 'User') }
+  $envPassword = [Environment]::GetEnvironmentVariable('KV_STUDIO_ADMIN_PASSWORD', 'Process')
+  if ([string]::IsNullOrWhiteSpace($envPassword)) { $envPassword = [Environment]::GetEnvironmentVariable('KV_STUDIO_ADMIN_PASSWORD', 'User') }
+  if (-not [string]::IsNullOrWhiteSpace($envUser) -or -not [string]::IsNullOrWhiteSpace($envPassword)) {
+    if ([string]::IsNullOrWhiteSpace($envUser) -or [string]::IsNullOrWhiteSpace($envPassword)) {
+      throw 'KV admin credential is incomplete: both KV_STUDIO_ADMIN_USER and KV_STUDIO_ADMIN_PASSWORD are required when either is set.'
+    }
+    return [pscustomobject]@{ User = $envUser; Password = $envPassword; Source = 'environment' }
+  }
+
+  $path = $CredentialPath
+  if ([string]::IsNullOrWhiteSpace($path)) { $path = Get-DefaultAdminCredentialPath }
+  if (Test-Path -LiteralPath $path -PathType Leaf) {
+    $credential = Import-Clixml -LiteralPath $path
+    if ($credential -isnot [System.Management.Automation.PSCredential]) {
+      throw "KV admin credential file is invalid: expected PSCredential at $path"
+    }
+    $plainPassword = $credential.GetNetworkCredential().Password
+    if ([string]::IsNullOrWhiteSpace($credential.UserName) -or [string]::IsNullOrWhiteSpace($plainPassword)) {
+      throw "KV admin credential file is incomplete: $path"
+    }
+    return [pscustomobject]@{ User = $credential.UserName; Password = $plainPassword; Source = "dpapi_file:$path" }
+  }
+
+  throw "KV admin credential is missing. Run scripts\set_kv_admin_credential.ps1 or pass -AdminUser/-AdminPassword. Expected DPAPI file: $path"
+}
+
+function Get-CreateProjectErrorCode([string]$Message) {
+  if ($Message -like '*KV admin credential*') { return 'KV_ADMIN_CREDENTIAL_MISSING' }
+  if ($Message -like '*foreground window is not KV STUDIO*') { return 'KV_FOCUS_LOST' }
+  if ($Message -like '*New project dialog did not open*') { return 'KV_CREATE_PROJECT_DIALOG_MISSING' }
+  if ($Message -like '*Project file was not created*') { return 'KV_CREATE_PROJECT_FILE_MISSING' }
+  return 'KV_CREATE_PROJECT_FAILED'
 }
 
 if (-not $KvsExe) {
@@ -305,7 +362,9 @@ function Wait-ProjectSaveSettled([string]$ProjectPath, [string]$ProjectName, [in
 
 try {
   $startedAt = Get-Date
+  $adminCredential = Resolve-KvAdminCredential -ExplicitUser $AdminUser -ExplicitPassword $AdminPassword -CredentialPath $AdminCredentialPath
   Log "start create_project_local ProjectName=$ProjectName ProjectRoot=$ProjectRoot CpuModel=$CpuModel KvsExe=$KvsExe"
+  Log ('admin credential source=' + $adminCredential.Source)
 
   if ($RestartKvs) {
     Get-Process Kvs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -349,9 +408,9 @@ try {
 
   $adminUser = Find-ElementByAutomationId '_ltxUserName' 12
   if ($adminUser) {
-    Set-TextById '_ltxUserName' $AdminUser
-    Set-TextById '_ltxPassword' $AdminPassword
-    Set-TextById '_ltxPasswordConfirmation' $AdminPassword
+    Set-TextById '_ltxUserName' $adminCredential.User
+    Set-TextById '_ltxPassword' $adminCredential.Password
+    Set-TextById '_ltxPasswordConfirmation' $adminCredential.Password
     Click-ById '_btnOK'
     Log 'submitted admin dialog'
   }
@@ -394,13 +453,23 @@ try {
     requested_project_path = $projectPath
     kvs_exe = $KvsExe
     cpu_model_requested = $CpuModel
+    admin_credential_source = $adminCredential.Source
     elapsed_seconds = [Math]::Round(((Get-Date) - $startedAt).TotalSeconds, 3)
   }
   $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'create_project_result.json') -Encoding UTF8
   $result | ConvertTo-Json -Depth 4
 } catch {
-  Log ('ERROR ' + $_.Exception.Message)
+  $message = $_.Exception.Message
+  Log ('ERROR ' + $message)
   Save-Uia 'create_project_error_uia.json'
   $_.Exception.ToString() | Set-Content -LiteralPath (Join-Path $OutDir 'fail.txt') -Encoding UTF8
+  [pscustomobject]@{
+    ok = $false
+    error_code = Get-CreateProjectErrorCode $message
+    message = $message
+    project_name = $ProjectName
+    project_root = $ProjectRoot
+    evidence = @((Join-Path $OutDir 'run.log'), (Join-Path $OutDir 'fail.txt'), (Join-Path $OutDir 'create_project_error_uia.json'))
+  } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'create_project_result.json') -Encoding UTF8
   exit 1
 }

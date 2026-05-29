@@ -35,7 +35,8 @@ public class MenuProbeWin32 {
 "@
 
 function Log([string]$Message) {
-  Add-Content -LiteralPath (Join-Path $OutDir 'run.log') -Value ((Get-Date -Format s) + ' ' + $Message) -Encoding UTF8
+  $line = (Get-Date -Format s) + ' ' + $Message + [Environment]::NewLine
+  [IO.File]::AppendAllText((Join-Path $OutDir 'run.log'), $line, [Text.Encoding]::UTF8)
 }
 
 function Get-Title([IntPtr]$Handle) {

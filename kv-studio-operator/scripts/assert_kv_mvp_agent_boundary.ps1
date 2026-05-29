@@ -6,9 +6,12 @@ param(
     'run_kv_mvp_scaffold.ps1',
     'run_kv_mvp_repair_existing_project.ps1',
     'run_kv_mvp_repeat.ps1',
+    'assert_kv_mnm_import_plan.ps1',
     'mvp/create_project_local_guarded.ps1',
     'mvp/import_mnm_guarded.ps1',
+    'mvp/export_mnm_guarded.ps1',
     'mvp/set_variables_guarded.ps1',
+    'mvp/set_fb_arguments_guarded.ps1',
     'mvp/compile_and_copy_result_bounded.ps1',
     'mvp/copy_convert_result_from_tree_handle.ps1'
   )
@@ -102,6 +105,7 @@ $contract = [ordered]@{
     'new_kv_mvp_scaffold.ps1',
     'new_kv_mvp_multi_mnm_scaffold.ps1',
     'validate_kv_mvp_scaffold.ps1',
+    'assert_kv_mnm_import_plan.ps1',
     'run_kv_mvp_scaffold.ps1',
     'run_kv_mvp_repair_existing_project.ps1',
     'run_kv_mvp_repeat.ps1'

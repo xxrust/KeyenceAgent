@@ -112,6 +112,25 @@ function Read-JsonFileIfPossible([string]$Path) {
   try { return (Get-Content -Raw -LiteralPath $Path -Encoding UTF8 | ConvertFrom-Json) } catch { return $null }
 }
 
+function Get-StepResultFile([string]$OutDir) {
+  if (-not $OutDir -or -not (Test-Path -LiteralPath $OutDir -PathType Container)) { return $null }
+  Get-ChildItem -LiteralPath $OutDir -File -Recurse -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like '*result.json' } |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+}
+
+function Clear-StaleStepArtifacts([string]$OutDir) {
+  if (-not $OutDir) { return }
+  New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+  foreach ($name in @('fail.txt','exit_code.txt','timeout_result.json','runner_child_stdout.txt','runner_child_stderr.txt')) {
+    $path = Join-Path $OutDir $name
+    if (Test-Path -LiteralPath $path -PathType Leaf) {
+      Remove-Item -LiteralPath $path -Force
+    }
+  }
+}
+
 function Get-StepFailureSummary([string]$Name, [string[]]$Arguments, [int]$ExitCode) {
   $outDir = Get-ArgumentValue $Arguments '-OutDir'
   $summary = [ordered]@{
@@ -126,9 +145,7 @@ function Get-StepFailureSummary([string]$Name, [string[]]$Arguments, [int]$ExitC
     message = ''
   }
   if (-not $outDir -or -not (Test-Path -LiteralPath $outDir -PathType Container)) { return [pscustomobject]$summary }
-  $resultFile = Get-ChildItem -LiteralPath $outDir -File -Filter '*result.json' -Recurse -ErrorAction SilentlyContinue |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
+  $resultFile = Get-StepResultFile $outDir
   if ($resultFile) {
     $summary.child_result_path = $resultFile.FullName
     $summary.evidence += $resultFile.FullName
@@ -154,6 +171,16 @@ function Get-StepFailureSummary([string]$Name, [string[]]$Arguments, [int]$ExitC
       try { $summary.message = ([IO.File]::ReadAllText($failText, [Text.Encoding]::UTF8)).Trim() } catch {}
     }
   }
+  $stderrPath = Join-Path $outDir 'runner_child_stderr.txt'
+  if (Test-Path -LiteralPath $stderrPath -PathType Leaf) {
+    $stderrItem = Get-Item -LiteralPath $stderrPath
+    if ($stderrItem.Length -gt 0) {
+      $summary.evidence += $stderrPath
+      if (-not $summary.message) {
+        try { $summary.message = ([IO.File]::ReadAllText($stderrPath, [Text.Encoding]::UTF8)).Trim() } catch {}
+      }
+    }
+  }
   if (-not $summary.error_code) { $summary.error_code = 'KV_MVP_REPAIR_STEP_FAILED' }
   $summary.evidence = @($summary.evidence | Where-Object { $_ } | Select-Object -Unique)
   return [pscustomobject]$summary
@@ -162,9 +189,7 @@ function Get-StepFailureSummary([string]$Name, [string[]]$Arguments, [int]$ExitC
 function Test-StepResultOk([string]$OutDir) {
   if (-not $OutDir -or -not (Test-Path -LiteralPath $OutDir -PathType Container)) { return $true }
   $failText = Join-Path $OutDir 'fail.txt'
-  $resultFile = Get-ChildItem -LiteralPath $OutDir -File -Filter '*result.json' -Recurse -ErrorAction SilentlyContinue |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
+  $resultFile = Get-StepResultFile $OutDir
   if (-not $resultFile) { return -not (Test-Path -LiteralPath $failText -PathType Leaf) }
   $child = Read-JsonFileIfPossible $resultFile.FullName
   if ($null -eq $child -or $null -eq $child.ok) { return $true }
@@ -198,7 +223,7 @@ function Invoke-MvpStep([string]$Name, [string]$ScriptName, [string[]]$Arguments
   if (-not (Test-Path -LiteralPath $scriptPath)) { throw "Required MVP script is missing: $scriptPath" }
   $stepStart = Get-Date
   $outDir = Get-ArgumentValue $Arguments '-OutDir'
-  if ($outDir) { New-Item -ItemType Directory -Force -Path $outDir | Out-Null }
+  if ($outDir) { Clear-StaleStepArtifacts $outDir }
   $stdoutPath = if ($outDir) { Join-Path $outDir 'runner_child_stdout.txt' } else { Join-Path $artifactRoot ("${Name}_stdout.txt") }
   $stderrPath = if ($outDir) { Join-Path $outDir 'runner_child_stderr.txt' } else { Join-Path $artifactRoot ("${Name}_stderr.txt") }
   $command = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath) + $Arguments
@@ -208,6 +233,10 @@ function Invoke-MvpStep([string]$Name, [string]$ScriptName, [string[]]$Arguments
   $timedOut = $false
   while (-not $process.HasExited) {
     Start-Sleep -Milliseconds 250
+    if ($outDir -and -not (Test-StepResultOk $outDir)) {
+      Stop-ProcessTree $process.Id
+      break
+    }
     if ((Get-Date) -ge $deadline) {
       $timedOut = $true
       Stop-ProcessTree $process.Id
@@ -241,6 +270,20 @@ function Invoke-MvpStep([string]$Name, [string]$ScriptName, [string[]]$Arguments
   }
   $process.WaitForExit()
   $exit = [int]$process.ExitCode
+  $childExitCodePath = if ($outDir) { Join-Path $outDir 'exit_code.txt' } else { '' }
+  if ($childExitCodePath -and (Test-Path -LiteralPath $childExitCodePath -PathType Leaf)) {
+    $childExitCodeText = ([IO.File]::ReadAllText($childExitCodePath, [Text.Encoding]::ASCII)).Trim()
+    if ($childExitCodeText -match '^-?\d+$') { $exit = [int]$childExitCodeText }
+  }
+  if ($exit -eq 0 -and $outDir -and (Test-Path -LiteralPath (Join-Path $outDir 'fail.txt') -PathType Leaf)) {
+    $exit = 1
+  }
+  if ($exit -eq 0 -and (Test-Path -LiteralPath $stderrPath -PathType Leaf) -and (Get-Item -LiteralPath $stderrPath).Length -gt 0) {
+    $exit = 1
+    if ($outDir) {
+      'Child step wrote to stderr; treating this as a failed guarded step.' | Set-Content -LiteralPath (Join-Path $outDir 'fail.txt') -Encoding UTF8
+    }
+  }
   if ($exit -eq 0 -and -not (Test-StepResultOk $outDir)) { $exit = 1 }
   $elapsed = [math]::Round(((Get-Date) - $stepStart).TotalSeconds, 3)
   $steps.Add([pscustomobject]@{ name = $Name; script = $scriptPath; exit_code = $exit; elapsed_seconds = $elapsed })
@@ -283,6 +326,8 @@ $scaffoldArtifactRoot = Join-Path $artifactRoot 'scaffold'
 $reportPath = Join-Path $runRoot 'repair_result.json'
 $agentBoundaryContractPath = ''
 $sourceSnapshotGateResult = $null
+$mnmImportPlanGateResult = $null
+$mnmImportPlanGatePath = ''
 $changePlanPath = Join-Path $artifactRoot 'change_plan.json'
 $regressionEvidencePath = Join-Path $artifactRoot 'regression_evidence.json'
 New-Item -ItemType Directory -Force -Path $runRoot, $artifactRoot, $scaffoldArtifactRoot | Out-Null
@@ -325,6 +370,18 @@ $agentBoundaryContractPath = [string]$agentBoundaryResult.contract_path
 
 $mnmEntries = @($manifest.mnm_files)
 if ($mnmEntries.Count -eq 0) { throw 'scaffold.json must contain at least one mnm_files entry.' }
+$fbTypeNames = @(
+  $mnmEntries |
+    Where-Object {
+      $moduleTypeForCustom = if ($null -ne $_.module_type -and [string]$_.module_type -ne '') { [int]$_.module_type } else { 0 }
+      $moduleTypeForCustom -eq 2
+    } |
+    ForEach-Object {
+      if ($_.module_name) { [string]$_.module_name } else { [IO.Path]::GetFileNameWithoutExtension([string]$_.path) }
+    } |
+    Where-Object { $_ } |
+    Select-Object -Unique
+)
 $resolvedMnmFiles = @()
 foreach ($entry in $mnmEntries) {
   $mnmPath = Resolve-ScaffoldPath ([string]$entry.path)
@@ -332,6 +389,7 @@ foreach ($entry in $mnmEntries) {
   $moduleName = [string]$entry.module_name
   if (-not $moduleName) { $moduleName = [IO.Path]::GetFileNameWithoutExtension($mnmPath) }
   $moduleType = if ($null -ne $entry.module_type -and [string]$entry.module_type -ne '') { [int]$entry.module_type } else { 0 }
+  $category = if ($entry.category) { [string]$entry.category } elseif ($moduleType -eq 2) { 'function_block' } else { 'scan' }
   if (-not $entry.variables -or -not $entry.variables.global_tsv -or -not $entry.variables.local_tsv) {
     throw "MNM entry $moduleName must define variables.global_tsv and variables.local_tsv."
   }
@@ -339,14 +397,40 @@ foreach ($entry in $mnmEntries) {
   $entryLocalTsv = Resolve-ScaffoldPath ([string]$entry.variables.local_tsv)
   if (-not (Test-Path -LiteralPath $entryGlobalTsv)) { throw "Global variable TSV not found for ${moduleName}: $entryGlobalTsv" }
   if (-not (Test-Path -LiteralPath $entryLocalTsv)) { throw "Local variable TSV not found for ${moduleName}: $entryLocalTsv" }
+  $entryArgumentsTsv = ''
+  if ($moduleType -eq 2) {
+    if (-not $entry.arguments -or -not $entry.arguments.tsv) {
+      throw "Function-block MNM entry $moduleName must define arguments.tsv."
+    }
+    $entryArgumentsTsv = Resolve-ScaffoldPath ([string]$entry.arguments.tsv)
+    if (-not (Test-Path -LiteralPath $entryArgumentsTsv)) { throw "FB arguments TSV not found for ${moduleName}: $entryArgumentsTsv" }
+  }
   $resolvedMnmFiles += [pscustomobject]@{
     path = $mnmPath
     module_name = $moduleName
     module_type = $moduleType
+    category = $category
     global_tsv = $entryGlobalTsv
     local_tsv = $entryLocalTsv
+    arguments_tsv = $entryArgumentsTsv
   }
 }
+
+$script:currentStep = 'assert_mnm_import_plan'
+$mnmImportPlanGate = Join-Path $scriptRoot 'assert_kv_mnm_import_plan.ps1'
+if (-not (Test-Path -LiteralPath $mnmImportPlanGate -PathType Leaf)) { throw "MNM import plan gate script not found: $mnmImportPlanGate" }
+$mnmImportPlanGatePath = Join-Path (Join-Path $artifactRoot 'mnm_import_plan_gate') 'mnm_import_plan_gate.json'
+$mnmImportPlanArgs = @(
+  '-ScaffoldRoot', $ScaffoldRoot,
+  '-SourceSnapshotManifestPath', $SourceSnapshotManifestPath,
+  '-SourceSnapshotGateResultPath', (Join-Path (Join-Path $artifactRoot 'source_snapshot_gate') 'existing_project_snapshot_gate.json'),
+  '-OutDir', (Join-Path $artifactRoot 'mnm_import_plan_gate')
+)
+if ($DeleteExistingModulesBeforeImport) { $mnmImportPlanArgs += '-DeleteExistingModulesBeforeImport' }
+$global:LASTEXITCODE = 0
+$mnmImportPlanJson = & $mnmImportPlanGate @mnmImportPlanArgs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$mnmImportPlanGateResult = $mnmImportPlanJson | ConvertFrom-Json
 
 Get-ChildItem -LiteralPath $ScaffoldRoot -Force | ForEach-Object {
   Copy-Item -LiteralPath $_.FullName -Destination $scaffoldArtifactRoot -Recurse -Force
@@ -368,6 +452,12 @@ $changePlan = [ordered]@{
   operation = 'existing_project_update'
   project_path = $ProjectPath
   source_snapshot_before = $sourceSnapshotBefore
+  mnm_import_plan_gate = [ordered]@{
+    path = $mnmImportPlanGatePath
+    delete_required = [bool]$mnmImportPlanGateResult.delete_required
+    delete_existing_modules_before_import = [bool]$DeleteExistingModulesBeforeImport
+    conflicts = @($mnmImportPlanGateResult.conflicts)
+  }
   scaffold_after = [ordered]@{
     root = $ScaffoldRoot
     manifest = $manifestPath
@@ -375,9 +465,11 @@ $changePlan = [ordered]@{
       [ordered]@{
         module_name = [string]$_.module_name
         module_type = [int]$_.module_type
+        category = [string]$_.category
         mnm_path = [string]$_.path
         global_tsv = [string]$_.global_tsv
         local_tsv = [string]$_.local_tsv
+        arguments_tsv = [string]$_.arguments_tsv
         global_variable_names = @(Get-ExecutableVariableNames $_.global_tsv 'global')
         local_variable_names = @(Get-ExecutableVariableNames $_.local_tsv 'local')
       }
@@ -385,8 +477,10 @@ $changePlan = [ordered]@{
     merged_global_variables_tsv = $mergedGlobal.path
   }
   apply_plan = @(
+    'Before KV STUDIO opens, compare incoming MNM module names with the verified source snapshot MNM inventory.',
+    'If a same-name module exists, require -DeleteExistingModulesBeforeImport and pre-delete the existing module before importing the replacement MNM.',
     'Import every scaffold MNM into the existing project.',
-    'Optionally delete an existing module with the same name before import when requested.',
+    'For each user function block, open its self-variable table and apply arguments.tsv before compile.',
     'Apply merged global variables once, then apply each module local variable TSV to its owning local program.',
     'Run bounded KV STUDIO compile/convert and copy the conversion result text.',
     'Accept only same-run compile OK and source snapshot gate evidence.'
@@ -416,6 +510,8 @@ function Write-RepairResult([bool]$Ok, [string]$Status, [string]$Message = '') {
     project_path = $ProjectPath
     source_snapshot_manifest = $SourceSnapshotManifestPath
     source_snapshot_gate = $sourceSnapshotGateResult
+    mnm_import_plan_gate = $mnmImportPlanGateResult
+    mnm_import_plan_gate_path = $mnmImportPlanGatePath
     change_plan_path = $changePlanPath
     regression_evidence_path = if (Test-Path -LiteralPath $regressionEvidencePath -PathType Leaf) { $regressionEvidencePath } else { '' }
     agent_allowed_phases = @('prepare_repair_scaffold_before_kv_studio_opens', 'verify_same_run_artifacts_after_runner_exits')
@@ -454,6 +550,22 @@ try {
     Invoke-MvpStep "repair_import_mnm_$($i + 1)" 'import_mnm_guarded.ps1' $importArgs
   }
 
+  $fbArgumentRoot = Join-Path $artifactRoot 'set_fb_arguments'
+  New-Item -ItemType Directory -Force -Path $fbArgumentRoot | Out-Null
+  for ($i = 0; $i -lt $resolvedMnmFiles.Count; $i++) {
+    $entry = $resolvedMnmFiles[$i]
+    if ([int]$entry.module_type -ne 2) { continue }
+    if (-not $entry.arguments_tsv) { throw "Function-block arguments TSV is missing after resolution: $($entry.module_name)" }
+    $safeModule = ($entry.module_name -replace '[^A-Za-z0-9_.-]+', '_')
+    Invoke-MvpStep "repair_set_fb_arguments_$($entry.module_name)" 'set_fb_arguments_guarded.ps1' @(
+      '-ProjectPath', $ProjectPath,
+      '-FbModuleName', $entry.module_name,
+      '-ArgumentsTsv', $entry.arguments_tsv,
+      '-ChecklistPath', $ChecklistPath,
+      '-OutDir', (Join-Path $fbArgumentRoot ('module_{0:D2}_{1}' -f ($i + 1), $safeModule))
+    )
+  }
+
   $setVariablesRoot = Join-Path $artifactRoot 'set_variables'
   New-Item -ItemType Directory -Force -Path $setVariablesRoot | Out-Null
   $globalVariablesPasted = $false
@@ -472,6 +584,9 @@ try {
       '-OutDir', $moduleOutDir,
       '-AppendGlobalVariables'
     )
+    if ($fbTypeNames.Count -gt 0) {
+      $setArgs += @('-AllowedCustomDataTypes', ($fbTypeNames -join ','))
+    }
     if ($globalVariablesPasted -or [int]$mergedGlobal.executable_global_variable_count -eq 0) { $setArgs += '-SkipGlobal' }
     if ($AuditVariablePersistence) {
       $setArgs += '-AuditPersistence'
@@ -531,6 +646,8 @@ try {
     operation = 'existing_project_update_regression'
     project_path = $ProjectPath
     source_snapshot_gate = $sourceSnapshotBefore
+    mnm_import_plan_gate_path = $mnmImportPlanGatePath
+    mnm_import_plan_gate = $mnmImportPlanGateResult
     change_plan_path = $changePlanPath
     compile_result_path = $compileResultPath
     compile_result_contains_ok = $true

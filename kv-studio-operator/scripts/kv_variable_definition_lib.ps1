@@ -9,8 +9,22 @@ $script:KvScalarVariableDataTypes = @(
   'TIME'
 )
 
+function Normalize-KvVariableCustomDataTypes([string[]]$AllowedCustomDataTypes = @()) {
+  @(
+    $AllowedCustomDataTypes |
+      ForEach-Object { ([string]$_) -split ',' } |
+      ForEach-Object { ([string]$_).Trim() } |
+      Where-Object { $_ } |
+      Select-Object -Unique
+  )
+}
+
 function Get-KvVariableSupportedTypePatternText {
-  'BOOL, INT, DINT, UINT, UDINT, REAL, LREAL, TIME, STRING[n], ARRAY[lower..upper] OF <supported scalar or STRING[n]>'
+  param([string[]]$AllowedCustomDataTypes = @())
+  $base = 'BOOL, INT, DINT, UINT, UDINT, REAL, LREAL, TIME, STRING[n], ARRAY[lower..upper] OF <supported scalar or STRING[n]>'
+  $custom = @(Normalize-KvVariableCustomDataTypes $AllowedCustomDataTypes)
+  if ($custom.Count -eq 0) { return $base }
+  return ($base + ', custom FB instance types: ' + ($custom -join ', '))
 }
 
 function Test-KvVariableScalarDataType([string]$DataType) {
@@ -40,11 +54,18 @@ function Test-KvVariableArrayDataType([string]$DataType) {
   return (Test-KvVariableScalarDataType $elementType) -or (Test-KvVariableStringDataType $elementType)
 }
 
-function Test-KvVariableDataType([string]$DataType) {
+function Test-KvVariableCustomDataType([string]$DataType, [string[]]$AllowedCustomDataTypes = @()) {
+  $type = ([string]$DataType).Trim()
+  if (-not $type) { return $false }
+  return (@(Normalize-KvVariableCustomDataTypes $AllowedCustomDataTypes) -contains $type)
+}
+
+function Test-KvVariableDataType([string]$DataType, [string[]]$AllowedCustomDataTypes = @()) {
   if ([string]::IsNullOrWhiteSpace($DataType)) { return $false }
   return (Test-KvVariableScalarDataType $DataType) -or
     (Test-KvVariableStringDataType $DataType) -or
-    (Test-KvVariableArrayDataType $DataType)
+    (Test-KvVariableArrayDataType $DataType) -or
+    (Test-KvVariableCustomDataType $DataType $AllowedCustomDataTypes)
 }
 
 function Test-KvSoftDeviceLikeVariableName([string]$Name) {
@@ -69,7 +90,8 @@ function New-KvVariableDefinition {
     [string]$InitialValue = '',
     [string]$Comment = '',
     [string]$Evidence = '',
-    [string]$Status = 'defined'
+    [string]$Status = 'defined',
+    [string[]]$AllowedCustomDataTypes = @()
   )
 
   $definition = [pscustomobject]@{
@@ -84,10 +106,10 @@ function New-KvVariableDefinition {
     status = if ($Status) { [string]$Status } else { 'defined' }
   }
 
-  $errors = @(Get-KvVariableDefinitionErrors -Rows @($definition) -Scope $Scope -ExpectedOwnerProgram $definition.owner_program)
+  $errors = @(Get-KvVariableDefinitionErrors -Rows @($definition) -Scope $Scope -ExpectedOwnerProgram $definition.owner_program -AllowedCustomDataTypes $AllowedCustomDataTypes)
   if ($errors.Count -gt 0) {
     $first = $errors[0]
-    throw "$($first.code): $($first.message) name=$($definition.name) data_type=$($definition.data_type) supported=$(Get-KvVariableSupportedTypePatternText)"
+    throw "$($first.code): $($first.message) name=$($definition.name) data_type=$($definition.data_type) supported=$(Get-KvVariableSupportedTypePatternText -AllowedCustomDataTypes $AllowedCustomDataTypes)"
   }
 
   return $definition
@@ -123,7 +145,8 @@ function Get-KvVariableDefinitionErrors {
     [string]$Scope,
 
     [string]$SourcePath = '',
-    [string]$ExpectedOwnerProgram = ''
+    [string]$ExpectedOwnerProgram = '',
+    [string[]]$AllowedCustomDataTypes = @()
   )
 
   if ($null -eq $Rows) { $Rows = @() }
@@ -159,14 +182,14 @@ function Get-KvVariableDefinitionErrors {
       })
     }
 
-    if (-not (Test-KvVariableDataType $dataType)) {
+    if (-not (Test-KvVariableDataType $dataType $AllowedCustomDataTypes)) {
       $errors.Add([pscustomobject]@{
         code = 'KV_VARIABLE_DATA_TYPE_UNSUPPORTED'
         scope = $Scope
         name = $name
         data_type = $dataType
         source = $SourcePath
-        supported = Get-KvVariableSupportedTypePatternText
+        supported = Get-KvVariableSupportedTypePatternText -AllowedCustomDataTypes $AllowedCustomDataTypes
         message = 'Variable data_type is outside the current script-supported KEYENCE type grammar.'
       })
     }

@@ -6,6 +6,7 @@ param(
   [string]$Scope = 'any',
 
   [string]$ExpectedOwnerProgram = '',
+  [string[]]$AllowedCustomDataTypes = @(),
   [string]$OutPath = ''
 )
 
@@ -54,7 +55,7 @@ foreach ($path in $TsvPath) {
     if (@($read.errors).Count -eq 0) {
       $scopesToCheck = if ($Scope -eq 'any') { @('global','local') } else { @($Scope) }
       foreach ($scopeItem in $scopesToCheck) {
-        $errors = Get-KvVariableDefinitionErrors -Rows @($read.rows) -Scope $scopeItem -SourcePath $fullPath -ExpectedOwnerProgram $ExpectedOwnerProgram
+        $errors = Get-KvVariableDefinitionErrors -Rows @($read.rows) -Scope $scopeItem -SourcePath $fullPath -ExpectedOwnerProgram $ExpectedOwnerProgram -AllowedCustomDataTypes $AllowedCustomDataTypes
         foreach ($errorItem in @($errors)) { $allErrors.Add($errorItem) }
       }
     }
@@ -71,7 +72,8 @@ foreach ($path in $TsvPath) {
 $payload = [ordered]@{
   ok = ($allErrors.Count -eq 0)
   checked = @($checked)
-  supported_type_pattern = Get-KvVariableSupportedTypePatternText
+  supported_type_pattern = Get-KvVariableSupportedTypePatternText -AllowedCustomDataTypes $AllowedCustomDataTypes
+  allowed_custom_data_types = @($AllowedCustomDataTypes)
   errors = @($allErrors)
 }
 

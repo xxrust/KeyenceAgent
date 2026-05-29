@@ -30,6 +30,16 @@ Before touching KV STUDIO, `run_kv_mvp_scaffold.ps1` and `run_kv_mvp_repair_exis
 
 This artifact records the allowed agent phases, the script-owned phase, public entrypoints, and runner-owned scripts. `mvp_result.json.agent_boundary_contract_path` must point to this current-run file.
 
+## Existing-Project MNM Import Plan
+
+Existing-project repair has a hard pre-import gate:
+
+```text
+<RepairRunRoot>\artifacts\mnm_import_plan_gate\mnm_import_plan_gate.json
+```
+
+The gate reads the verified source snapshot MNM inventory and the incoming scaffold MNM list before KV STUDIO opens. If any incoming `module_name` already exists in the source snapshot, direct import is rejected with `KV_MNM_SAME_NAME_IMPORT_REQUIRES_PREDELETE` unless the runner was invoked with `-DeleteExistingModulesBeforeImport`. With that flag, the repair runner records the conflict and each affected import step must pre-delete the existing module before importing the replacement MNM. If the project fingerprint does not match the snapshot, `assert_kv_existing_project_snapshot.ps1` fails first and the current project must be exported again.
+
 ## Scaffold Files
 
 Required files:
@@ -76,7 +86,7 @@ Every executable global variable row must be referenced by its paired MNM file. 
 
 `global_tsv` may contain only the header when that MNM has no global variables. `local_tsv` must contain executable local rows whose `owner_program` equals the MNM entry's `module_name`.
 
-## MNM Module Type
+## MNM Module Type And Category
 
 The MNM file must contain:
 
@@ -84,7 +94,29 @@ The MNM file must contain:
 ;MODULE_TYPE:0
 ```
 
-Use `0` for ordinary scan-executed modules. The current MVP runner rejects `2` with `KV_SCAFFOLD_FB_SUPPORT_INCOMPLETE`; function-block support needs its own contract for FB definition, FB instance variables, call points, instance scope, import order, and compile-error classification. `scaffold.json.mnm_files[].module_type` must match the MNM file.
+Use `0` for ordinary scan-executed modules. Use `2` for user function-block definitions. `scaffold.json.mnm_files[].module_type` must match the MNM file.
+
+Each MNM entry may also declare `category`:
+
+```json
+{
+  "module_name": "SimpleLatchFb",
+  "module_type": 2,
+  "category": "function_block"
+}
+```
+
+Supported categories:
+
+- `scan`: ordinary scan-executed module, expected under `每次扫描执行型模块`.
+- `function_block`: function-block definition, expected under `功能块`; the variable validator allows this module name as an FB instance data type.
+
+Known but gated categories:
+
+- `standby`: concept and project-tree category are known, but no same-run MNM import/export mapping has been proven.
+- `interrupt`: concept and project-tree category are known, but no same-run MNM import/export mapping has been proven.
+
+The validator fails closed with `KV_SCAFFOLD_MODULE_CATEGORY_SUPPORT_INCOMPLETE` for `standby` and `interrupt` until their MNM representation, import order, placement, and compile behavior are verified from same-run artifacts.
 
 ## Runner Result
 
@@ -125,6 +157,8 @@ Existing-project repair uses the same scaffold, variable, compile, and copy evid
 ```
 
 Success requires `repair_result.json.ok=true`, `compile_result_contains_ok=true`, the corrected MNM files listed under `mnm_files[]`, and the current-run copied conversion text under `artifacts\copy_result`.
+
+For existing-project repair, success also requires `repair_result.json.mnm_import_plan_gate.ok=true`. If `mnm_import_plan_gate.delete_required=true`, the result must show `delete_existing_modules_before_import=true`; otherwise same-name replacement was not planned safely.
 
 Failure action:
 

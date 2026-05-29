@@ -4,7 +4,9 @@ param(
   [string[]]$ScriptNames = @(
     'create_project_local_guarded.ps1',
     'import_mnm_guarded.ps1',
+    'export_mnm_guarded.ps1',
     'set_variables_guarded.ps1',
+    'set_fb_arguments_guarded.ps1',
     'compile_and_copy_result_bounded.ps1'
   )
 )

@@ -58,8 +58,33 @@ function New-VariableTsv([string]$Scope, [string]$OwnerProgram, [object[]]$Rows,
       -InitialValue $(if ($null -ne $row.initial_value) { [string]$row.initial_value } else { 'FALSE' }) `
       -Comment ([string]$row.comment) `
       -Evidence $Evidence `
-      -Status $(if ($row.status) { [string]$row.status } else { 'defined' })
+      -Status $(if ($row.status) { [string]$row.status } else { 'defined' }) `
+      -AllowedCustomDataTypes $script:AllowedCustomDataTypes
     $lines += ConvertTo-KvVariableTsvLine $definition
+  }
+  return ($lines -join "`r`n") + "`r`n"
+}
+
+function New-FbArgumentTsv([string]$OwnerProgram, [object[]]$Rows, [string]$Evidence) {
+  $lines = @('owner_program' + "`t" + 'argument_name' + "`t" + 'argument_kind' + "`t" + 'constant' + "`t" + 'data_type' + "`t" + 'default_value' + "`t" + 'retain' + "`t" + 'hidden' + "`t" + 'comment1' + "`t" + 'comment2' + "`t" + 'comment3' + "`t" + 'comment4' + "`t" + 'comment5' + "`t" + 'comment6' + "`t" + 'comment7' + "`t" + 'comment8' + "`t" + 'evidence' + "`t" + 'status')
+  foreach ($row in @($Rows)) {
+    $comments = @($row.comments)
+    $line = @(
+      $OwnerProgram
+      [string]$row.name
+      [string]$row.argument_type
+      $(if ($null -ne $row.constant) { [string]$row.constant } else { 'FALSE' })
+      [string]$row.data_type
+      $(if ($null -ne $row.default_value) { [string]$row.default_value } else { '' })
+      $(if ($null -ne $row.retain) { [string]$row.retain } else { 'FALSE' })
+      $(if ($null -ne $row.hidden) { [string]$row.hidden } else { 'FALSE' })
+    )
+    for ($i = 0; $i -lt 8; $i++) {
+      $line += $(if ($i -lt $comments.Count) { [string]$comments[$i] } else { '' })
+    }
+    $line += $Evidence
+    $line += $(if ($row.status) { [string]$row.status } else { 'defined' })
+    $lines += ($line -join "`t")
   }
   return ($lines -join "`r`n") + "`r`n"
 }
@@ -68,12 +93,13 @@ function New-MnmText($Module) {
   $moduleName = [string]$Module.name
   if (-not $moduleName) { throw 'Module is missing name.' }
   $moduleType = if ($null -ne $Module.module_type -and [string]$Module.module_type -ne '') { [int]$Module.module_type } else { 0 }
+  $deviceCode = if ($null -ne $Module.mnm.device -and [string]$Module.mnm.device -ne '') { [int]$Module.mnm.device } elseif ($moduleType -eq 2) { 59 } else { 63 }
   $comment = if ($Module.mnm.comment) { [string]$Module.mnm.comment } else { "Generated scan module $moduleName." }
   $instructions = @($Module.mnm.instructions | ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })
   $stLines = @($Module.mnm.st_lines | ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })
   if ($instructions.Count -eq 0 -and $stLines.Count -eq 0) { throw "Module $moduleName has neither mnm.instructions nor mnm.st_lines." }
   $lines = @(
-    'DEVICE:63'
+    "DEVICE:$deviceCode"
     ";MODULE:$moduleName"
     ";MODULE_TYPE:$moduleType"
     "; $comment"
@@ -104,6 +130,17 @@ foreach ($module in $modules) {
   if (-not $allModuleNames.Add($moduleName)) { throw "Duplicate module name in scaffold model: $moduleName" }
 }
 
+$script:AllowedCustomDataTypes = @(
+  $modules |
+    Where-Object {
+      $moduleTypeForCustom = if ($null -ne $_.module_type -and [string]$_.module_type -ne '') { [int]$_.module_type } else { 0 }
+      $moduleTypeForCustom -eq 2
+    } |
+    ForEach-Object { [string]$_.name } |
+    Where-Object { $_ } |
+    Select-Object -Unique
+)
+
 foreach ($module in $modules) {
   $moduleName = [string]$module.name
   $moduleType = if ($null -ne $module.module_type -and [string]$module.module_type -ne '') { [int]$module.module_type } else { 0 }
@@ -111,24 +148,32 @@ foreach ($module in $modules) {
   $moduleVarDir = Join-Path $varDir $moduleName
   $globalTsv = Join-Path $moduleVarDir 'global_variables.tsv'
   $localTsv = Join-Path $moduleVarDir 'local_variables.tsv'
+  $argumentsTsv = Join-Path $moduleVarDir 'arguments.tsv'
   $evidence = if ($model.evidence) { [string]$model.evidence } else { 'scaffold_model' }
 
   Write-Text $mnmPath (New-MnmText $module) ([Text.Encoding]::Unicode)
   Write-Text $globalTsv (New-VariableTsv 'global' $moduleName @($module.variables.global) $evidence) ([Text.Encoding]::Default)
   Write-Text $localTsv (New-VariableTsv 'local' $moduleName @($module.variables.local) $evidence) ([Text.Encoding]::Default)
+  if ($moduleType -eq 2) {
+    Write-Text $argumentsTsv (New-FbArgumentTsv $moduleName @($module.arguments) $evidence) ([Text.Encoding]::Default)
+  }
 
   $mnmEntries += [ordered]@{
     path = ('mnm/' + [IO.Path]::GetFileName($mnmPath))
     module_name = $moduleName
     module_type = $moduleType
+    category = $(if ($module.category) { [string]$module.category } elseif ($moduleType -eq 2) { 'function_block' } else { 'scan' })
+    device = $(if ($null -ne $module.mnm.device -and [string]$module.mnm.device -ne '') { [int]$module.mnm.device } elseif ($moduleType -eq 2) { 59 } else { 63 })
     encoding = 'UTF-16LE'
     variables = [ordered]@{
       global_tsv = ('variables/' + $moduleName + '/global_variables.tsv')
       local_tsv = ('variables/' + $moduleName + '/local_variables.tsv')
     }
+    arguments = $(if ($moduleType -eq 2) { [ordered]@{ tsv = ('variables/' + $moduleName + '/arguments.tsv') } } else { $null })
   }
   $variableSets += [ordered]@{
     module_name = $moduleName
+    category = $(if ($module.category) { [string]$module.category } elseif ($moduleType -eq 2) { 'function_block' } else { 'scan' })
     global_tsv = ('variables/' + $moduleName + '/global_variables.tsv')
     local_tsv = ('variables/' + $moduleName + '/local_variables.tsv')
   }

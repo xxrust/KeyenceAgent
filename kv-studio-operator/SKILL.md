@@ -41,6 +41,7 @@ Use this route for existing project updates, including user-requested feature ad
 | --- | --- | --- | --- |
 | Create/update workspace | `scripts\new_kv_existing_project_update_workspace.ps1` | `source_snapshot_manifest.json.status=ready` | `KV_SOURCE_SNAPSHOT_EXPORT_REQUIRED` or script exits nonzero |
 | Verify current source snapshot | `scripts\assert_kv_existing_project_snapshot.ps1` | `existing_project_snapshot_gate.json.ok=true` and project fingerprint matches | `KV_SOURCE_SNAPSHOT_STALE`, missing MNM, missing variable manifest, or missing architecture file |
+| Plan MNM import | `scripts\assert_kv_mnm_import_plan.ps1` | Same-name incoming MNM conflicts are absent, or `-DeleteExistingModulesBeforeImport` is explicitly planned | `KV_MNM_SAME_NAME_IMPORT_REQUIRES_PREDELETE`, duplicate incoming module names, stale/export-required snapshot |
 | Edit update scaffold | Agent edits scaffold/model files before KV STUDIO opens | Logic and variables are derived from the verified snapshot plus task request | Snapshot is stale or architecture intent is ambiguous |
 | Run existing-project update | `scripts\run_kv_mvp_repair_existing_project.ps1 -SourceSnapshotManifestPath <manifest>` | `repair_result.json.ok=true` and source snapshot gate is included in result | Any child step fails |
 | Verify | Read same-run artifacts | Compile text contains `转换结果 OK` and result references the snapshot manifest | Do not use old exports or old compile text |
@@ -88,6 +89,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\assert_k
 
 Run scaffold:
 
+Configure the local KV STUDIO administrator credential once per Windows user before project creation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\set_kv_admin_credential.ps1"
+```
+
+The default credential file is `%APPDATA%\Codex\kv-studio-operator\credentials.xml`. It is a Windows DPAPI `Export-Clixml` file and must not be committed. Runners may also pass `-AdminUser/-AdminPassword` or `-AdminCredentialPath`; do not store passwords in scaffold files, skill text, README files, or git.
+
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_mvp_scaffold.ps1" `
   -ScaffoldRoot $ScaffoldRoot `
@@ -107,6 +116,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\assert_k
   -ProjectPath '<existing-project.kpr>' `
   -SnapshotManifestPath (Join-Path $WorkRoot 'existing_project_updates\<task-id>\source_snapshot_manifest.json') `
   -OutDir (Join-Path $WorkRoot 'existing_project_updates\<task-id>\validation\source_snapshot_gate')
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\assert_kv_mnm_import_plan.ps1" `
+  -ScaffoldRoot $ScaffoldRoot `
+  -SourceSnapshotManifestPath (Join-Path $WorkRoot 'existing_project_updates\<task-id>\source_snapshot_manifest.json') `
+  -SourceSnapshotGateResultPath (Join-Path $WorkRoot 'existing_project_updates\<task-id>\validation\source_snapshot_gate\existing_project_snapshot_gate.json') `
+  -OutDir (Join-Path $WorkRoot 'existing_project_updates\<task-id>\validation\mnm_import_plan_gate')
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_mvp_repair_existing_project.ps1" `
   -ProjectPath '<existing-project.kpr>' `
@@ -167,15 +182,18 @@ Executable variable rows use `status` other than `display_name`.
 MNM module type:
 
 - `;MODULE_TYPE:0` means scan-executed program/module.
-- `;MODULE_TYPE:2` means function block, but the current MVP runner rejects it with `KV_SCAFFOLD_FB_SUPPORT_INCOMPLETE`.
-- Function-block support requires a separate contract for FB definition, FB instance variables, call points, instance scope, import order, and compile-error classification before KV STUDIO operation.
-- The value in each MNM file must match `scaffold.json.mnm_files[].module_type`; use `0` for the supported MVP path.
+- `;MODULE_TYPE:2` means user function block.
+- `scaffold.json.mnm_files[].category` should be `scan` or `function_block`. If omitted, `0` maps to `scan` and `2` maps to `function_block`.
+- Function-block instance variables use the FB module name as `data_type`. The variable validator allows only FB names declared by `module_type=2` in the same scaffold.
+- `standby` and `interrupt` categories are gated with `KV_SCAFFOLD_MODULE_CATEGORY_SUPPORT_INCOMPLETE` until a same-run KV STUDIO export/import probe proves their MNM representation, placement, and compile behavior.
+- The value in each MNM file must match `scaffold.json.mnm_files[].module_type`.
 
 ## Hard Gates
 
 - Checklist gate: every KV STUDIO operation must pass `scripts\assert_kv_operation_checklist.ps1`.
 - Variable definition gate: every generated or edited variable TSV must pass `scripts\assert_kv_variable_definitions.ps1` or the equivalent shared validator before KV STUDIO opens.
 - Existing-project source gate: before modifying an existing `.kpr`, `scripts\assert_kv_existing_project_snapshot.ps1` must prove that the current project fingerprint matches a ready source snapshot containing MNM files, variable manifests, inventory evidence, and an open architecture file.
+- MNM import plan gate: before modifying an existing `.kpr`, `scripts\assert_kv_mnm_import_plan.ps1` compares incoming `scaffold.json.mnm_files[].module_name` values with the verified source snapshot MNM inventory. Direct import is forbidden when a same-name module already exists. If a conflict exists, the top-level runner must be invoked with `-DeleteExistingModulesBeforeImport`, and the child import step must pre-delete that module before importing its replacement. If the project fingerprint no longer matches the snapshot, export current MNM first and re-plan.
 - Scaffold gate: an existing scaffold must pass `scripts\validate_kv_mvp_scaffold.ps1` before runner use.
 - UI guard gate: the runner must pass `scripts\assert_kv_mvp_ui_guard_usage.ps1` before touching KV STUDIO.
 - Agent boundary gate: the runner must pass `scripts\assert_kv_mvp_agent_boundary.ps1` before touching KV STUDIO; this rejects interactive prompts/manual decision points in runner-owned scripts.
@@ -192,11 +210,24 @@ Agents normally call only:
 - `scripts\new_kv_mvp_multi_mnm_scaffold.ps1`
 - `scripts\new_kv_existing_project_update_workspace.ps1`
 - `scripts\assert_kv_existing_project_snapshot.ps1`
+- `scripts\assert_kv_mnm_import_plan.ps1`
 - `scripts\assert_kv_variable_definitions.ps1`
 - `scripts\validate_kv_mvp_scaffold.ps1`
 - `scripts\run_kv_mvp_scaffold.ps1`
 - `scripts\run_kv_mvp_repair_existing_project.ps1`
 - `scripts\run_kv_mvp_repeat.ps1`
+
+Runner-owned export probe:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\mvp\export_mnm_guarded.ps1" `
+  -ProjectPath '<project.kpr>' `
+  -ExportDir '<out>\exported_mnm' `
+  -ChecklistPath '<CHECKLIST.md>' `
+  -OutDir '<out>\export_mnm'
+```
+
+Export route: open the target project, guarded `Alt+F`, `R`, `S`, confirm the export option dialog, select the requested folder, then accept the folder dialog. Success requires same-run `.mnm` files under `ExportDir` and `export_mnm_result.json.ok=true`.
 
 Child scripts under `scripts\mvp\` are runner-owned. Call them directly only when diagnosing a failed runner step.
 
@@ -242,8 +273,10 @@ Common gate codes:
 
 - `KV_CHECKLIST_MISSING`, `KV_CHECKLIST_EMPTY`, `KV_CHECKLIST_INVALID`
 - `KV_SCAFFOLD_REQUIRED_FILE_MISSING`, `KV_SCAFFOLD_TSV_SCHEMA_INVALID`, `KV_SCAFFOLD_MNM_MODULE_TYPE_MISMATCH`
-- `KV_SCAFFOLD_FB_SUPPORT_INCOMPLETE`
+- `KV_SCAFFOLD_MODULE_CATEGORY_UNSUPPORTED`, `KV_SCAFFOLD_MODULE_CATEGORY_MISMATCH`, `KV_SCAFFOLD_MODULE_CATEGORY_SUPPORT_INCOMPLETE`
+- `KV_UIA_OPERATION_TIMEOUT`, `KV_CREATE_PROJECT_DIALOG_MISSING`
 - `KV_SOURCE_SNAPSHOT_MANIFEST_MISSING`, `KV_SOURCE_SNAPSHOT_NOT_READY`, `KV_SOURCE_SNAPSHOT_STALE`, `KV_SOURCE_SNAPSHOT_MNM_EMPTY`, `KV_SOURCE_SNAPSHOT_VARIABLES_EMPTY`, `KV_UPDATE_ARCHITECTURE_FILE_MISSING`
+- `KV_MNM_SAME_NAME_IMPORT_REQUIRES_PREDELETE`, `KV_MNM_INCOMING_DUPLICATE_MODULE_NAME`
 - `KV_VARIABLE_DATA_TYPE_UNSUPPORTED`, `KV_VARIABLE_TSV_SCHEMA_INVALID`, `KV_VARIABLE_NAME_SOFT_DEVICE_CONFLICT`, `KV_VARIABLE_LOCAL_OWNER_MISSING`, `KV_VARIABLE_LOCAL_OWNER_MISMATCH`
 - `KV_UI_GUARD_STATIC_VIOLATION`
 - `KV_FOCUS_LOST`, `KV_FOCUS_LOST_TERMINAL`, `KV_MODAL_PRESENT`

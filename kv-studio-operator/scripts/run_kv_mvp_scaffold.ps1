@@ -6,6 +6,9 @@
   [string]$ProjectName = '',
   [string]$CpuModel = '',
   [string]$KvsExe = '',
+  [string]$AdminUser = '',
+  [string]$AdminPassword = '',
+  [string]$AdminCredentialPath = '',
   [string]$ChecklistPath = '',
   [int]$TimeoutSeconds = 600,
   [switch]$AuditVariablePersistence,
@@ -113,6 +116,25 @@ function Read-JsonFileIfPossible([string]$Path) {
   try { return (Get-Content -Raw -LiteralPath $Path -Encoding UTF8 | ConvertFrom-Json) } catch { return $null }
 }
 
+function Get-StepResultFile([string]$OutDir) {
+  if (-not $OutDir -or -not (Test-Path -LiteralPath $OutDir -PathType Container)) { return $null }
+  Get-ChildItem -LiteralPath $OutDir -File -Recurse -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like '*result.json' } |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+}
+
+function Clear-StaleStepArtifacts([string]$OutDir) {
+  if (-not $OutDir) { return }
+  New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+  foreach ($name in @('fail.txt','exit_code.txt','timeout_result.json','runner_child_stdout.txt','runner_child_stderr.txt')) {
+    $path = Join-Path $OutDir $name
+    if (Test-Path -LiteralPath $path -PathType Leaf) {
+      Remove-Item -LiteralPath $path -Force
+    }
+  }
+}
+
 function Get-StepFailureSummary([string]$Name, [string[]]$Arguments, [int]$ExitCode) {
   $outDir = Get-ArgumentValue $Arguments '-OutDir'
   $summary = [ordered]@{
@@ -128,9 +150,7 @@ function Get-StepFailureSummary([string]$Name, [string[]]$Arguments, [int]$ExitC
   }
   if (-not $outDir -or -not (Test-Path -LiteralPath $outDir -PathType Container)) { return [pscustomobject]$summary }
 
-  $resultFile = Get-ChildItem -LiteralPath $outDir -File -Filter '*result.json' -Recurse -ErrorAction SilentlyContinue |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
+  $resultFile = Get-StepResultFile $outDir
   if ($resultFile) {
     $summary.child_result_path = $resultFile.FullName
     $summary.evidence += $resultFile.FullName
@@ -165,6 +185,16 @@ function Get-StepFailureSummary([string]$Name, [string[]]$Arguments, [int]$ExitC
       try { $summary.message = ([IO.File]::ReadAllText($failText, [Text.Encoding]::UTF8)).Trim() } catch {}
     }
   }
+  $stderrPath = Join-Path $outDir 'runner_child_stderr.txt'
+  if (Test-Path -LiteralPath $stderrPath -PathType Leaf) {
+    $stderrItem = Get-Item -LiteralPath $stderrPath
+    if ($stderrItem.Length -gt 0) {
+      $summary.evidence += $stderrPath
+      if (-not $summary.message) {
+        try { $summary.message = ([IO.File]::ReadAllText($stderrPath, [Text.Encoding]::UTF8)).Trim() } catch {}
+      }
+    }
+  }
   if (-not $summary.error_code) { $summary.error_code = 'KV_MVP_STEP_FAILED' }
   $summary.evidence = @($summary.evidence | Where-Object { $_ } | Select-Object -Unique)
   return [pscustomobject]$summary
@@ -173,9 +203,7 @@ function Get-StepFailureSummary([string]$Name, [string[]]$Arguments, [int]$ExitC
 function Test-StepResultOk([string]$OutDir) {
   if (-not $OutDir -or -not (Test-Path -LiteralPath $OutDir -PathType Container)) { return $true }
   $failText = Join-Path $OutDir 'fail.txt'
-  $resultFile = Get-ChildItem -LiteralPath $OutDir -File -Filter '*result.json' -Recurse -ErrorAction SilentlyContinue |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
+  $resultFile = Get-StepResultFile $OutDir
   if (-not $resultFile) { return -not (Test-Path -LiteralPath $failText -PathType Leaf) }
   $child = Read-JsonFileIfPossible $resultFile.FullName
   if ($null -eq $child -or $null -eq $child.ok) { return $true }
@@ -211,7 +239,7 @@ function Invoke-MvpStep([string]$Name, [string]$ScriptName, [string[]]$Arguments
   }
   $stepStart = Get-Date
   $outDir = Get-ArgumentValue $Arguments '-OutDir'
-  if ($outDir) { New-Item -ItemType Directory -Force -Path $outDir | Out-Null }
+  if ($outDir) { Clear-StaleStepArtifacts $outDir }
   $stdoutPath = if ($outDir) { Join-Path $outDir 'runner_child_stdout.txt' } else { Join-Path $artifactRoot ("${Name}_stdout.txt") }
   $stderrPath = if ($outDir) { Join-Path $outDir 'runner_child_stderr.txt' } else { Join-Path $artifactRoot ("${Name}_stderr.txt") }
   $command = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath) + $Arguments
@@ -261,6 +289,20 @@ function Invoke-MvpStep([string]$Name, [string]$ScriptName, [string[]]$Arguments
   }
   $process.WaitForExit()
   $exit = [int]$process.ExitCode
+  $childExitCodePath = if ($outDir) { Join-Path $outDir 'exit_code.txt' } else { '' }
+  if ($childExitCodePath -and (Test-Path -LiteralPath $childExitCodePath -PathType Leaf)) {
+    $childExitCodeText = ([IO.File]::ReadAllText($childExitCodePath, [Text.Encoding]::ASCII)).Trim()
+    if ($childExitCodeText -match '^-?\d+$') { $exit = [int]$childExitCodeText }
+  }
+  if ($exit -eq 0 -and $outDir -and (Test-Path -LiteralPath (Join-Path $outDir 'fail.txt') -PathType Leaf)) {
+    $exit = 1
+  }
+  if ($exit -eq 0 -and (Test-Path -LiteralPath $stderrPath -PathType Leaf) -and (Get-Item -LiteralPath $stderrPath).Length -gt 0) {
+    $exit = 1
+    if ($outDir) {
+      'Child step wrote to stderr; treating this as a failed guarded step.' | Set-Content -LiteralPath (Join-Path $outDir 'fail.txt') -Encoding UTF8
+    }
+  }
   if ($exit -eq 0 -and -not (Test-StepResultOk $outDir)) { $exit = 1 }
   $elapsed = [math]::Round(((Get-Date) - $stepStart).TotalSeconds, 3)
   $steps.Add([pscustomobject]@{
@@ -355,14 +397,31 @@ foreach ($entry in $mnmEntries) {
   $entryLocalTsv = Resolve-ScaffoldPath ([string]$entry.variables.local_tsv)
   if (-not (Test-Path -LiteralPath $entryGlobalTsv)) { throw "Global variable TSV not found for ${moduleName}: $entryGlobalTsv" }
   if (-not (Test-Path -LiteralPath $entryLocalTsv)) { throw "Local variable TSV not found for ${moduleName}: $entryLocalTsv" }
+  $entryArgumentsTsv = ''
+  if ($moduleType -eq 2) {
+    if (-not $entry.arguments -or -not $entry.arguments.tsv) {
+      throw "Function-block MNM entry $moduleName must define arguments.tsv."
+    }
+    $entryArgumentsTsv = Resolve-ScaffoldPath ([string]$entry.arguments.tsv)
+    if (-not (Test-Path -LiteralPath $entryArgumentsTsv)) { throw "FB arguments TSV not found for ${moduleName}: $entryArgumentsTsv" }
+  }
   $resolvedMnmFiles += [pscustomobject]@{
     path = $mnmPath
     module_name = $moduleName
     module_type = $moduleType
     global_tsv = $entryGlobalTsv
     local_tsv = $entryLocalTsv
+    arguments_tsv = $entryArgumentsTsv
   }
 }
+
+$fbTypeNames = @(
+  $resolvedMnmFiles |
+    Where-Object { [int]$_.module_type -eq 2 } |
+    ForEach-Object { [string]$_.module_name } |
+    Where-Object { $_ } |
+    Select-Object -Unique
+)
 
 Get-ChildItem -LiteralPath $ScaffoldRoot -Force | ForEach-Object {
   Copy-Item -LiteralPath $_.FullName -Destination $scaffoldArtifactRoot -Recurse -Force
@@ -384,6 +443,7 @@ $encodingCheck = [ordered]@{
       module_name = $_.module_name
       global_tsv = $_.global_tsv
       local_tsv = $_.local_tsv
+      arguments_tsv = $_.arguments_tsv
     }
   })
 }
@@ -425,6 +485,7 @@ function Write-MvpResult([bool]$Ok, [string]$Status, [string]$Message = '') {
         module_name = $_.module_name
         global_tsv = $_.global_tsv
         local_tsv = $_.local_tsv
+        arguments_tsv = $_.arguments_tsv
       }
     })
     compile_result_path = $compileResultPath
@@ -506,6 +567,9 @@ try {
     '-RestartKvs'
   )
   if ($KvsExe) { $createArgs += @('-KvsExe', $KvsExe) }
+  if ($AdminUser) { $createArgs += @('-AdminUser', $AdminUser) }
+  if ($AdminPassword) { $createArgs += @('-AdminPassword', $AdminPassword) }
+  if ($AdminCredentialPath) { $createArgs += @('-AdminCredentialPath', $AdminCredentialPath) }
   Invoke-MvpStep 'create_project' 'create_project_local_guarded.ps1' $createArgs
 
   for ($i = 0; $i -lt $resolvedMnmFiles.Count; $i++) {
@@ -525,6 +589,22 @@ try {
     Assert-ImportedModulePlacement $entry
   }
 
+  $fbArgumentRoot = Join-Path $artifactRoot 'set_fb_arguments'
+  New-Item -ItemType Directory -Force -Path $fbArgumentRoot | Out-Null
+  for ($i = 0; $i -lt $resolvedMnmFiles.Count; $i++) {
+    $entry = $resolvedMnmFiles[$i]
+    if ([int]$entry.module_type -ne 2) { continue }
+    if (-not $entry.arguments_tsv) { throw "Function-block arguments TSV is missing after resolution: $($entry.module_name)" }
+    $safeModule = ($entry.module_name -replace '[^A-Za-z0-9_.-]+', '_')
+    Invoke-MvpStep "set_fb_arguments_$($entry.module_name)" 'set_fb_arguments_guarded.ps1' @(
+      '-ProjectPath', $projectPath,
+      '-FbModuleName', $entry.module_name,
+      '-ArgumentsTsv', $entry.arguments_tsv,
+      '-ChecklistPath', $ChecklistPath,
+      '-OutDir', (Join-Path $fbArgumentRoot ('module_{0:D2}_{1}' -f ($i + 1), $safeModule))
+    )
+  }
+
   $setVariablesRoot = Join-Path $artifactRoot 'set_variables'
   New-Item -ItemType Directory -Force -Path $setVariablesRoot | Out-Null
   $globalVariablesPasted = $false
@@ -542,6 +622,9 @@ try {
       '-ChecklistPath', $ChecklistPath,
       '-OutDir', $moduleOutDir
     )
+    if ($fbTypeNames.Count -gt 0) {
+      $setArgs += @('-AllowedCustomDataTypes', ($fbTypeNames -join ','))
+    }
     if ($globalVariablesPasted -or [int]$mergedGlobal.executable_global_variable_count -eq 0) {
       $setArgs += '-SkipGlobal'
     }

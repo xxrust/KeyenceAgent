@@ -156,13 +156,31 @@ function Assert-KvUiForegroundHwnd {
 
   if ($AllowSingleRecovery) {
     $recoveryPath = Write-KvUiGuardCheckpoint -Step $Step -Status 'recovery_before' -Action 'restore foreground once' -Expected @{ hwnd = $ExpectedHwnd.ToInt64(); title_like = $ExpectedTitleLike } -Before $before -ErrorCode (Get-KvUiGuardForegroundErrorCode $before $ExpectedHwnd) -Message 'Foreground did not match target; attempting one controlled recovery.'
-    [KvSharedUiGuardWin32]::ShowWindow($ExpectedHwnd, 9) | Out-Null
+    if ([KvSharedUiGuardWin32]::IsIconic($ExpectedHwnd)) {
+      [KvSharedUiGuardWin32]::ShowWindow($ExpectedHwnd, 9) | Out-Null
+    }
     [KvSharedUiGuardWin32]::SetForegroundWindow($ExpectedHwnd) | Out-Null
     Start-Sleep -Milliseconds 180
     $afterRecovery = Get-KvForegroundSnapshot
     if ($afterRecovery.hwnd -eq $ExpectedHwnd.ToInt64() -and ((-not $ExpectedTitleLike) -or $afterRecovery.title -like $ExpectedTitleLike)) {
       Write-KvUiGuardCheckpoint -Step $Step -Status 'recovery_after' -Action 'restore foreground once' -Expected @{ hwnd = $ExpectedHwnd.ToInt64(); title_like = $ExpectedTitleLike } -Before $before -After $afterRecovery -Message 'Foreground recovery succeeded.' -Evidence @($recoveryPath) | Out-Null
       return $afterRecovery
+    }
+    if ([string]$afterRecovery.process_name -match '^(?i:RustDesk)$') {
+      $blockerPath = Write-KvUiGuardCheckpoint -Step $Step -Status 'recovery_blocker' -Action 'minimize known foreground blocker once' -Expected @{ hwnd = $ExpectedHwnd.ToInt64(); title_like = $ExpectedTitleLike; blocker_process = $afterRecovery.process_name } -Before $before -After $afterRecovery -Message 'Known remote-control foreground blocker still owns focus; minimizing it once before target recovery.'
+      [KvSharedUiGuardWin32]::ShowWindow([IntPtr]$afterRecovery.hwnd, 6) | Out-Null
+      Start-Sleep -Milliseconds 180
+      if ([KvSharedUiGuardWin32]::IsIconic($ExpectedHwnd)) {
+        [KvSharedUiGuardWin32]::ShowWindow($ExpectedHwnd, 9) | Out-Null
+      }
+      [KvSharedUiGuardWin32]::SetForegroundWindow($ExpectedHwnd) | Out-Null
+      Start-Sleep -Milliseconds 220
+      $afterBlockerRecovery = Get-KvForegroundSnapshot
+      if ($afterBlockerRecovery.hwnd -eq $ExpectedHwnd.ToInt64() -and ((-not $ExpectedTitleLike) -or $afterBlockerRecovery.title -like $ExpectedTitleLike)) {
+        Write-KvUiGuardCheckpoint -Step $Step -Status 'recovery_after' -Action 'minimize known blocker and restore target' -Expected @{ hwnd = $ExpectedHwnd.ToInt64(); title_like = $ExpectedTitleLike } -Before $afterRecovery -After $afterBlockerRecovery -Message 'Foreground recovery succeeded after minimizing known blocker.' -Evidence @($recoveryPath, $blockerPath) | Out-Null
+        return $afterBlockerRecovery
+      }
+      $afterRecovery = $afterBlockerRecovery
     }
     $code = Get-KvUiGuardForegroundErrorCode $afterRecovery $ExpectedHwnd
     $failurePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'failed' -Action 'assert foreground hwnd' -Expected @{ hwnd = $ExpectedHwnd.ToInt64(); title_like = $ExpectedTitleLike } -Before $before -After $afterRecovery -ErrorCode $code -Message 'Foreground recovery failed; input was not sent.' -Evidence @($recoveryPath)
@@ -214,6 +232,16 @@ function Invoke-KvGuardedSendKeysAllowTargetClose {
       $successForeground = $true
       break
     }
+  }
+  if (-not $successForeground -and $Action -like '*self-variable table*' -and $after.process_name -eq 'Kvs') {
+    $selfVariableNeedle = -join (@(0x81EA,0x53D8,0x91CF) | ForEach-Object { [char]$_ })
+    $variableNeedle = -join (@(0x53D8,0x91CF) | ForEach-Object { [char]$_ })
+    if ($after.title -like "*$selfVariableNeedle*" -or $after.title -like "*$variableNeedle*") {
+      $successForeground = $true
+    }
+  }
+  if (-not $successForeground -and $Action -like '*paste-data-error modal*' -and $after.process_name -eq 'Kvs' -and [string]$after.class_name -ne '#32770') {
+    $successForeground = $true
   }
   if ($targetStillForeground -or $successForeground) {
     Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; keys = $Keys; success_title_like = @($SuccessTitleLike); target_still_window = $targetStillWindow } -Before $before -After $after -Message 'Postcondition passed; target remained foreground or closed into the expected successor foreground.' -Evidence @($beforePath) | Out-Null
@@ -272,6 +300,35 @@ function Invoke-KvGuardedMouseClick {
   Start-Sleep -Milliseconds $SleepMs
   $after = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step "$Step postcondition" -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
   Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action 'mouse left click' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; x = $X; y = $Y } -Before $before -After $after -Message 'Postcondition passed; target still owns foreground.' -Evidence @($beforePath) | Out-Null
+}
+
+function Invoke-KvGuardedMouseRightClick {
+  param(
+    [Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,
+    [Parameter(Mandatory=$true)][string]$Step,
+    [Parameter(Mandatory=$true)][int]$X,
+    [Parameter(Mandatory=$true)][int]$Y,
+    [string]$ExpectedTitleLike = '',
+    [int]$SleepMs = 180
+  )
+  $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
+  $beforePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Action 'mouse right click' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; x = $X; y = $Y; popup_class = '#32768' } -Before $before -Message 'Precondition passed; target owns foreground.'
+  [KvSharedUiGuardWin32]::SetCursorPos($X, $Y) | Out-Null
+  Start-Sleep -Milliseconds 40
+  [KvSharedUiGuardWin32]::mouse_event(0x0008, 0, 0, 0, 0)
+  Start-Sleep -Milliseconds 30
+  [KvSharedUiGuardWin32]::mouse_event(0x0010, 0, 0, 0, 0)
+  Start-Sleep -Milliseconds $SleepMs
+  $after = Get-KvForegroundSnapshot
+  $targetStillForeground = ($after.hwnd -eq $TargetHwnd.ToInt64() -and ((-not $ExpectedTitleLike) -or $after.title -like $ExpectedTitleLike))
+  $popupForeground = ([string]$after.class_name -eq '#32768')
+  if ($targetStillForeground -or $popupForeground) {
+    Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action 'mouse right click' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; x = $X; y = $Y; popup_class = '#32768' } -Before $before -After $after -Message 'Postcondition passed; target remained foreground or context menu owns foreground.' -Evidence @($beforePath) | Out-Null
+    return
+  }
+  $code = Get-KvUiGuardForegroundErrorCode $after $TargetHwnd
+  $failurePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'failed' -Action 'mouse right click' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; x = $X; y = $Y; popup_class = '#32768' } -Before $before -After $after -ErrorCode $code -Message 'Right click did not leave target or a context menu in foreground.' -Evidence @($beforePath)
+  Stop-KvUiGuard -ErrorCode $code -Step $Step -Message "Right click postcondition failed. Actual foreground title='$($after.title)' class='$($after.class_name)' process='$($after.process_name)'." -Evidence @($beforePath, $failurePath)
 }
 
 function Invoke-KvGuardedVkTap {

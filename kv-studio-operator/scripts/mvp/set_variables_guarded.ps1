@@ -21,6 +21,7 @@
   [string]$LocalPasteFormat = 'NameType',
 
   [switch]$AppendGlobalVariables,
+  [string[]]$AllowedCustomDataTypes = @(),
 
   [string]$ChecklistPath = '',
 
@@ -78,7 +79,8 @@ public class KvSetVarWin32 {
 "@
 
 function Log([string]$Message) {
-  Add-Content -LiteralPath (Join-Path $OutDir 'run.log') -Value ((Get-Date -Format s) + ' ' + $Message) -Encoding UTF8
+  $line = (Get-Date -Format s) + ' ' + $Message + [Environment]::NewLine
+  [IO.File]::AppendAllText((Join-Path $OutDir 'run.log'), $line, [Text.Encoding]::UTF8)
 }
 
 function Get-VisibleKvsProcess {
@@ -140,7 +142,9 @@ function Get-VariableFormSnapshot($Form) {
 function Convert-SafeFileName([string]$Value) {
   $safe = $Value -replace '[^A-Za-z0-9_.-]+', '_'
   if ([string]::IsNullOrWhiteSpace($safe)) { return 'step' }
-  return $safe.Trim('_')
+  $safe = $safe.Trim('_')
+  if ($safe.Length -gt 48) { return $safe.Substring(0, 48) }
+  return $safe
 }
 
 function Write-StepCheckpoint(
@@ -536,7 +540,9 @@ function Bring-VariableFormForeground($Form, [string]$Label) {
   if (-not $Form) { throw "KvVariableForm missing before foreground restore for $Label." }
   $hwnd = [IntPtr]$Form.Current.NativeWindowHandle
   if ($hwnd -eq [IntPtr]::Zero) { throw "KvVariableForm has no native window handle before $Label." }
-  [KvSetVarWin32]::ShowWindow($hwnd, 3) | Out-Null
+  if ([KvSetVarWin32]::IsIconic($hwnd)) {
+    [KvSetVarWin32]::ShowWindow($hwnd, 9) | Out-Null
+  }
   [KvSetVarWin32]::SetForegroundWindow($hwnd) | Out-Null
   Start-Sleep -Milliseconds 180
   $fg = Get-ForegroundTitle
@@ -562,7 +568,9 @@ function Assert-VariableFormForeground($Form, [string]$Step, [switch]$AllowSingl
 
   if ($AllowSingleRecovery) {
     $recoveryPath = Write-StepCheckpoint $Step 'recovery_before' 'restore variable editor foreground once' $Form $before $null (Classify-ForegroundMismatch $before $targetHwnd) 'Foreground was not KvVariableForm; attempting one controlled recovery.' @()
-    [KvSetVarWin32]::ShowWindow($targetHwnd, 3) | Out-Null
+    if ([KvSetVarWin32]::IsIconic($targetHwnd)) {
+      [KvSetVarWin32]::ShowWindow($targetHwnd, 9) | Out-Null
+    }
     [KvSetVarWin32]::SetForegroundWindow($targetHwnd) | Out-Null
     Start-Sleep -Milliseconds 180
     $afterRecovery = Get-ForegroundSnapshot
@@ -742,14 +750,15 @@ function Assert-NoSoftDeviceLikeVariableNames([object[]]$Rows, [string]$Scope, [
 }
 
 function Assert-KvVariableDefinitionsBeforePaste([object[]]$Rows, [string]$Scope, [string]$SourcePath, [string]$ExpectedOwnerProgram = '') {
-  $errors = @(Get-KvVariableDefinitionErrors -Rows $Rows -Scope $Scope -SourcePath $SourcePath -ExpectedOwnerProgram $ExpectedOwnerProgram)
+  $errors = @(Get-KvVariableDefinitionErrors -Rows $Rows -Scope $Scope -SourcePath $SourcePath -ExpectedOwnerProgram $ExpectedOwnerProgram -AllowedCustomDataTypes $AllowedCustomDataTypes)
   if ($errors.Count -gt 0) {
     $evidencePath = Join-Path $OutDir "${Scope}_variable_definition_errors.json"
     [pscustomobject]@{
       ok = $false
       source = $SourcePath
       scope = $Scope
-      supported_type_pattern = Get-KvVariableSupportedTypePatternText
+      supported_type_pattern = Get-KvVariableSupportedTypePatternText -AllowedCustomDataTypes $AllowedCustomDataTypes
+      allowed_custom_data_types = @($AllowedCustomDataTypes)
       errors = $errors
     } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $evidencePath -Encoding UTF8
     $first = $errors[0]

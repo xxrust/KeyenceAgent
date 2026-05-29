@@ -30,7 +30,10 @@ $global:LASTEXITCODE = 0
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Set-Content -LiteralPath (Join-Path $out 'bootstrap.log') -Value ((Get-Date -Format s) + ' bootstrap start') -Encoding UTF8
-function Log($m){Add-Content -LiteralPath (Join-Path $out 'run.log') -Value ((Get-Date -Format s)+' '+$m) -Encoding UTF8}
+function Log($m){
+  $line = (Get-Date -Format s) + ' ' + $m + [Environment]::NewLine
+  [IO.File]::AppendAllText((Join-Path $out 'run.log'), $line, [Text.Encoding]::UTF8)
+}
 
 function ConvertTo-BoolValue([object]$Value, [bool]$Default) {
   if ($null -eq $Value) { return $Default }
@@ -172,7 +175,7 @@ function GetForegroundTitle(){
 }
 function ForceKvStudioForeground([IntPtr]$hwnd){
   if($hwnd -eq [IntPtr]::Zero){ return $false }
-  [W]::ShowWindow($hwnd,3)|Out-Null
+  if([W]::IsIconic($hwnd)){ [W]::ShowWindow($hwnd,9)|Out-Null }
   $foreground=[W]::GetForegroundWindow()
   $targetPid=[uint32]0
   $foregroundPid=[uint32]0
@@ -545,29 +548,32 @@ function FindProjectModuleTreeItem([string]$moduleName){
   return $null
 }
 function ConfirmDeleteDialogIfPresent(){
-  Start-Sleep -Milliseconds 700
-  foreach($dialog in @(GetVisibleDialogs)){
-    try{
-      $buttons=$dialog.FindAll(
-        [System.Windows.Automation.TreeScope]::Descendants,
-        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Button))
-      )
-      for($i=0;$i -lt $buttons.Count;$i++){
-        $button=$buttons.Item($i)
-        $name=[string]$button.Current.Name
-        if($name -match '^(是|はい|Yes|OK|确定)'){
-          try{
-            $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-          }catch{
-            ClickAutomationElementCenter $button ('delete confirm '+$name)
+  $deadline=(Get-Date).AddSeconds(5)
+  do{
+    foreach($dialog in @(GetVisibleDialogs)){
+      try{
+        $buttons=$dialog.FindAll(
+          [System.Windows.Automation.TreeScope]::Descendants,
+          (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Button))
+        )
+        for($i=0;$i -lt $buttons.Count;$i++){
+          $button=$buttons.Item($i)
+          $name=[string]$button.Current.Name
+          if($name -match '^(是|はい|Yes|OK|确定)'){
+            try{
+              $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            }catch{
+              ClickAutomationElementCenter $button ('delete confirm '+$name)
+            }
+            Log ('confirmed delete dialog by '+$name)
+            Start-Sleep -Seconds 2
+            return $true
           }
-          Log ('confirmed delete dialog by '+$name)
-          Start-Sleep -Seconds 2
-          return $true
         }
-      }
-    }catch{}
-  }
+      }catch{}
+    }
+    Start-Sleep -Milliseconds 200
+  }while((Get-Date) -lt $deadline)
   return $false
 }
 function RemoveProjectModuleIfPresent([string]$moduleName){
@@ -1043,8 +1049,19 @@ function AssertMnmChineseEncoding([string]$path){
     [string]::Concat([char[]]@(0x7EFF,0x004C,0x0045,0x0044,0x706F))
     )
   }
-  if(-not $decodedText.StartsWith('DEVICE:63')){
-    throw 'MNM device header validation failed: target KV-X310 project expects DEVICE:63.'
+  $headerDevice = $null
+  $headerModuleType = $null
+  if($decodedText -match '^\uFEFF?DEVICE:(\d+)'){ $headerDevice = [int]$matches[1] }
+  if($decodedText -match '(?m)^;MODULE_TYPE:(\d+)\s*$'){ $headerModuleType = [int]$matches[1] }
+  if($null -eq $headerDevice){
+    throw 'MNM device header validation failed: missing DEVICE:<n>.'
+  }
+  if($null -eq $headerModuleType){
+    throw 'MNM module type validation failed: missing ;MODULE_TYPE:<n>.'
+  }
+  $deviceOk = (($headerModuleType -eq 2 -and $headerDevice -eq 59) -or ($headerModuleType -ne 2 -and $headerDevice -eq 63))
+  if(-not $deviceOk){
+    throw ('MNM device header validation failed: MODULE_TYPE='+$headerModuleType+' requires DEVICE:'+(if($headerModuleType -eq 2){'59'}else{'63'})+', actual DEVICE:'+$headerDevice+'.')
   }
   $missing=@()
   foreach($needle in $required){
@@ -1638,13 +1655,10 @@ try{
   $p = Get-Process Kvs -ErrorAction SilentlyContinue |
     Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like ('*'+$expectedProjectNeedle+'*') } |
     Select-Object -First 1
-  if(-not $p){
-    $p = Get-Process Kvs -ErrorAction SilentlyContinue |
-      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' } |
-      Select-Object -First 1
-  }
+  $projectOpenRequested = $false
   if(-not $p){
     Start-Process -FilePath $kvs -ArgumentList ('"'+$project+'"') | Out-Null
+    $projectOpenRequested = $true
   }
   $deadline=(Get-Date).AddSeconds(90)
   while((-not $p) -and (Get-Date) -lt $deadline) {
@@ -1652,13 +1666,13 @@ try{
     $p=Get-Process Kvs -ErrorAction SilentlyContinue |
       Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like ('*'+$expectedProjectNeedle+'*') } |
       Select-Object -First 1
-    if(-not $p){
-      $p=Get-Process Kvs -ErrorAction SilentlyContinue |
-        Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' } |
-        Select-Object -First 1
+    if((-not $p) -and (-not $projectOpenRequested) -and (Get-Date) -gt $deadline.AddSeconds(-82)){
+      Log ('target project window not visible yet; requesting project open explicitly: '+$project)
+      Start-Process -FilePath $kvs -ArgumentList ('"'+$project+'"') | Out-Null
+      $projectOpenRequested = $true
     }
   }
-  if(-not $p){ throw 'Kvs visible main window not found after start' }
+  if(-not $p){ throw "Kvs target project window not found after start: $expectedProjectNeedle" }
   [void](ForceKvStudioForeground ([IntPtr]$p.MainWindowHandle))
   Start-Sleep -Milliseconds 150
   [void](ForceKvStudioForeground ([IntPtr]$p.MainWindowHandle))
@@ -1668,6 +1682,28 @@ try{
   if(-not (WaitKvInteractive 60)){
     throw 'KV STUDIO main window still shows splash/loader; refusing menu route.'
   }
+  $titleDeadline=(Get-Date).AddSeconds(60)
+  $reopenRequestedForTitle=$false
+  while((Get-Date) -lt $titleDeadline){
+    $targetProjectProcess=Get-Process Kvs -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like ('*'+$expectedProjectNeedle+'*') } |
+      Select-Object -First 1
+    if($targetProjectProcess){
+      $p=$targetProjectProcess
+      [void](ForceKvStudioForeground ([IntPtr]$p.MainWindowHandle))
+      break
+    }
+    if((-not $reopenRequestedForTitle) -and (Get-Date) -gt $titleDeadline.AddSeconds(-52)){
+      Log ('foreground KV STUDIO title does not contain target project; requesting project open before startup guard: '+$project)
+      Start-Process -FilePath $kvs -ArgumentList ('"'+$project+'"') | Out-Null
+      $reopenRequestedForTitle=$true
+    }
+    Start-Sleep -Milliseconds 500
+  }
+  try{ $p.Refresh() }catch{}
+  if($p.MainWindowTitle -notlike ('*'+$expectedProjectNeedle+'*')){
+    throw "Kvs target project title did not become visible before startup guard: expected=$expectedProjectNeedle actual=$($p.MainWindowTitle)"
+  }
   SetKvGuardTarget ([IntPtr]$p.MainWindowHandle) ('KV STUDIO*'+$expectedProjectNeedle+'*')
   AssertKvStudioForeground 'MNM import startup' $expectedProjectNeedle
   if($RestartKvs){ Start-Sleep -Seconds 2 } else { Start-Sleep -Milliseconds 200 }
@@ -1676,14 +1712,7 @@ try{
   DismissUnitConfigDialogIfPresent 'before_import' | Out-Null
   if($DeleteExistingModuleBeforeImport -and $ExpectedModuleName){
     if(-not (RemoveProjectModuleIfPresent $ExpectedModuleName)){
-      if(-not (CreatePlaceholderModule)){
-        throw "Failed to create placeholder module before deleting: $ExpectedModuleName"
-      }
-      if(-not (RemoveProjectModuleIfPresent $ExpectedModuleName)){
-        if(-not (RenameProjectModuleIfPresent $ExpectedModuleName)){
-          throw "Failed to delete or rename existing module before import: $ExpectedModuleName"
-        }
-      }
+      throw "Failed to delete existing module before import: $ExpectedModuleName"
     }
   }elseif($ExpectedModuleName){
     Log ('skipping project-tree module open before MNM import; full MNM import must create/update module: '+$ExpectedModuleName)

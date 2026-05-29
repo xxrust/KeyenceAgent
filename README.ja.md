@@ -1,199 +1,174 @@
 # KeyenceAgent
 
 <p align="center">
-  <img src="docs/images/keyenceagent-harness-overview.png" alt="KeyenceAgent 実行フレームワーク概要">
+  <img src="docs/images/keyenceagent-harness-overview.png" alt="KeyenceAgent アーキテクチャ概要">
 </p>
 
 <p align="center">
-  <a href="https://github.com/xxrust/KeyenceAgent/commits/master"><img alt="最新コミット" src="https://img.shields.io/badge/%E6%9C%80%E6%96%B0%E3%82%B3%E3%83%9F%E3%83%83%E3%83%88-GitHub%E3%81%A7%E7%A2%BA%E8%AA%8D-555555?style=flat-square&logo=git"></a>
-  <a href="https://github.com/xxrust/KeyenceAgent"><img alt="リポジトリサイズ" src="https://img.shields.io/badge/%E3%83%AA%E3%83%9D%E3%82%B8%E3%83%88%E3%83%AA%E3%82%B5%E3%82%A4%E3%82%BA-GitHub%E3%81%A7%E7%A2%BA%E8%AA%8D-555555?style=flat-square"></a>
+  <a href="https://github.com/xxrust/KeyenceAgent/commits/master"><img alt="Latest commit" src="https://img.shields.io/github/last-commit/xxrust/KeyenceAgent?style=flat-square&logo=git"></a>
+  <a href="https://github.com/xxrust/KeyenceAgent"><img alt="Repository size" src="https://img.shields.io/github/repo-size/xxrust/KeyenceAgent?style=flat-square"></a>
   <img alt="PowerShell" src="https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?style=flat-square&logo=powershell&logoColor=white">
-  <img alt="KV STUDIO スクリプト管理" src="https://img.shields.io/badge/KV%20STUDIO-%E3%82%B9%E3%82%AF%E3%83%AA%E3%83%97%E3%83%88%E7%AE%A1%E7%90%86-008C95?style=flat-square">
-  <img alt="実行フレームワーク検証済み" src="https://img.shields.io/badge/%E5%AE%9F%E8%A1%8C%E3%83%95%E3%83%AC%E3%83%BC%E3%83%A0-%E5%A4%89%E6%8F%9B%E6%B8%88%E3%81%BF-22A06B?style=flat-square">
-  <img alt="UI ゲート有効" src="https://img.shields.io/badge/UI%E3%82%B2%E3%83%BC%E3%83%88-%E6%9C%89%E5%8A%B9-0B5FFF?style=flat-square">
+  <img alt="KV STUDIO" src="https://img.shields.io/badge/KV%20STUDIO-script--owned-008C95?style=flat-square">
+  <img alt="MVP" src="https://img.shields.io/badge/MVP-3x%20repeat%20passed-22A06B?style=flat-square">
+  <img alt="UI guard" src="https://img.shields.io/badge/UI%20guard-shared%20library-0B5FFF?style=flat-square">
 </p>
 
 <p align="center">
-  <a href="README.md"><img alt="英語" src="https://img.shields.io/badge/%E8%8B%B1%E8%AA%9E-0B5FFF?style=for-the-badge"></a>
-  <a href="README.zh-CN.md"><img alt="中国語" src="https://img.shields.io/badge/%E4%B8%AD%E5%9B%BD%E8%AA%9E-008C95?style=for-the-badge"></a>
-  <a href="README.ja.md"><img alt="日本語" src="https://img.shields.io/badge/日本語-22A06B?style=for-the-badge"></a>
+  <a href="README.md"><img alt="English" src="https://img.shields.io/badge/English-0B5FFF?style=for-the-badge"></a>
+  <a href="README.zh-CN.md"><img alt="中文" src="https://img.shields.io/badge/%E4%B8%AD%E6%96%87-008C95?style=for-the-badge"></a>
+  <a href="README.ja.md"><img alt="日本語" src="https://img.shields.io/badge/%E6%97%A5%E6%9C%AC%E8%AA%9E-22A06B?style=for-the-badge"></a>
 </p>
 
-<p align="center">
-  KEYENCE KV STUDIO プロジェクトを決定的なスクリプトで作成、修復、検証するエージェント駆動の実行フレームワーク。
-</p>
+KeyenceAgent は、KEYENCE KV STUDIO の PLC プロジェクトをエージェント支援で作成、更新、検証するためのスクリプト所有ハーネスです。
 
-> この README の画像は GPT-image2 で生成し、`docs/images/` にリポジトリアセットとして保存しています。
+エージェントは意図の準備と証拠の確認を担当します。KV STUDIO が開いている間の操作は、プロジェクト作成から変換結果の取得まで runner スクリプトが担当します。
 
-## KeyenceAgent の目的
+## アーキテクチャ
 
-KV STUDIO の自動化は、エージェントが IDE を見ながらクリック、入力、判断を続けると不安定になります。KeyenceAgent はその作業を実行フレームワークに分離します。
+KeyenceAgent は、推論、実行、検証を明確な境界に分けます。
 
-| フェーズ | 担当 | ルール | 証拠 |
-| --- | --- | --- | --- |
-| 準備 | エージェント | KV STUDIO を開く前に scaffold を編集し、検証ゲートを通します。 | `scaffold_validation.json` |
-| 実行 | 実行スクリプト | KV STUDIO 内のすべての UI 操作は実行スクリプトが担当します。 | `artifacts/` |
-| 検証 | エージェント | 実行スクリプト終了後に同一実行の結果ファイルだけを読みます。 | `mvp_result.json`、`repair_result.json` |
+```text
+タスク要求
+  -> scaffold model
+  -> scaffold renderer
+  -> static gates
+  -> guarded KV runner
+  -> same-run artifacts
+  -> agent verification
+```
 
-目標は再現性です。同じ scaffold と同じ実行コマンドから、同じプロジェクト、変数、変換結果、証拠構造を得ます。
+| レイヤー | 責務 | 主な成果物 |
+| --- | --- | --- |
+| Scaffold model | モジュール、MNM、変数、FB 引数、プロジェクト情報、受け入れ条件を記述します。 | `scaffold.model.json`, `TASK.md`, `VERSION.md` |
+| Renderer | 構造化モデルを KV STUDIO 用のインポートファイルへ変換します。 | `mnm/*.mnm`, `variables/<module>/*.tsv`, `scaffold.json` |
+| Static gates | KV STUDIO を開く前に、不完全または危険な入力を拒否します。 | checklist, variable validation, import plan, scaffold validation |
+| Guarded runner | プロジェクト作成またはオープン、MNM インポート、変数入力、FB 引数入力、コンパイル、結果取得を実行します。 | `mvp_result.json`, `repair_result.json`, `artifacts/` |
+| Route governance | キーボード、UIA、マウス、スクリプト戦略の無根拠な切り替えを防ぎます。 | `route-state.json` |
 
-## 主な機能
+## コアメカニズム
 
-| 機能 | 説明 |
+KeyenceAgent は強い実行契約を使います。
+
+| フェーズ | 所有者 | 契約 |
+| --- | --- | --- |
+| KV STUDIO を開く前 | エージェント | scaffold を編集し、検証ゲートを通してから runner を 1 回起動します。 |
+| KV STUDIO が開いている間 | スクリプト | 共有 UI guard でフォーカス、キー入力、マウス入力、貼り付け、モーダル検出、失敗境界を制御します。 |
+| runner 終了後 | エージェント | 同一実行の artifacts だけを読み、結果 JSON と KV STUDIO テキストから次の変更を判断します。 |
+
+この契約は、デスクトップ IDE 自動化の主要な失敗を制御します。つまり、エージェントがライブ UI を見ながら即興で操作し、古いエラーを新しい操作へ誤って帰因する状態を避けます。
+
+## 現在の機能
+
+| 機能 | 状態 |
 | --- | --- |
-| 構造化 scaffold | `scaffold.model.json` を MNM とモジュール別変数 TSV に変換します。 |
-| 複数 MNM インポート | 複数のスキャン実行型モジュールを扱い、ローカル変数表を分離します。 |
-| 変数入力ガード | フォーカス確認、貼り付けエラー検出、明確なエラーコードで保護します。 |
-| コンパイル証拠取得 | KV STUDIO の実際の変換結果テキストをコピーします。 |
-| 既存プロジェクト修復 | 対象モジュールを削除/再インポートし、変数を再適用してコンパイルします。 |
-| ルート管理 | UIA、キーボード、マウス、スクリプト間の根拠なし切替を防ぎます。 |
+| 新規プロジェクト作成 | repeat runner で検証済み。 |
+| 複数 MNM インポート | 複数モジュールとモジュール別変数ファイルに対応。 |
+| グローバル変数とローカル変数の再構築 | 貼り付け前に検証し、runner 証拠で確認。 |
+| 既存プロジェクト更新 | `.kpr` を変更する前に snapshot gate と import-plan gate を使用。 |
+| コンパイル結果取得 | 結果ツリーのテキストを `compile_result_copied.txt` に保存し、クリップボードは補助証拠として扱います。 |
+| ファンクションブロック作成 | `MODULE_TYPE:2` の MNM をユーザー FB としてインポート。 |
+| FB 引数テーブル | 必須列の入力を guarded runner で検証済み。 |
+| FB インスタンスと呼び出し | コンパイル可能な平滑フィルタ FB プロジェクトで検証済み。 |
+| 再現性ゲート | 連続成功を要求し、最新 FB MVP は 3 回連続で成功。 |
 
-## 決定的な修復ループ
+## Runner フロー
 
 <p align="center">
-  <img src="docs/images/kv-repair-loop.png" alt="決定的な KV STUDIO 修復ループ">
+  <img src="docs/images/kv-repair-loop.png" alt="決定的な KV STUDIO runner ループ">
 </p>
 
-1. 意図的にバグを含む scaffold を作成します。
-2. 新規プロジェクト実行スクリプトを実行します。
-3. KV STUDIO の実際の `转换结果 NG` テキストを取得します。
-4. 診断内容に基づいて scaffold model、MNM、変数一覧を修正します。
-5. 修正済み scaffold で既存プロジェクト修復スクリプトを実行します。
-6. `repair_result.json.ok=true` かつコピーした変換結果に `转换结果 OK` が含まれる場合だけ成功とします。
+1. scaffold model を作成または更新します。
+2. MNM と変数アダプターファイルを生成します。
+3. KV STUDIO を開く前に静的ゲートを実行します。
+4. 新規プロジェクトは `run_kv_mvp_scaffold.ps1`、既存プロジェクトは `run_kv_mvp_repair_existing_project.ps1` を使います。
+5. 最初の子ステップ失敗で停止し、同一実行の artifact ディレクトリを確認します。
+6. 成功判定は結果 JSON と変換結果テキストで行います。
+7. `run_kv_mvp_repeat.ps1` で安定性を証明します。
 
 ## リポジトリ構成
 
 ```text
 .
-├─ README.md
-├─ README.zh-CN.md
-├─ README.ja.md
-├─ docs/
-│  └─ images/
-├─ kv-studio-operator/
-│  ├─ SKILL.md
-│  ├─ references/
-│  └─ scripts/
-└─ route-governance/
+|-- README.md
+|-- README.zh-CN.md
+|-- README.ja.md
+|-- docs/
+|   `-- images/
+|-- kv-studio-operator/
+|   |-- SKILL.md
+|   |-- references/
+|   `-- scripts/
+|       |-- run_kv_mvp_scaffold.ps1
+|       |-- run_kv_mvp_repair_existing_project.ps1
+|       |-- run_kv_mvp_repeat.ps1
+|       `-- mvp/
+|-- keyence-plc-programmer/
+`-- route-governance/
 ```
 
 ## 主要スクリプト
 
 | スクリプト | 用途 |
 | --- | --- |
-| `kv-studio-operator/scripts/render_kv_mvp_scaffold_model.ps1` | 構造化モデルを KV STUDIO 用ファイルに変換します。 |
-| `kv-studio-operator/scripts/validate_kv_mvp_scaffold.ps1` | KV STUDIO を開く前に checklist、schema、MNM 種別、危険な変数名を検証します。 |
-| `kv-studio-operator/scripts/run_kv_mvp_scaffold.ps1` | 新規プロジェクト作成、MNM インポート、変数入力、コンパイル、結果コピーを実行します。 |
-| `kv-studio-operator/scripts/run_kv_mvp_repair_existing_project.ps1` | 修正済み scaffold で既存のエラー `.kpr` を修復します。 |
+| `kv-studio-operator/scripts/render_kv_mvp_scaffold_model.ps1` | 構造化プロジェクトモデルを MNM と変数ファイルへ変換します。 |
+| `kv-studio-operator/scripts/validate_kv_mvp_scaffold.ps1` | checklist、schema、module type、変数、FB 宣言、scaffold 整合性を検証します。 |
+| `kv-studio-operator/scripts/assert_kv_mnm_import_plan.ps1` | 同名 MNM をインポートする前に、明示的な事前削除計画を要求します。 |
+| `kv-studio-operator/scripts/run_kv_mvp_scaffold.ps1` | 新規 KV STUDIO プロジェクトを作成し、MVP 全体を実行します。 |
+| `kv-studio-operator/scripts/run_kv_mvp_repair_existing_project.ps1` | snapshot gate を通したうえで scaffold 更新を既存プロジェクトへ適用します。 |
 | `kv-studio-operator/scripts/run_kv_mvp_repeat.ps1` | 連続成功ゲートを実行します。 |
+| `kv-studio-operator/scripts/mvp/kv_ui_guard.ps1` | すべての KV UI 子スクリプトが共有するフォーカス、モーダル、キーボード、マウス、クリップボード保護ライブラリです。 |
 
-## Scaffold が唯一のソース
+## 検証証拠
 
-構造化プロジェクトは `scaffold.model.json` から始めます。生成された MNM と TSV は KV STUDIO 用のアダプタ成果物です。
-
-```text
-scaffold.model.json
-CHECKLIST.md
-TASK.md
-VERSION.md
-mnm/<module>.mnm
-variables/<module>/global_variables.tsv
-variables/<module>/local_variables.tsv
-scaffold.json
-```
-
-レンダリング:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\kv-studio-operator\scripts\render_kv_mvp_scaffold_model.ps1 `
-  -ModelPath C:\KV_MVP\scaffolds\<task>\scaffold.model.json
-```
-
-検証:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\kv-studio-operator\scripts\validate_kv_mvp_scaffold.ps1 `
-  -ScaffoldRoot C:\KV_MVP\scaffolds\<task> `
-  -OutDir C:\KV_MVP\scaffolds\<task>\_validation
-```
-
-## 新規プロジェクト実行
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\kv-studio-operator\scripts\run_kv_mvp_scaffold.ps1 `
-  -ScaffoldRoot C:\KV_MVP\scaffolds\<task> `
-  -OutRoot C:\KV_MVP\mvp_runs `
-  -TimeoutSeconds 600
-```
-
-主な結果:
+最新の FB MVP は次の経路を完了しました。
 
 ```text
-C:\KV_MVP\mvp_runs\<ProjectName>\mvp_result.json
+FB MNM import
+-> scan module MNM import
+-> FB argument table paste
+-> global/local variable paste
+-> compile
+-> result-tree text capture
+-> baseline snapshot write
 ```
 
-## 既存エラープロジェクト修復
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\kv-studio-operator\scripts\run_kv_mvp_repair_existing_project.ps1 `
-  -ProjectPath C:\KV_MVP\mvp_runs\<ProjectName>\Projects\<ProjectName>\<ProjectName>.kpr `
-  -ScaffoldRoot C:\KV_MVP\scaffolds\<fixed-task> `
-  -OutRoot C:\KV_MVP\repair_runs `
-  -DeleteExistingModulesBeforeImport `
-  -TimeoutSeconds 600
-```
-
-主な結果:
+最新 repeat gate:
 
 ```text
-C:\KV_MVP\repair_runs\<ProjectName>\repair_result.json
+required_consecutive_passes: 3
+attempts_completed: 3
+consecutive_passes: 3
+status: pass
 ```
 
-## 変数名の制約
-
-KV STUDIO では `X0`、`Y0`、`R100`、`DM10` のような名前がソフトデバイス名として扱われる可能性があります。変数名には使いません。
-
-業務名を使います:
+コンパイル oracle は同一実行の KV STUDIO 結果テキストです。
 
 ```text
-Pt0X
-Pt0Y
-Pt1X
-Pt1Y
-Pt2X
-Pt2Y
-CenterX
-CenterY
-FitValid
+Conversion result OK
+error count: 0
+warning count: 0
 ```
 
-## 検証済みケース
+## 設計原則
 
-意図的な ST バグ:
-
-```text
-CenterX := (0.0 - Bcoff) / (2.0 * Acoef);
-```
-
-KV STUDIO の同一 run 診断:
-
-```text
-转换结果 NG (错误数量:1  警告数量:0)
-QuadFitMain(行:00002)(列: 01)(ST行: 0016)[错误 1232]:"Bcoff": 发现非法的字符串。
-```
-
-修復では `Bcoff` を定義済みローカル変数 `Bcoef` に変更しました。既存エラープロジェクト修復と新規エラープロジェクト修復の両方で成功しています。
-
-```text
-转换结果 OK (错误数量:0  警告数量:0)
-```
-
-## エンジニアリングルール
-
-| ルール | 理由 |
+| 原則 | 意味 |
 | --- | --- |
-| KV STUDIO 操作前に checklist が必要 | 制御されていない UI スクリプト実行を防ぎます。 |
-| KV 操作フェーズはスクリプト専有 | エージェントのリアルタイム操作によるフォーカスずれを排除します。 |
-| 同一実行の成果物のみ採用 | 古いスクリーンショットやログによる誤判定を防ぎます。 |
-| 最初のフィードバックを保存 | 貼り付けエラーとコンパイル診断を実行可能なエラーコードにします。 |
-| ルート変更には証拠が必要 | UIA、キーボード、マウス、スクリプト間の無根拠な切替を防ぎます。 |
+| Harness first | 手作業で成功したルートは、skill の約束になる前にスクリプト所有ハーネスになります。 |
+| Checklist before UI | checklist がない場合、KV STUDIO スクリプトは即座に失敗します。 |
+| Same-run evidence | 古いスクリーンショット、ログ、プロジェクト状態は成功証明になりません。 |
+| Shared UI guard | フォーカスとモーダル処理は各スクリプトの局所修正ではなく共有ライブラリに置きます。 |
+| Fileized oracles | コンパイル結果と貼り付け結果は、エージェントが判断する前に artifact として保存されます。 |
+| Route governance | ルート変更には失敗メカニズムと新しい制御手段の証拠が必要です。 |
+
+## ロードマップ
+
+| 領域 | 計画 |
+| --- | --- |
+| Function blocks | フォーマット probe で安定性を確認した後、FB 引数コメントと任意列へ対応します。 |
+| Existing projects | harness で作成されていないプロジェクト向けに、より強い export/import snapshot ループを完成させます。 |
+| Module categories | standby module と interrupt program の検証済み対応を追加します。 |
+| FB composition | ネストした FB インスタンス、複数呼び出し点、インスタンススコープ監査を扱います。 |
+| Speed | bounded failure の性質を維持しながら不要な待機を削減します。 |
+| Sub-agent validation | 独立したサブエージェントが skill だけで同じ MVP を連続成功させる検証を追加します。 |
+| Documentation | アーキテクチャ図、失敗分類、runner contract の例を追加します。 |
+

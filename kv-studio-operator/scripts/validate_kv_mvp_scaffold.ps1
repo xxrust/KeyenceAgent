@@ -85,10 +85,31 @@ function Get-MnmModuleTypeFromText([string]$Text) {
   return $null
 }
 
+function Get-MnmDeviceCodeFromText([string]$Text) {
+  foreach ($line in ($Text -split "(`r`n|`n|`r)")) {
+    $normalized = $line.TrimStart([char]0xFEFF)
+    if ($normalized -match '^DEVICE:(\d+)\s*$') { return [int]$matches[1] }
+  }
+  return $null
+}
+
 function Test-MnmReferencesName([string]$Text, [string]$Name) {
   if ([string]::IsNullOrWhiteSpace($Name)) { return $false }
   $pattern = '(?<![A-Za-z0-9_])' + [regex]::Escape($Name) + '(?![A-Za-z0-9_])'
   return [regex]::IsMatch($Text, $pattern)
+}
+
+function Assert-MnmImportableInstructionText([string]$Text, [string]$Path) {
+  $badBracketedInstructions = @()
+  foreach ($line in ($Text -split "(`r`n|`n|`r)")) {
+    $trimmed = ([string]$line).Trim()
+    if ($trimmed -match '^\[(FBEXEC|FBCALL|FUN)\]\b') {
+      $badBracketedInstructions += $trimmed
+    }
+  }
+  if ($badBracketedInstructions.Count -gt 0) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_BRACKETED_INSTRUCTION_INVALID' "MNM import text must use raw KEYENCE mnemonic instructions such as FBEXEC, FBCALL, or FUN without square brackets. Invalid line(s): $($badBracketedInstructions -join ' | ')" @($Path)
+  }
 }
 
 function Test-SoftDeviceLikeVariableName([string]$Name) {
@@ -103,16 +124,45 @@ function Assert-NoSoftDeviceLikeVariableRows([object[]]$Rows, [string]$Scope, [s
   }
 }
 
-function Assert-KvVariableDefinitions([object[]]$Rows, [string]$Scope, [string]$Path, [string]$ExpectedOwnerProgram = '') {
-  $errors = @(Get-KvVariableDefinitionErrors -Rows $Rows -Scope $Scope -SourcePath $Path -ExpectedOwnerProgram $ExpectedOwnerProgram)
+function Assert-KvVariableDefinitions([object[]]$Rows, [string]$Scope, [string]$Path, [string]$ExpectedOwnerProgram = '', [string[]]$AllowedCustomDataTypes = @()) {
+  $errors = @(Get-KvVariableDefinitionErrors -Rows $Rows -Scope $Scope -SourcePath $Path -ExpectedOwnerProgram $ExpectedOwnerProgram -AllowedCustomDataTypes $AllowedCustomDataTypes)
   if ($errors.Count -gt 0) {
     $evidencePath = Join-Path $OutDir ("variable_definition_errors_{0}_{1}.json" -f $Scope, ([IO.Path]::GetFileNameWithoutExtension($Path)))
     [pscustomobject]@{
       ok = $false
       source = $Path
       scope = $Scope
-      supported_type_pattern = Get-KvVariableSupportedTypePatternText
+      supported_type_pattern = Get-KvVariableSupportedTypePatternText -AllowedCustomDataTypes $AllowedCustomDataTypes
+      allowed_custom_data_types = @($AllowedCustomDataTypes)
       errors = $errors
+    } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $evidencePath -Encoding UTF8
+    $first = $errors[0]
+    Stop-ScaffoldValidation ([string]$first.code) ([string]$first.message) @($Path, $evidencePath)
+  }
+}
+
+function Assert-FbArgumentDefinitions([object[]]$Rows, [string]$OwnerProgram, [string]$Path) {
+  $allowedKinds = @('IN','OUT','IN-OUT')
+  $errors = [System.Collections.Generic.List[object]]::new()
+  foreach ($row in @($Rows | Where-Object { $_.status -ne 'display_name' -and $_.argument_name })) {
+    if ([string]$row.owner_program -ne $OwnerProgram) {
+      $errors.Add([pscustomobject]@{ code='KV_FB_ARGUMENT_OWNER_MISMATCH'; argument_name=[string]$row.argument_name; message="FB argument owner_program must be $OwnerProgram." })
+    }
+    if ($allowedKinds -notcontains ([string]$row.argument_kind)) {
+      $errors.Add([pscustomobject]@{ code='KV_FB_ARGUMENT_KIND_INVALID'; argument_name=[string]$row.argument_name; argument_kind=[string]$row.argument_kind; message='FB argument_kind must be IN, OUT, or IN-OUT.' })
+    }
+    if (-not (Test-KvVariableDataType ([string]$row.data_type))) {
+      $errors.Add([pscustomobject]@{ code='KV_FB_ARGUMENT_DATA_TYPE_UNSUPPORTED'; argument_name=[string]$row.argument_name; data_type=[string]$row.data_type; message='FB argument data_type is outside the supported KEYENCE type grammar.' })
+    }
+  }
+  if ($errors.Count -gt 0) {
+    $evidencePath = Join-Path $OutDir ("fb_argument_definition_errors_{0}.json" -f ([IO.Path]::GetFileNameWithoutExtension($Path)))
+    [pscustomobject]@{
+      ok = $false
+      source = $Path
+      owner_program = $OwnerProgram
+      supported_type_pattern = Get-KvVariableSupportedTypePatternText
+      errors = @($errors)
     } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $evidencePath -Encoding UTF8
     $first = $errors[0]
     Stop-ScaffoldValidation ([string]$first.code) ([string]$first.message) @($Path, $evidencePath)
@@ -168,6 +218,32 @@ if ($mnmEntries.Count -eq 0) {
   Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_LIST_EMPTY' 'scaffold.json must contain at least one mnm_files entry.' @($manifestPath)
 }
 
+$incomingModuleNameKeys = @(
+  $mnmEntries | ForEach-Object {
+    $declared = [string]$_.module_name
+    if (-not $declared) { $declared = [IO.Path]::GetFileNameWithoutExtension([string]$_.path) }
+    $declared.Trim().ToUpperInvariant()
+  }
+)
+$duplicateIncomingModuleNames = @($incomingModuleNameKeys | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
+if ($duplicateIncomingModuleNames.Count -gt 0) {
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_DUPLICATE_MNM_MODULE_NAME' "scaffold.json contains duplicate MNM/module names. Direct multi-MNM import cannot be stable with duplicates: $($duplicateIncomingModuleNames -join ', ')" @($manifestPath)
+}
+
+$allowedCategories = @('scan','function_block','standby','interrupt')
+$fbTypeNames = @(
+  $mnmEntries |
+    Where-Object {
+      $moduleTypeForCustom = if ($null -ne $_.module_type -and [string]$_.module_type -ne '') { [int]$_.module_type } else { 0 }
+      $moduleTypeForCustom -eq 2
+    } |
+    ForEach-Object {
+      if ($_.module_name) { [string]$_.module_name } else { [IO.Path]::GetFileNameWithoutExtension([string]$_.path) }
+    } |
+    Where-Object { $_ } |
+    Select-Object -Unique
+)
+
 $checklistGuard = Join-Path (Split-Path -Parent $PSCommandPath) 'assert_kv_operation_checklist.ps1'
 if (-not (Test-Path -LiteralPath $checklistGuard)) {
   Stop-ScaffoldValidation 'KV_SCAFFOLD_VALIDATOR_INTERNAL_ERROR' "Checklist guard script not found: $checklistGuard"
@@ -196,8 +272,8 @@ foreach ($entry in $mnmEntries) {
   $localRows = Read-TsvRows $entryLocalTsv $requiredTsvColumns "local variable TSV for $moduleName"
   $definedGlobalRows = @(Get-ExecutableRows $globalRows 'global')
   $definedLocalRows = @(Get-ExecutableRows $localRows 'local')
-  Assert-KvVariableDefinitions $definedGlobalRows 'global' $entryGlobalTsv
-  Assert-KvVariableDefinitions $definedLocalRows 'local' $entryLocalTsv $moduleName
+  Assert-KvVariableDefinitions $definedGlobalRows 'global' $entryGlobalTsv '' $fbTypeNames
+  Assert-KvVariableDefinitions $definedLocalRows 'local' $entryLocalTsv $moduleName $fbTypeNames
   if ($definedLocalRows.Count -eq 0) {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_LOCAL_VARIABLES_EMPTY' "local variable TSV must contain executable local rows for module/program $moduleName." @($entryLocalTsv)
   }
@@ -219,6 +295,11 @@ foreach ($entry in $mnmEntries) {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_ENCODING_INVALID' "MNM file must be UTF-16LE with BOM: $mnmPath" @($mnmPath)
   }
   $text = [Text.Encoding]::Unicode.GetString($bytes)
+  Assert-MnmImportableInstructionText $text $mnmPath
+  $actualDeviceCode = Get-MnmDeviceCodeFromText $text
+  if ($null -eq $actualDeviceCode) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_DEVICE_MISSING' "MNM file missing DEVICE:<n>: $mnmPath" @($mnmPath)
+  }
   $actualModuleType = Get-MnmModuleTypeFromText $text
   if ($null -eq $actualModuleType) {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_MODULE_TYPE_MISSING' "MNM file missing ;MODULE_TYPE:<n>: $mnmPath" @($mnmPath)
@@ -230,8 +311,44 @@ foreach ($entry in $mnmEntries) {
   if ($actualModuleType -ne 0 -and $actualModuleType -ne 2) {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_MODULE_TYPE_UNSUPPORTED' "Unsupported MODULE_TYPE=$actualModuleType in $mnmPath. Use 0 for scan-executed modules or 2 for function blocks." @($mnmPath)
   }
+  $expectedDeviceCode = if ($null -ne $entry.device -and [string]$entry.device -ne '') { [int]$entry.device } elseif ($actualModuleType -eq 2) { 59 } else { 63 }
+  if ($actualDeviceCode -ne $expectedDeviceCode) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_DEVICE_MISMATCH' "MNM DEVICE does not match module kind. module=$moduleName module_type=$actualModuleType expected_device=$expectedDeviceCode actual_device=$actualDeviceCode" @($manifestPath, $mnmPath)
+  }
+  if ($actualModuleType -eq 2 -and $actualDeviceCode -ne 59) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_FUNCTION_BLOCK_DEVICE_INVALID' "Function-block MNM must use DEVICE:59 based on KV STUDIO export evidence. module=$moduleName actual_device=$actualDeviceCode" @($mnmPath)
+  }
+  $category = if ($entry.category) { [string]$entry.category } elseif ($actualModuleType -eq 2) { 'function_block' } else { 'scan' }
+  if ($allowedCategories -notcontains $category) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MODULE_CATEGORY_UNSUPPORTED' "Unsupported module category '$category' in scaffold.json for $moduleName. Supported categories: $($allowedCategories -join ', ')." @($manifestPath)
+  }
+  if ($actualModuleType -eq 2 -and $category -ne 'function_block') {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MODULE_CATEGORY_MISMATCH' "MODULE_TYPE=2 must use category=function_block. module=$moduleName category=$category" @($manifestPath, $mnmPath)
+  }
+  $argumentCount = 0
   if ($actualModuleType -eq 2) {
-    Stop-ScaffoldValidation 'KV_SCAFFOLD_FB_SUPPORT_INCOMPLETE' "Function-block import is not accepted by the current MVP runner. MODULE_TYPE:2 requires a separate FB contract covering FB definition, FB instance variables, call sites, instance scope, import order, and compile-error classification before KV STUDIO operation is allowed. File=$mnmPath" @($mnmPath, $manifestPath)
+    if (-not $entry.arguments -or -not $entry.arguments.tsv) {
+      Stop-ScaffoldValidation 'KV_SCAFFOLD_FB_ARGUMENTS_MISSING' "Function-block module must define arguments.tsv for self-variable table paste. module=$moduleName" @($manifestPath)
+    }
+    $argumentsTsv = Resolve-ScaffoldPath ([string]$entry.arguments.tsv)
+    $argumentRows = Read-TsvRows $argumentsTsv @('owner_program','argument_name','argument_kind','constant','data_type','default_value','retain','hidden','comment1','comment2','comment3','comment4','comment5','comment6','comment7','comment8','evidence','status') "FB argument TSV for $moduleName"
+    $definedArgumentRows = @($argumentRows | Where-Object { $_.status -ne 'display_name' -and $_.argument_name })
+    if ($definedArgumentRows.Count -eq 0) {
+      Stop-ScaffoldValidation 'KV_SCAFFOLD_FB_ARGUMENTS_EMPTY' "Function-block arguments.tsv must contain executable argument rows. module=$moduleName" @($argumentsTsv)
+    }
+    Assert-FbArgumentDefinitions $definedArgumentRows $moduleName $argumentsTsv
+    $argumentCount = $definedArgumentRows.Count
+    $argumentNames = @($definedArgumentRows | ForEach-Object { [string]$_.argument_name } | Where-Object { $_ } | Select-Object -Unique)
+    $unreferencedArguments = @($argumentNames | Where-Object { -not (Test-MnmReferencesName $text $_) })
+    if ($unreferencedArguments.Count -gt 0) {
+      Stop-ScaffoldValidation 'KV_SCAFFOLD_FB_ARGUMENT_NOT_REFERENCED_BY_MNM' "FB argument rows must be referenced by the FB MNM/ST body. Missing MNM references: $($unreferencedArguments -join ', ')" @($mnmPath, $argumentsTsv)
+    }
+  }
+  if ($actualModuleType -eq 0 -and $category -eq 'function_block') {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MODULE_CATEGORY_MISMATCH' "category=function_block must use MODULE_TYPE=2. module=$moduleName" @($manifestPath, $mnmPath)
+  }
+  if ($category -eq 'standby' -or $category -eq 'interrupt') {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MODULE_CATEGORY_SUPPORT_INCOMPLETE' "Module category '$category' is not accepted until a same-run KV STUDIO probe proves its MNM import mapping and placement. module=$moduleName" @($manifestPath, $mnmPath)
   }
   if ($actualModuleType -eq 0 -and $text -notmatch '(?m)^ENDH\s*$') {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_ENDH_MISSING' "Scan-executed MNM must contain ENDH so KV STUDIO conversion can complete: $mnmPath" @($mnmPath)
@@ -244,8 +361,11 @@ foreach ($entry in $mnmEntries) {
   $mnmChecks += [pscustomobject]@{
     path = $mnmPath
     module_name = $moduleName
+    device = $actualDeviceCode
     module_type = $actualModuleType
+    category = $category
     utf16le_bom = $hasBom
+    fb_argument_count = $argumentCount
     referenced_executable_global_variable_count = $referencedNames.Count
   }
   $variableSetChecks += [pscustomobject]@{

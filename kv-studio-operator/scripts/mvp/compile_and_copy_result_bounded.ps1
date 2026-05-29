@@ -45,7 +45,8 @@ public class KvCompileBoundedWin32 {
 
 function Log {
   param([string]$Message)
-  Add-Content -LiteralPath (Join-Path $OutDir 'run.log') -Value ((Get-Date -Format s) + ' ' + $Message) -Encoding UTF8
+  $line = (Get-Date -Format s) + ' ' + $Message + [Environment]::NewLine
+  [IO.File]::AppendAllText((Join-Path $OutDir 'run.log'), $line, [Text.Encoding]::UTF8)
 }
 
 function Get-ForegroundTitle {
@@ -188,7 +189,9 @@ try {
   $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
 
   Assert-NoBlockingPopup $process.Id
-  [KvCompileBoundedWin32]::ShowWindow($process.MainWindowHandle, 3) | Out-Null
+  if ([KvCompileBoundedWin32]::IsIconic($process.MainWindowHandle)) {
+    [KvCompileBoundedWin32]::ShowWindow($process.MainWindowHandle, 9) | Out-Null
+  }
   for ($i = 1; $i -le 10; $i++) {
     [KvCompileBoundedWin32]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
     Start-Sleep -Milliseconds 150
