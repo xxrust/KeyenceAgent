@@ -83,11 +83,11 @@ if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
 }
 
 Write-Host 'KeyenceAgent local setup'
-Write-Host 'This script installs local Codex skills, writes VM path config, and optionally stores the KV STUDIO administrator credential with Windows DPAPI.'
+Write-Host 'This script installs local Codex skills, writes local machine config, and optionally stores the KV STUDIO administrator credential with Windows DPAPI.'
 Write-Host ''
 
 $CodexSkillsRoot = Read-TextDefault 'Codex skills directory' $CodexSkillsRoot
-$ConfigPath = Read-TextDefault 'VM config path' $ConfigPath
+$ConfigPath = Read-TextDefault 'Local config path' $ConfigPath
 
 $kvsExeDefault = First-ExistingPath @(
   'D:\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe',
@@ -115,15 +115,17 @@ $credentialPathDefault = Get-DefaultCredentialPath
 
 $kvsExe = Read-TextDefault 'KV STUDIO Kvs.exe path' $kvsExeDefault
 $workRoot = Read-TextDefault 'Disposable work root' $workRootDefault
-$htmlhelpRoot = Read-TextDefault 'KEYENCE htmlhelp root' $htmlhelpDefault
 $wikiRoot = Read-TextDefault 'KEYENCE Wiki V2 root' $wikiRootDefault
-$wikiCleanedDb = Read-TextDefault 'Wiki cleaned DB path' (Join-Path $wikiRoot 'wiki.v2.cleaned.db')
-$wikiFixedDb = Read-TextDefault 'Wiki fixed DB path' (Join-Path $wikiRoot 'wiki.v2.fixed.db')
-$wikiQueryScript = Read-TextDefault 'Wiki query script path' (Join-Path $wikiRoot 'scripts\wiki_query.py')
 $credentialPath = Read-TextDefault 'KV STUDIO administrator credential path' $credentialPathDefault
 $adminUserDefault = Read-TextDefault 'Default KV STUDIO administrator user name' 'Administrator'
-$timeoutSecondsText = Read-TextDefault 'Runner timeout seconds' '600'
-$localPasteFormat = Read-TextDefault 'Local variable paste format' 'NameType'
+$advancedConfig = Read-YesNoDefault 'Configure advanced runner defaults' $false
+if ($advancedConfig) {
+  $timeoutSecondsText = Read-TextDefault 'Runner timeout seconds' '600'
+  $localPasteFormat = Read-TextDefault 'Local variable paste format' 'NameType'
+} else {
+  $timeoutSecondsText = '600'
+  $localPasteFormat = 'NameType'
+}
 
 $installedSkills = @()
 if (-not $SkipSkillInstall) {
@@ -139,18 +141,13 @@ if (-not $SkipSkillInstall) {
 $configObject = [ordered]@{
   kvs_exe = $kvsExe
   work_root = $workRoot
-  mvp_out_root = (Join-Path $workRoot 'mvp_runs')
-  repair_out_root = (Join-Path $workRoot 'mvp_repair_runs')
-  repeat_out_root = (Join-Path $workRoot 'mvp_repeat_runs')
   admin_credential_path = $credentialPath
   admin_user_default = $adminUserDefault
-  htmlhelp_root = $htmlhelpRoot
   wiki_root = $wikiRoot
-  wiki_cleaned_db = $wikiCleanedDb
-  wiki_fixed_db = $wikiFixedDb
-  wiki_query_script = $wikiQueryScript
-  timeout_seconds = [int]$timeoutSecondsText
-  local_paste_format = $localPasteFormat
+}
+if ($advancedConfig) {
+  $configObject['timeout_seconds'] = [int]$timeoutSecondsText
+  $configObject['local_paste_format'] = $localPasteFormat
 }
 
 $configParent = Split-Path -Parent $ConfigPath
@@ -173,7 +170,9 @@ if (-not $SkipCredential) {
 }
 
 $warnings = @()
-foreach ($path in @($kvsExe, $htmlhelpRoot, $wikiRoot, $wikiCleanedDb, $wikiQueryScript)) {
+$wikiCleanedDb = Join-Path $wikiRoot 'wiki.v2.cleaned.db'
+$wikiQueryScript = Join-Path $wikiRoot 'scripts\wiki_query.py'
+foreach ($path in @($kvsExe, $wikiRoot, $wikiCleanedDb, $wikiQueryScript)) {
   if (-not (Test-Path -LiteralPath $path)) { $warnings += "Missing path: $path" }
 }
 if (-not $credentialWritten -and -not (Test-Path -LiteralPath $credentialPath -PathType Leaf)) {

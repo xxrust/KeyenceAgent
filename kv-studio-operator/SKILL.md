@@ -1,6 +1,6 @@
 ---
 name: kv-studio-operator
-description: Operate KEYENCE KV STUDIO from Codex or a Windows editor VM. Use when the task requires creating KV STUDIO projects, importing/exporting MNM mnemonic lists, editing global/local variables, compiling/converting, copying KV STUDIO result text, or running the scaffold runner workflow for a disposable PLC project.
+description: Operate KEYENCE KV STUDIO through script-owned Windows desktop automation. Use when the task requires creating KV STUDIO projects, importing/exporting MNM mnemonic lists, editing global/local variables, compiling/converting, copying KV STUDIO result text, or running the scaffold runner workflow for a disposable PLC project.
 ---
 
 # KV STUDIO Operator

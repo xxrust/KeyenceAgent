@@ -110,9 +110,9 @@ KeyenceAgent 使用硬执行协议。
 `-- route-governance/
 ```
 
-## 虚拟机部署
+## Windows 本机部署
 
-KeyenceAgent 在运行 KV STUDIO 的 Windows 虚拟机上作为文本化 harness 部署。
+KeyenceAgent 在运行 KV STUDIO 的 Windows 机器上作为文本化 harness 部署；这台机器可以是物理 Windows 电脑，也可以是 Windows 虚拟机。
 
 需要拷贝或克隆这些运行目录：
 
@@ -138,9 +138,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1
 
 runner 默认把一次性项目和证据写到 `C:\Users\Public\KVSkillPractice`。这个目录应放在仓库外，避免把 `.kpr`、截图、日志和编译 artifacts 提交进 git。
 
-## 虚拟机配置
+## 本机配置
 
-每台虚拟机需要一个本机配置文件。模板在：
+每个 Windows 用户需要一个本机配置文件。模板在：
 
 ```text
 kv-studio-operator\config\kv-studio-operator.example.json
@@ -153,26 +153,19 @@ kv-studio-operator\config\kv-studio-operator.example.json
 kv-studio-operator\config\kv-studio-operator.local.json
 ```
 
-配置文件保存 KV STUDIO 操作和 KEYENCE Wiki V2 检索所需的机器相关路径：
+普通配置只保存机器相关根路径。派生路径由脚本解析：
 
 ```json
 {
   "kvs_exe": "D:\\KEYENCE\\KVS12G\\KVS12\\KVS\\Kvs.exe",
   "work_root": "C:\\Users\\Public\\KVSkillPractice",
-  "mvp_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_runs",
-  "repair_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repair_runs",
-  "repeat_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repeat_runs",
   "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
   "admin_user_default": "Administrator",
-  "htmlhelp_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp",
-  "wiki_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence",
-  "wiki_cleaned_db": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\wiki.v2.cleaned.db",
-  "wiki_fixed_db": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\wiki.v2.fixed.db",
-  "wiki_query_script": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\scripts\\wiki_query.py",
-  "timeout_seconds": 600,
-  "local_paste_format": "NameType"
+  "wiki_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence"
 }
 ```
+
+`work_root` 会派生 `mvp_runs`、`mvp_repair_runs` 和 `mvp_repeat_runs`。`wiki_root` 会派生 `wiki.v2.cleaned.db`、可选的 `wiki.v2.fixed.db` 和 `scripts\wiki_query.py`。`timeout_seconds`、`local_paste_format`、`mvp_out_root`、`repair_out_root`、`repeat_out_root`、`wiki_cleaned_db`、`wiki_fixed_db`、`wiki_query_script` 等高级字段仍可作为显式覆盖，但安装流程默认不询问这些字段。
 
 不要把 KV STUDIO 管理员密码写入 JSON。`setup_keyence_agent.ps1` 会用 `Read-Host -AsSecureString` 获取密码，并用 Windows DPAPI 保存到 `admin_credential_path`。也可以单独运行：
 
@@ -200,8 +193,8 @@ Wiki 路径优先级是：命令行 `--db/--query-script`、`KEYENCE_WIKI_*` 环
 
 | 脚本 | 用途 |
 | --- | --- |
-| `setup_keyence_agent.ps1` | clone 后的一键本机配置入口：安装 skills、生成 VM config、保存 DPAPI 凭据、设置配置路径环境变量。 |
-| `kv-studio-operator/scripts/Import-KvStudioOperatorConfig.ps1` | 读取虚拟机本地的 KV STUDIO 路径、输出目录、超时和凭据文件路径。 |
+| `setup_keyence_agent.ps1` | clone 后的一键本机配置入口：安装 skills、生成本机 config、保存 DPAPI 凭据、设置配置路径环境变量。 |
+| `kv-studio-operator/scripts/Import-KvStudioOperatorConfig.ps1` | 读取本机 KV STUDIO 路径、输出目录、超时和凭据文件路径。 |
 | `kv-studio-operator/scripts/render_kv_mvp_scaffold_model.ps1` | 把结构化项目模型渲染为按模块分组的 MNM 与变量文件。 |
 | `kv-studio-operator/scripts/validate_kv_mvp_scaffold.ps1` | 验证 checklist、schema、模块类型、变量、功能块声明和脚手架一致性。 |
 | `kv-studio-operator/scripts/assert_kv_mnm_import_plan.ps1` | 同名 MNM 导入前要求明确预删除计划。 |

@@ -110,9 +110,9 @@ KeyenceAgent は強い実行契約を使います。
 `-- route-governance/
 ```
 
-## VM デプロイ
+## Windows ローカルデプロイ
 
-KeyenceAgent は、KV STUDIO を実行する Windows VM 上にテキスト主体の harness として配置します。
+KeyenceAgent は、KV STUDIO を実行する Windows machine 上にテキスト主体の harness として配置します。この machine は physical Windows PC でも Windows VM でも構いません。
 
 コピーまたは clone する実行時ディレクトリ:
 
@@ -126,7 +126,7 @@ KeyenceAgent は、KV STUDIO を実行する Windows VM 上にテキスト主体
 | `llm-wiki-v2-keyence/` | プログラミング根拠に必須 | ローカル Wiki V2 database と query script。KEYENCE `htmlhelp` 配下に置くか、harness の近くへコピーし、設定ファイルで実パスを指定します。 |
 | `docs/` と `README*.md` | 推奨 | 人向けのデプロイ説明とアーキテクチャ文書。 |
 
-安全な標準配置は、リポジトリ全体を VM に clone する方法です。
+安全な標準配置は、リポジトリ全体を target Windows machine に clone する方法です。
 
 ```powershell
 git clone https://github.com/xxrust/KeyenceAgent.git C:\Users\Public\KeyenceAgent
@@ -138,9 +138,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1
 
 runner は既定で一時プロジェクトと証拠を `C:\Users\Public\KVSkillPractice` に書き込みます。このディレクトリはリポジトリ外に置き、生成された `.kpr`、スクリーンショット、ログ、compile artifacts を git に入れません。
 
-## VM 設定
+## ローカル設定
 
-VM ごとに non-secret のローカル設定ファイルを 1 つ作成します。テンプレート:
+Windows user ごとに non-secret のローカル設定ファイルを 1 つ作成します。テンプレート:
 
 ```text
 kv-studio-operator\config\kv-studio-operator.example.json
@@ -153,26 +153,19 @@ kv-studio-operator\config\kv-studio-operator.example.json
 kv-studio-operator\config\kv-studio-operator.local.json
 ```
 
-設定ファイルは KV STUDIO 操作と KEYENCE Wiki V2 retrieval に必要な VM 固有パスを保持します。
+通常設定は machine-specific root path だけを保持します。派生 path は scripts が解決します。
 
 ```json
 {
   "kvs_exe": "D:\\KEYENCE\\KVS12G\\KVS12\\KVS\\Kvs.exe",
   "work_root": "C:\\Users\\Public\\KVSkillPractice",
-  "mvp_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_runs",
-  "repair_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repair_runs",
-  "repeat_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repeat_runs",
   "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
   "admin_user_default": "Administrator",
-  "htmlhelp_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp",
-  "wiki_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence",
-  "wiki_cleaned_db": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\wiki.v2.cleaned.db",
-  "wiki_fixed_db": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\wiki.v2.fixed.db",
-  "wiki_query_script": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\scripts\\wiki_query.py",
-  "timeout_seconds": 600,
-  "local_paste_format": "NameType"
+  "wiki_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence"
 }
 ```
+
+`work_root` derives `mvp_runs`, `mvp_repair_runs`, and `mvp_repeat_runs`. `wiki_root` derives `wiki.v2.cleaned.db`, optional `wiki.v2.fixed.db`, and `scripts\wiki_query.py`. Advanced fields such as `timeout_seconds`, `local_paste_format`, `mvp_out_root`, `repair_out_root`, `repeat_out_root`, `wiki_cleaned_db`, `wiki_fixed_db`, and `wiki_query_script` remain supported as explicit overrides, but setup does not ask for them by default.
 
 KV STUDIO 管理者パスワードは JSON に保存しません。`setup_keyence_agent.ps1` は `Read-Host -AsSecureString` で password を読み取り、Windows DPAPI で `admin_credential_path` に保存します。credential writer を単独で実行することもできます。
 
@@ -200,8 +193,8 @@ Wiki path の優先順位は、command-line `--db/--query-script`、`KEYENCE_WIK
 
 | スクリプト | 用途 |
 | --- | --- |
-| `setup_keyence_agent.ps1` | clone 後の local setup entrypoint。skills install、VM config 作成、DPAPI credential 保存、config-path environment variables 設定を行います。 |
-| `kv-studio-operator/scripts/Import-KvStudioOperatorConfig.ps1` | VM ローカルの KV STUDIO パス、出力ルート、timeout、credential file path を読み込みます。 |
+| `setup_keyence_agent.ps1` | clone 後の local setup entrypoint。skills install、local config 作成、DPAPI credential 保存、config-path environment variables 設定を行います。 |
+| `kv-studio-operator/scripts/Import-KvStudioOperatorConfig.ps1` | local KV STUDIO path、出力ルート、timeout、credential file path を読み込みます。 |
 | `kv-studio-operator/scripts/render_kv_mvp_scaffold_model.ps1` | 構造化プロジェクトモデルをモジュール別 MNM と変数ファイルへ変換します。 |
 | `kv-studio-operator/scripts/validate_kv_mvp_scaffold.ps1` | checklist、schema、module type、変数、FB 宣言、scaffold 整合性を検証します。 |
 | `kv-studio-operator/scripts/assert_kv_mnm_import_plan.ps1` | 同名 MNM をインポートする前に、明示的な事前削除計画を要求します。 |

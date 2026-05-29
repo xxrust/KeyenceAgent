@@ -45,15 +45,28 @@ if ([string]::IsNullOrWhiteSpace($resolvedPath)) {
 }
 
 $config = Get-Content -Raw -LiteralPath $resolvedPath -Encoding UTF8 | ConvertFrom-Json
+$workRoot = Expand-ConfigPathValue ([string]$config.work_root)
+$mvpOutRoot = Expand-ConfigPathValue ([string]$config.mvp_out_root)
+$repairOutRoot = Expand-ConfigPathValue ([string]$config.repair_out_root)
+$repeatOutRoot = Expand-ConfigPathValue ([string]$config.repeat_out_root)
+if ([string]::IsNullOrWhiteSpace($mvpOutRoot) -and -not [string]::IsNullOrWhiteSpace($workRoot)) {
+  $mvpOutRoot = Join-Path $workRoot 'mvp_runs'
+}
+if ([string]::IsNullOrWhiteSpace($repairOutRoot) -and -not [string]::IsNullOrWhiteSpace($workRoot)) {
+  $repairOutRoot = Join-Path $workRoot 'mvp_repair_runs'
+}
+if ([string]::IsNullOrWhiteSpace($repeatOutRoot) -and -not [string]::IsNullOrWhiteSpace($workRoot)) {
+  $repeatOutRoot = Join-Path $workRoot 'mvp_repeat_runs'
+}
 
 return [pscustomobject]@{
   found = $true
   path = $resolvedPath
   kvs_exe = Expand-ConfigPathValue ([string]$config.kvs_exe)
-  work_root = Expand-ConfigPathValue ([string]$config.work_root)
-  mvp_out_root = Expand-ConfigPathValue ([string]$config.mvp_out_root)
-  repair_out_root = Expand-ConfigPathValue ([string]$config.repair_out_root)
-  repeat_out_root = Expand-ConfigPathValue ([string]$config.repeat_out_root)
+  work_root = $workRoot
+  mvp_out_root = $mvpOutRoot
+  repair_out_root = $repairOutRoot
+  repeat_out_root = $repeatOutRoot
   admin_credential_path = Expand-ConfigPathValue ([string]$config.admin_credential_path)
   admin_user_default = if ($config.admin_user_default) { [string]$config.admin_user_default } else { '' }
   htmlhelp_root = Expand-ConfigPathValue ([string]$config.htmlhelp_root)
