@@ -93,6 +93,7 @@ KeyenceAgent 使用硬执行协议。
 |-- README.md
 |-- README.zh-CN.md
 |-- README.ja.md
+|-- setup_keyence_agent.ps1
 |-- docs/
 |   `-- images/
 |-- kv-studio-operator/
@@ -104,6 +105,7 @@ KeyenceAgent 使用硬执行协议。
 |       |-- run_kv_mvp_repair_existing_project.ps1
 |       |-- run_kv_mvp_repeat.ps1
 |       `-- mvp/
+|-- agent-harness-project-standard/
 |-- keyence-plc-programmer/
 `-- route-governance/
 ```
@@ -117,8 +119,10 @@ KeyenceAgent 在运行 KV STUDIO 的 Windows 虚拟机上作为文本化 harness
 | 目录 | 是否必须 | 作用 |
 | --- | --- | --- |
 | `kv-studio-operator/` | 必须 | runner、受保护 UI 操作、脚手架渲染器、验证器、配置模板。 |
+| `agent-harness-project-standard/` | 建议 | agent 准备、脚本执行、artifact 验收的 harness 标准。 |
 | `keyence-plc-programmer/` | 建议 | PLC 编程规则和 KEYENCE 项目工作流。 |
 | `kv-studio-kb-programming/` | 建议 | 本地 Wiki V2 查询封装与规则，用于确认 KEYENCE 语法和手册依据。 |
+| `route-governance/` | 建议 | 脆弱 UI 自动化和重复失败复盘中的路线变更约束。 |
 | `llm-wiki-v2-keyence/` | 编程依据必需 | 本地 Wiki V2 数据库和查询脚本。它可以保留在 KEYENCE `htmlhelp` 下，也可以拷贝到 harness 旁边，只要配置文件指向实际路径。 |
 | `docs/` 与 `README*.md` | 建议 | 人类部署说明和架构文档。 |
 
@@ -126,7 +130,11 @@ KeyenceAgent 在运行 KV STUDIO 的 Windows 虚拟机上作为文本化 harness
 
 ```powershell
 git clone https://github.com/xxrust/KeyenceAgent.git C:\Users\Public\KeyenceAgent
+cd C:\Users\Public\KeyenceAgent
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1
 ```
+
+`setup_keyence_agent.ps1` 是非 AI 交互式配置脚本。它会通过命令行问答完成 skill 安装、KV STUDIO 路径、工作目录、Wiki V2 知识库路径、默认管理员账号和 DPAPI 凭据写入。
 
 runner 默认把一次性项目和证据写到 `C:\Users\Public\KVSkillPractice`。这个目录应放在仓库外，避免把 `.kpr`、截图、日志和编译 artifacts 提交进 git。
 
@@ -155,6 +163,7 @@ kv-studio-operator\config\kv-studio-operator.local.json
   "repair_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repair_runs",
   "repeat_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repeat_runs",
   "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
+  "admin_user_default": "Administrator",
   "htmlhelp_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp",
   "wiki_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence",
   "wiki_cleaned_db": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\wiki.v2.cleaned.db",
@@ -165,7 +174,7 @@ kv-studio-operator\config\kv-studio-operator.local.json
 }
 ```
 
-不要把 KV STUDIO 管理员密码写入 JSON。每个 Windows 用户用 DPAPI 保存一次凭据：
+不要把 KV STUDIO 管理员密码写入 JSON。`setup_keyence_agent.ps1` 会用 `Read-Host -AsSecureString` 获取密码，并用 Windows DPAPI 保存到 `admin_credential_path`。也可以单独运行：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\Public\KeyenceAgent\kv-studio-operator\scripts\set_kv_admin_credential.ps1
@@ -191,6 +200,7 @@ Wiki 路径优先级是：命令行 `--db/--query-script`、`KEYENCE_WIKI_*` 环
 
 | 脚本 | 用途 |
 | --- | --- |
+| `setup_keyence_agent.ps1` | clone 后的一键本机配置入口：安装 skills、生成 VM config、保存 DPAPI 凭据、设置配置路径环境变量。 |
 | `kv-studio-operator/scripts/Import-KvStudioOperatorConfig.ps1` | 读取虚拟机本地的 KV STUDIO 路径、输出目录、超时和凭据文件路径。 |
 | `kv-studio-operator/scripts/render_kv_mvp_scaffold_model.ps1` | 把结构化项目模型渲染为按模块分组的 MNM 与变量文件。 |
 | `kv-studio-operator/scripts/validate_kv_mvp_scaffold.ps1` | 验证 checklist、schema、模块类型、变量、功能块声明和脚手架一致性。 |

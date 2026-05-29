@@ -93,6 +93,7 @@ KeyenceAgent は強い実行契約を使います。
 |-- README.md
 |-- README.zh-CN.md
 |-- README.ja.md
+|-- setup_keyence_agent.ps1
 |-- docs/
 |   `-- images/
 |-- kv-studio-operator/
@@ -104,6 +105,7 @@ KeyenceAgent は強い実行契約を使います。
 |       |-- run_kv_mvp_repair_existing_project.ps1
 |       |-- run_kv_mvp_repeat.ps1
 |       `-- mvp/
+|-- agent-harness-project-standard/
 |-- keyence-plc-programmer/
 `-- route-governance/
 ```
@@ -117,8 +119,10 @@ KeyenceAgent は、KV STUDIO を実行する Windows VM 上にテキスト主体
 | ディレクトリ | 必須 | 用途 |
 | --- | --- | --- |
 | `kv-studio-operator/` | 必須 | runner、guarded UI 操作、scaffold renderer、validator、設定テンプレート。 |
+| `agent-harness-project-standard/` | 推奨 | agent-owned preparation、script-owned execution、artifact-owned verification の harness rules。 |
 | `keyence-plc-programmer/` | 推奨 | PLC 作成ルールと KEYENCE プログラミング手順。 |
 | `kv-studio-kb-programming/` | 推奨 | KEYENCE 構文とマニュアル根拠を確認するローカル Wiki V2 query wrapper とワークフロー。 |
+| `route-governance/` | 推奨 | fragile UI automation と repeated-failure review の route-change discipline。 |
 | `llm-wiki-v2-keyence/` | プログラミング根拠に必須 | ローカル Wiki V2 database と query script。KEYENCE `htmlhelp` 配下に置くか、harness の近くへコピーし、設定ファイルで実パスを指定します。 |
 | `docs/` と `README*.md` | 推奨 | 人向けのデプロイ説明とアーキテクチャ文書。 |
 
@@ -126,7 +130,11 @@ KeyenceAgent は、KV STUDIO を実行する Windows VM 上にテキスト主体
 
 ```powershell
 git clone https://github.com/xxrust/KeyenceAgent.git C:\Users\Public\KeyenceAgent
+cd C:\Users\Public\KeyenceAgent
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1
 ```
+
+`setup_keyence_agent.ps1` は non-AI の対話式 setup script です。コマンドラインの質問で skill install、KV STUDIO path、work root、Wiki V2 knowledge-base path、default administrator user name、DPAPI credential storage を設定します。
 
 runner は既定で一時プロジェクトと証拠を `C:\Users\Public\KVSkillPractice` に書き込みます。このディレクトリはリポジトリ外に置き、生成された `.kpr`、スクリーンショット、ログ、compile artifacts を git に入れません。
 
@@ -155,6 +163,7 @@ kv-studio-operator\config\kv-studio-operator.local.json
   "repair_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repair_runs",
   "repeat_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repeat_runs",
   "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
+  "admin_user_default": "Administrator",
   "htmlhelp_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp",
   "wiki_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence",
   "wiki_cleaned_db": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\wiki.v2.cleaned.db",
@@ -165,7 +174,7 @@ kv-studio-operator\config\kv-studio-operator.local.json
 }
 ```
 
-KV STUDIO 管理者パスワードは JSON に保存しません。Windows ユーザーごとに DPAPI で 1 回保存します。
+KV STUDIO 管理者パスワードは JSON に保存しません。`setup_keyence_agent.ps1` は `Read-Host -AsSecureString` で password を読み取り、Windows DPAPI で `admin_credential_path` に保存します。credential writer を単独で実行することもできます。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\Public\KeyenceAgent\kv-studio-operator\scripts\set_kv_admin_credential.ps1
@@ -191,6 +200,7 @@ Wiki path の優先順位は、command-line `--db/--query-script`、`KEYENCE_WIK
 
 | スクリプト | 用途 |
 | --- | --- |
+| `setup_keyence_agent.ps1` | clone 後の local setup entrypoint。skills install、VM config 作成、DPAPI credential 保存、config-path environment variables 設定を行います。 |
 | `kv-studio-operator/scripts/Import-KvStudioOperatorConfig.ps1` | VM ローカルの KV STUDIO パス、出力ルート、timeout、credential file path を読み込みます。 |
 | `kv-studio-operator/scripts/render_kv_mvp_scaffold_model.ps1` | 構造化プロジェクトモデルをモジュール別 MNM と変数ファイルへ変換します。 |
 | `kv-studio-operator/scripts/validate_kv_mvp_scaffold.ps1` | checklist、schema、module type、変数、FB 宣言、scaffold 整合性を検証します。 |

@@ -55,6 +55,7 @@ return [pscustomobject]@{
   repair_out_root = Expand-ConfigPathValue ([string]$config.repair_out_root)
   repeat_out_root = Expand-ConfigPathValue ([string]$config.repeat_out_root)
   admin_credential_path = Expand-ConfigPathValue ([string]$config.admin_credential_path)
+  admin_user_default = if ($config.admin_user_default) { [string]$config.admin_user_default } else { '' }
   htmlhelp_root = Expand-ConfigPathValue ([string]$config.htmlhelp_root)
   wiki_root = Expand-ConfigPathValue ([string]$config.wiki_root)
   wiki_cleaned_db = Expand-ConfigPathValue ([string]$config.wiki_cleaned_db)

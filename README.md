@@ -93,6 +93,7 @@ This contract prevents the main failure mode of desktop IDE automation: an agent
 |-- README.md
 |-- README.zh-CN.md
 |-- README.ja.md
+|-- setup_keyence_agent.ps1
 |-- docs/
 |   `-- images/
 |-- kv-studio-operator/
@@ -104,6 +105,7 @@ This contract prevents the main failure mode of desktop IDE automation: an agent
 |       |-- run_kv_mvp_repair_existing_project.ps1
 |       |-- run_kv_mvp_repeat.ps1
 |       `-- mvp/
+|-- agent-harness-project-standard/
 |-- keyence-plc-programmer/
 `-- route-governance/
 ```
@@ -117,8 +119,10 @@ Copy or clone these runtime folders:
 | Folder | Required | Purpose |
 | --- | --- | --- |
 | `kv-studio-operator/` | Yes | Runner scripts, guarded UI actions, scaffold renderer, validator, config template. |
+| `agent-harness-project-standard/` | Recommended | Harness rules for agent-owned preparation, script-owned execution, and artifact-owned verification. |
 | `keyence-plc-programmer/` | Recommended | PLC authoring rules and KEYENCE programming workflow. |
 | `kv-studio-kb-programming/` | Recommended | Local Wiki V2 query wrapper and workflow for KEYENCE syntax and manuals. |
+| `route-governance/` | Recommended | Route-change discipline for fragile UI automation and repeated-failure review. |
 | `llm-wiki-v2-keyence/` | Required for programming evidence | Local Wiki V2 database and query script. It may stay under KEYENCE `htmlhelp` or be copied beside the harness if the config points to it. |
 | `docs/` and `README*.md` | Recommended | Human deployment and architecture documentation. |
 
@@ -126,7 +130,11 @@ The safe default is to copy the whole repository to the VM, for example:
 
 ```powershell
 git clone https://github.com/xxrust/KeyenceAgent.git C:\Users\Public\KeyenceAgent
+cd C:\Users\Public\KeyenceAgent
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1
 ```
+
+`setup_keyence_agent.ps1` is a non-AI interactive setup script. It asks command-line questions and installs the skills, writes KV STUDIO paths, writes the work root, writes Wiki V2 knowledge-base paths, records the default administrator user name, and stores the administrator credential with DPAPI.
 
 The runner writes disposable projects and evidence under `C:\Users\Public\KVSkillPractice` by default. Keep that directory outside the repository so generated `.kpr` projects, screenshots, logs, and compile artifacts are not committed.
 
@@ -155,6 +163,7 @@ The config stores machine-specific paths for both KV STUDIO operation and KEYENC
   "repair_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repair_runs",
   "repeat_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repeat_runs",
   "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
+  "admin_user_default": "Administrator",
   "htmlhelp_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp",
   "wiki_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence",
   "wiki_cleaned_db": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\wiki.v2.cleaned.db",
@@ -165,7 +174,7 @@ The config stores machine-specific paths for both KV STUDIO operation and KEYENC
 }
 ```
 
-Do not store KV STUDIO administrator passwords in JSON. Store the credential once per Windows user with DPAPI:
+Do not store KV STUDIO administrator passwords in JSON. `setup_keyence_agent.ps1` reads the password with `Read-Host -AsSecureString` and stores it at `admin_credential_path` with Windows DPAPI. You can also run the credential writer directly:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\Public\KeyenceAgent\kv-studio-operator\scripts\set_kv_admin_credential.ps1
@@ -191,6 +200,7 @@ Override order for Wiki paths is: command-line `--db/--query-script`, `KEYENCE_W
 
 | Script | Purpose |
 | --- | --- |
+| `setup_keyence_agent.ps1` | One-command local setup after clone: installs skills, writes VM config, stores DPAPI credential, and sets config-path environment variables. |
 | `kv-studio-operator/scripts/Import-KvStudioOperatorConfig.ps1` | Loads VM-local KV STUDIO path, output roots, timeout, and credential file path. |
 | `kv-studio-operator/scripts/render_kv_mvp_scaffold_model.ps1` | Renders structured project models into per-module MNM and variable files. |
 | `kv-studio-operator/scripts/validate_kv_mvp_scaffold.ps1` | Validates checklist, schema, module type, variables, FB declarations, and scaffold consistency. |
