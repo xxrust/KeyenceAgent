@@ -10,6 +10,7 @@
   [object]$FailOnMissingValidationNeedles = $false,
   [switch]$DeleteExistingModuleBeforeImport,
   [object]$RestartKvs = $true,
+  [string]$ExpectedCategory = '',
   [string]$ChecklistPath = '',
   [switch]$VerboseUiDump,
   [switch]$AuditImportWaits,
@@ -1059,9 +1060,9 @@ function AssertMnmChineseEncoding([string]$path){
   if($null -eq $headerModuleType){
     throw 'MNM module type validation failed: missing ;MODULE_TYPE:<n>.'
   }
-  $deviceOk = (($headerModuleType -eq 2 -and $headerDevice -eq 59) -or ($headerModuleType -ne 2 -and $headerDevice -eq 63))
+  $deviceOk = (($headerModuleType -eq 2 -and $headerDevice -eq 59) -or ($headerModuleType -eq 0 -and ($headerDevice -eq 63 -or $headerDevice -eq 59)))
   if(-not $deviceOk){
-    throw ('MNM device header validation failed: MODULE_TYPE='+$headerModuleType+' requires DEVICE:'+(if($headerModuleType -eq 2){'59'}else{'63'})+', actual DEVICE:'+$headerDevice+'.')
+    throw ('MNM device header validation failed: MODULE_TYPE='+$headerModuleType+' allows DEVICE:'+(if($headerModuleType -eq 2){'59'}elseif($headerModuleType -eq 0){'63 or 59'}else{'unsupported'})+', actual DEVICE:'+$headerDevice+'.')
   }
   $missing=@()
   foreach($needle in $required){
@@ -1489,7 +1490,150 @@ function DismissUnitConfigDialogIfPresent([string]$stage){
   }
   return $false
 }
-function ConfirmProgramKindDialog(){
+function ResolveProgramKindName([string]$category){
+  $normalized=([string]$category).Trim()
+  if($normalized.Length -eq 0){ return '' }
+  switch($normalized){
+    'scan' { return '每次扫描执行型模块' }
+    'function_block' { return '功能块' }
+    'standby' { return '后备模块' }
+    'initialization' { return '初始化模块' }
+    'fixed_cycle' { return '固定周期模块' }
+    'interrupt' { return '中断模块' }
+    'unit_sync' { return '单元间同步模块' }
+    default { throw ('Unsupported program category for program-kind dialog: '+$category) }
+  }
+}
+function DumpProgramKindDialog($dialog, [string]$name, [string]$targetKind, [string]$actualKind){
+  try{
+    $rows=@()
+    $desc=$dialog.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)
+    for($i=0;$i -lt $desc.Count;$i++){
+      $e=$desc.Item($i)
+      $r=$e.Current.BoundingRectangle
+      $rows += [pscustomobject]@{
+        Index=$i
+        Name=$e.Current.Name
+        Class=$e.Current.ClassName
+        Type=$e.Current.ControlType.ProgrammaticName
+        AutomationId=$e.Current.AutomationId
+        IsEnabled=$e.Current.IsEnabled
+        Rect=('{0},{1},{2},{3}' -f $r.Left,$r.Top,$r.Width,$r.Height)
+      }
+    }
+    [pscustomobject]@{
+      target_kind=$targetKind
+      actual_kind=$actualKind
+      dialog_name=$dialog.Current.Name
+      dialog_automation_id=$dialog.Current.AutomationId
+      elements=$rows
+    } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $out $name) -Encoding UTF8
+    Log ('dump '+$name)
+  }catch{
+    Log ('program kind dialog dump failed: '+$_.Exception.Message)
+  }
+}
+function GetProgramKindComboText($combo){
+  try{
+    $selectionPattern=$combo.GetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern)
+    $selected=@($selectionPattern.GetSelection())
+    $names=@()
+    foreach($item in $selected){
+      $n=([string]$item.Current.Name).Trim()
+      if($n){ $names += $n }
+    }
+    if($names.Count -gt 0){ return ($names -join '|') }
+  }catch{}
+  try{
+    $valuePattern=$combo.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+    $value=([string]$valuePattern.Current.Value).Trim()
+    if($value){ return $value }
+  }catch{}
+  try{
+    $lines=@(GetElementTextLines $combo | Where-Object { $_ })
+    if($lines.Count -gt 0){ return ($lines -join '|') }
+  }catch{}
+  return ''
+}
+function FindProgramKindListItem($dialog, $combo, [string]$targetKind){
+  $nameCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty,$targetKind)
+  $listItemCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::ListItem)
+  $targetCondition = New-Object System.Windows.Automation.AndCondition($nameCondition,$listItemCondition)
+
+  foreach($scopeRoot in @($combo,$dialog)){
+    if(-not $scopeRoot){ continue }
+    try{
+      $match=$scopeRoot.FindFirst([System.Windows.Automation.TreeScope]::Descendants,$targetCondition)
+      if($match){ return $match }
+    }catch{}
+  }
+
+  try{
+    $root=[System.Windows.Automation.AutomationElement]::RootElement
+    $match=$root.FindFirst([System.Windows.Automation.TreeScope]::Descendants,$targetCondition)
+    if($match){ return $match }
+  }catch{}
+
+  return $null
+}
+function SelectProgramKind($dialog, [string]$targetKind){
+  if(-not $targetKind){ return '' }
+  $combo=$dialog.FindFirst(
+    [System.Windows.Automation.TreeScope]::Descendants,
+    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::ComboBox))
+  )
+  if(-not $combo){ throw ('Program kind dialog found but ComboBox was not found for target kind: '+$targetKind) }
+  try{ [W]::SetForegroundWindow([IntPtr]$dialog.Current.NativeWindowHandle) | Out-Null }catch{}
+  try{ $combo.SetFocus() }catch{ Log ('program kind combo SetFocus failed: '+$_.Exception.Message) }
+  try{
+    $expand=$combo.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+    $expand.Expand()
+    Log ('expanded program kind combo for target='+$targetKind)
+  }catch{
+    throw ('Program kind combo did not support ExpandCollapsePattern for target '+$targetKind+': '+$_.Exception.Message)
+  }
+  Start-Sleep -Milliseconds 100
+  $findStarted=Get-Date
+  $match=FindProgramKindListItem $dialog $combo $targetKind
+  $findMs=[math]::Round(((Get-Date)-$findStarted).TotalMilliseconds,0)
+  Log ('program kind exact lookup target='+$targetKind+' elapsed_ms='+$findMs+' found='+[bool]$match)
+  if(-not $match){
+    $root=[System.Windows.Automation.AutomationElement]::RootElement
+    $items=$root.FindAll(
+      [System.Windows.Automation.TreeScope]::Descendants,
+      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::ListItem))
+    )
+    for($i=0;$i -lt $items.Count;$i++){
+      $item=$items.Item($i)
+      if(([string]$item.Current.Name).Trim() -eq $targetKind){
+        $match=$item
+        break
+      }
+    }
+    $fallbackMs=[math]::Round(((Get-Date)-$findStarted).TotalMilliseconds,0)
+    Log ('program kind fallback enumeration target='+$targetKind+' elapsed_ms='+$fallbackMs+' found='+[bool]$match)
+  }
+  if(-not $match){
+    DumpProgramKindDialog $dialog 'program_kind_dialog_target_missing.json' $targetKind (GetProgramKindComboText $combo)
+    throw ('Program kind list item not found: '+$targetKind)
+  }
+  try{
+    $selection=$match.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)
+    $selection.Select()
+    Log ('selected program kind by SelectionItemPattern: '+$targetKind)
+  }catch{
+    DumpProgramKindDialog $dialog 'program_kind_dialog_select_failed.json' $targetKind (GetProgramKindComboText $combo)
+    throw ('Failed to select program kind '+$targetKind+': '+$_.Exception.Message)
+  }
+  Start-Sleep -Milliseconds 100
+  $actual=GetProgramKindComboText $combo
+  DumpProgramKindDialog $dialog 'program_kind_dialog_after_select.json' $targetKind $actual
+  if($actual -and $actual -notlike ('*'+$targetKind+'*')){
+    throw ('Program kind selection mismatch: expected '+$targetKind+', actual '+$actual)
+  }
+  return $actual
+}
+function ConfirmProgramKindDialog([string]$expectedCategory){
   $root=[System.Windows.Automation.AutomationElement]::RootElement
   $dialog=$root.FindFirst(
     [System.Windows.Automation.TreeScope]::Descendants,
@@ -1502,6 +1646,14 @@ function ConfirmProgramKindDialog(){
     Log 'program kind dialog not found'
     return $false
   }
+  $targetKind=ResolveProgramKindName $expectedCategory
+  if($targetKind){
+    DumpProgramKindDialog $dialog 'program_kind_dialog_before_select.json' $targetKind ''
+    $actualKind=SelectProgramKind $dialog $targetKind
+    Log ('program kind target='+$targetKind+' actual='+$actualKind)
+  }else{
+    Log 'program kind dialog present; no ExpectedCategory supplied, accepting current selection'
+  }
   $button=$dialog.FindFirst(
     [System.Windows.Automation.TreeScope]::Descendants,
     (New-Object System.Windows.Automation.AndCondition(
@@ -1512,7 +1664,7 @@ function ConfirmProgramKindDialog(){
   if(-not $button){ throw 'Program kind dialog found but OK button _buttonOK was not found.' }
   try{
     $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-    Log 'invoked program kind OK button by AutomationId _buttonOK'
+    Log ('invoked program kind OK button by AutomationId _buttonOK category='+$expectedCategory)
   }catch{
     ClickAutomationElementCenter $button 'program kind OK button'
   }
@@ -1742,7 +1894,7 @@ try{
     AssertNoMnmReadFailureDialog 'after_file_open'
     Log 'standard open dialog accepted MNM file; no separate MNM insert/overwrite panel is required for this route'
     DismissInstructionErrorDialogs 'after_file_open'
-    $programKindConfirmed = ConfirmProgramKindDialog
+    $programKindConfirmed = ConfirmProgramKindDialog $ExpectedCategory
     if($programKindConfirmed){
       if($AuditImportWaits){ Start-Sleep -Seconds 8 } else { Start-Sleep -Milliseconds 800 }
       AssertNoMnmReadFailureDialog 'after_program_kind_confirm'

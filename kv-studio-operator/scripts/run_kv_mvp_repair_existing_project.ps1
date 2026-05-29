@@ -8,6 +8,7 @@ param(
   [string]$OutRoot = 'C:\Users\Public\KVSkillPractice\mvp_repair_runs',
   [string]$ProjectName = '',
   [string]$KvsExe = '',
+  [string]$ConfigPath = '',
   [string]$ChecklistPath = '',
   [string]$SourceSnapshotManifestPath = '',
   [int]$TimeoutSeconds = 600,
@@ -21,6 +22,16 @@ $ErrorActionPreference = 'Stop'
 $start = Get-Date
 $scriptRoot = Split-Path -Parent $PSCommandPath
 $mvpScriptRoot = Join-Path $scriptRoot 'mvp'
+$configLoader = Join-Path $scriptRoot 'Import-KvStudioOperatorConfig.ps1'
+if (Test-Path -LiteralPath $configLoader -PathType Leaf) {
+  $operatorConfig = & $configLoader -ConfigPath $ConfigPath -ScriptRoot $scriptRoot
+  if ($operatorConfig.found) {
+    if (-not $PSBoundParameters.ContainsKey('KvsExe') -and $operatorConfig.kvs_exe) { $KvsExe = [string]$operatorConfig.kvs_exe }
+    if (-not $PSBoundParameters.ContainsKey('OutRoot') -and $operatorConfig.repair_out_root) { $OutRoot = [string]$operatorConfig.repair_out_root }
+    if (-not $PSBoundParameters.ContainsKey('TimeoutSeconds') -and $null -ne $operatorConfig.timeout_seconds) { $TimeoutSeconds = [int]$operatorConfig.timeout_seconds }
+    if (-not $PSBoundParameters.ContainsKey('LocalPasteFormat') -and $operatorConfig.local_paste_format) { $LocalPasteFormat = [string]$operatorConfig.local_paste_format }
+  }
+}
 $steps = [System.Collections.Generic.List[object]]::new()
 $script:currentStep = 'init'
 $script:lastFailure = $null
@@ -520,7 +531,7 @@ function Write-RepairResult([bool]$Ok, [string]$Status, [string]$Message = '') {
     mnm_files = @($resolvedMnmFiles)
     merged_global_variables_tsv = $mergedGlobal.path
     variable_sets = @($resolvedMnmFiles | ForEach-Object {
-      [pscustomobject]@{ module_name = $_.module_name; global_tsv = $_.global_tsv; local_tsv = $_.local_tsv }
+      [pscustomobject]@{ module_name = $_.module_name; category = $_.category; global_tsv = $_.global_tsv; local_tsv = $_.local_tsv; arguments_tsv = $_.arguments_tsv }
     })
     compile_result_path = $compileResultPath
     compile_result_contains_ok = ($compileText.Contains($okNeedle))
@@ -540,6 +551,7 @@ try {
       '-ProjectPath', $ProjectPath,
       '-OutDir', (Join-Path $artifactRoot ("import_mnm_$($i + 1)")),
       '-ExpectedModuleName', $entry.module_name,
+      '-ExpectedCategory', $entry.category,
       '-ProjectSearchRoot', (Split-Path -Parent $ProjectPath),
       '-ChecklistPath', $ChecklistPath,
       '-SaveAfterImport',
@@ -655,8 +667,10 @@ try {
     variable_sets = @($resolvedMnmFiles | ForEach-Object {
       [ordered]@{
         module_name = [string]$_.module_name
+        category = [string]$_.category
         global_tsv = [string]$_.global_tsv
         local_tsv = [string]$_.local_tsv
+        arguments_tsv = [string]$_.arguments_tsv
       }
     })
   } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $regressionEvidencePath -Encoding UTF8

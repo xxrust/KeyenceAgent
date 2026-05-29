@@ -311,19 +311,25 @@ foreach ($entry in $mnmEntries) {
   if ($actualModuleType -ne 0 -and $actualModuleType -ne 2) {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_MODULE_TYPE_UNSUPPORTED' "Unsupported MODULE_TYPE=$actualModuleType in $mnmPath. Use 0 for scan-executed modules or 2 for function blocks." @($mnmPath)
   }
-  $expectedDeviceCode = if ($null -ne $entry.device -and [string]$entry.device -ne '') { [int]$entry.device } elseif ($actualModuleType -eq 2) { 59 } else { 63 }
-  if ($actualDeviceCode -ne $expectedDeviceCode) {
-    Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_DEVICE_MISMATCH' "MNM DEVICE does not match module kind. module=$moduleName module_type=$actualModuleType expected_device=$expectedDeviceCode actual_device=$actualDeviceCode" @($manifestPath, $mnmPath)
-  }
-  if ($actualModuleType -eq 2 -and $actualDeviceCode -ne 59) {
-    Stop-ScaffoldValidation 'KV_SCAFFOLD_FUNCTION_BLOCK_DEVICE_INVALID' "Function-block MNM must use DEVICE:59 based on KV STUDIO export evidence. module=$moduleName actual_device=$actualDeviceCode" @($mnmPath)
-  }
   $category = if ($entry.category) { [string]$entry.category } elseif ($actualModuleType -eq 2) { 'function_block' } else { 'scan' }
   if ($allowedCategories -notcontains $category) {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_MODULE_CATEGORY_UNSUPPORTED' "Unsupported module category '$category' in scaffold.json for $moduleName. Supported categories: $($allowedCategories -join ', ')." @($manifestPath)
   }
+  $expectedDeviceCode = if ($null -ne $entry.device -and [string]$entry.device -ne '') { [int]$entry.device } else { $null }
+  if ($null -ne $expectedDeviceCode -and $actualDeviceCode -ne $expectedDeviceCode) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_DEVICE_MISMATCH' "MNM DEVICE does not match scaffold.json. module=$moduleName module_type=$actualModuleType expected_device=$expectedDeviceCode actual_device=$actualDeviceCode" @($manifestPath, $mnmPath)
+  }
+  if ($actualModuleType -eq 2 -and $actualDeviceCode -ne 59) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_FUNCTION_BLOCK_DEVICE_INVALID' "Function-block MNM must use DEVICE:59 based on KV STUDIO export evidence. module=$moduleName actual_device=$actualDeviceCode" @($mnmPath)
+  }
+  if ($actualModuleType -eq 0 -and @('scan','standby','interrupt') -contains $category -and $actualDeviceCode -ne 63 -and $actualDeviceCode -ne 59) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_PROGRAM_DEVICE_UNSUPPORTED' "Program MNM MODULE_TYPE=0 currently allows DEVICE:63 or DEVICE:59. The scaffold category selects KV STUDIO program kind; DEVICE is not used as the standby discriminator. module=$moduleName category=$category actual_device=$actualDeviceCode" @($mnmPath)
+  }
   if ($actualModuleType -eq 2 -and $category -ne 'function_block') {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_MODULE_CATEGORY_MISMATCH' "MODULE_TYPE=2 must use category=function_block. module=$moduleName category=$category" @($manifestPath, $mnmPath)
+  }
+  if ($category -eq 'standby' -and $actualModuleType -ne 0) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_STANDBY_MODULE_TYPE_INVALID' "Standby category uses ordinary program MNM MODULE_TYPE=0; the category is applied by selecting 后备模块 in KV STUDIO's program-kind dialog. module=$moduleName actual_module_type=$actualModuleType" @($manifestPath, $mnmPath)
   }
   $argumentCount = 0
   if ($actualModuleType -eq 2) {
@@ -347,8 +353,8 @@ foreach ($entry in $mnmEntries) {
   if ($actualModuleType -eq 0 -and $category -eq 'function_block') {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_MODULE_CATEGORY_MISMATCH' "category=function_block must use MODULE_TYPE=2. module=$moduleName" @($manifestPath, $mnmPath)
   }
-  if ($category -eq 'standby' -or $category -eq 'interrupt') {
-    Stop-ScaffoldValidation 'KV_SCAFFOLD_MODULE_CATEGORY_SUPPORT_INCOMPLETE' "Module category '$category' is not accepted until a same-run KV STUDIO probe proves its MNM import mapping and placement. module=$moduleName" @($manifestPath, $mnmPath)
+  if ($category -eq 'interrupt') {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MODULE_CATEGORY_SUPPORT_INCOMPLETE' "Module category '$category' is not accepted until a same-run KV STUDIO probe proves MNM import mapping, CPU-system interrupt settings, interrupt-enable path, placement, and compile behavior. module=$moduleName" @($manifestPath, $mnmPath)
   }
   if ($actualModuleType -eq 0 -and $text -notmatch '(?m)^ENDH\s*$') {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_ENDH_MISSING' "Scan-executed MNM must contain ENDH so KV STUDIO conversion can complete: $mnmPath" @($mnmPath)

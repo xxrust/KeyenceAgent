@@ -1,0 +1,10 @@
+{
+  "kvs_exe": "D:\\KEYENCE\\KVS12G\\KVS12\\KVS\\Kvs.exe",
+  "work_root": "C:\\Users\\Public\\KVSkillPractice",
+  "mvp_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_runs",
+  "repair_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repair_runs",
+  "repeat_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repeat_runs",
+  "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
+  "timeout_seconds": 600,
+  "local_paste_format": "NameType"
+}

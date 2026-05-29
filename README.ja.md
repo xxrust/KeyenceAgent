@@ -40,7 +40,7 @@ KeyenceAgent は、推論、実行、検証を明確な境界に分けます。
 | レイヤー | 責務 | 主な成果物 |
 | --- | --- | --- |
 | Scaffold model | モジュール、MNM、変数、FB 引数、プロジェクト情報、受け入れ条件を記述します。 | `scaffold.model.json`, `TASK.md`, `VERSION.md` |
-| Renderer | 構造化モデルを KV STUDIO 用のインポートファイルへ変換します。 | `mnm/*.mnm`, `variables/<module>/*.tsv`, `scaffold.json` |
+| Renderer | 構造化モデルを KV STUDIO 用のインポートファイルへ変換します。 | `modules/<module>/*.mnm`, `modules/<module>/*.tsv`, `scaffold.json` |
 | Static gates | KV STUDIO を開く前に、不完全または危険な入力を拒否します。 | checklist, variable validation, import plan, scaffold validation |
 | Guarded runner | プロジェクト作成またはオープン、MNM インポート、変数入力、FB 引数入力、コンパイル、結果取得を実行します。 | `mvp_result.json`, `repair_result.json`, `artifacts/` |
 | Route governance | キーボード、UIA、マウス、スクリプト戦略の無根拠な切り替えを防ぎます。 | `route-state.json` |
@@ -69,6 +69,7 @@ KeyenceAgent は強い実行契約を使います。
 | ファンクションブロック作成 | `MODULE_TYPE:2` の MNM をユーザー FB としてインポート。 |
 | FB 引数テーブル | 必須列の入力を guarded runner で検証済み。 |
 | FB インスタンスと呼び出し | コンパイル可能な平滑フィルタ FB プロジェクトで検証済み。 |
+| スタンバイモジュール import | `category=standby` で検証済み。runner は KV STUDIO の program-kind ダイアログで `後備モジュール` を選択します。 |
 | 再現性ゲート | 連続成功を要求し、最新 FB MVP は 3 回連続で成功。 |
 
 ## Runner フロー
@@ -95,6 +96,7 @@ KeyenceAgent は強い実行契約を使います。
 |-- docs/
 |   `-- images/
 |-- kv-studio-operator/
+|   |-- config/
 |   |-- SKILL.md
 |   |-- references/
 |   `-- scripts/
@@ -106,11 +108,77 @@ KeyenceAgent は強い実行契約を使います。
 `-- route-governance/
 ```
 
+## VM デプロイ
+
+KeyenceAgent は、KV STUDIO を実行する Windows VM 上にテキスト主体の harness として配置します。
+
+コピーまたは clone する実行時ディレクトリ:
+
+| ディレクトリ | 必須 | 用途 |
+| --- | --- | --- |
+| `kv-studio-operator/` | 必須 | runner、guarded UI 操作、scaffold renderer、validator、設定テンプレート。 |
+| `keyence-plc-programmer/` | 推奨 | PLC 作成ルールと KEYENCE プログラミング手順。 |
+| `kv-studio-kb-programming/` | 推奨 | KEYENCE 構文とマニュアル根拠を確認するローカル Wiki V2 ワークフロー。 |
+| `docs/` と `README*.md` | 推奨 | 人向けのデプロイ説明とアーキテクチャ文書。 |
+
+安全な標準配置は、リポジトリ全体を VM に clone する方法です。
+
+```powershell
+git clone https://github.com/xxrust/KeyenceAgent.git C:\Users\Public\KeyenceAgent
+```
+
+runner は既定で一時プロジェクトと証拠を `C:\Users\Public\KVSkillPractice` に書き込みます。このディレクトリはリポジトリ外に置き、生成された `.kpr`、スクリーンショット、ログ、compile artifacts を git に入れません。
+
+## VM 設定
+
+VM ごとに non-secret のローカル設定ファイルを 1 つ作成します。テンプレート:
+
+```text
+kv-studio-operator\config\kv-studio-operator.example.json
+```
+
+ローカルコピーは次のどちらかに置きます。
+
+```text
+%APPDATA%\Codex\kv-studio-operator\config.json
+kv-studio-operator\config\kv-studio-operator.local.json
+```
+
+設定ファイルは VM 固有のパスを保持します。
+
+```json
+{
+  "kvs_exe": "D:\\KEYENCE\\KVS12G\\KVS12\\KVS\\Kvs.exe",
+  "work_root": "C:\\Users\\Public\\KVSkillPractice",
+  "mvp_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_runs",
+  "repair_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repair_runs",
+  "repeat_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repeat_runs",
+  "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
+  "timeout_seconds": 600,
+  "local_paste_format": "NameType"
+}
+```
+
+KV STUDIO 管理者パスワードは JSON に保存しません。Windows ユーザーごとに DPAPI で 1 回保存します。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\Public\KeyenceAgent\kv-studio-operator\scripts\set_kv_admin_credential.ps1
+```
+
+runner は `%APPDATA%` の設定を自動で読み取れます。明示的に指定することもできます。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\Public\KeyenceAgent\kv-studio-operator\scripts\run_kv_mvp_scaffold.ps1 `
+  -ConfigPath "$env:APPDATA\Codex\kv-studio-operator\config.json" `
+  -ScaffoldRoot C:\Users\Public\KVSkillPractice\scaffolds\example
+```
+
 ## 主要スクリプト
 
 | スクリプト | 用途 |
 | --- | --- |
-| `kv-studio-operator/scripts/render_kv_mvp_scaffold_model.ps1` | 構造化プロジェクトモデルを MNM と変数ファイルへ変換します。 |
+| `kv-studio-operator/scripts/Import-KvStudioOperatorConfig.ps1` | VM ローカルの KV STUDIO パス、出力ルート、timeout、credential file path を読み込みます。 |
+| `kv-studio-operator/scripts/render_kv_mvp_scaffold_model.ps1` | 構造化プロジェクトモデルをモジュール別 MNM と変数ファイルへ変換します。 |
 | `kv-studio-operator/scripts/validate_kv_mvp_scaffold.ps1` | checklist、schema、module type、変数、FB 宣言、scaffold 整合性を検証します。 |
 | `kv-studio-operator/scripts/assert_kv_mnm_import_plan.ps1` | 同名 MNM をインポートする前に、明示的な事前削除計画を要求します。 |
 | `kv-studio-operator/scripts/run_kv_mvp_scaffold.ps1` | 新規 KV STUDIO プロジェクトを作成し、MVP 全体を実行します。 |
@@ -166,9 +234,8 @@ warning count: 0
 | --- | --- |
 | Function blocks | フォーマット probe で安定性を確認した後、FB 引数コメントと任意列へ対応します。 |
 | Existing projects | harness で作成されていないプロジェクト向けに、より強い export/import snapshot ループを完成させます。 |
-| Module categories | standby module と interrupt program の検証済み対応を追加します。 |
+| Module categories | standby module は検証済みです。interrupt program は CPU system interrupt settings と enable path のスクリプト化後に有効化します。 |
 | FB composition | ネストした FB インスタンス、複数呼び出し点、インスタンススコープ監査を扱います。 |
 | Speed | bounded failure の性質を維持しながら不要な待機を削減します。 |
 | Sub-agent validation | 独立したサブエージェントが skill だけで同じ MVP を連続成功させる検証を追加します。 |
 | Documentation | アーキテクチャ図、失敗分類、runner contract の例を追加します。 |
-

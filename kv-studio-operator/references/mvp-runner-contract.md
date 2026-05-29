@@ -48,9 +48,9 @@ Required files:
 - `CHECKLIST.md`
 - `TASK.md`
 - `VERSION.md`
-- `mnm/*.mnm`
-- one `variables/<module>/global_variables.tsv` for each `scaffold.json.mnm_files[]` entry
-- one `variables/<module>/local_variables.tsv` for each `scaffold.json.mnm_files[]` entry
+- `modules/<module>/*.mnm` for new scaffolds; `mnm/*.mnm` remains legacy-compatible
+- one `modules/<module>/global_variables.tsv` for each `scaffold.json.mnm_files[]` entry
+- one `modules/<module>/local_variables.tsv` for each `scaffold.json.mnm_files[]` entry
 
 Schema v2 stores variable files on the MNM entry:
 
@@ -60,12 +60,12 @@ Schema v2 stores variable files on the MNM entry:
   "variables": { "schema": "per_mnm" },
   "mnm_files": [
     {
-      "path": "mnm/Main_MVP.mnm",
+      "path": "modules/Main_MVP/Main_MVP.mnm",
       "module_name": "Main_MVP",
       "module_type": 0,
       "variables": {
-        "global_tsv": "variables/Main_MVP/global_variables.tsv",
-        "local_tsv": "variables/Main_MVP/local_variables.tsv"
+        "global_tsv": "modules/Main_MVP/global_variables.tsv",
+        "local_tsv": "modules/Main_MVP/local_variables.tsv"
       }
     }
   ]
@@ -94,7 +94,7 @@ The MNM file must contain:
 ;MODULE_TYPE:0
 ```
 
-Use `0` for ordinary scan-executed modules. Use `2` for user function-block definitions. `scaffold.json.mnm_files[].module_type` must match the MNM file.
+Use `0` for ordinary program MNM. The `0` value does not by itself distinguish scan-executed and standby modules. Use `2` for user function-block definitions. `scaffold.json.mnm_files[].module_type` must match the MNM file.
 
 Each MNM entry may also declare `category`:
 
@@ -108,15 +108,16 @@ Each MNM entry may also declare `category`:
 
 Supported categories:
 
+- `standby`: standby module. The scaffold category drives the import-time `选择程序种类` dialog; the runner selects `后备模块` before confirming.
+
 - `scan`: ordinary scan-executed module, expected under `每次扫描执行型模块`.
 - `function_block`: function-block definition, expected under `功能块`; the variable validator allows this module name as an FB instance data type.
 
 Known but gated categories:
 
-- `standby`: concept and project-tree category are known, but no same-run MNM import/export mapping has been proven.
-- `interrupt`: concept and project-tree category are known, but no same-run MNM import/export mapping has been proven.
+- `interrupt`: concept and project-tree category are known, but same-run support is gated because Wiki evidence requires CPU system settings for fixed-cycle/user-interrupt factors and an interrupt-enable path in addition to MNM import.
 
-The validator fails closed with `KV_SCAFFOLD_MODULE_CATEGORY_SUPPORT_INCOMPLETE` for `standby` and `interrupt` until their MNM representation, import order, placement, and compile behavior are verified from same-run artifacts.
+The validator fails closed with `KV_SCAFFOLD_MODULE_CATEGORY_SUPPORT_INCOMPLETE` for `interrupt` until its MNM representation, CPU-system settings, interrupt-enable path, placement, and compile behavior are verified from same-run artifacts.
 
 ## Runner Result
 

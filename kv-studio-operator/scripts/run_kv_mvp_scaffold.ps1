@@ -6,6 +6,7 @@
   [string]$ProjectName = '',
   [string]$CpuModel = '',
   [string]$KvsExe = '',
+  [string]$ConfigPath = '',
   [string]$AdminUser = '',
   [string]$AdminPassword = '',
   [string]$AdminCredentialPath = '',
@@ -20,6 +21,17 @@ $ErrorActionPreference = 'Stop'
 $start = Get-Date
 $scriptRoot = Split-Path -Parent $PSCommandPath
 $mvpScriptRoot = Join-Path $scriptRoot 'mvp'
+$configLoader = Join-Path $scriptRoot 'Import-KvStudioOperatorConfig.ps1'
+if (Test-Path -LiteralPath $configLoader -PathType Leaf) {
+  $operatorConfig = & $configLoader -ConfigPath $ConfigPath -ScriptRoot $scriptRoot
+  if ($operatorConfig.found) {
+    if (-not $PSBoundParameters.ContainsKey('KvsExe') -and $operatorConfig.kvs_exe) { $KvsExe = [string]$operatorConfig.kvs_exe }
+    if (-not $PSBoundParameters.ContainsKey('OutRoot') -and $operatorConfig.mvp_out_root) { $OutRoot = [string]$operatorConfig.mvp_out_root }
+    if (-not $PSBoundParameters.ContainsKey('AdminCredentialPath') -and $operatorConfig.admin_credential_path) { $AdminCredentialPath = [string]$operatorConfig.admin_credential_path }
+    if (-not $PSBoundParameters.ContainsKey('TimeoutSeconds') -and $null -ne $operatorConfig.timeout_seconds) { $TimeoutSeconds = [int]$operatorConfig.timeout_seconds }
+    if (-not $PSBoundParameters.ContainsKey('LocalPasteFormat') -and $operatorConfig.local_paste_format) { $LocalPasteFormat = [string]$operatorConfig.local_paste_format }
+  }
+}
 $steps = [System.Collections.Generic.List[object]]::new()
 $script:currentStep = 'init'
 $script:lastFailure = $null
@@ -390,6 +402,7 @@ foreach ($entry in $mnmEntries) {
   if ($null -ne $entry.module_type -and [string]$entry.module_type -ne '') {
     $moduleType = [int]$entry.module_type
   }
+  $category = if ($entry.category) { [string]$entry.category } elseif ($moduleType -eq 2) { 'function_block' } else { 'scan' }
   if (-not $entry.variables -or -not $entry.variables.global_tsv -or -not $entry.variables.local_tsv) {
     throw "MNM entry $moduleName must define variables.global_tsv and variables.local_tsv."
   }
@@ -409,6 +422,7 @@ foreach ($entry in $mnmEntries) {
     path = $mnmPath
     module_name = $moduleName
     module_type = $moduleType
+    category = $category
     global_tsv = $entryGlobalTsv
     local_tsv = $entryLocalTsv
     arguments_tsv = $entryArgumentsTsv
@@ -441,6 +455,7 @@ $encodingCheck = [ordered]@{
   variable_sets = @($resolvedMnmFiles | ForEach-Object {
     [pscustomobject]@{
       module_name = $_.module_name
+      category = $_.category
       global_tsv = $_.global_tsv
       local_tsv = $_.local_tsv
       arguments_tsv = $_.arguments_tsv
@@ -483,6 +498,7 @@ function Write-MvpResult([bool]$Ok, [string]$Status, [string]$Message = '') {
     variable_sets = @($resolvedMnmFiles | ForEach-Object {
       [pscustomobject]@{
         module_name = $_.module_name
+        category = $_.category
         global_tsv = $_.global_tsv
         local_tsv = $_.local_tsv
         arguments_tsv = $_.arguments_tsv
@@ -506,7 +522,8 @@ function Get-ProjectTreeModuleCategory([string]$ProjectTreePath, [string]$Module
 
   $functionBlockCategory = New-Cn @(0x529F,0x80FD,0x5757)
   $scanModuleCategory = New-Cn @(0x6BCF,0x6B21,0x626B,0x63CF,0x6267,0x884C,0x578B,0x6A21,0x5757)
-  $knownCategories = @($functionBlockCategory, $scanModuleCategory)
+  $standbyModuleCategory = New-Cn @(0x540E,0x5907,0x6A21,0x5757)
+  $knownCategories = @($functionBlockCategory, $scanModuleCategory, $standbyModuleCategory)
   $text = [IO.File]::ReadAllText($ProjectTreePath, [Text.Encoding]::UTF8)
   $matches = [regex]::Matches($text, '<value\.first>(.*?)</value\.first>', [Text.RegularExpressions.RegexOptions]::Singleline)
   $currentCategory = ''
@@ -530,11 +547,14 @@ function Assert-ImportedModulePlacement([object]$Entry) {
   $actualCategory = Get-ProjectTreeModuleCategory $treePath $Entry.module_name
   $functionBlockCategory = New-Cn @(0x529F,0x80FD,0x5757)
   $scanModuleCategory = New-Cn @(0x6BCF,0x6B21,0x626B,0x63CF,0x6267,0x884C,0x578B,0x6A21,0x5757)
-  $expectedCategory = if ([int]$Entry.module_type -eq 2) { $functionBlockCategory } else { $scanModuleCategory }
+  $standbyModuleCategory = New-Cn @(0x540E,0x5907,0x6A21,0x5757)
+  $entryCategory = if ($Entry.category) { [string]$Entry.category } elseif ([int]$Entry.module_type -eq 2) { 'function_block' } else { 'scan' }
+  $expectedCategory = if ($entryCategory -eq 'function_block') { $functionBlockCategory } elseif ($entryCategory -eq 'standby') { $standbyModuleCategory } else { $scanModuleCategory }
   $ok = ($actualCategory -eq $expectedCategory)
   $placement = [pscustomobject]@{
     module_name = $Entry.module_name
     module_type = [int]$Entry.module_type
+    category = $entryCategory
     expected_category = $expectedCategory
     actual_category = $actualCategory
     ok = $ok
@@ -550,7 +570,7 @@ function Assert-ImportedModulePlacement([object]$Entry) {
     elapsed_seconds = [math]::Round(((Get-Date) - $stepStart).TotalSeconds, 3)
   })
   if (-not $ok) {
-    throw "Imported module placement mismatch for $($Entry.module_name): expected '$expectedCategory' for MODULE_TYPE=$($Entry.module_type), actual '$actualCategory'."
+    throw "Imported module placement mismatch for $($Entry.module_name): expected '$expectedCategory' for category=$entryCategory MODULE_TYPE=$($Entry.module_type), actual '$actualCategory'."
   }
 }
 
@@ -579,6 +599,7 @@ try {
       '-ProjectPath', $projectPath,
       '-OutDir', (Join-Path $artifactRoot ("import_mnm_$($i + 1)")),
       '-ExpectedModuleName', $entry.module_name,
+      '-ExpectedCategory', $entry.category,
       '-ProjectSearchRoot', (Join-Path $projectRoot $ProjectName),
       '-ChecklistPath', $ChecklistPath,
       '-SaveAfterImport',

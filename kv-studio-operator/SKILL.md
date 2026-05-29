@@ -157,7 +157,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_m
 Edit only scaffold source files before running KV STUDIO:
 
 - `scaffold.model.json` when present. This is the source of truth for structured scaffolds.
-- `mnm\*.mnm`
+- `modules\<module>\*.mnm` for new structured scaffolds; `mnm\*.mnm` is a legacy-compatible layout only.
 - `scaffold.json.mnm_files[].variables.global_tsv`
 - `scaffold.json.mnm_files[].variables.local_tsv`
 - `architecture\*.json` for open-ended project/update configuration such as source snapshot binding, IO map, unit map, safety notes, acceptance, and future categories.
@@ -167,9 +167,9 @@ Edit only scaffold source files before running KV STUDIO:
 
 Do not hand-edit generated runner artifacts.
 
-For structured scaffolds, edit `scaffold.model.json` first and then run `scripts\render_kv_mvp_scaffold_model.ps1`. Treat generated MNM and TSV files as KV STUDIO adapter artifacts. Edit generated MNM/TSV directly only for diagnosis or for legacy scaffolds without `scaffold.model.json`.
+For structured scaffolds, edit `scaffold.model.json` first and then run `scripts\render_kv_mvp_scaffold_model.ps1`. Treat generated MNM and TSV files as KV STUDIO adapter artifacts. New scaffolds place each module under `modules\<module>\` with that module's MNM, global TSV, local TSV, and optional FB argument TSV together. Edit generated MNM/TSV directly only for diagnosis or for legacy scaffolds without `scaffold.model.json`.
 
-Variable files are per MNM/module. Do not assume one project-level `variables\global_variables.tsv` or `variables\local_variables.tsv`. For each `scaffold.json.mnm_files[]` entry, edit the MNM file named by `path`, then edit that entry's paired `variables.global_tsv` and `variables.local_tsv`.
+Variable files are per MNM/module. Do not assume one project-level `variables\global_variables.tsv` or `variables\local_variables.tsv`. For each `scaffold.json.mnm_files[]` entry, edit the MNM file named by `path`, then edit that entry's paired `variables.global_tsv` and `variables.local_tsv`; in new scaffolds these files should live in the same module folder.
 
 Minimum TSV header:
 
@@ -181,11 +181,12 @@ Executable variable rows use `status` other than `display_name`.
 
 MNM module type:
 
-- `;MODULE_TYPE:0` means scan-executed program/module.
+- `;MODULE_TYPE:0` means ordinary program MNM. It does not by itself distinguish scan-executed and standby modules.
 - `;MODULE_TYPE:2` means user function block.
-- `scaffold.json.mnm_files[].category` should be `scan` or `function_block`. If omitted, `0` maps to `scan` and `2` maps to `function_block`.
+- `scaffold.json.mnm_files[].category` should be `scan`, `standby`, or `function_block`. If omitted, `0` maps to `scan` and `2` maps to `function_block`.
 - Function-block instance variables use the FB module name as `data_type`. The variable validator allows only FB names declared by `module_type=2` in the same scaffold.
-- `standby` and `interrupt` categories are gated with `KV_SCAFFOLD_MODULE_CATEGORY_SUPPORT_INCOMPLETE` until a same-run KV STUDIO export/import probe proves their MNM representation, placement, and compile behavior.
+- `standby` is represented by scaffold metadata, not a unique MNM module type. During MNM import, `import_mnm_guarded.ps1` must select `后备模块` in the `选择程序种类` dialog before OK. Current proof: `C:\Users\Public\KVSkillPractice\standby_module_20260529\runs\standby_import_program_kind_fix\StandbyImportProbe\mvp_result.json`.
+- `interrupt` remains gated with `KV_SCAFFOLD_MODULE_CATEGORY_SUPPORT_INCOMPLETE`: Wiki evidence says interrupt modules also require CPU system settings for fixed-cycle/user-interrupt factors plus interrupt enable, not just MNM import.
 - The value in each MNM file must match `scaffold.json.mnm_files[].module_type`.
 
 ## Hard Gates

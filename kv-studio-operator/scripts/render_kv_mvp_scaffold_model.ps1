@@ -36,9 +36,8 @@ $TaskSummary = if ($model.task.summary) { [string]$model.task.summary } else { '
 $TemplateName = if ($model.template) { [string]$model.template } else { 'StructuredModel' }
 $ScaffoldVersion = if ($model.scaffold_version) { [string]$model.scaffold_version } else { '3.0.0' }
 
-$mnmDir = Join-Path $ScaffoldRoot 'mnm'
-$varDir = Join-Path $ScaffoldRoot 'variables'
-New-Item -ItemType Directory -Force -Path $ScaffoldRoot, $mnmDir, $varDir | Out-Null
+$modulesDir = Join-Path $ScaffoldRoot 'modules'
+New-Item -ItemType Directory -Force -Path $ScaffoldRoot, $modulesDir | Out-Null
 
 function Write-Text([string]$Path, [string]$Text, [Text.Encoding]$Encoding) {
   $parent = Split-Path -Parent $Path
@@ -93,6 +92,7 @@ function New-MnmText($Module) {
   $moduleName = [string]$Module.name
   if (-not $moduleName) { throw 'Module is missing name.' }
   $moduleType = if ($null -ne $Module.module_type -and [string]$Module.module_type -ne '') { [int]$Module.module_type } else { 0 }
+  $category = if ($Module.category) { [string]$Module.category } elseif ($moduleType -eq 2) { 'function_block' } else { 'scan' }
   $deviceCode = if ($null -ne $Module.mnm.device -and [string]$Module.mnm.device -ne '') { [int]$Module.mnm.device } elseif ($moduleType -eq 2) { 59 } else { 63 }
   $comment = if ($Module.mnm.comment) { [string]$Module.mnm.comment } else { "Generated scan module $moduleName." }
   $instructions = @($Module.mnm.instructions | ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })
@@ -144,11 +144,12 @@ $script:AllowedCustomDataTypes = @(
 foreach ($module in $modules) {
   $moduleName = [string]$module.name
   $moduleType = if ($null -ne $module.module_type -and [string]$module.module_type -ne '') { [int]$module.module_type } else { 0 }
-  $mnmPath = Join-Path $mnmDir ($moduleName + '.mnm')
-  $moduleVarDir = Join-Path $varDir $moduleName
-  $globalTsv = Join-Path $moduleVarDir 'global_variables.tsv'
-  $localTsv = Join-Path $moduleVarDir 'local_variables.tsv'
-  $argumentsTsv = Join-Path $moduleVarDir 'arguments.tsv'
+  $category = if ($module.category) { [string]$module.category } elseif ($moduleType -eq 2) { 'function_block' } else { 'scan' }
+  $moduleDir = Join-Path $modulesDir $moduleName
+  $mnmPath = Join-Path $moduleDir ($moduleName + '.mnm')
+  $globalTsv = Join-Path $moduleDir 'global_variables.tsv'
+  $localTsv = Join-Path $moduleDir 'local_variables.tsv'
+  $argumentsTsv = Join-Path $moduleDir 'arguments.tsv'
   $evidence = if ($model.evidence) { [string]$model.evidence } else { 'scaffold_model' }
 
   Write-Text $mnmPath (New-MnmText $module) ([Text.Encoding]::Unicode)
@@ -159,23 +160,23 @@ foreach ($module in $modules) {
   }
 
   $mnmEntries += [ordered]@{
-    path = ('mnm/' + [IO.Path]::GetFileName($mnmPath))
+    path = ('modules/' + $moduleName + '/' + [IO.Path]::GetFileName($mnmPath))
     module_name = $moduleName
     module_type = $moduleType
-    category = $(if ($module.category) { [string]$module.category } elseif ($moduleType -eq 2) { 'function_block' } else { 'scan' })
+    category = $category
     device = $(if ($null -ne $module.mnm.device -and [string]$module.mnm.device -ne '') { [int]$module.mnm.device } elseif ($moduleType -eq 2) { 59 } else { 63 })
     encoding = 'UTF-16LE'
     variables = [ordered]@{
-      global_tsv = ('variables/' + $moduleName + '/global_variables.tsv')
-      local_tsv = ('variables/' + $moduleName + '/local_variables.tsv')
+      global_tsv = ('modules/' + $moduleName + '/global_variables.tsv')
+      local_tsv = ('modules/' + $moduleName + '/local_variables.tsv')
     }
-    arguments = $(if ($moduleType -eq 2) { [ordered]@{ tsv = ('variables/' + $moduleName + '/arguments.tsv') } } else { $null })
+    arguments = $(if ($moduleType -eq 2) { [ordered]@{ tsv = ('modules/' + $moduleName + '/arguments.tsv') } } else { $null })
   }
   $variableSets += [ordered]@{
     module_name = $moduleName
-    category = $(if ($module.category) { [string]$module.category } elseif ($moduleType -eq 2) { 'function_block' } else { 'scan' })
-    global_tsv = ('variables/' + $moduleName + '/global_variables.tsv')
-    local_tsv = ('variables/' + $moduleName + '/local_variables.tsv')
+    category = $category
+    global_tsv = ('modules/' + $moduleName + '/global_variables.tsv')
+    local_tsv = ('modules/' + $moduleName + '/local_variables.tsv')
   }
 }
 
@@ -194,7 +195,7 @@ $manifest = [ordered]@{
   }
   task = [ordered]@{
     summary = $TaskSummary
-    agent_fill_rule = 'Edit scaffold.model.json first, then run render_kv_mvp_scaffold_model.ps1. Generated MNM/TSV files are KV STUDIO adapter artifacts.'
+    agent_fill_rule = 'Edit scaffold.model.json first, then run render_kv_mvp_scaffold_model.ps1. Generated module artifacts are grouped under modules/<module>/ and are KV STUDIO adapter artifacts.'
   }
   checklist = 'CHECKLIST.md'
   source_model = 'scaffold.model.json'
@@ -235,7 +236,8 @@ $TaskSummary
 
 - Edit scaffold.model.json for modules, MNM instructions, and variables.
 - Run render_kv_mvp_scaffold_model.ps1 after model changes.
-- Do not hand-maintain TSV as the source of truth.
+- Generated adapter files are grouped by module under modules/<module>/.
+- Do not hand-maintain generated MNM/TSV files as the source of truth.
 
 ## Acceptance
 
@@ -259,8 +261,8 @@ Template: $TemplateName
 - [ ] Confirm this scaffold is disposable or explicitly approved for KV STUDIO operation.
 - [ ] Confirm scaffold.model.json is the source of truth and generated files were rendered after the latest model edit.
 - [ ] Confirm scaffold.json contains every generated MNM entry and each entry has the intended module_type.
-- [ ] Confirm every MNM file is UTF-16LE and contains ;MODULE_TYPE:<n>.
-- [ ] Confirm every module has paired generated global and local TSV files.
+- [ ] Confirm every modules/<module>/*.mnm file is UTF-16LE and contains ;MODULE_TYPE:<n>.
+- [ ] Confirm every module folder has paired generated global and local TSV files.
 - [ ] Confirm executable global variables are referenced by their paired MNM file.
 - [ ] Confirm local variable rows use owner_program equal to the target module name.
 - [ ] Confirm no operation will type program text directly into the ladder/program editor.

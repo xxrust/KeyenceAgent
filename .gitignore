@@ -11,5 +11,7 @@
 !/kv-studio-kb-programming/**
 !/kv-studio-operator/
 !/kv-studio-operator/**
+kv-studio-operator/config/*.local.json
+kv-studio-operator/config/config.json
 **/__pycache__/
 *.pyc

@@ -5,6 +5,7 @@ param(
   [string]$OutRoot = 'C:\Users\Public\KVSkillPractice\mvp_repeat_runs',
   [string]$ProjectNamePrefix = '',
   [string]$KvsExe = '',
+  [string]$ConfigPath = '',
   [string]$ChecklistPath = '',
   [int]$TimeoutSeconds = 600,
   [switch]$AuditVariablePersistence,
@@ -19,6 +20,16 @@ $ErrorActionPreference = 'Stop'
 $scriptRoot = Split-Path -Parent $PSCommandPath
 $runner = Join-Path $scriptRoot 'run_kv_mvp_scaffold.ps1'
 if (-not (Test-Path -LiteralPath $runner -PathType Leaf)) { throw "Runner not found: $runner" }
+$configLoader = Join-Path $scriptRoot 'Import-KvStudioOperatorConfig.ps1'
+if (Test-Path -LiteralPath $configLoader -PathType Leaf) {
+  $operatorConfig = & $configLoader -ConfigPath $ConfigPath -ScriptRoot $scriptRoot
+  if ($operatorConfig.found) {
+    if (-not $PSBoundParameters.ContainsKey('KvsExe') -and $operatorConfig.kvs_exe) { $KvsExe = [string]$operatorConfig.kvs_exe }
+    if (-not $PSBoundParameters.ContainsKey('OutRoot') -and $operatorConfig.repeat_out_root) { $OutRoot = [string]$operatorConfig.repeat_out_root }
+    if (-not $PSBoundParameters.ContainsKey('TimeoutSeconds') -and $null -ne $operatorConfig.timeout_seconds) { $TimeoutSeconds = [int]$operatorConfig.timeout_seconds }
+    if (-not $PSBoundParameters.ContainsKey('LocalPasteFormat') -and $operatorConfig.local_paste_format) { $LocalPasteFormat = [string]$operatorConfig.local_paste_format }
+  }
+}
 
 $ScaffoldRoot = [IO.Path]::GetFullPath($ScaffoldRoot)
 $OutRoot = [IO.Path]::GetFullPath($OutRoot)
@@ -60,6 +71,7 @@ for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
     '-ProjectName', $attemptName,
     '-TimeoutSeconds', ([string]$TimeoutSeconds)
   )
+  if ($ConfigPath) { $args += @('-ConfigPath', $ConfigPath) }
   if ($KvsExe) { $args += @('-KvsExe', $KvsExe) }
   if ($ChecklistPath) { $args += @('-ChecklistPath', $ChecklistPath) }
   if ($AuditVariablePersistence) { $args += '-AuditVariablePersistence' }

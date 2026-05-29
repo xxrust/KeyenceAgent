@@ -13,10 +13,8 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $ScaffoldRoot = [IO.Path]::GetFullPath($ScaffoldRoot)
-$mnmDir = Join-Path $ScaffoldRoot 'mnm'
-$varDir = Join-Path $ScaffoldRoot 'variables'
-$moduleVarDir = Join-Path $varDir $ModuleName
-New-Item -ItemType Directory -Force -Path $ScaffoldRoot, $mnmDir, $varDir, $moduleVarDir | Out-Null
+$moduleDir = Join-Path (Join-Path $ScaffoldRoot 'modules') $ModuleName
+New-Item -ItemType Directory -Force -Path $ScaffoldRoot, $moduleDir | Out-Null
 
 function Write-Text([string]$Path, [string]$Text, [Text.Encoding]$Encoding) {
   [IO.File]::WriteAllText($Path, $Text, $Encoding)
@@ -26,9 +24,9 @@ function New-Cn([int[]]$CodePoints) {
   -join ($CodePoints | ForEach-Object { [char]$_ })
 }
 
-$mnmPath = Join-Path $mnmDir ($ModuleName + '.mnm')
-$globalTsv = Join-Path $moduleVarDir 'global_variables.tsv'
-$localTsv = Join-Path $moduleVarDir 'local_variables.tsv'
+$mnmPath = Join-Path $moduleDir ($ModuleName + '.mnm')
+$globalTsv = Join-Path $moduleDir 'global_variables.tsv'
+$localTsv = Join-Path $moduleDir 'local_variables.tsv'
 
 if ($Template -eq 'TrafficLight') {
   $cnStart = New-Cn @(0x542F,0x52A8)
@@ -156,18 +154,20 @@ $manifest = [ordered]@{
   }
   task = [ordered]@{
     summary = $TaskSummary
-    agent_fill_rule = 'For every mnm_files[] entry, edit that MNM file and its paired variables.global_tsv / variables.local_tsv before running KV STUDIO.'
+    agent_fill_rule = 'For every mnm_files[] entry, edit that module folder MNM file and its paired variables.global_tsv / variables.local_tsv before running KV STUDIO.'
   }
   checklist = 'CHECKLIST.md'
   mnm_files = @(
     [ordered]@{
-      path = ('mnm/' + [IO.Path]::GetFileName($mnmPath))
+      path = ('modules/' + $ModuleName + '/' + [IO.Path]::GetFileName($mnmPath))
       module_name = $ModuleName
       module_type = 0
+      category = 'scan'
+      device = 63
       encoding = 'UTF-16LE'
       variables = [ordered]@{
-        global_tsv = ('variables/' + $ModuleName + '/global_variables.tsv')
-        local_tsv = ('variables/' + $ModuleName + '/local_variables.tsv')
+        global_tsv = ('modules/' + $ModuleName + '/global_variables.tsv')
+        local_tsv = ('modules/' + $ModuleName + '/local_variables.tsv')
       }
     }
   )
@@ -176,8 +176,9 @@ $manifest = [ordered]@{
     sets = @(
       [ordered]@{
         module_name = $ModuleName
-        global_tsv = ('variables/' + $ModuleName + '/global_variables.tsv')
-        local_tsv = ('variables/' + $ModuleName + '/local_variables.tsv')
+        category = 'scan'
+        global_tsv = ('modules/' + $ModuleName + '/global_variables.tsv')
+        local_tsv = ('modules/' + $ModuleName + '/local_variables.tsv')
       }
     )
     encoding = 'system-default ANSI'
@@ -210,8 +211,8 @@ $TaskSummary
 ## Agent Workflow
 
 1. Read scaffold.json.
-2. Edit mnm/*.mnm for program logic.
-3. Edit each module's paired variables/<module>/global_variables.tsv and variables/<module>/local_variables.tsv.
+2. Edit modules/<module>/*.mnm for program logic.
+3. Edit each module's paired modules/<module>/global_variables.tsv and modules/<module>/local_variables.tsv.
 4. Update TASK.md and VERSION.md with the implemented behavior and version note.
 5. Run run_kv_mvp_scaffold.ps1 against this scaffold.
 "@
@@ -229,7 +230,7 @@ Template: $Template
 
 - [ ] Confirm this scaffold is disposable or explicitly approved for KV STUDIO operation.
 - [ ] Confirm scaffold.json project name, CPU model, module name, and MNM file list.
-- [ ] Confirm every mnm/*.mnm file has the intended ;MODULE_TYPE and program body.
+- [ ] Confirm every modules/<module>/*.mnm file has the intended ;MODULE_TYPE and program body.
 - [ ] Confirm every mnm_files[] entry has a paired variables.global_tsv and variables.local_tsv.
 - [ ] Confirm each module's global TSV contains the global variables required by that MNM module, or only the TSV header when that module has no global variables.
 - [ ] Confirm each module's local TSV contains executable local variables for that module/program.

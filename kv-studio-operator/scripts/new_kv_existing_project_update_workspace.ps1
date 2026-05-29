@@ -65,6 +65,51 @@ function Copy-IfPresent([string]$Source, [string]$Destination) {
   return $false
 }
 
+function Copy-FileToDirectory([string]$SourceFile, [string]$DestinationDirectory) {
+  [IO.Directory]::CreateDirectory($DestinationDirectory) | Out-Null
+  $destinationFile = Join-Path $DestinationDirectory ([IO.Path]::GetFileName($SourceFile))
+  [IO.File]::Copy($SourceFile, $destinationFile, $true)
+}
+
+function Copy-SeedScaffoldArtifactsFromManifest([string]$SeedRoot, [string]$MnmDestination, [string]$VariablesDestination) {
+  $manifestPath = Join-Path $SeedRoot 'scaffold.json'
+  if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+    return [pscustomobject]@{ mnm_count = 0; variable_count = 0 }
+  }
+  $manifest = Get-Content -Raw -LiteralPath $manifestPath -Encoding UTF8 | ConvertFrom-Json
+  $mnmCount = 0
+  $variableCount = 0
+  foreach ($entry in @($manifest.mnm_files)) {
+    $moduleName = if ($entry.module_name) { [string]$entry.module_name } else { [IO.Path]::GetFileNameWithoutExtension([string]$entry.path) }
+    $safeModuleName = $moduleName -replace '[\\/:*?"<>|]+', '_'
+    if ($entry.path) {
+      $sourceMnm = Join-Path $SeedRoot ([string]$entry.path)
+      if (Test-Path -LiteralPath $sourceMnm -PathType Leaf) {
+        $targetDir = Join-Path $MnmDestination $safeModuleName
+        Copy-FileToDirectory $sourceMnm $targetDir
+        $mnmCount++
+      }
+    }
+    $variablePaths = @()
+    if ($entry.variables) {
+      if ($entry.variables.global_tsv) { $variablePaths += [string]$entry.variables.global_tsv }
+      if ($entry.variables.local_tsv) { $variablePaths += [string]$entry.variables.local_tsv }
+    }
+    if ($entry.arguments -and $entry.arguments.tsv) {
+      $variablePaths += [string]$entry.arguments.tsv
+    }
+    foreach ($relativeVariablePath in @($variablePaths | Where-Object { $_ } | Select-Object -Unique)) {
+      $sourceVariable = Join-Path $SeedRoot $relativeVariablePath
+      if (Test-Path -LiteralPath $sourceVariable -PathType Leaf) {
+        $targetDir = Join-Path $VariablesDestination $safeModuleName
+        Copy-FileToDirectory $sourceVariable $targetDir
+        $variableCount++
+      }
+    }
+  }
+  return [pscustomobject]@{ mnm_count = $mnmCount; variable_count = $variableCount }
+}
+
 function ConvertTo-RelativePath([string]$Base, [string]$Path) {
   $baseUri = [Uri](([IO.Path]::GetFullPath($Base).TrimEnd('\') + '\'))
   $pathUri = [Uri]([IO.Path]::GetFullPath($Path))
@@ -121,6 +166,9 @@ if ($SeedScaffoldRoot) {
   $SeedScaffoldRoot = [IO.Path]::GetFullPath($SeedScaffoldRoot)
   $seededMnm = Copy-IfPresent (Join-Path $SeedScaffoldRoot 'mnm') $mnmDir
   $seededVariables = Copy-IfPresent (Join-Path $SeedScaffoldRoot 'variables') $variablesDir
+  $manifestSeed = Copy-SeedScaffoldArtifactsFromManifest $SeedScaffoldRoot $mnmDir $variablesDir
+  if ($manifestSeed.mnm_count -gt 0) { $seededMnm = $true }
+  if ($manifestSeed.variable_count -gt 0) { $seededVariables = $true }
   foreach ($name in @('scaffold.json', 'scaffold.model.json', 'TASK.md', 'VERSION.md', 'CHECKLIST.md')) {
     $source = Join-Path $SeedScaffoldRoot $name
     if (Test-Path -LiteralPath $source -PathType Leaf) {
@@ -171,7 +219,7 @@ $architecture = [ordered]@{
 }
 $architecture | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $architecturePath -Encoding UTF8
 
-$mnmCount = @(Get-ChildItem -LiteralPath $mnmDir -File -Filter '*.mnm' -ErrorAction SilentlyContinue).Count
+$mnmCount = @(Get-ChildItem -LiteralPath $mnmDir -File -Filter '*.mnm' -Recurse -ErrorAction SilentlyContinue).Count
 $variableCount = @(Get-ChildItem -LiteralPath $variablesDir -File -Recurse -ErrorAction SilentlyContinue |
   Where-Object { $_.Extension -in @('.tsv', '.csv', '.json') }).Count
 $trustedSeed = ($SeedTrust -eq 'SameRunSkillBaseline' -or $SeedTrust -eq 'ControlledScaffoldSnapshot')
