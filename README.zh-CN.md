@@ -118,7 +118,8 @@ KeyenceAgent 在运行 KV STUDIO 的 Windows 虚拟机上作为文本化 harness
 | --- | --- | --- |
 | `kv-studio-operator/` | 必须 | runner、受保护 UI 操作、脚手架渲染器、验证器、配置模板。 |
 | `keyence-plc-programmer/` | 建议 | PLC 编程规则和 KEYENCE 项目工作流。 |
-| `kv-studio-kb-programming/` | 建议 | 本地 Wiki V2 查询规则，用于确认 KEYENCE 语法和手册依据。 |
+| `kv-studio-kb-programming/` | 建议 | 本地 Wiki V2 查询封装与规则，用于确认 KEYENCE 语法和手册依据。 |
+| `llm-wiki-v2-keyence/` | 编程依据必需 | 本地 Wiki V2 数据库和查询脚本。它可以保留在 KEYENCE `htmlhelp` 下，也可以拷贝到 harness 旁边，只要配置文件指向实际路径。 |
 | `docs/` 与 `README*.md` | 建议 | 人类部署说明和架构文档。 |
 
 最稳妥的部署方式是直接复制或克隆整个仓库：
@@ -144,7 +145,7 @@ kv-studio-operator\config\kv-studio-operator.example.json
 kv-studio-operator\config\kv-studio-operator.local.json
 ```
 
-配置文件保存机器相关路径：
+配置文件保存 KV STUDIO 操作和 KEYENCE Wiki V2 检索所需的机器相关路径：
 
 ```json
 {
@@ -154,6 +155,11 @@ kv-studio-operator\config\kv-studio-operator.local.json
   "repair_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repair_runs",
   "repeat_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repeat_runs",
   "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
+  "htmlhelp_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp",
+  "wiki_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence",
+  "wiki_cleaned_db": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\wiki.v2.cleaned.db",
+  "wiki_fixed_db": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\wiki.v2.fixed.db",
+  "wiki_query_script": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\scripts\\wiki_query.py",
   "timeout_seconds": 600,
   "local_paste_format": "NameType"
 }
@@ -172,6 +178,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\Public\KeyenceAgent
   -ConfigPath "$env:APPDATA\Codex\kv-studio-operator\config.json" `
   -ScaffoldRoot C:\Users\Public\KVSkillPractice\scaffolds\example
 ```
+
+知识库查询也自动读取同一份配置：
+
+```powershell
+python C:\Users\Public\KeyenceAgent\kv-studio-kb-programming\scripts\query_keyence_kb.py "ST 赋值语句" --limit 5 --evidence
+```
+
+Wiki 路径优先级是：命令行 `--db/--query-script`、`KEYENCE_WIKI_*` 环境变量、共享 KeyenceAgent 配置、脚本内置默认路径。
 
 ## 关键脚本
 

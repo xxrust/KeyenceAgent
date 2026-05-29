@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -23,6 +24,12 @@ def parse_args() -> argparse.Namespace:
         description="Query the local KEYENCE LLM Wiki V2 database used for KV STUDIO work."
     )
     parser.add_argument("keywords", nargs="+", help="Keywords passed through to wiki_query.py.")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Optional KeyenceAgent VM config JSON. Defaults to KEYENCE_AGENT_CONFIG, KV_STUDIO_OPERATOR_CONFIG, or %APPDATA%\\Codex\\kv-studio-operator\\config.json.",
+    )
     parser.add_argument("--db", type=Path, default=None, help="Explicit path to wiki.v2.cleaned.db or wiki.v2.fixed.db.")
     parser.add_argument(
         "--query-script",
@@ -41,12 +48,56 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def candidate_roots() -> list[Path]:
+def expand_path(value: str | None) -> Path | None:
+    if not value:
+        return None
+    return Path(os.path.expandvars(value))
+
+
+def candidate_config_paths(explicit_config: Path | None) -> list[Path]:
+    candidates: list[Path] = []
+    if explicit_config:
+        candidates.append(explicit_config)
+
+    for env_name in ["KEYENCE_AGENT_CONFIG", "KV_STUDIO_OPERATOR_CONFIG"]:
+        env_path = os.environ.get(env_name)
+        expanded = expand_path(env_path)
+        if expanded:
+            candidates.append(expanded)
+
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        candidates.append(Path(appdata) / "Codex" / "kv-studio-operator" / "config.json")
+
+    skill_root = Path(__file__).resolve().parents[2]
+    candidates.append(skill_root / "kv-studio-operator" / "config" / "kv-studio-operator.local.json")
+    return dedupe(candidates)
+
+
+def load_config(explicit_config: Path | None) -> dict[str, str]:
+    for path in candidate_config_paths(explicit_config):
+        if not path.exists():
+            continue
+        with path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        return {str(key): str(value) for key, value in data.items() if value is not None}
+    return {}
+
+
+def candidate_roots(config: dict[str, str]) -> list[Path]:
     candidates: list[Path] = []
     env_root = os.environ.get("KEYENCE_WIKI_ROOT") or os.environ.get("KEYENCE_KB_ROOT")
     if env_root:
         root = Path(env_root)
         candidates.extend([root, root / "htmlhelp"])
+
+    config_htmlhelp_root = expand_path(config.get("htmlhelp_root"))
+    if config_htmlhelp_root:
+        candidates.append(config_htmlhelp_root)
+
+    config_wiki_root = expand_path(config.get("wiki_root"))
+    if config_wiki_root:
+        candidates.append(config_wiki_root.parent)
 
     candidates.append(DEFAULT_HTMLHELP_ROOT)
 
@@ -58,21 +109,29 @@ def candidate_roots() -> list[Path]:
     return dedupe(candidates)
 
 
-def candidate_query_scripts() -> list[Path]:
+def candidate_query_scripts(config: dict[str, str]) -> list[Path]:
     candidates: list[Path] = []
     env_path = os.environ.get("KEYENCE_WIKI_QUERY_SCRIPT")
     if env_path:
         candidates.append(Path(env_path))
 
+    config_query_script = expand_path(config.get("wiki_query_script"))
+    if config_query_script:
+        candidates.append(config_query_script)
+
+    config_wiki_root = expand_path(config.get("wiki_root"))
+    if config_wiki_root:
+        candidates.append(config_wiki_root / "scripts" / "wiki_query.py")
+
     candidates.append(DEFAULT_QUERY_SCRIPT)
 
-    for root in candidate_roots():
+    for root in candidate_roots(config):
         candidates.append(root / "llm-wiki-v2-keyence" / "scripts" / "wiki_query.py")
 
     return dedupe(candidates)
 
 
-def candidate_dbs(fixed: bool, query_script: Path | None) -> list[Path]:
+def candidate_dbs(fixed: bool, query_script: Path | None, config: dict[str, str]) -> list[Path]:
     db_name = "wiki.v2.fixed.db" if fixed else "wiki.v2.cleaned.db"
     candidates: list[Path] = []
 
@@ -80,9 +139,18 @@ def candidate_dbs(fixed: bool, query_script: Path | None) -> list[Path]:
     if env_db:
         candidates.append(Path(env_db))
 
+    config_db_key = "wiki_fixed_db" if fixed else "wiki_cleaned_db"
+    config_db = expand_path(config.get(config_db_key))
+    if config_db:
+        candidates.append(config_db)
+
+    config_wiki_root = expand_path(config.get("wiki_root"))
+    if config_wiki_root:
+        candidates.append(config_wiki_root / db_name)
+
     candidates.append(DEFAULT_WIKI_DIR / db_name)
 
-    for root in candidate_roots():
+    for root in candidate_roots(config):
         candidates.append(root / "llm-wiki-v2-keyence" / db_name)
 
     if query_script:
@@ -113,8 +181,9 @@ def resolve_existing_path(candidates: list[Path]) -> Path | None:
 
 def main() -> int:
     args = parse_args()
+    config = load_config(args.config)
 
-    query_script = args.query_script or resolve_existing_path(candidate_query_scripts())
+    query_script = args.query_script or resolve_existing_path(candidate_query_scripts(config))
     if query_script is None:
         print(
             "Could not find llm-wiki-v2-keyence/scripts/wiki_query.py. "
@@ -123,7 +192,7 @@ def main() -> int:
         )
         return 1
 
-    db_path = args.db or resolve_existing_path(candidate_dbs(args.fixed, query_script))
+    db_path = args.db or resolve_existing_path(candidate_dbs(args.fixed, query_script, config))
     if db_path is None:
         print(
             "Could not find wiki.v2.cleaned.db. Set KEYENCE_WIKI_DB or KEYENCE_WIKI_ROOT, "

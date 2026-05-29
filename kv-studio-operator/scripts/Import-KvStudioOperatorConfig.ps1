@@ -55,6 +55,11 @@ return [pscustomobject]@{
   repair_out_root = Expand-ConfigPathValue ([string]$config.repair_out_root)
   repeat_out_root = Expand-ConfigPathValue ([string]$config.repeat_out_root)
   admin_credential_path = Expand-ConfigPathValue ([string]$config.admin_credential_path)
+  htmlhelp_root = Expand-ConfigPathValue ([string]$config.htmlhelp_root)
+  wiki_root = Expand-ConfigPathValue ([string]$config.wiki_root)
+  wiki_cleaned_db = Expand-ConfigPathValue ([string]$config.wiki_cleaned_db)
+  wiki_fixed_db = Expand-ConfigPathValue ([string]$config.wiki_fixed_db)
+  wiki_query_script = Expand-ConfigPathValue ([string]$config.wiki_query_script)
   timeout_seconds = if ($null -ne $config.timeout_seconds -and [string]$config.timeout_seconds -ne '') { [int]$config.timeout_seconds } else { $null }
   local_paste_format = if ($config.local_paste_format) { [string]$config.local_paste_format } else { '' }
 }

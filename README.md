@@ -118,7 +118,8 @@ Copy or clone these runtime folders:
 | --- | --- | --- |
 | `kv-studio-operator/` | Yes | Runner scripts, guarded UI actions, scaffold renderer, validator, config template. |
 | `keyence-plc-programmer/` | Recommended | PLC authoring rules and KEYENCE programming workflow. |
-| `kv-studio-kb-programming/` | Recommended | Local Wiki V2 query workflow for KEYENCE syntax and manuals. |
+| `kv-studio-kb-programming/` | Recommended | Local Wiki V2 query wrapper and workflow for KEYENCE syntax and manuals. |
+| `llm-wiki-v2-keyence/` | Required for programming evidence | Local Wiki V2 database and query script. It may stay under KEYENCE `htmlhelp` or be copied beside the harness if the config points to it. |
 | `docs/` and `README*.md` | Recommended | Human deployment and architecture documentation. |
 
 The safe default is to copy the whole repository to the VM, for example:
@@ -144,7 +145,7 @@ Place the local copy at either path:
 kv-studio-operator\config\kv-studio-operator.local.json
 ```
 
-The config stores machine-specific paths:
+The config stores machine-specific paths for both KV STUDIO operation and KEYENCE Wiki V2 retrieval:
 
 ```json
 {
@@ -154,6 +155,11 @@ The config stores machine-specific paths:
   "repair_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repair_runs",
   "repeat_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repeat_runs",
   "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
+  "htmlhelp_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp",
+  "wiki_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence",
+  "wiki_cleaned_db": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\wiki.v2.cleaned.db",
+  "wiki_fixed_db": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\wiki.v2.fixed.db",
+  "wiki_query_script": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\scripts\\wiki_query.py",
   "timeout_seconds": 600,
   "local_paste_format": "NameType"
 }
@@ -172,6 +178,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\Public\KeyenceAgent
   -ConfigPath "$env:APPDATA\Codex\kv-studio-operator\config.json" `
   -ScaffoldRoot C:\Users\Public\KVSkillPractice\scaffolds\example
 ```
+
+Knowledge-base queries use the same config automatically:
+
+```powershell
+python C:\Users\Public\KeyenceAgent\kv-studio-kb-programming\scripts\query_keyence_kb.py "ST assignment" --limit 5 --evidence
+```
+
+Override order for Wiki paths is: command-line `--db/--query-script`, `KEYENCE_WIKI_*` environment variables, shared KeyenceAgent config, then built-in defaults.
 
 ## Key Scripts
 

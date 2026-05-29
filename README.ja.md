@@ -118,7 +118,8 @@ KeyenceAgent は、KV STUDIO を実行する Windows VM 上にテキスト主体
 | --- | --- | --- |
 | `kv-studio-operator/` | 必須 | runner、guarded UI 操作、scaffold renderer、validator、設定テンプレート。 |
 | `keyence-plc-programmer/` | 推奨 | PLC 作成ルールと KEYENCE プログラミング手順。 |
-| `kv-studio-kb-programming/` | 推奨 | KEYENCE 構文とマニュアル根拠を確認するローカル Wiki V2 ワークフロー。 |
+| `kv-studio-kb-programming/` | 推奨 | KEYENCE 構文とマニュアル根拠を確認するローカル Wiki V2 query wrapper とワークフロー。 |
+| `llm-wiki-v2-keyence/` | プログラミング根拠に必須 | ローカル Wiki V2 database と query script。KEYENCE `htmlhelp` 配下に置くか、harness の近くへコピーし、設定ファイルで実パスを指定します。 |
 | `docs/` と `README*.md` | 推奨 | 人向けのデプロイ説明とアーキテクチャ文書。 |
 
 安全な標準配置は、リポジトリ全体を VM に clone する方法です。
@@ -144,7 +145,7 @@ kv-studio-operator\config\kv-studio-operator.example.json
 kv-studio-operator\config\kv-studio-operator.local.json
 ```
 
-設定ファイルは VM 固有のパスを保持します。
+設定ファイルは KV STUDIO 操作と KEYENCE Wiki V2 retrieval に必要な VM 固有パスを保持します。
 
 ```json
 {
@@ -154,6 +155,11 @@ kv-studio-operator\config\kv-studio-operator.local.json
   "repair_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repair_runs",
   "repeat_out_root": "C:\\Users\\Public\\KVSkillPractice\\mvp_repeat_runs",
   "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
+  "htmlhelp_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp",
+  "wiki_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence",
+  "wiki_cleaned_db": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\wiki.v2.cleaned.db",
+  "wiki_fixed_db": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\wiki.v2.fixed.db",
+  "wiki_query_script": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence\\scripts\\wiki_query.py",
   "timeout_seconds": 600,
   "local_paste_format": "NameType"
 }
@@ -172,6 +178,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\Public\KeyenceAgent
   -ConfigPath "$env:APPDATA\Codex\kv-studio-operator\config.json" `
   -ScaffoldRoot C:\Users\Public\KVSkillPractice\scaffolds\example
 ```
+
+Knowledge-base query も同じ設定を自動で読み取ります。
+
+```powershell
+python C:\Users\Public\KeyenceAgent\kv-studio-kb-programming\scripts\query_keyence_kb.py "ST assignment" --limit 5 --evidence
+```
+
+Wiki path の優先順位は、command-line `--db/--query-script`、`KEYENCE_WIKI_*` environment variables、shared KeyenceAgent config、built-in defaults です。
 
 ## 主要スクリプト
 

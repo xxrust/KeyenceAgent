@@ -9,6 +9,8 @@ description: Use when Codex needs to answer questions, design logic, write ST co
 
 Use the local KEYENCE LLM Wiki V2 database before writing or explaining KV STUDIO code. Treat `llm-wiki-v2-keyence/wiki.v2.cleaned.db` as the default source of truth for KEYENCE-specific syntax, module behavior, device maps, motion terminology, and manual evidence. If recall is weak or the result set is unexpectedly empty, rerun the same query against `llm-wiki-v2-keyence/wiki.v2.fixed.db` as a Wiki V2 fallback.
 
+On a Windows VM, prefer the shared KeyenceAgent config created from `kv-studio-operator/config/kv-studio-operator.example.json`. The query wrapper reads `KEYENCE_AGENT_CONFIG`, `KV_STUDIO_OPERATOR_CONFIG`, `%APPDATA%\Codex\kv-studio-operator\config.json`, or `kv-studio-operator\config\kv-studio-operator.local.json` and uses `wiki_root`, `wiki_cleaned_db`, `wiki_fixed_db`, and `wiki_query_script` when present. CLI arguments and `KEYENCE_WIKI_*` environment variables remain higher-priority overrides.
+
 Use Wiki V2 as the only retrieval path described by this skill. Do not use the legacy `knowledge-base/knowledge.db` or `kb_tools/query_kb.py` path for this skill.
 
 ## Workflow
@@ -23,7 +25,7 @@ Use Wiki V2 as the only retrieval path described by this skill. Do not use the l
    - error handling, scan timing, conversion, or PLC verification
 
 2. Query Wiki V2 before answering.
-   Run `llm-wiki-v2-keyence/scripts/wiki_query.py ... --db llm-wiki-v2-keyence/wiki.v2.cleaned.db` from the htmlhelp workspace.
+   Run `scripts/query_keyence_kb.py ...` from this skill, or run `llm-wiki-v2-keyence/scripts/wiki_query.py ... --db llm-wiki-v2-keyence/wiki.v2.cleaned.db` from the htmlhelp workspace.
    Run at least one exact query and one semantic query when the request is non-trivial.
    If the user asks in Chinese, reuse the user's original wording as one of the queries.
 
