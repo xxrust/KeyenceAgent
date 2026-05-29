@@ -1,4 +1,4 @@
-# KeyenceAgent
+﻿# KeyenceAgent
 
 <p align="center">
   <img src="docs/images/keyenceagent-harness-overview.png" alt="KeyenceAgent アーキテクチャ概要">
@@ -165,7 +165,7 @@ kv-studio-operator\config\kv-studio-operator.local.json
 }
 ```
 
-`work_root` derives `mvp_runs`, `mvp_repair_runs`, and `mvp_repeat_runs`. `wiki_root` derives `wiki.v2.cleaned.db`, optional `wiki.v2.fixed.db`, and `scripts\wiki_query.py`. Advanced fields such as `timeout_seconds`, `local_paste_format`, `mvp_out_root`, `repair_out_root`, `repeat_out_root`, `wiki_cleaned_db`, `wiki_fixed_db`, and `wiki_query_script` remain supported as explicit overrides, but setup does not ask for them by default.
+`work_root` derives `mvp_runs`, `mvp_repair_runs`, and `mvp_repeat_runs`. `wiki_root` derives `wiki.v2.cleaned.db` and `scripts\wiki_query.py`. Advanced fields such as `timeout_seconds`, `local_paste_format`, `mvp_out_root`, `repair_out_root`, `repeat_out_root`, `wiki_cleaned_db` and `wiki_query_script` remain supported as explicit overrides, but setup does not ask for them by default.
 
 KV STUDIO 管理者パスワードは JSON に保存しません。`setup_keyence_agent.ps1` は `Read-Host -AsSecureString` で password を読み取り、Windows DPAPI で `admin_credential_path` に保存します。credential writer を単独で実行することもできます。
 

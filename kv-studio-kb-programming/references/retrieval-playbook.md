@@ -38,11 +38,7 @@ python .\llm-wiki-v2-keyence\scripts\wiki_query.py "KV-XLE buffer memory" --db .
 python .\llm-wiki-v2-keyence\scripts\wiki_query.py "register map" --db .\llm-wiki-v2-keyence\wiki.v2.cleaned.db --limit 5 --evidence
 ```
 
-If the cleaned database has weak recall, rerun the same query with `wiki.v2.fixed.db`:
-
-```powershell
-python .\llm-wiki-v2-keyence\scripts\wiki_query.py "KV-XH DeviceMap" --db .\llm-wiki-v2-keyence\wiki.v2.fixed.db --limit 5 --evidence
-```
+If `wiki.v2.cleaned.db` has weak recall, do not switch databases by default. Rewrite the query as exact identifiers plus short semantic phrases, then compare evidence by source type. Use `--db` only when the user provides another verified Wiki V2 database for the current machine.
 
 ### Motion and positioning
 

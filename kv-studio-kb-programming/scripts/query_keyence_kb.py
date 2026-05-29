@@ -30,7 +30,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional KeyenceAgent VM config JSON. Defaults to KEYENCE_AGENT_CONFIG, KV_STUDIO_OPERATOR_CONFIG, or %APPDATA%\\Codex\\kv-studio-operator\\config.json.",
     )
-    parser.add_argument("--db", type=Path, default=None, help="Explicit path to wiki.v2.cleaned.db or wiki.v2.fixed.db.")
+    parser.add_argument("--db", type=Path, default=None, help="Explicit path to an alternate Wiki V2 database.")
     parser.add_argument(
         "--query-script",
         type=Path,
@@ -40,11 +40,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=5, help="Maximum results to print.")
     parser.add_argument("--graph", action="store_true", help="Include graph-hop results.")
     parser.add_argument("--evidence", action="store_true", help="Print source/evidence oriented output.")
-    parser.add_argument(
-        "--fixed",
-        action="store_true",
-        help="Use wiki.v2.fixed.db instead of the default cleaned database.",
-    )
     return parser.parse_args()
 
 
@@ -131,16 +126,15 @@ def candidate_query_scripts(config: dict[str, str]) -> list[Path]:
     return dedupe(candidates)
 
 
-def candidate_dbs(fixed: bool, query_script: Path | None, config: dict[str, str]) -> list[Path]:
-    db_name = "wiki.v2.fixed.db" if fixed else "wiki.v2.cleaned.db"
+def candidate_dbs(query_script: Path | None, config: dict[str, str]) -> list[Path]:
+    db_name = "wiki.v2.cleaned.db"
     candidates: list[Path] = []
 
     env_db = os.environ.get("KEYENCE_WIKI_DB")
     if env_db:
         candidates.append(Path(env_db))
 
-    config_db_key = "wiki_fixed_db" if fixed else "wiki_cleaned_db"
-    config_db = expand_path(config.get(config_db_key))
+    config_db = expand_path(config.get("wiki_cleaned_db"))
     if config_db:
         candidates.append(config_db)
 
@@ -192,11 +186,11 @@ def main() -> int:
         )
         return 1
 
-    db_path = args.db or resolve_existing_path(candidate_dbs(args.fixed, query_script, config))
+    db_path = args.db or resolve_existing_path(candidate_dbs(query_script, config))
     if db_path is None:
         print(
             "Could not find wiki.v2.cleaned.db. Set KEYENCE_WIKI_DB or KEYENCE_WIKI_ROOT, "
-            "or pass --db. Use --fixed to search for wiki.v2.fixed.db.",
+            "or pass --db.",
             file=sys.stderr,
         )
         return 1

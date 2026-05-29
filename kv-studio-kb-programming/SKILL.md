@@ -7,9 +7,9 @@ description: Use when Codex needs to answer questions, design logic, write ST co
 
 ## Overview
 
-Use the local KEYENCE LLM Wiki V2 database before writing or explaining KV STUDIO code. Treat `llm-wiki-v2-keyence/wiki.v2.cleaned.db` as the default source of truth for KEYENCE-specific syntax, module behavior, device maps, motion terminology, and manual evidence. If recall is weak or the result set is unexpectedly empty, rerun the same query against `llm-wiki-v2-keyence/wiki.v2.fixed.db` as a Wiki V2 fallback.
+Use the local KEYENCE LLM Wiki V2 database before writing or explaining KV STUDIO code. Treat `llm-wiki-v2-keyence/wiki.v2.cleaned.db` as the source of truth for KEYENCE-specific syntax, module behavior, device maps, motion terminology, and manual evidence.
 
-Prefer the shared KeyenceAgent config created from `kv-studio-operator/config/kv-studio-operator.example.json` on the Windows machine where Codex runs. The normal config only needs `wiki_root`; the query wrapper derives `wiki.v2.cleaned.db`, optional `wiki.v2.fixed.db`, and `scripts/wiki_query.py` from that root. The wrapper still accepts `wiki_cleaned_db`, `wiki_fixed_db`, and `wiki_query_script` as advanced overrides. CLI arguments and `KEYENCE_WIKI_*` environment variables remain higher-priority overrides.
+Prefer the shared KeyenceAgent config created from `kv-studio-operator/config/kv-studio-operator.example.json` on the Windows machine where Codex runs. The normal config only needs `wiki_root`; the query wrapper derives `wiki.v2.cleaned.db` and `scripts/wiki_query.py` from that root. The wrapper still accepts `wiki_cleaned_db` and `wiki_query_script` as advanced overrides. CLI arguments and `KEYENCE_WIKI_*` environment variables remain higher-priority overrides.
 
 Use Wiki V2 as the only retrieval path described by this skill. Do not use the legacy `knowledge-base/knowledge.db` or `kb_tools/query_kb.py` path for this skill.
 
@@ -80,13 +80,9 @@ python .\llm-wiki-v2-keyence\scripts\wiki_query.py "JOG 正方向 负方向" --d
 python .\llm-wiki-v2-keyence\scripts\wiki_query.py "定位 轴 软元件 分配" --db .\llm-wiki-v2-keyence\wiki.v2.cleaned.db --limit 5 --evidence
 ```
 
-### Weak Recall Fallback
+### Weak Recall
 
-If `wiki.v2.cleaned.db` returns no useful evidence, rerun the exact query with `wiki.v2.fixed.db`:
-
-```powershell
-python .\llm-wiki-v2-keyence\scripts\wiki_query.py "KV-XH DeviceMap" --db .\llm-wiki-v2-keyence\wiki.v2.fixed.db --limit 5 --evidence
-```
+If `wiki.v2.cleaned.db` returns no useful evidence, change the query terms, split the query into exact identifiers plus semantic phrases, or read `references/retrieval-playbook.md`. Use `--db` only when a user explicitly provides another verified Wiki V2 database.
 
 ## Programming Rules
 

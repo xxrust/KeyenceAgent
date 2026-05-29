@@ -1,4 +1,4 @@
-# KeyenceAgent
+﻿# KeyenceAgent
 
 <p align="center">
   <img src="docs/images/keyenceagent-harness-overview.png" alt="KeyenceAgent architecture overview">
@@ -165,7 +165,7 @@ The normal config stores only machine-specific roots. Derived paths are resolved
 }
 ```
 
-`work_root` derives `mvp_runs`, `mvp_repair_runs`, and `mvp_repeat_runs`. `wiki_root` derives `wiki.v2.cleaned.db`, optional `wiki.v2.fixed.db`, and `scripts\wiki_query.py`. Advanced fields such as `timeout_seconds`, `local_paste_format`, `mvp_out_root`, `repair_out_root`, `repeat_out_root`, `wiki_cleaned_db`, `wiki_fixed_db`, and `wiki_query_script` remain supported as explicit overrides, but the setup flow does not ask for them by default.
+`work_root` derives `mvp_runs`, `mvp_repair_runs`, and `mvp_repeat_runs`. `wiki_root` derives `wiki.v2.cleaned.db` and `scripts\wiki_query.py`. Advanced fields such as `timeout_seconds`, `local_paste_format`, `mvp_out_root`, `repair_out_root`, `repeat_out_root`, `wiki_cleaned_db` and `wiki_query_script` remain supported as explicit overrides, but the setup flow does not ask for them by default.
 
 Do not store KV STUDIO administrator passwords in JSON. `setup_keyence_agent.ps1` reads the password with `Read-Host -AsSecureString` and stores it at `admin_credential_path` with Windows DPAPI. You can also run the credential writer directly:
 
