@@ -99,6 +99,24 @@ function Test-MnmReferencesName([string]$Text, [string]$Name) {
   return [regex]::IsMatch($Text, $pattern)
 }
 
+$script:NetworkConfigPayloadKeyPattern = "(?im)(^|[\s,{])[""']?(ethernet_ip|ethernetIp|ethercat|device_path|devicePath|device_path_text|devicePathText|node_address|nodeAddress|ip_address|ipAddress|variable_name_prefix|variableNamePrefix|variable_names|variableNames|batch_axis_registration|batchAxisRegistration|esi_path|esiPath|esi_file|esiFile)[""']?\s*[:=]"
+
+function Assert-NoNetworkConfigPayloadText([string]$Text, [string]$Path, [string]$Label, [string]$NetworkConfigPath) {
+  if ([string]::IsNullOrEmpty($Text)) { return }
+  $matches = @([regex]::Matches($Text, $script:NetworkConfigPayloadKeyPattern))
+  if ($matches.Count -eq 0) { return }
+  $hits = @(
+    $matches |
+      Select-Object -First 8 |
+      ForEach-Object {
+        $before = if ($_.Index -gt 0) { $Text.Substring(0, $_.Index) } else { '' }
+        $lineNumber = ([regex]::Matches($before, "(`r`n|`n|`r)")).Count + 1
+        '{0}:line {1}: {2}' -f $Label, $lineNumber, $_.Groups[2].Value
+      }
+  )
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_LEAK' "EtherCAT/EtherNet/IP unit configuration payload keys belong only in architecture/network_config.json. Move these entries out of TASK.md, VERSION.md, MNM comments, and variable TSV files: $($hits -join '; ')" @($Path, $NetworkConfigPath)
+}
+
 function Assert-MnmImportableInstructionText([string]$Text, [string]$Path) {
   $badBracketedInstructions = @()
   foreach ($line in ($Text -split "(`r`n|`n|`r)")) {
@@ -200,25 +218,33 @@ if ([string]$manifest.variables.schema -ne 'per_mnm') {
 
 $networkConfigPath = ''
 $networkConfig = $null
-if ($manifest.architecture -and $manifest.architecture.network_config) {
-  $networkConfigPath = Resolve-ScaffoldPath ([string]$manifest.architecture.network_config)
-  Assert-File $networkConfigPath 'network configuration architecture file'
-  try {
-    $networkConfig = Get-Content -Raw -LiteralPath $networkConfigPath -Encoding UTF8 | ConvertFrom-Json
-  } catch {
-    Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_INVALID_JSON' "architecture.network_config is not valid JSON: $($_.Exception.Message)" @($networkConfigPath)
-  }
-  if ([int]$networkConfig.schema_version -ne 1) {
-    Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_SCHEMA_UNSUPPORTED' 'architecture/network_config.json must use schema_version=1.' @($networkConfigPath)
-  }
-  if ([string]$networkConfig.route -ne 'project_tree_unit_configuration') {
-    Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_ROUTE_INVALID' 'network_config.route must be project_tree_unit_configuration.' @($networkConfigPath)
-  }
-  if (-not $networkConfig.ethernet_ip -or $null -eq $networkConfig.ethernet_ip.devices) {
-    Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_ETHERNET_MISSING' 'network_config must contain ethernet_ip.devices array, even when empty.' @($networkConfigPath)
-  }
-  if (-not $networkConfig.ethercat -or $null -eq $networkConfig.ethercat.devices) {
-    Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_ETHERCAT_MISSING' 'network_config must contain ethercat.devices array, even when empty.' @($networkConfigPath)
+if (-not $manifest.architecture -or -not $manifest.architecture.network_config) {
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_MISSING' 'scaffold.json must declare architecture.network_config. EtherCAT/EtherNet/IP unit configuration is not allowed in TASK.md, VERSION.md, MNM comments, or variable TSV files.' @($manifestPath)
+}
+$networkConfigPath = Resolve-ScaffoldPath ([string]$manifest.architecture.network_config)
+Assert-File $networkConfigPath 'network configuration architecture file'
+try {
+  $networkConfig = Get-Content -Raw -LiteralPath $networkConfigPath -Encoding UTF8 | ConvertFrom-Json
+} catch {
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_INVALID_JSON' "architecture.network_config is not valid JSON: $($_.Exception.Message)" @($networkConfigPath)
+}
+if ([int]$networkConfig.schema_version -ne 1) {
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_SCHEMA_UNSUPPORTED' 'architecture/network_config.json must use schema_version=1.' @($networkConfigPath)
+}
+if ([string]$networkConfig.route -ne 'project_tree_unit_configuration') {
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_ROUTE_INVALID' 'network_config.route must be project_tree_unit_configuration.' @($networkConfigPath)
+}
+if (-not $networkConfig.ethernet_ip -or $null -eq $networkConfig.ethernet_ip.devices) {
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_ETHERNET_MISSING' 'network_config must contain ethernet_ip.devices array, even when empty.' @($networkConfigPath)
+}
+if (-not $networkConfig.ethercat -or $null -eq $networkConfig.ethercat.devices) {
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_ETHERCAT_MISSING' 'network_config must contain ethercat.devices array, even when empty.' @($networkConfigPath)
+}
+
+foreach ($docName in @('TASK.md','VERSION.md')) {
+  $docPath = Join-Path $ScaffoldRoot $docName
+  if (Test-Path -LiteralPath $docPath -PathType Leaf) {
+    Assert-NoNetworkConfigPayloadText ([IO.File]::ReadAllText($docPath, [Text.Encoding]::UTF8)) $docPath $docName $networkConfigPath
   }
 }
 
@@ -292,6 +318,10 @@ foreach ($entry in $mnmEntries) {
   }
   $entryGlobalTsv = Resolve-ScaffoldPath ([string]$entry.variables.global_tsv)
   $entryLocalTsv = Resolve-ScaffoldPath ([string]$entry.variables.local_tsv)
+  Assert-File $entryGlobalTsv "global variable TSV for $moduleName"
+  Assert-File $entryLocalTsv "local variable TSV for $moduleName"
+  Assert-NoNetworkConfigPayloadText ([IO.File]::ReadAllText($entryGlobalTsv, [Text.Encoding]::Default)) $entryGlobalTsv "global variable TSV for $moduleName" $networkConfigPath
+  Assert-NoNetworkConfigPayloadText ([IO.File]::ReadAllText($entryLocalTsv, [Text.Encoding]::Default)) $entryLocalTsv "local variable TSV for $moduleName" $networkConfigPath
   $globalRows = Read-TsvRows $entryGlobalTsv $requiredTsvColumns "global variable TSV for $moduleName"
   $localRows = Read-TsvRows $entryLocalTsv $requiredTsvColumns "local variable TSV for $moduleName"
   $definedGlobalRows = @(Get-ExecutableRows $globalRows 'global')
@@ -319,6 +349,7 @@ foreach ($entry in $mnmEntries) {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_ENCODING_INVALID' "MNM file must be UTF-16LE with BOM: $mnmPath" @($mnmPath)
   }
   $text = [Text.Encoding]::Unicode.GetString($bytes)
+  Assert-NoNetworkConfigPayloadText $text $mnmPath "MNM file for $moduleName" $networkConfigPath
   Assert-MnmImportableInstructionText $text $mnmPath
   $actualDeviceCode = Get-MnmDeviceCodeFromText $text
   if ($null -eq $actualDeviceCode) {

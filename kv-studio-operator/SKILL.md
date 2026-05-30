@@ -196,7 +196,7 @@ MNM module type:
 - Variable definition gate: every generated or edited variable TSV must pass `scripts\assert_kv_variable_definitions.ps1` or the equivalent shared validator before KV STUDIO opens.
 - Existing-project source gate: before modifying an existing `.kpr`, `scripts\assert_kv_existing_project_snapshot.ps1` must prove that the current project fingerprint matches a ready source snapshot containing MNM files, variable manifests, inventory evidence, and an open architecture file.
 - MNM import plan gate: before modifying an existing `.kpr`, `scripts\assert_kv_mnm_import_plan.ps1` compares incoming `scaffold.json.mnm_files[].module_name` values with the verified source snapshot MNM inventory. Direct import is forbidden when a same-name module already exists. If a conflict exists, the top-level runner must be invoked with `-DeleteExistingModulesBeforeImport`, and the child import step must pre-delete that module before importing its replacement. If the project fingerprint no longer matches the snapshot, export current MNM first and re-plan.
-- Scaffold gate: an existing scaffold must pass `scripts\validate_kv_mvp_scaffold.ps1` before runner use.
+- Scaffold gate: an existing scaffold must pass `scripts\validate_kv_mvp_scaffold.ps1` before runner use. This gate requires `architecture\network_config.json` and rejects structured network payload keys such as `node_address`, `ip_address`, `device_path`, or `esi_path` in `TASK.md`, `VERSION.md`, MNM comments, or variable TSV files with `KV_SCAFFOLD_NETWORK_CONFIG_LEAK`.
 - UI guard gate: the runner must pass `scripts\assert_kv_mvp_ui_guard_usage.ps1` before touching KV STUDIO.
 - Agent boundary gate: the runner must pass `scripts\assert_kv_mvp_agent_boundary.ps1` before touching KV STUDIO; this rejects interactive prompts/manual decision points in runner-owned scripts.
 - Program construction uses MNM files. If MNM import fails, fix the scaffold or stop; do not type program text into the ladder/editor.
@@ -409,6 +409,7 @@ Common gate codes:
 
 - `KV_CHECKLIST_MISSING`, `KV_CHECKLIST_EMPTY`, `KV_CHECKLIST_INVALID`
 - `KV_SCAFFOLD_REQUIRED_FILE_MISSING`, `KV_SCAFFOLD_TSV_SCHEMA_INVALID`, `KV_SCAFFOLD_MNM_MODULE_TYPE_MISMATCH`
+- `KV_SCAFFOLD_NETWORK_CONFIG_MISSING`, `KV_SCAFFOLD_NETWORK_CONFIG_INVALID_JSON`, `KV_SCAFFOLD_NETWORK_CONFIG_LEAK`
 - `KV_SCAFFOLD_MODULE_CATEGORY_UNSUPPORTED`, `KV_SCAFFOLD_MODULE_CATEGORY_MISMATCH`, `KV_SCAFFOLD_MODULE_CATEGORY_SUPPORT_INCOMPLETE`
 - `KV_UIA_OPERATION_TIMEOUT`, `KV_CREATE_PROJECT_DIALOG_MISSING`
 - `KV_SOURCE_SNAPSHOT_MANIFEST_MISSING`, `KV_SOURCE_SNAPSHOT_NOT_READY`, `KV_SOURCE_SNAPSHOT_STALE`, `KV_SOURCE_SNAPSHOT_MNM_EMPTY`, `KV_SOURCE_SNAPSHOT_VARIABLES_EMPTY`, `KV_UPDATE_ARCHITECTURE_FILE_MISSING`
