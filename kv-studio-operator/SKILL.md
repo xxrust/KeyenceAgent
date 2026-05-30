@@ -244,6 +244,27 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configur
 
 If `-VariableNames` is omitted, the script generates two names from `-VariableNamePrefix` or from `-NodeAddress`: `<prefix>_in100` and `<prefix>_out101`. The variable-name grid does not accept bulk paste reliably; the script focuses the grid, moves to the variable-name column, and types names one cell at a time.
 
+After registration, the generated names are global structured variables. Use `scripts\get_kv_ethernet_ip_device_members.ps1` to read the local KV STUDIO EDS/XML cache and list valid ST member references before writing code:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\get_kv_ethernet_ip_device_members.ps1" `
+  -DeviceNamePattern 'SR-2000' `
+  -VariableNamePrefix 'eip_n008' `
+  -Assembly 100,101 `
+  -Json
+```
+
+For SR-2000 local evidence, the OUT101 clear bit is `ErrClear`, not `ErrorClr`. Treat the parsed `IOComment/ENG` names in `C:\ProgramData\KEYENCE\KVS\EIP_Eds\*.xml` as the source of truth. Example ST references:
+
+```text
+eip_n008_out101.ErrClear
+eip_n008_out101.ReadReq
+eip_n008_out101.ReadCmpltClr
+eip_n008_in100.ReadCmplt
+```
+
+For compile verification in this task family, use KV STUDIO conversion `Ctrl+F9`. `Ctrl+F2` can enter simulator/monitor mode and is not a valid compile oracle for network configuration usage validation. If KV STUDIO is already in simulator mode, return to editor mode before continuing and verify the title contains `[编辑器: <CPU>]`.
+
 Runner-owned export probe:
 
 ```powershell

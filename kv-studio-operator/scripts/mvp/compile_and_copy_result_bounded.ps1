@@ -6,7 +6,7 @@
   [switch]$AuditCompileWait,
   [switch]$AuditScreenshots,
   [ValidateSet('CtrlF2','CtrlF9')]
-  [string]$ConvertAction = 'CtrlF2'
+  [string]$ConvertAction = 'CtrlF9'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -133,8 +133,19 @@ function Assert-NoBlockingPopup {
       }
       throw 'Variable editor is still open before compile and cannot be closed safely.'
     }
+    $text = Get-WindowTextFlat $window
+    if ($text.Contains('转换结果') -and ($text.Contains('转换成功') -or $text.Contains('OK'))) {
+      $patternObj = $null
+      if ($window.TryGetCurrentPattern([Windows.Automation.WindowPattern]::Pattern, [ref]$patternObj)) {
+        $patternObj.Close()
+        Start-Sleep -Milliseconds 500
+        Log 'closed stale conversion result dialog before compile by WindowPattern'
+        continue
+      }
+      throw ('Stale conversion result dialog exists before compile and cannot be closed safely: ' + $text)
+    }
     if ($class -eq '#32770' -or $aid -eq 'PasteConfirmationForm' -or $name -eq 'KV STUDIO') {
-      throw ('Blocking popup exists before compile: ' + (Get-WindowTextFlat $window))
+      throw ('Blocking popup exists before compile: ' + $text)
     }
   }
 }
@@ -205,7 +216,7 @@ try {
   if ($title -notlike 'KV STUDIO*' -or $title -notlike "*$projectNeedle*") {
     throw "KV STUDIO is not foreground on target project before compile. title=$title"
   }
-  if ($title -like '*妯℃嫙鍣?') {
+  if ($title.Contains('模拟器') -or $title.Contains('妯℃嫙鍣')) {
     Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'return from simulator Ctrl+F1' -Keys '^{F1}' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -Action 'Ctrl+F1 returns from simulator to editor' -SleepMs 2000
     Log 'sent Ctrl+F1 to return from simulator to editor before conversion'
     $title = Get-ForegroundTitle
@@ -254,6 +265,7 @@ try {
   }
   [pscustomobject]@{
     ok = $true
+    convert_action = $ConvertAction
     foreground = Get-ForegroundTitle
     result_area_found = [bool]$resultArea
     text_extraction_deferred = $true
