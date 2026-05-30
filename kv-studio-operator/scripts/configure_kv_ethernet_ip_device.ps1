@@ -6,6 +6,8 @@ param(
   [string]$NodeAddress = '1',
   [Parameter(Mandatory=$true)]
   [string]$IpAddress,
+  [string]$VariableNamePrefix = '',
+  [string[]]$VariableNames = @(),
   [int]$MaxScanSteps = 700,
   [string]$OutDir = 'C:\Users\Public\KVSkillPractice\kv_network_config_runs',
   [switch]$KeepWindowOpen
@@ -28,6 +30,11 @@ public class KvEthernetIpWin32 {
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern IntPtr SetFocus(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
+  [DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr hWnd, EnumWindowsProc lpEnumFunc, IntPtr lParam);
+  [DllImport("user32.dll")] public static extern IntPtr GetParent(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr hDlg, int nIDDlgItem);
   [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, string lParam);
@@ -49,6 +56,9 @@ $NameCancel = -join ([char[]](0x53D6,0x6D88))
 $NameAdapterInitialSetting = -join ([char[]](0x9002,0x914D,0x5668,0x521D,0x59CB,0x8BBE,0x5B9A))
 $NameNodeAddress = -join ([char[]](0x8282,0x70B9,0x5730,0x5740))
 $NameIpAddress = 'IP' + (-join ([char[]](0x5730,0x5740)))
+$NameOkCn = -join ([char[]](0x786E,0x5B9A))
+$NameVariable = -join ([char[]](0x53D8,0x91CF))
+$NameUnitEditor = (-join ([char[]](0x5355,0x5143,0x7F16,0x8F91,0x5668))) + '*'
 
 function New-EvidencePath {
   param([string]$Name)
@@ -105,6 +115,7 @@ function Get-KvRelevantWindows {
   Get-VisibleTopWindows | Where-Object {
     $_.process_id -eq $process.Id -and (
       $_.title -like 'KV STUDIO*' -or
+      $_.title -like $NameUnitEditor -or
       $_.title -like '*EtherNet/IP*' -or
       $_.title -like "*$NameAdapterInitialSetting*" -or
       $_.class_name -eq '#32770'
@@ -158,6 +169,43 @@ function Get-ElementRows {
     }
   }
   $rows
+}
+
+function Get-ChildWindowRows {
+  param([long]$ParentHwnd)
+  $rows = New-Object System.Collections.ArrayList
+  $callback = [KvEthernetIpWin32+EnumWindowsProc]{
+    param($handle, $lParam)
+    $titleBuilder = New-Object System.Text.StringBuilder 512
+    $classBuilder = New-Object System.Text.StringBuilder 256
+    [void][KvEthernetIpWin32]::GetWindowText($handle, $titleBuilder, $titleBuilder.Capacity)
+    [void][KvEthernetIpWin32]::GetClassName($handle, $classBuilder, $classBuilder.Capacity)
+    [void]$rows.Add([pscustomobject]@{
+      hwnd = $handle.ToInt64()
+      parent = ([KvEthernetIpWin32]::GetParent($handle)).ToInt64()
+      visible = [KvEthernetIpWin32]::IsWindowVisible($handle)
+      enabled = [KvEthernetIpWin32]::IsWindowEnabled($handle)
+      title = $titleBuilder.ToString()
+      class_name = $classBuilder.ToString()
+    })
+    return $true
+  }
+  [void][KvEthernetIpWin32]::EnumChildWindows([IntPtr]$ParentHwnd, $callback, [IntPtr]::Zero)
+  @($rows)
+}
+
+function Invoke-ChildButtonByTitle {
+  param(
+    [long]$ParentHwnd,
+    [string]$Title
+  )
+  $button = Get-ChildWindowRows -ParentHwnd $ParentHwnd |
+    Where-Object { $_.visible -and $_.enabled -and $_.class_name -eq 'Button' -and $_.title -eq $Title } |
+    Select-Object -First 1
+  if (-not $button) { return $null }
+  [void][KvEthernetIpWin32]::PostMessage([IntPtr]$button.hwnd, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
+  Start-Sleep -Milliseconds 700
+  [pscustomobject]@{ title = $button.title; hwnd = $button.hwnd; method = 'PostMessage_BM_CLICK' }
 }
 
 function Find-Descendant {
@@ -597,6 +645,192 @@ function Confirm-EtherNetMainWindow {
   }
 }
 
+function Wait-TopWindow {
+  param(
+    [scriptblock]$Predicate,
+    [int]$TimeoutMs = 10000
+  )
+  $deadline = (Get-Date).AddMilliseconds($TimeoutMs)
+  do {
+    foreach ($window in @(Get-KvRelevantWindows)) {
+      if (& $Predicate $window) { return $window }
+    }
+    Start-Sleep -Milliseconds 200
+  } while ((Get-Date) -lt $deadline)
+  $null
+}
+
+function Get-UnitEditorWindowRow {
+  Wait-TopWindow -TimeoutMs 8000 -Predicate {
+    param($window)
+    $window.title -like $NameUnitEditor -and $window.class_name -like 'Afx:*'
+  }
+}
+
+function Invoke-UnitEditorOk {
+  $unitEditor = Get-UnitEditorWindowRow
+  if (-not $unitEditor) {
+    throw 'Unit editor window was not found after EtherNet/IP main OK.'
+  }
+  $children = @(Get-ChildWindowRows -ParentHwnd $unitEditor.hwnd)
+  $ok = $children |
+    Where-Object { $_.visible -and $_.enabled -and $_.class_name -eq 'Button' -and $_.title -eq 'OK' } |
+    Select-Object -First 1
+  if (-not $ok) {
+    throw 'Unit editor OK button was not found.'
+  }
+  [void][KvEthernetIpWin32]::PostMessage([IntPtr]$ok.hwnd, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
+  Start-Sleep -Milliseconds 800
+  [pscustomobject]@{
+    window = $unitEditor
+    ok_button = $ok
+    method = 'PostMessage_BM_CLICK'
+  }
+}
+
+function Wait-KvStudioMessageDialog {
+  param([int]$TimeoutMs = 15000)
+  Wait-TopWindow -TimeoutMs $TimeoutMs -Predicate {
+    param($window)
+    if ($window.title -ne 'KV STUDIO' -or $window.class_name -ne '#32770') { return $false }
+    $children = @(Get-ChildWindowRows -ParentHwnd $window.hwnd)
+    return [bool]($children | Where-Object { $_.visible -and $_.class_name -eq 'Button' -and $_.title -eq $NameOkCn } | Select-Object -First 1)
+  }
+}
+
+function Confirm-KvStudioMessageDialog {
+  param([string]$Phase)
+  $dialog = Wait-KvStudioMessageDialog -TimeoutMs 20000
+  if (-not $dialog) {
+    throw "KV STUDIO message dialog was not found for phase '$Phase'."
+  }
+  $children = @(Get-ChildWindowRows -ParentHwnd $dialog.hwnd)
+  $text = @($children | Where-Object { $_.class_name -eq 'Static' -and $_.title } | ForEach-Object { $_.title })
+  $button = Invoke-ChildButtonByTitle -ParentHwnd $dialog.hwnd -Title $NameOkCn
+  if (-not $button) {
+    throw "KV STUDIO message dialog OK button could not be clicked for phase '$Phase'."
+  }
+  [pscustomobject]@{
+    phase = $Phase
+    dialog = $dialog
+    text = $text
+    ok_button = $button
+  }
+}
+
+function Get-EtherNetVariableDialogRow {
+  Wait-TopWindow -TimeoutMs 12000 -Predicate {
+    param($window)
+    $window.title -like '*EtherNet/IP*' -and $window.title -like "*$NameVariable*"
+  }
+}
+
+function Get-DefaultVariableNames {
+  if ($VariableNames -and $VariableNames.Count -gt 0) { return @($VariableNames) }
+  $prefix = $VariableNamePrefix
+  if (-not $prefix) {
+    $nodeNumber = 0
+    if ([int]::TryParse($NodeAddress, [ref]$nodeNumber)) {
+      $prefix = 'eip_n{0:000}' -f $nodeNumber
+    } else {
+      $safeNode = ($NodeAddress -replace '[^A-Za-z0-9_]', '_').Trim('_')
+      if (-not $safeNode) { $safeNode = 'node' }
+      $prefix = "eip_$safeNode"
+    }
+  }
+  $prefix = ($prefix -replace '[^A-Za-z0-9_]', '_').Trim('_')
+  if (-not $prefix) { $prefix = 'eip_node' }
+  @("${prefix}_in100", "${prefix}_out101")
+}
+
+function Set-EtherNetVariableDialogNames {
+  $dialog = Get-EtherNetVariableDialogRow
+  if (-not $dialog) {
+    return [pscustomobject]@{ skipped = $true; reason = 'EtherNet/IP variable setting dialog did not appear.' }
+  }
+  $children = @(Get-ChildWindowRows -ParentHwnd $dialog.hwnd)
+  $grid = $children |
+    Where-Object { $_.visible -and $_.class_name -like 'WindowsForms10.Window.*' } |
+    Select-Object -First 1
+  $okButton = $children |
+    Where-Object { $_.visible -and $_.class_name -like 'WindowsForms10.Button*' -and $_.title -eq 'OK' } |
+    Select-Object -First 1
+  if (-not $grid) { throw 'EtherNet/IP variable setting grid was not found.' }
+  if (-not $okButton) { throw 'EtherNet/IP variable setting OK button was not found.' }
+
+  $names = @(Get-DefaultVariableNames)
+  if ($names.Count -lt 1) { throw 'No variable names were provided or generated.' }
+  Set-ForegroundWindowByHwnd -Hwnd $dialog.hwnd
+  [void][KvEthernetIpWin32]::SetFocus([IntPtr]$grid.hwnd)
+  Start-Sleep -Milliseconds 200
+  [System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
+  Start-Sleep -Milliseconds 120
+  [System.Windows.Forms.SendKeys]::SendWait('{HOME}')
+  Start-Sleep -Milliseconds 120
+  [System.Windows.Forms.SendKeys]::SendWait('{RIGHT}{RIGHT}{RIGHT}{RIGHT}{RIGHT}')
+  Start-Sleep -Milliseconds 120
+
+  $typed = @()
+  for ($i = 0; $i -lt $names.Count; $i++) {
+    $name = ($names[$i] -replace '[^A-Za-z0-9_]', '_').Trim('_')
+    if (-not $name) { throw "Variable name at index $i is empty after sanitization." }
+    if ($name[0] -match '[0-9]') { $name = "v_$name" }
+    [System.Windows.Forms.SendKeys]::SendWait($name)
+    Start-Sleep -Milliseconds 120
+    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    Start-Sleep -Milliseconds 160
+    $typed += $name
+    if ($i -lt ($names.Count - 1)) {
+      [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+      Start-Sleep -Milliseconds 120
+    }
+  }
+
+  if (-not [KvEthernetIpWin32]::IsWindowEnabled([IntPtr]$okButton.hwnd)) {
+    throw 'EtherNet/IP variable setting OK button is still disabled after typing variable names.'
+  }
+  [void][KvEthernetIpWin32]::PostMessage([IntPtr]$okButton.hwnd, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
+  Start-Sleep -Milliseconds 1000
+
+  [pscustomobject]@{
+    skipped = $false
+    dialog = $dialog
+    grid = $grid
+    ok_button = $okButton
+    typed_variable_names = $typed
+  }
+}
+
+function Complete-UnitEditorEtherNetApply {
+  if ($KeepWindowOpen) {
+    return [pscustomobject]@{ skipped = $true; reason = 'KeepWindowOpen was specified.' }
+  }
+  $beforeWindows = @(Get-KvRelevantWindows)
+  $unitOk = Invoke-UnitEditorOk
+  $deviceUpdatedDialog = Confirm-KvStudioMessageDialog -Phase 'ethernet_device_updated'
+  $variableDialog = Set-EtherNetVariableDialogNames
+  $variablesRegisteredDialog = $null
+  if (-not $variableDialog.skipped) {
+    $variablesRegisteredDialog = Confirm-KvStudioMessageDialog -Phase 'ethernet_variables_registered'
+  }
+  Start-Sleep -Milliseconds 1500
+  $afterWindows = @(Get-KvRelevantWindows)
+  $remainingVariableDialogs = @($afterWindows | Where-Object { $_.title -like '*EtherNet/IP*' -and $_.title -like "*$NameVariable*" })
+  $remainingKvDialogs = @($afterWindows | Where-Object { $_.title -eq 'KV STUDIO' -and $_.class_name -eq '#32770' })
+  [pscustomobject]@{
+    skipped = $false
+    before_windows = $beforeWindows
+    unit_editor_ok = $unitOk
+    device_updated_dialog = $deviceUpdatedDialog
+    variable_dialog = $variableDialog
+    variables_registered_dialog = $variablesRegisteredDialog
+    after_windows = $afterWindows
+    remaining_variable_dialogs = $remainingVariableDialogs
+    remaining_kv_dialogs = $remainingKvDialogs
+    ok = ($remainingVariableDialogs.Count -eq 0 -and $remainingKvDialogs.Count -eq 0)
+  }
+}
+
 $evidencePath = New-EvidencePath -Name 'configure_kv_ethernet_ip_device'
 $result = [ordered]@{
   ok = $false
@@ -623,6 +857,10 @@ try {
   $result.phases.main_ok = Confirm-EtherNetMainWindow
   if (-not $KeepWindowOpen -and -not $result.phases.main_ok.ok) {
     throw 'EtherNet/IP setting window did not close after main OK.'
+  }
+  $result.phases.unit_editor_apply = Complete-UnitEditorEtherNetApply
+  if (-not $KeepWindowOpen -and -not $result.phases.unit_editor_apply.ok) {
+    throw 'Unit editor EtherNet/IP apply did not complete cleanly.'
   }
   $result.ok = $true
 } catch {

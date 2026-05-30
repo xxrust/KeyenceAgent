@@ -228,7 +228,7 @@ Use `scripts\configure_kv_ethernet_ip_device.ps1` only for the project-tree unit
 
 Do not use toolbar/menu communication settings for this task; that configures PC-to-PLC debugging communication, not project EtherNet/IP scanner/device setup.
 
-The script selects an existing EtherNet/IP device-list entry by reading the device detail fields after `Alt+1` focuses the list. It then opens the adapter initial setting dialog, writes node address and IP address, confirms the adapter dialog, and confirms the main EtherNet/IP setting window.
+The script selects an existing EtherNet/IP device-list entry by reading the device detail fields after `Alt+1` focuses the list. It then opens the adapter initial setting dialog, writes node address and IP address, confirms the adapter dialog, confirms the main EtherNet/IP setting window, confirms the unit editor, and fills the `EtherNet/IP设备 变量设置` dialog with per-row variable names.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configure_kv_ethernet_ip_device.ps1" `
@@ -236,10 +236,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configur
   -DeviceNamePattern 'SR-1000' `
   -NodeAddress 1 `
   -IpAddress '192.168.0.11' `
+  -VariableNamePrefix 'eip_n001' `
   -OutDir (Join-Path $WorkRoot 'kv_network_config_runs')
 ```
 
 `DeviceNamePattern` without `*` or `?` uses prefix-boundary matching, so `SR-200` does not match `SR-2000`. Use explicit wildcards only when fuzzy matching is intentional, for example `'*Code Reader*'`.
+
+If `-VariableNames` is omitted, the script generates two names from `-VariableNamePrefix` or from `-NodeAddress`: `<prefix>_in100` and `<prefix>_out101`. The variable-name grid does not accept bulk paste reliably; the script focuses the grid, moves to the variable-name column, and types names one cell at a time.
 
 Runner-owned export probe:
 
