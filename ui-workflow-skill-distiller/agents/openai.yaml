@@ -1,4 +1,0 @@
-interface:
-  display_name: "UI 工作流 Skill 提炼"
-  short_description: "把 UI 探索经验整理成中文可复用 skill。"
-  default_prompt: "使用这个 skill，从已完成的 UI 操作探索、用户纠正、证据 artifact 和稳定脚本中提炼知识，编写一个面向后续执行的中文指导性 skill。"

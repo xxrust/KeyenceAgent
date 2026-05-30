@@ -1,0 +1,4 @@
+interface:
+  display_name: "UI 链路探究自动化"
+  short_description: "把陌生 UI 操作链路验证并沉淀为稳定脚本。"
+  default_prompt: "使用这个 skill，在陌生或脆弱桌面 UI 中结合知识库、用户提示和真实界面证据，小步探明操作链路，脚本化已验证片段，并只把干净运行通过的流程声明为稳定自动化。"
