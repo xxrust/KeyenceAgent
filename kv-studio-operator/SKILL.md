@@ -218,6 +218,29 @@ Agents normally call only:
 - `scripts\run_kv_mvp_repair_existing_project.ps1`
 - `scripts\run_kv_mvp_repeat.ps1`
 
+## EtherNet/IP Unit Configuration
+
+Use `scripts\configure_kv_ethernet_ip_device.ps1` only for the project-tree unit configuration route:
+
+```text
+单元配置 -> [0] KV-X310 -> EtherNet/IP -> 手动设定
+```
+
+Do not use toolbar/menu communication settings for this task; that configures PC-to-PLC debugging communication, not project EtherNet/IP scanner/device setup.
+
+The script selects an existing EtherNet/IP device-list entry by reading the device detail fields after `Alt+1` focuses the list. It then opens the adapter initial setting dialog, writes node address and IP address, confirms the adapter dialog, and confirms the main EtherNet/IP setting window.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configure_kv_ethernet_ip_device.ps1" `
+  -ProjectName '<open-project-name>' `
+  -DeviceNamePattern 'SR-1000' `
+  -NodeAddress 1 `
+  -IpAddress '192.168.0.11' `
+  -OutDir (Join-Path $WorkRoot 'kv_network_config_runs')
+```
+
+`DeviceNamePattern` without `*` or `?` uses prefix-boundary matching, so `SR-200` does not match `SR-2000`. Use explicit wildcards only when fuzzy matching is intentional, for example `'*Code Reader*'`.
+
 Runner-owned export probe:
 
 ```powershell
