@@ -2,6 +2,7 @@ param(
   [Parameter(Mandatory=$true)]
   [string]$ProjectName,
   [string[]]$DevicePath = @('KEYENCE CORPORATION','Servo Drives','SV3'),
+  [string]$EsiPath = '',
   [string]$BatchAxisRegistration = 'No',
   [string]$OutDir = 'C:\Users\Public\KVSkillPractice\kv_network_config_runs',
   [switch]$KeepWindowOpen
@@ -467,9 +468,13 @@ try {
   }
   $DevicePath = $normalizedDevicePath
   if ($DevicePath.Count -eq 0) { throw 'DevicePath must contain at least one tree item name.' }
+  if (-not [string]::IsNullOrWhiteSpace($EsiPath)) {
+    throw 'KV_ETHERCAT_ESI_REGISTRATION_UNSTABLE: ESI file registration is not accepted as a stable script route yet. Register the ESI file before running this device-add script, or continue route breakthrough in a disposable project.'
+  }
   if ($BatchAxisRegistration -notin @('Yes','No')) { throw "BatchAxisRegistration must be Yes or No." }
   $beforeWindows = @(Get-KvRelevantWindows)
   $open = Open-EtherCatSetting
+  $esiRegistration = $null
   $device = Select-EtherCatDeviceByPath
   $mainOk = $null
   $dialogs = @()
@@ -485,9 +490,11 @@ try {
     project_name = $ProjectName
     route = 'unit_configuration_ethercat_manual_device_tree_enter'
     device_path = $DevicePath
+    esi_path = $EsiPath
     batch_axis_registration = $BatchAxisRegistration
     before_windows = $beforeWindows
     open = $open
+    esi_registration = $esiRegistration
     device = $device
     main_ok = $mainOk
     post_ok_dialogs = $dialogs
