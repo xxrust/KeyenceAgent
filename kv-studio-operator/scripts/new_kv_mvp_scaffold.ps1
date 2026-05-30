@@ -14,7 +14,8 @@ $ErrorActionPreference = 'Stop'
 
 $ScaffoldRoot = [IO.Path]::GetFullPath($ScaffoldRoot)
 $moduleDir = Join-Path (Join-Path $ScaffoldRoot 'modules') $ModuleName
-New-Item -ItemType Directory -Force -Path $ScaffoldRoot, $moduleDir | Out-Null
+$architectureDir = Join-Path $ScaffoldRoot 'architecture'
+New-Item -ItemType Directory -Force -Path $ScaffoldRoot, $moduleDir, $architectureDir | Out-Null
 
 function Write-Text([string]$Path, [string]$Text, [Text.Encoding]$Encoding) {
   [IO.File]::WriteAllText($Path, $Text, $Encoding)
@@ -27,6 +28,7 @@ function New-Cn([int[]]$CodePoints) {
 $mnmPath = Join-Path $moduleDir ($ModuleName + '.mnm')
 $globalTsv = Join-Path $moduleDir 'global_variables.tsv'
 $localTsv = Join-Path $moduleDir 'local_variables.tsv'
+$networkConfigPath = Join-Path $architectureDir 'network_config.json'
 
 if ($Template -eq 'TrafficLight') {
   $cnStart = New-Cn @(0x542F,0x52A8)
@@ -140,6 +142,26 @@ Write-Text $mnmPath $mnmText ([Text.Encoding]::Unicode)
 Write-Text $globalTsv $globalText ([Text.Encoding]::Default)
 Write-Text $localTsv $localText ([Text.Encoding]::Default)
 
+$networkConfig = [ordered]@{
+  schema_version = 1
+  route = 'project_tree_unit_configuration'
+  project = [ordered]@{
+    cpu_model = $CpuModel
+  }
+  ethernet_ip = [ordered]@{
+    devices = @()
+  }
+  ethercat = [ordered]@{
+    devices = @()
+  }
+  notes = @(
+    'Network/unit configuration belongs here, not in TASK.md, VERSION.md, MNM comments, or variable TSV files.'
+    'EtherNet/IP devices are configured through 单元配置 -> [0] CPU -> EtherNet/IP.'
+    'EtherCAT devices are configured through 单元配置 -> [0] CPU -> EtherCAT.'
+  )
+}
+$networkConfig | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $networkConfigPath -Encoding UTF8
+
 $manifest = [ordered]@{
   schema_version = 2
   project = [ordered]@{
@@ -157,6 +179,9 @@ $manifest = [ordered]@{
     agent_fill_rule = 'For every mnm_files[] entry, edit that module folder MNM file and its paired variables.global_tsv / variables.local_tsv before running KV STUDIO.'
   }
   checklist = 'CHECKLIST.md'
+  architecture = [ordered]@{
+    network_config = 'architecture/network_config.json'
+  }
   mnm_files = @(
     [ordered]@{
       path = ('modules/' + $ModuleName + '/' + [IO.Path]::GetFileName($mnmPath))
@@ -213,8 +238,9 @@ $TaskSummary
 1. Read scaffold.json.
 2. Edit modules/<module>/*.mnm for program logic.
 3. Edit each module's paired modules/<module>/global_variables.tsv and modules/<module>/local_variables.tsv.
-4. Update TASK.md and VERSION.md with the implemented behavior and version note.
-5. Run run_kv_mvp_scaffold.ps1 against this scaffold.
+4. Put EtherCAT and EtherNet/IP unit configuration in architecture/network_config.json, not in MNM, variable TSV, TASK.md, or VERSION.md.
+5. Update TASK.md and VERSION.md with behavior and version notes only.
+6. Run run_kv_mvp_scaffold.ps1 against this scaffold.
 "@
 Set-Content -LiteralPath (Join-Path $ScaffoldRoot 'TASK.md') -Value $taskText -Encoding UTF8
 
@@ -230,6 +256,7 @@ Template: $Template
 
 - [ ] Confirm this scaffold is disposable or explicitly approved for KV STUDIO operation.
 - [ ] Confirm scaffold.json project name, CPU model, module name, and MNM file list.
+- [ ] Confirm EtherCAT and EtherNet/IP unit configuration, if needed, is declared only in architecture/network_config.json.
 - [ ] Confirm every modules/<module>/*.mnm file has the intended ;MODULE_TYPE and program body.
 - [ ] Confirm every mnm_files[] entry has a paired variables.global_tsv and variables.local_tsv.
 - [ ] Confirm each module's global TSV contains the global variables required by that MNM module, or only the TSV header when that module has no global variables.

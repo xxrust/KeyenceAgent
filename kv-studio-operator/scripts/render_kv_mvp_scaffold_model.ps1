@@ -37,7 +37,8 @@ $TemplateName = if ($model.template) { [string]$model.template } else { 'Structu
 $ScaffoldVersion = if ($model.scaffold_version) { [string]$model.scaffold_version } else { '3.0.0' }
 
 $modulesDir = Join-Path $ScaffoldRoot 'modules'
-New-Item -ItemType Directory -Force -Path $ScaffoldRoot, $modulesDir | Out-Null
+$architectureDir = Join-Path $ScaffoldRoot 'architecture'
+New-Item -ItemType Directory -Force -Path $ScaffoldRoot, $modulesDir, $architectureDir | Out-Null
 
 function Write-Text([string]$Path, [string]$Text, [Text.Encoding]$Encoding) {
   $parent = Split-Path -Parent $Path
@@ -120,6 +121,27 @@ function New-MnmText($Module) {
   return ($lines -join "`r`n") + "`r`n"
 }
 
+function New-DefaultNetworkConfig {
+  [ordered]@{
+    schema_version = 1
+    route = 'project_tree_unit_configuration'
+    project = [ordered]@{
+      cpu_model = $CpuModel
+    }
+    ethernet_ip = [ordered]@{
+      devices = @()
+    }
+    ethercat = [ordered]@{
+      devices = @()
+    }
+    notes = @(
+      'Network/unit configuration belongs here, not in TASK.md, VERSION.md, MNM comments, or variable TSV files.'
+      'EtherNet/IP devices are configured through 单元配置 -> [0] CPU -> EtherNet/IP.'
+      'EtherCAT devices are configured through 单元配置 -> [0] CPU -> EtherCAT.'
+    )
+  }
+}
+
 $mnmEntries = @()
 $variableSets = @()
 $allModuleNames = [System.Collections.Generic.HashSet[string]]::new()
@@ -180,6 +202,16 @@ foreach ($module in $modules) {
   }
 }
 
+$networkConfigPath = Join-Path $architectureDir 'network_config.json'
+$networkConfig = if ($model.network_config) { $model.network_config } else { New-DefaultNetworkConfig }
+if (-not $networkConfig.schema_version) {
+  $networkConfig | Add-Member -NotePropertyName schema_version -NotePropertyValue 1
+}
+if (-not $networkConfig.route) {
+  $networkConfig | Add-Member -NotePropertyName route -NotePropertyValue 'project_tree_unit_configuration'
+}
+$networkConfig | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $networkConfigPath -Encoding UTF8
+
 $manifest = [ordered]@{
   schema_version = 2
   project = [ordered]@{
@@ -199,6 +231,9 @@ $manifest = [ordered]@{
   }
   checklist = 'CHECKLIST.md'
   source_model = 'scaffold.model.json'
+  architecture = [ordered]@{
+    network_config = 'architecture/network_config.json'
+  }
   mnm_files = $mnmEntries
   variables = [ordered]@{
     schema = 'per_mnm'
@@ -235,6 +270,7 @@ $TaskSummary
 ## Source Model
 
 - Edit scaffold.model.json for modules, MNM instructions, and variables.
+- Edit network unit configuration only in architecture/network_config.json, or in scaffold.model.json network_config before rendering.
 - Run render_kv_mvp_scaffold_model.ps1 after model changes.
 - Generated adapter files are grouped by module under modules/<module>/.
 - Do not hand-maintain generated MNM/TSV files as the source of truth.
@@ -260,6 +296,7 @@ Template: $TemplateName
 
 - [ ] Confirm this scaffold is disposable or explicitly approved for KV STUDIO operation.
 - [ ] Confirm scaffold.model.json is the source of truth and generated files were rendered after the latest model edit.
+- [ ] Confirm EtherCAT and EtherNet/IP unit configuration, if needed, is declared only in architecture/network_config.json or scaffold.model.json network_config.
 - [ ] Confirm scaffold.json contains every generated MNM entry and each entry has the intended module_type.
 - [ ] Confirm every modules/<module>/*.mnm file is UTF-16LE and contains ;MODULE_TYPE:<n>.
 - [ ] Confirm every module folder has paired generated global and local TSV files.

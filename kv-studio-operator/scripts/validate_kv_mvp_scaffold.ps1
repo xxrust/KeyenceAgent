@@ -198,6 +198,30 @@ if ([string]$manifest.variables.schema -ne 'per_mnm') {
   Stop-ScaffoldValidation 'KV_SCAFFOLD_VARIABLE_SCHEMA_INVALID' 'scaffold.json variables.schema must be per_mnm. Top-level variables.global_tsv/local_tsv is not authoritative.' @($manifestPath)
 }
 
+$networkConfigPath = ''
+$networkConfig = $null
+if ($manifest.architecture -and $manifest.architecture.network_config) {
+  $networkConfigPath = Resolve-ScaffoldPath ([string]$manifest.architecture.network_config)
+  Assert-File $networkConfigPath 'network configuration architecture file'
+  try {
+    $networkConfig = Get-Content -Raw -LiteralPath $networkConfigPath -Encoding UTF8 | ConvertFrom-Json
+  } catch {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_INVALID_JSON' "architecture.network_config is not valid JSON: $($_.Exception.Message)" @($networkConfigPath)
+  }
+  if ([int]$networkConfig.schema_version -ne 1) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_SCHEMA_UNSUPPORTED' 'architecture/network_config.json must use schema_version=1.' @($networkConfigPath)
+  }
+  if ([string]$networkConfig.route -ne 'project_tree_unit_configuration') {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_ROUTE_INVALID' 'network_config.route must be project_tree_unit_configuration.' @($networkConfigPath)
+  }
+  if (-not $networkConfig.ethernet_ip -or $null -eq $networkConfig.ethernet_ip.devices) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_ETHERNET_MISSING' 'network_config must contain ethernet_ip.devices array, even when empty.' @($networkConfigPath)
+  }
+  if (-not $networkConfig.ethercat -or $null -eq $networkConfig.ethercat.devices) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_NETWORK_CONFIG_ETHERCAT_MISSING' 'network_config must contain ethercat.devices array, even when empty.' @($networkConfigPath)
+  }
+}
+
 $sourceModelPath = ''
 $sourceModel = $null
 if ($manifest.source_model) {
@@ -435,6 +459,8 @@ $payload = [ordered]@{
   cpu_model = [string]$manifest.project.cpu_model
   local_program = [string]$manifest.project.local_program
   variable_schema = 'per_mnm'
+  network_config = $networkConfigPath
+  network_config_hash = Get-FileHashText $networkConfigPath
   source_model = $sourceModelPath
   source_model_hash = Get-FileHashText $sourceModelPath
   variable_sets = $variableSetChecks
