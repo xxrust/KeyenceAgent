@@ -1,4 +1,0 @@
-interface:
-  display_name: "UI 路线学习自动化"
-  short_description: "把脆弱 UI 探索沉淀为验证过的自动化。"
-  default_prompt: "使用这个 skill，把陌生桌面/UI 工作流从知识库证据和用户提示出发，通过 route 治理、小步验证、错误反思和同轮证据审计，逐步沉淀为稳定自动化脚本。"
