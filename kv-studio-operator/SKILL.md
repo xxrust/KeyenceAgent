@@ -219,6 +219,37 @@ Agents normally call only:
 - `scripts\run_kv_mvp_repair_existing_project.ps1`
 - `scripts\run_kv_mvp_repeat.ps1`
 - `scripts\configure_kv_network_from_config.ps1`
+- `scripts\configure_kv_expansion_units.ps1`
+
+## PLC Expansion Unit Configuration
+
+Use `scripts\configure_kv_expansion_units.ps1` only for adding registered KV expansion units through the project-tree unit configuration route:
+
+```text
+单元配置 -> [0] KV-X310 -> 单元编辑器 - 编辑模式 -> Alt+1 选择单元
+```
+
+Open `[0] KV-X310` with `Enter`; do not enter EtherCAT, EtherNet/IP, or communication settings. The script focuses the unit list with `Alt+1`, scans by reading the current selection detail fields, presses `Enter` on matched unit names, clicks the unit editor `OK`, saves the project, and reads `WsTreeEnv.xml` for slot/address evidence.
+
+Use comma-separated patterns when invoking through `powershell -File`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configure_kv_expansion_units.ps1" `
+  -ProjectName '<open-project-name>' `
+  -ProjectPath '<project.kpr>' `
+  -UnitNamePatterns 'KV-B16X*,KV-AD40V' `
+  -MaxDurationSeconds 180 `
+  -OutDir (Join-Path $WorkRoot 'kv_unit_config_runs')
+```
+
+Stable clean-project evidence currently covers adding `KV-B16X*` and `KV-AD40V` in 29.233 seconds, then passing `Ctrl+F9` conversion with copied result text. The parsed unit tree entries were:
+
+```text
+[1] KV-B16X*  R33000  -----
+[2] KV-AD40V  R34000  DM10300
+```
+
+Treat `WsTreeEnv.xml` entries as the readable project evidence for unit slot and start-address parameters. Use `UnitSet.ue2` only as auxiliary binary evidence.
 
 ## EtherNet/IP Unit Configuration
 
