@@ -58,6 +58,28 @@ Current MNM acceptance boundary:
 - Ctrl+F2/Ctrl+F9 conversion is valid only after MNM roundtrip fingerprint equality for the target module.
 ## Hard Constraints
 
+```yaml
+gate_integrity:
+  invariant: gate_semantics_are_correctness
+  forbidden:
+    - dummy_variables_or_devices_to_satisfy_manifest_rules
+    - placeholder_source_snapshots_or_header_only_manifests_as_evidence
+    - weakening_validation_or_acceptance_to_continue
+    - treating_compile_after_bypassed_gate_as_valid
+  exception_only_if:
+    suspected_wrong_gate:
+      required:
+        - written_failure_evidence
+        - exact_gate_rule_under_challenge
+        - proof_artifact_is_semantically_valid
+        - independent_subagent_strict_audit_before_import_or_compile_claim
+      if_subagent_unavailable: stop_and_report_gate_blocker
+  failure_boundary:
+    unresolved_mnm_variable_reference: stop
+    incomplete_variable_manifest: stop
+    stale_or_stub_source_snapshot: stop
+```
+
 - Do not implement by renaming the official reference project.
 - Do not import the whole official reference program as the answer.
 - Importing official FBs/function blocks is allowed only when they remain official and unmodified.

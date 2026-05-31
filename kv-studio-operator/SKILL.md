@@ -292,6 +292,38 @@ MNM module type:
 
 ## Hard Gates
 
+Gate integrity:
+
+```yaml
+gate_integrity:
+  invariant: gate_semantics_are_correctness
+  pass_condition: required_semantic_evidence_present_in_same_run
+  forbidden:
+    - dummy_variable_rows_to_satisfy_non_empty_tsv
+    - placeholder_or_stub_snapshot_files_as_project_evidence
+    - weakening_or_deleting_validation_rules_to_continue
+    - treating_file_presence_as_semantic_completeness
+    - continuing_after_gate_failure_by_relabeling_the_failure
+  exception_only_if:
+    suspected_wrong_gate:
+      required:
+        - written_failure_evidence
+        - exact_gate_rule_under_challenge
+        - why_artifact_is_valid_despite_gate_failure
+        - task_local_patch_or_wrapper_only
+        - independent_subagent_strict_audit_before_execution
+      audit_must_answer:
+        - gate_wrong_or_artifact_incomplete
+        - exception_preserves_original_acceptance_semantics
+        - downstream_compile_import_evidence_would_be_polluted
+      if_subagent_unavailable: stop_and_report_gate_blocker
+  failure_boundary:
+    variable_manifest_incomplete: stop
+    source_snapshot_stub: stop
+    scaffold_dummy_rows: stop
+    compile_after_bypassed_gate: invalid_evidence
+```
+
 - Checklist gate: every KV STUDIO operation must pass `scripts\assert_kv_operation_checklist.ps1`.
 - Variable definition gate: every generated or edited variable TSV must pass `scripts\assert_kv_variable_definitions.ps1` or the equivalent shared validator before KV STUDIO opens.
 - Existing-project source gate: before modifying an existing `.kpr`, `scripts\assert_kv_existing_project_snapshot.ps1` must prove that the current project fingerprint matches a ready source snapshot containing MNM files, variable manifests, inventory evidence, and an open architecture file.

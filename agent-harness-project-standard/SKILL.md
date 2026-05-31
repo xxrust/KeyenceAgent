@@ -38,6 +38,8 @@ A harness is the executable shell around the target work. It defines the input s
    - Replace "looks done" with concrete checks: file exists, schema valid, names persisted, module placed correctly, compile result OK, API response matches, UI element state changed, exported roundtrip matches.
    - Read evidence from the current run only.
    - Treat stale output as invalid unless the runner proves it was produced in the current run.
+   - Preserve gate semantics: placeholder files, dummy rows, weakened validators, or relabeled failures do not pass a gate.
+   - If a gate appears wrong, stop, record the exact rule and evidence, and run an independent subagent strict audit before applying a task-local exception. If no subagent is available, report the gate blocker.
 
 6. Classify failures by mechanism.
    - Do not attribute failure from an old step to a later change.
