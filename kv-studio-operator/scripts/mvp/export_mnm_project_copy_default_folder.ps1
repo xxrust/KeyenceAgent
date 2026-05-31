@@ -9,6 +9,7 @@ param(
   [string]$WorkRoot = '',
   [string]$KvsExe = '',
   [switch]$AllowOverwrite,
+  [switch]$AllowWorkRootOutsideExportDir,
   [switch]$NoRestartKvs,
   [int]$TimeoutSeconds = 120
 )
@@ -24,6 +25,7 @@ function Write-Result([bool]$Ok, [string]$Code, [string]$Message, [object[]]$Mnm
     export_dir = $ExportDir
     out_dir = $OutDir
     work_root = $WorkRoot
+    actual_kv_export_dir = $script:ActualKvExportDir
     core_result_path = $CoreResultPath
     message = $Message
     mnm_files = @($MnmFiles)
@@ -35,8 +37,12 @@ try {
   $ExportDir = [IO.Path]::GetFullPath($ExportDir)
   if (-not $OutDir) { $OutDir = Join-Path $ExportDir ('_export_mnm_project_copy_' + (Get-Date -Format 'yyyyMMdd_HHmmss')) }
   $OutDir = [IO.Path]::GetFullPath($OutDir)
-  if (-not $WorkRoot) { $WorkRoot = Join-Path $OutDir 'work' }
+  if (-not $WorkRoot) { $WorkRoot = Join-Path $ExportDir '_kv_export_workspace' }
   $WorkRoot = [IO.Path]::GetFullPath($WorkRoot)
+  $exportRootWithSep = $ExportDir.TrimEnd('\') + '\'
+  if (-not $AllowWorkRootOutsideExportDir -and -not ($WorkRoot.TrimEnd('\') + '\').StartsWith($exportRootWithSep, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "WorkRoot must be inside ExportDir so KV STUDIO's actual export path remains in the caller file framework. WorkRoot=$WorkRoot ExportDir=$ExportDir"
+  }
 
   New-Item -ItemType Directory -Force -Path $ExportDir, $OutDir, $WorkRoot | Out-Null
   if (-not (Test-Path -LiteralPath $ProjectPath -PathType Leaf)) { throw "ProjectPath not found: $ProjectPath" }
@@ -58,6 +64,7 @@ try {
 
   $projectCopyPath = Join-Path $projectCopyDir $projectFileName
   if (-not (Test-Path -LiteralPath $projectCopyPath -PathType Leaf)) { throw "Copied project not found: $projectCopyPath" }
+  $script:ActualKvExportDir = $projectCopyDir
 
   $core = Join-Path (Split-Path -Parent $PSCommandPath) 'export_mnm_browse_default_folder_guarded.ps1'
   if (-not (Test-Path -LiteralPath $core -PathType Leaf)) { throw "Core export script not found: $core" }

@@ -126,7 +126,8 @@ MNM export stable route:
 ```yaml
 script: scripts/mvp/export_mnm_project_copy_default_folder.ps1
 route:
-  - copy_source_project_directory_to_work_root
+  - set_WorkRoot_to_ExportDir/_kv_export_workspace_unless_explicitly_inside_ExportDir
+  - copy_source_project_directory_to_WorkRoot
   - remove_mnm_files_from_project_copy
   - open_copied_kpr
   - Alt+F
@@ -138,6 +139,7 @@ route:
 success:
   - export_mnm_project_copy_result.json.ok == true
   - mnm_files.count > 0
+  - actual_kv_export_dir starts_with ExportDir
   - core_result_path points_to_same_run_browse_folder_export_result
 rejected:
   - BFFM_SETSELECTIONW_as_custom_folder_selection
@@ -149,7 +151,7 @@ evidence:
   - C:\Users\Public\KVSkillPractice\kv_clone_taizhou_20260531\stable_export_run1\out\export_mnm_project_copy_result.json
 ```
 
-Do not use `BFFM_SETSELECTIONW` as the folder-selection mechanism for KV STUDIO MNM export. In verified runs it left the tree selection on the default project folder or destabilized KV STUDIO. To export into an arbitrary caller directory, control the project copy location, accept the Browse Folder default selection, then copy the produced `.mnm` files to the requested `ExportDir`.
+Do not use `BFFM_SETSELECTIONW` as the folder-selection mechanism for KV STUDIO MNM export. In verified runs it left the tree selection on the default project folder or destabilized KV STUDIO. To export into an arbitrary caller directory, control the project copy location inside `ExportDir`, accept the Browse Folder default selection inside that file framework, then copy the produced `.mnm` files to the requested `ExportDir`.
 
 Create scaffold:
 
@@ -562,10 +564,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\mvp\expo
   -ProjectPath '<project.kpr>' `
   -ExportDir '<out>\exported_mnm' `
   -OutDir '<out>\export_mnm_project_copy' `
-  -WorkRoot '<out>\export_mnm_project_copy_work'
+  -WorkRoot '<out>\exported_mnm\_kv_export_workspace'
 ```
 
-Export route: copy the source project directory to `WorkRoot`, remove `.mnm` files from the copy, open the copied `.kpr`, guarded `Alt+F`, `R`, `S`, confirm the export option dialog, accept the Browse Folder default selected project directory, then copy same-run `.mnm` files from the copied project directory to `ExportDir`. Success requires `export_mnm_project_copy_result.json.ok=true` and same-run `.mnm` files under `ExportDir`. Do not use `export_mnm_guarded.ps1` as the stable export entry for project replication.
+Export route: keep `WorkRoot` inside `ExportDir` by default, copy the source project directory to `WorkRoot`, remove `.mnm` files from the copy, open the copied `.kpr`, guarded `Alt+F`, `R`, `S`, confirm the export option dialog, accept the Browse Folder default selected project directory inside the file framework, then copy same-run `.mnm` files from the copied project directory to `ExportDir`. Success requires `export_mnm_project_copy_result.json.ok=true`, `actual_kv_export_dir` under `ExportDir`, and same-run `.mnm` files under `ExportDir`. Do not use `export_mnm_guarded.ps1` as the stable export entry for project replication.
 
 Child scripts under `scripts\mvp\` are runner-owned. Call them directly only when diagnosing a failed runner step.
 

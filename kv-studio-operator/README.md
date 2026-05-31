@@ -89,7 +89,7 @@ Project replication must not export/import official or library FBs as user sourc
 
 MNM export status:
 
-- `scripts\mvp\export_mnm_project_copy_default_folder.ps1` is the stable export entry for existing projects. It copies the project to a disposable work directory, removes old `.mnm` files in the copy, opens the copy in KV STUDIO, accepts the Browse Folder default project directory, then copies same-run `.mnm` files to `ExportDir`.
+- `scripts\mvp\export_mnm_project_copy_default_folder.ps1` is the stable export entry for existing projects. It copies the project to `ExportDir\_kv_export_workspace` by default, removes old `.mnm` files in the copy, opens the copy in KV STUDIO, accepts the Browse Folder default project directory inside that framework, then copies same-run `.mnm` files to `ExportDir`.
 - `scripts\mvp\export_mnm_browse_default_folder_guarded.ps1` is the internal UI core for the default-folder route.
 - `scripts\mvp\export_mnm_guarded.ps1` is `probe_only_until_success_artifact`.
 - Direct-call success requires current-run `.mnm` files under `ExportDir` and `export_mnm_result.json.ok=true`.
@@ -105,6 +105,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\mvp\export_mnm_pr
   -OutDir "<run-evidence-dir>" `
   -WorkRoot "<disposable-work-dir>"
 ```
+
+`WorkRoot` defaults to `<raw-mnm-dir>\_kv_export_workspace`. If supplied, it must be inside `ExportDir` unless `-AllowWorkRootOutsideExportDir` is explicitly passed for diagnosis. This keeps KV STUDIO's actual first export path and the final raw MNM files inside the caller's file framework.
 
 Validation evidence from `台州检测机`: three clean core runs and one promoted wrapper run produced 12 same-run `.mnm` files. Evidence root: `C:\Users\Public\KVSkillPractice\kv_clone_taizhou_20260531\stable_export_run1`.
 
