@@ -83,11 +83,29 @@ Primitive script boundary:
 
 ```yaml
 primitive_scripts:
-  immutable_during_feature_probe:
-    - scripts/mvp/export_mnm_guarded.ps1
-    - scripts/mvp/import_mnm_guarded.ps1
-    - scripts/mvp/compile_and_copy_result_bounded.ps1
-    - scripts/filter_kv_mnm_user_sources.ps1
+  status:
+    scripts/mvp/export_mnm_guarded.ps1: probe_only_until_success_artifact
+    scripts/mvp/import_mnm_guarded.ps1: immutable_during_feature_probe
+    scripts/mvp/compile_and_copy_result_bounded.ps1: immutable_during_feature_probe
+    scripts/filter_kv_mnm_user_sources.ps1: immutable_during_feature_probe
+  maturity_states:
+    independent_mature:
+      requires:
+        - direct_invocation_ok_artifact
+        - documented_preconditions_created_by_script_itself
+    wrapper_dependent:
+      requires:
+        - parent_runner_or_wrapper
+        - upstream_preconditions
+        - same_run_ok_artifact_from_parent_context
+      direct_call_failure_classification: missing_or_unproven_precondition
+    probe_only:
+      requires:
+        - no_ok_artifact_yet
+  maturity_required:
+    - export_mnm_result_json_ok_true
+    - same_run_mnm_files
+    - invocation_context_or_parent_runner
   rule: run_or_restore
   forbidden:
     - add_new_workflow_logic_to_primitive
@@ -99,7 +117,7 @@ primitive_scripts:
     - create_new_versioned_probe_or_wrapper
 ```
 
-If a primitive script is too coarse for a task, keep it unchanged and create an orchestrator or probe script. For example, `export_mnm_guarded.ps1` owns only "export MNM from an exact project to a directory"; project replication must call it as a stable segment, then perform filtering, scaffold construction, and import through separate scripts. A failed new route inside a primitive is not a reason to mutate that primitive during the task; restore it and move the experiment into a task-local probe.
+If a primitive script is too coarse for a task, keep it unchanged and create an orchestrator or probe script. `export_mnm_guarded.ps1` owns only "export MNM from an exact project to a directory", but it is not an independent mature segment until an `export_mnm_result.json.ok=true` artifact exists for the exact invocation context. If the only success evidence is inside a parent runner, classify it as `wrapper_dependent` and record the parent runner plus the upstream preconditions it creates, such as foreground KV STUDIO window, edit mode, project tree focus, keyboard state, and absence of modal dialogs. Project replication must call proven stable segments, then perform filtering, scaffold construction, and import through separate scripts. A failed route inside a primitive is not a reason to mutate that primitive during the task; restore it, inspect git history and caller context, then move experiments into a task-local probe.
 
 Create scaffold:
 

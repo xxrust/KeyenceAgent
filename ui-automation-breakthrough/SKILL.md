@@ -26,6 +26,8 @@ invariants:
   - probe_unknown_ui_only_from_a_verified_checkpoint
   - mature_primitive_scripts_are_immutable
   - unknown_behavior_uses_probe_copy_or_wrapper
+  - maturity_requires_positive_artifact_evidence
+  - primitive_regression_debug_starts_with_history
 ```
 
 ## 输入
@@ -47,6 +49,10 @@ segment_types:
     oracle: same_run_artifact
     agent_action: run_only
     patch_allowed: false
+    maturity_required:
+      - committed_version
+      - same_run_ok_artifact
+      - known_call_context
   unknown_ui_probe:
     entry: verified_checkpoint
     oracle: ui_or_artifact_delta
@@ -115,12 +121,19 @@ compound_workflow:
       - mode_editable_when_editing
       - selected_object_when_selection_matters
       - same_run_evidence_path
+  mature_segment_proof:
+    required:
+      - git_commit_or_version
+      - successful_result_artifact_path
+      - invocation_command_or_runner
+      - preconditions_created_by_upstream
   forbidden:
     - explore_full_workflow_from_initial_window_when_mature_prefix_exists
     - mix_mature_segment_failure_with_unknown_ui_failure
     - continue_after_unexpected_window_without_segment_review
     - patch_mature_primitive_script_during_probe
     - enlarge_primitive_script_scope_for_one_task
+    - classify_script_as_mature_from_memory
 ```
 
 ```pseudo
@@ -144,6 +157,7 @@ for segment in workflow:
 | 成熟脚本无法到达检查点 | `mature_segment_regression` | 先修成熟脚本；禁止继续探究后续新功能 |
 | 为探究新功能而修改成熟脚本 | `mature_script_boundary_violation` | 立即恢复成熟脚本；把新逻辑移到探针副本或包装器 |
 | 一个基础脚本开始承载多个目标 | `granularity_drift` | 拆成原子脚本 + 编排脚本 |
+| 找不到该脚本的成功产物 | `mature_assumption_disproved` | 降级为未成熟探针；先查历史和调用链 |
 
 ## 颗粒度
 
@@ -158,6 +172,21 @@ script_granularity:
       - configure_one_unit_address
     mutable_during_probe: false
     accepts_new_task_logic: false
+    maturity_proof:
+      - result_json_ok_true
+      - artifact_timestamp
+      - command_line_or_parent_runner
+      - upstream_preconditions
+    maturity_states:
+      - independent_mature
+      - wrapper_dependent
+      - probe_only
+      - disproved
+    wrapper_dependent_required:
+      - parent_runner_or_wrapper
+      - upstream_preconditions
+      - same_run_parent_context_artifact
+    direct_call_failure_when_wrapper_dependent: missing_or_unproven_precondition
   probe_script:
     scope: one_unknown_transition
     location: task_workdir_or_new_file
@@ -184,21 +213,38 @@ if mature_script.needs_change_for_new_task:
   promote_only_after_repeatable_evidence()
 ```
 
+```pseudo
+if primitive_script.fails:
+  restore_to_committed_version()
+  collect(git_log, git_diff, success_artifacts, caller_artifacts)
+  if no_success_artifact:
+    mark("mature_assumption_disproved")
+    stop_feature_work()
+  else if success_only_inside_parent_context:
+    mark("wrapper_dependent")
+    document(parent_runner, upstream_preconditions)
+    call_through_parent_or_create_wrapper_probe()
+  else:
+    compare(known_good_commit_or_context, current_context)
+    reproduce_only_original_goal()
+```
+
 ## 流程
 
 | 步骤 | 动作 | 判据 | 失败处理 |
 | --- | --- | --- | --- |
 | 1 | 定义 `target_state` 与 `success_oracle` | 目标可观察、判据可复测 | 停止写脚本 |
 | 2 | 把工作流切成 `mature_script` 与 `unknown_ui_probe` | 每段有入口、出口、判据 | 不能切分则停止 |
-| 3 | 先运行成熟脚本到最近检查点 | 同 run 证据证明检查点成立 | 成熟段失败则先修成熟段 |
-| 4 | 收集 UI、用户提示、知识库、现有脚本事实 | 每条结论有 `source` | 标为 `assumption` |
-| 5 | 拆成单个 `transition` | 有前置、动作、预期观察 | 继续拆小 |
-| 6 | 只在检查点状态验证一个 `transition` | 产出证据路径 | 分类为 `failed/rejected/blocked` |
-| 7 | 只把 `verified transition` 写成探针脚本或包装器 | JSON 结果 + 证据路径 | 禁止改成熟基础脚本 |
-| 8 | 用探针脚本复现状态，再探下一步 | 下一步前置由脚本创造 | 修正片段，不拼完整链 |
-| 9 | 组合全部已验证片段 | 干净运行到达 `target_state` | 删除未验证分支 |
-| 10 | 用独立判据验证稳定性 | 编译/导出/回读/保存重开/结果文本通过 | 不声明稳定 |
-| 11 | 记录支持范围与拒绝范围 | 支持输入、错误码、边界明确 | 拒绝发布通用能力 |
+| 3 | 证明成熟段确实成熟 | 有历史成功产物和调用上下文 | 无成功证据则降级为探针 |
+| 4 | 先运行成熟脚本到最近检查点 | 同 run 证据证明检查点成立 | 成熟段失败则先查历史/调用链 |
+| 5 | 收集 UI、用户提示、知识库、现有脚本事实 | 每条结论有 `source` | 标为 `assumption` |
+| 6 | 拆成单个 `transition` | 有前置、动作、预期观察 | 继续拆小 |
+| 7 | 只在检查点状态验证一个 `transition` | 产出证据路径 | 分类为 `failed/rejected/blocked` |
+| 8 | 只把 `verified transition` 写成探针脚本或包装器 | JSON 结果 + 证据路径 | 禁止改成熟基础脚本 |
+| 9 | 用探针脚本复现状态，再探下一步 | 下一步前置由脚本创造 | 修正片段，不拼完整链 |
+| 10 | 组合全部已验证片段 | 干净运行到达 `target_state` | 删除未验证分支 |
+| 11 | 用独立判据验证稳定性 | 编译/导出/回读/保存重开/结果文本通过 | 不声明稳定 |
+| 12 | 记录支持范围与拒绝范围 | 支持输入、错误码、边界明确 | 拒绝发布通用能力 |
 
 ## 本地记录
 
@@ -261,6 +307,7 @@ for hint in user_hints:
 | 新功能位于已成熟链路中间 | 先运行成熟脚本到最近检查点；只探究新 transition |
 | 进入陌生或错误界面 | 判为 `checkpoint_missing_or_wrong_entry`；禁止继续沿该界面探究 |
 | 成熟脚本因探究被改慢/改坏 | 立即恢复；新建 probe/wrapper；记录 `mature_script_boundary_violation` |
+| 记忆中“之前成功”的脚本当前失败 | 用 git restore/bisect、成功产物和调用链定位；禁止凭症状改 |
 | 当前模式不可编辑 | 先恢复可编辑状态；恢复失败则停止编辑 |
 | 自动导入/注册/识别未验证 | 只允许探针；稳定脚本返回明确错误 |
 
@@ -325,6 +372,8 @@ stable_script:
 | 失败后只增加等待时间 | 检查窗口、焦点、模式、状态 |
 | 为新功能修改成熟基础脚本 | 新建探针脚本或包装器 |
 | 让原子脚本承担编排职责 | 建立 orchestrator 调用多个原子脚本 |
+| 没有成功产物却称脚本成熟 | 降级为 `probe_only` |
+| 不查 git 历史就修回归 | 先 restore/bisect/比对调用上下文 |
 | 单一型号成功后声明通用支持 | 写明已验证型号、输入、边界 |
 | 静默尝试未验证能力 | 返回稳定错误码 |
 | 用脏项目状态证明成功 | 一次性干净项目重跑 |
