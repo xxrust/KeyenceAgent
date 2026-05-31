@@ -85,6 +85,8 @@ Primitive script boundary:
 primitive_scripts:
   status:
     scripts/mvp/export_mnm_guarded.ps1: probe_only_until_success_artifact
+    scripts/mvp/export_mnm_browse_default_folder_guarded.ps1: internal_core_for_default_browse_folder_route
+    scripts/mvp/export_mnm_project_copy_default_folder.ps1: independent_mature_for_existing_project_mnm_export
     scripts/mvp/import_mnm_guarded.ps1: immutable_during_feature_probe
     scripts/mvp/compile_and_copy_result_bounded.ps1: immutable_during_feature_probe
     scripts/filter_kv_mnm_user_sources.ps1: immutable_during_feature_probe
@@ -118,6 +120,36 @@ primitive_scripts:
 ```
 
 If a primitive script is too coarse for a task, keep it unchanged and create an orchestrator or probe script. `export_mnm_guarded.ps1` owns only "export MNM from an exact project to a directory", but it is not an independent mature segment until an `export_mnm_result.json.ok=true` artifact exists for the exact invocation context. If the only success evidence is inside a parent runner, classify it as `wrapper_dependent` and record the parent runner plus the upstream preconditions it creates, such as foreground KV STUDIO window, edit mode, project tree focus, keyboard state, and absence of modal dialogs. Project replication must call proven stable segments, then perform filtering, scaffold construction, and import through separate scripts. A failed route inside a primitive is not a reason to mutate that primitive during the task; restore it, inspect git history and caller context, then move experiments into a task-local probe.
+
+MNM export stable route:
+
+```yaml
+script: scripts/mvp/export_mnm_project_copy_default_folder.ps1
+route:
+  - copy_source_project_directory_to_work_root
+  - remove_mnm_files_from_project_copy
+  - open_copied_kpr
+  - Alt+F
+  - R
+  - S
+  - confirm_export_option_dialog
+  - accept_browse_folder_default_selected_project_directory
+  - copy_same_run_mnm_files_to_ExportDir
+success:
+  - export_mnm_project_copy_result.json.ok == true
+  - mnm_files.count > 0
+  - core_result_path points_to_same_run_browse_folder_export_result
+rejected:
+  - BFFM_SETSELECTIONW_as_custom_folder_selection
+  - direct_export_mnm_guarded_as_stable_without_ok_artifact
+evidence:
+  - C:\Users\Public\KVSkillPractice\kv_clone_taizhou_20260531\export_mnm_browse_probe9_default_copy_yes\browse_folder_export_result.json
+  - C:\Users\Public\KVSkillPractice\kv_clone_taizhou_20260531\export_mnm_browse_probe10_default_copy_repeat\browse_folder_export_result.json
+  - C:\Users\Public\KVSkillPractice\kv_clone_taizhou_20260531\export_mnm_browse_probe11_default_copy_repeat\browse_folder_export_result.json
+  - C:\Users\Public\KVSkillPractice\kv_clone_taizhou_20260531\stable_export_run1\out\export_mnm_project_copy_result.json
+```
+
+Do not use `BFFM_SETSELECTIONW` as the folder-selection mechanism for KV STUDIO MNM export. In verified runs it left the tree selection on the default project folder or destabilized KV STUDIO. To export into an arbitrary caller directory, control the project copy location, accept the Browse Folder default selection, then copy the produced `.mnm` files to the requested `ExportDir`.
 
 Create scaffold:
 
@@ -523,17 +555,17 @@ Current same-run validation evidence for this script is:
 
 The script is parameterized with `-DevicePath`. Stable evidence currently covers KEYENCE SV3 and a registered Beckhoff BK1120 EtherCAT Fieldbus coupler from the Beckhoff ESI sample. Do not claim automatic ESI registration support until a clean-project run registers the ESI file, adds the device, saves, and passes `Ctrl+F9` with copied conversion text.
 
-Runner-owned export probe, not a mature primitive:
+Stable existing-project MNM export:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\mvp\export_mnm_guarded.ps1" `
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\mvp\export_mnm_project_copy_default_folder.ps1" `
   -ProjectPath '<project.kpr>' `
   -ExportDir '<out>\exported_mnm' `
-  -ChecklistPath '<CHECKLIST.md>' `
-  -OutDir '<out>\export_mnm'
+  -OutDir '<out>\export_mnm_project_copy' `
+  -WorkRoot '<out>\export_mnm_project_copy_work'
 ```
 
-Export route: open the target project, guarded `Alt+F`, `R`, `S`, confirm the export option dialog, select the requested folder, then accept the folder dialog. Success requires same-run `.mnm` files under `ExportDir` and `export_mnm_result.json.ok=true`. Until that artifact exists for the exact invocation context, do not use the output as project-replication input. If the route succeeds only when called by a parent runner, record the parent runner and classify the export as `wrapper_dependent`.
+Export route: copy the source project directory to `WorkRoot`, remove `.mnm` files from the copy, open the copied `.kpr`, guarded `Alt+F`, `R`, `S`, confirm the export option dialog, accept the Browse Folder default selected project directory, then copy same-run `.mnm` files from the copied project directory to `ExportDir`. Success requires `export_mnm_project_copy_result.json.ok=true` and same-run `.mnm` files under `ExportDir`. Do not use `export_mnm_guarded.ps1` as the stable export entry for project replication.
 
 Child scripts under `scripts\mvp\` are runner-owned. Call them directly only when diagnosing a failed runner step.
 

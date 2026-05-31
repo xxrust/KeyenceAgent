@@ -5,7 +5,7 @@ This skill operates KEYENCE KV STUDIO through script-owned Windows desktop autom
 ## Stable Scope
 
 - Create, validate, and run disposable KV STUDIO scaffolds.
-- Import MNM mnemonic-list programs; treat guarded MNM export as probe-only until same-run `export_mnm_result.json.ok=true` evidence exists for the exact invocation context.
+- Import MNM mnemonic-list programs; export existing-project MNM through `scripts\mvp\export_mnm_project_copy_default_folder.ps1`.
 - Edit global/local variable tables through scaffold TSV files.
 - Compile/convert with KV STUDIO `Ctrl+F9` and copy same-run conversion results.
 - Configure verified EtherNet/IP and EtherCAT unit settings through project-tree unit configuration scripts.
@@ -89,10 +89,24 @@ Project replication must not export/import official or library FBs as user sourc
 
 MNM export status:
 
+- `scripts\mvp\export_mnm_project_copy_default_folder.ps1` is the stable export entry for existing projects. It copies the project to a disposable work directory, removes old `.mnm` files in the copy, opens the copy in KV STUDIO, accepts the Browse Folder default project directory, then copies same-run `.mnm` files to `ExportDir`.
+- `scripts\mvp\export_mnm_browse_default_folder_guarded.ps1` is the internal UI core for the default-folder route.
 - `scripts\mvp\export_mnm_guarded.ps1` is `probe_only_until_success_artifact`.
 - Direct-call success requires current-run `.mnm` files under `ExportDir` and `export_mnm_result.json.ok=true`.
 - If export succeeds only inside a parent runner or wrapper, classify it as `wrapper_dependent` and record the parent runner plus upstream preconditions.
 - Without positive export evidence, do not start project replication from exported MNM.
+
+Stable export command:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\mvp\export_mnm_project_copy_default_folder.ps1" `
+  -ProjectPath "<project.kpr>" `
+  -ExportDir "<raw-mnm-dir>" `
+  -OutDir "<run-evidence-dir>" `
+  -WorkRoot "<disposable-work-dir>"
+```
+
+Validation evidence from `台州检测机`: three clean core runs and one promoted wrapper run produced 12 same-run `.mnm` files. Evidence root: `C:\Users\Public\KVSkillPractice\kv_clone_taizhou_20260531\stable_export_run1`.
 
 After a proven raw MNM export, run:
 
