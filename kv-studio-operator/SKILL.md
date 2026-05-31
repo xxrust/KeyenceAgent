@@ -569,6 +569,46 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\mvp\expo
 
 Export route: keep `WorkRoot` inside `ExportDir` by default, copy the source project directory to `WorkRoot`, remove `.mnm` files from the copy, open the copied `.kpr`, guarded `Alt+F`, `R`, `S`, confirm the export option dialog, accept the Browse Folder default selected project directory inside the file framework, then copy same-run `.mnm` files from the copied project directory to `ExportDir`. Success requires `export_mnm_project_copy_result.json.ok=true`, `actual_kv_export_dir` under `ExportDir`, and same-run `.mnm` files under `ExportDir`. Do not use `export_mnm_guarded.ps1` as the stable export entry for project replication.
 
+## Project Replication Inventory
+
+1:1 project replication is configuration-first, not MNM-only.
+
+```yaml
+source_assets_required:
+  plc_units:
+    evidence: [WsTreeEnv.xml, UnitSet_string_evidence, ui_probe_if_needed]
+  ethercat:
+    evidence: [WsTreeEnv.xml_nodes, registered_device_or_esi_origin, mapping_parameter_probe]
+  ethernet_ip:
+    evidence: [WsTreeEnv.xml_nodes, local_eds_xml, node_ip_variable_probe]
+  motion_axis:
+    evidence: [WsTreeEnv.xml_axis_names, axis_setting_probe]
+  mnm:
+    evidence: [fresh_export, official_fb_filter]
+import_order:
+  - create_clean_project_matching_cpu
+  - configure_plc_units
+  - configure_ethercat
+  - configure_motion_axis
+  - configure_ethernet_ip
+  - let_kvstudio_generate_official_fb
+  - import_filtered_user_mnm
+  - ctrl_f9_and_compare_inventory
+```
+
+Use the read-only extractor before attempting a clone import:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\export_kv_project_inventory.ps1" `
+  -ProjectPath '<source-project.kpr>' `
+  -MnmDir '<top-level-raw-mnm-dir>' `
+  -OutDir '<run>\source_assets'
+```
+
+`project_inventory.json` is a checkpoint. If `clone_readiness.ready_for_full_1_to_1_import=false`, do not start a full clone import. Open missing categories as small UI breakthrough tasks. Known missing categories include detailed axis settings, EtherCAT mapping/parameters, and EtherNet/IP IP/variable details.
+
+Do not feed recursive filters with an MNM export directory that contains `_kv_export_workspace`; use a top-level-only MNM directory or an orchestration wrapper that excludes the internal workspace.
+
 Child scripts under `scripts\mvp\` are runner-owned. Call them directly only when diagnosing a failed runner step.
 
 All global keyboard, mouse, menu accelerator, and paste operations must be implemented through `scripts\mvp\kv_ui_guard.ps1`. Read `references\ui-guard-contract.md` only when modifying or diagnosing UI guard behavior.
