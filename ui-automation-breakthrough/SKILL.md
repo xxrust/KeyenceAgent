@@ -22,6 +22,8 @@ invariants:
   - never_overwrite_unrelated_user_scripts_or_projects
   - reject_unverified_capability_explicitly
   - script_only_verified_transitions
+  - compose_large_workflows_from_verified_script_segments
+  - probe_unknown_ui_only_from_a_verified_checkpoint
 ```
 
 ## 输入
@@ -37,11 +39,26 @@ invariants:
 ## 状态机
 
 ```yaml
+segment_types:
+  mature_script:
+    entry: script_command
+    oracle: same_run_artifact
+    agent_action: run_only
+  unknown_ui_probe:
+    entry: verified_checkpoint
+    oracle: ui_or_artifact_delta
+    agent_action: explore_one_transition
+  stable_segment_patch:
+    entry: verified_probe
+    oracle: clean_segment_replay
+    agent_action: patch_or_create_small_script
+
 states:
   S0_scope_defined:
     enter_when:
       - target_state.observable == true
       - success_oracle.defined == true
+      - workflow.segmented == true
     next: S1_evidence_collected
   S1_evidence_collected:
     enter_when:
@@ -66,7 +83,7 @@ states:
     next: S5_chain_composed
   S5_chain_composed:
     enter_when:
-      - all_transitions.status == verified
+      - all_segments.status in [mature_script_verified, probe_verified]
       - unsupported_branches.rejected == true
     next: S6_stable_script
   S6_stable_script:
@@ -77,19 +94,63 @@ states:
     next: S7_delivered
 ```
 
+## 分段组合
+
+```yaml
+compound_workflow:
+  required_order:
+    - run_mature_script_to_checkpoint
+    - assert_checkpoint_or_stop
+    - probe_one_unknown_transition
+    - promote_verified_probe_to_small_script
+    - resume_next_mature_script_or_repeat_probe
+  checkpoint:
+    required:
+      - window_or_artifact_identity
+      - mode_editable_when_editing
+      - selected_object_when_selection_matters
+      - same_run_evidence_path
+  forbidden:
+    - explore_full_workflow_from_initial_window_when_mature_prefix_exists
+    - mix_mature_segment_failure_with_unknown_ui_failure
+    - continue_after_unexpected_window_without_segment_review
+```
+
+```pseudo
+for segment in workflow:
+  if segment.kind == mature_script:
+    run(segment.script)
+    assert(segment.oracle)
+    if not ok: stop("mature segment regression or wrong precondition")
+  else:
+    assert(previous_checkpoint.ok)
+    verify_one_transition(segment)
+    if verified: patch_small_script(segment)
+    else: stop_or_record_failure(segment)
+```
+
+| 现象 | 分类 | 动作 |
+| --- | --- | --- |
+| 已有成熟前缀脚本却从初始界面直接探究 | `route_design_error` | 停止；改为先运行成熟脚本到检查点 |
+| 进入从未见过的其他界面 | `checkpoint_missing_or_wrong_entry` | 记录错误入口；回到上一个成熟检查点复现 |
+| 新功能失败 | `unknown_transition_failure` | 只修该 transition，不重写整条链 |
+| 成熟脚本无法到达检查点 | `mature_segment_regression` | 先修成熟脚本；禁止继续探究后续新功能 |
+
 ## 流程
 
 | 步骤 | 动作 | 判据 | 失败处理 |
 | --- | --- | --- | --- |
 | 1 | 定义 `target_state` 与 `success_oracle` | 目标可观察、判据可复测 | 停止写脚本 |
-| 2 | 收集 UI、用户提示、知识库、现有脚本事实 | 每条结论有 `source` | 标为 `assumption` |
-| 3 | 拆成单个 `transition` | 有前置、动作、预期观察 | 继续拆小 |
-| 4 | 在一次性项目/窗口中验证一个 `transition` | 产出证据路径 | 分类为 `failed/rejected/blocked` |
-| 5 | 只把 `verified transition` 写成探针脚本 | JSON 结果 + 证据路径 | 保持 `probe_script` |
-| 6 | 用探针脚本复现状态，再探下一步 | 下一步前置由脚本创造 | 修正片段，不拼完整链 |
-| 7 | 组合全部已验证片段 | 干净运行到达 `target_state` | 删除未验证分支 |
-| 8 | 用独立判据验证稳定性 | 编译/导出/回读/保存重开/结果文本通过 | 不声明稳定 |
-| 9 | 记录支持范围与拒绝范围 | 支持输入、错误码、边界明确 | 拒绝发布通用能力 |
+| 2 | 把工作流切成 `mature_script` 与 `unknown_ui_probe` | 每段有入口、出口、判据 | 不能切分则停止 |
+| 3 | 先运行成熟脚本到最近检查点 | 同 run 证据证明检查点成立 | 成熟段失败则先修成熟段 |
+| 4 | 收集 UI、用户提示、知识库、现有脚本事实 | 每条结论有 `source` | 标为 `assumption` |
+| 5 | 拆成单个 `transition` | 有前置、动作、预期观察 | 继续拆小 |
+| 6 | 只在检查点状态验证一个 `transition` | 产出证据路径 | 分类为 `failed/rejected/blocked` |
+| 7 | 只把 `verified transition` 写成探针脚本 | JSON 结果 + 证据路径 | 保持 `probe_script` |
+| 8 | 用探针脚本复现状态，再探下一步 | 下一步前置由脚本创造 | 修正片段，不拼完整链 |
+| 9 | 组合全部已验证片段 | 干净运行到达 `target_state` | 删除未验证分支 |
+| 10 | 用独立判据验证稳定性 | 编译/导出/回读/保存重开/结果文本通过 | 不声明稳定 |
+| 11 | 记录支持范围与拒绝范围 | 支持输入、错误码、边界明确 | 拒绝发布通用能力 |
 
 ## 本地记录
 
@@ -107,6 +168,7 @@ ui_chain:
       source: ui|user|kb|script|assumption
   transitions:
     - id: T01
+      segment: mature_script|unknown_ui_probe
       precondition: <state>
       action:
         kind: keyboard|uia|win32|mouse|script
@@ -148,6 +210,8 @@ for hint in user_hints:
 | --- | --- |
 | 用户纠正入口/对象/按键 | 立即停止旧入口；把旧入口写入 `rejected_entries` |
 | 用户给出局部链路 | 先验证该片段；用脚本复现该片段作为下一步前置 |
+| 新功能位于已成熟链路中间 | 先运行成熟脚本到最近检查点；只探究新 transition |
+| 进入陌生或错误界面 | 判为 `checkpoint_missing_or_wrong_entry`；禁止继续沿该界面探究 |
 | 当前模式不可编辑 | 先恢复可编辑状态；恢复失败则停止编辑 |
 | 自动导入/注册/识别未验证 | 只允许探针；稳定脚本返回明确错误 |
 

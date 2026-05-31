@@ -53,6 +53,31 @@ Agent participation boundary:
 - After the runner exits, the agent may verify only same-run artifacts such as `mvp_result.json`, `repeat_result.json`, copied compile text, variable persistence JSON, and guard checkpoints.
 - If the runner fails, diagnose from result JSON and artifacts first. Any further KV STUDIO operation must start as a fresh runner command after scaffold/script repair, not as an in-window manual continuation.
 
+Compound workflows:
+
+```yaml
+kv_compound_workflow:
+  rule: mature_script_segments_first
+  segment_order:
+    - mature_script_to_checkpoint
+    - unknown_ui_transition_probe
+    - mature_script_to_next_checkpoint
+  checkpoint_required:
+    - same_run_result_json
+    - target_window_or_artifact_identity
+    - editable_mode_when_project_editing
+    - selected_project_tree_object_when_relevant
+  stop_conditions:
+    - mature_script_checkpoint_missing
+    - unexpected_window_before_unknown_probe
+    - probe_attempt_starts_from_initial_ui_when_mature_prefix_exists
+  classification:
+    unexpected_window_before_checkpoint: route_design_error
+    unexpected_window_after_checkpoint: transition_failure
+```
+
+For a new KV STUDIO capability inside a larger workflow, do not explore from the initial project window when an existing script can reach the nearest precondition. Run the mature script to that checkpoint, assert the checkpoint artifact/window, then probe only the new transition. After that transition is verified, turn it into a small script segment and resume the next mature script. If a run enters an unrelated or never-seen window before the checkpoint is proven, treat it as `route_design_error`, not as evidence about the new feature.
+
 Create scaffold:
 
 ```powershell
