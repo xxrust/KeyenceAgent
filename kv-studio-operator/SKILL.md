@@ -278,7 +278,16 @@ Minimum TSV header:
 scope	owner_program	name	data_type	device	initial_value	comment	evidence	status
 ```
 
-Executable variable rows use `status` other than `display_name`.
+Executable variable rows use `status` other than `display_name` or `no_local_variables`.
+
+No-local marker row:
+
+```tsv
+scope	owner_program	name	data_type	device	initial_value	comment	evidence	status
+local	<module>	__NO_LOCAL_VARIABLES__				Confirmed no local variables.	<source snapshot or audit evidence>	no_local_variables
+```
+
+Use exactly one marker row only when the module/program has no local variables. The marker is gate evidence, not a KV STUDIO variable; runners must not paste it.
 
 MNM module type:
 
@@ -332,7 +341,7 @@ gate_integrity:
 - UI guard gate: the runner must pass `scripts\assert_kv_mvp_ui_guard_usage.ps1` before touching KV STUDIO.
 - Agent boundary gate: the runner must pass `scripts\assert_kv_mvp_agent_boundary.ps1` before touching KV STUDIO; this rejects interactive prompts/manual decision points in runner-owned scripts.
 - Program construction uses MNM files. If MNM import fails, fix the scaffold or stop; do not type program text into the ladder/editor.
-- Variables are mandatory per MNM entry. `variables.local_tsv` must contain executable local rows for that module/program. `variables.global_tsv` may be header-only only when that MNM uses no global variables.
+- Variables are mandatory per MNM entry. `variables.local_tsv` must contain executable local rows for that module/program, or exactly one `no_local_variables` marker row when the module/program has no local variables. `variables.global_tsv` may be header-only only when that MNM uses no global variables.
 - Executable global variable rows must be referenced by their paired MNM file. The compile gate proves the variables used by the imported program. Local variable close/reopen/copy verification is an audit path, not the default fast path.
 - Success must come from the current run's `mvp_result.json`, not screenshots or old compile text.
 
@@ -688,7 +697,7 @@ Common gate codes:
 - `KV_SCAFFOLD_NETWORK_CONFIG_MISSING`, `KV_SCAFFOLD_NETWORK_CONFIG_INVALID_JSON`, `KV_SCAFFOLD_NETWORK_CONFIG_LEAK`
 - `KV_SCAFFOLD_MODULE_CATEGORY_UNSUPPORTED`, `KV_SCAFFOLD_MODULE_CATEGORY_MISMATCH`, `KV_SCAFFOLD_MODULE_CATEGORY_SUPPORT_INCOMPLETE`
 - `KV_UIA_OPERATION_TIMEOUT`, `KV_CREATE_PROJECT_DIALOG_MISSING`
-- `KV_SOURCE_SNAPSHOT_MANIFEST_MISSING`, `KV_SOURCE_SNAPSHOT_NOT_READY`, `KV_SOURCE_SNAPSHOT_STALE`, `KV_SOURCE_SNAPSHOT_MNM_EMPTY`, `KV_SOURCE_SNAPSHOT_VARIABLES_EMPTY`, `KV_UPDATE_ARCHITECTURE_FILE_MISSING`
+- `KV_SOURCE_SNAPSHOT_MANIFEST_MISSING`, `KV_SOURCE_SNAPSHOT_NOT_READY`, `KV_SOURCE_SNAPSHOT_STALE`, `KV_SOURCE_SNAPSHOT_MNM_EMPTY`, `KV_SOURCE_SNAPSHOT_VARIABLES_EMPTY`, `KV_SOURCE_SNAPSHOT_VARIABLES_STUB`, `KV_UPDATE_ARCHITECTURE_FILE_MISSING`
 - `KV_MNM_SAME_NAME_IMPORT_REQUIRES_PREDELETE`, `KV_MNM_INCOMING_DUPLICATE_MODULE_NAME`
 - `KV_VARIABLE_DATA_TYPE_UNSUPPORTED`, `KV_VARIABLE_TSV_SCHEMA_INVALID`, `KV_VARIABLE_NAME_SOFT_DEVICE_CONFLICT`, `KV_VARIABLE_LOCAL_OWNER_MISSING`, `KV_VARIABLE_LOCAL_OWNER_MISMATCH`
 - `KV_UI_GUARD_STATIC_VIOLATION`

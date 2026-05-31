@@ -75,7 +75,7 @@ function Read-TsvRows([string]$Path, [string[]]$RequiredColumns, [string]$Label)
 }
 
 function Get-ExecutableRows([object[]]$Rows, [string]$Scope) {
-  @($Rows | Where-Object { $_.scope -eq $Scope -and $_.status -ne 'display_name' -and $_.name })
+  @(Get-KvExecutableVariableRows -Rows $Rows -Scope $Scope)
 }
 
 function Get-MnmModuleTypeFromText([string]$Text) {
@@ -326,10 +326,25 @@ foreach ($entry in $mnmEntries) {
   $localRows = Read-TsvRows $entryLocalTsv $requiredTsvColumns "local variable TSV for $moduleName"
   $definedGlobalRows = @(Get-ExecutableRows $globalRows 'global')
   $definedLocalRows = @(Get-ExecutableRows $localRows 'local')
+  $noLocalMarkers = @($localRows | Where-Object { Test-KvNoLocalVariablesMarkerRow $_ })
   Assert-KvVariableDefinitions $definedGlobalRows 'global' $entryGlobalTsv '' $fbTypeNames
   Assert-KvVariableDefinitions $definedLocalRows 'local' $entryLocalTsv $moduleName $fbTypeNames
+  $noLocalMarkerErrors = @(Get-KvNoLocalVariablesMarkerErrors -Rows $localRows -SourcePath $entryLocalTsv -ExpectedOwnerProgram $moduleName)
+  if ($noLocalMarkerErrors.Count -gt 0) {
+    $evidencePath = Join-Path $OutDir ("no_local_variables_marker_errors_{0}.json" -f ([IO.Path]::GetFileNameWithoutExtension($entryLocalTsv)))
+    [pscustomobject]@{
+      ok = $false
+      source = $entryLocalTsv
+      module_name = $moduleName
+      errors = $noLocalMarkerErrors
+    } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $evidencePath -Encoding UTF8
+    $first = $noLocalMarkerErrors[0]
+    Stop-ScaffoldValidation ([string]$first.code) ([string]$first.message) @($entryLocalTsv, $evidencePath)
+  }
   if ($definedLocalRows.Count -eq 0) {
-    Stop-ScaffoldValidation 'KV_SCAFFOLD_LOCAL_VARIABLES_EMPTY' "local variable TSV must contain executable local rows for module/program $moduleName." @($entryLocalTsv)
+    if ($noLocalMarkers.Count -ne 1) {
+      Stop-ScaffoldValidation 'KV_SCAFFOLD_LOCAL_VARIABLES_EMPTY' "local variable TSV must contain executable local rows for module/program $moduleName, or exactly one no_local_variables marker row." @($entryLocalTsv)
+    }
   }
   $wrongOwnerRows = @($definedLocalRows | Where-Object { [string]$_.owner_program -ne $moduleName })
   if ($wrongOwnerRows.Count -gt 0) {
@@ -435,6 +450,7 @@ foreach ($entry in $mnmEntries) {
     local_tsv = $entryLocalTsv
     executable_global_variable_count = $definedGlobalRows.Count
     executable_local_variable_count = $definedLocalRows.Count
+    no_local_variables_marked = ($definedLocalRows.Count -eq 0 -and $noLocalMarkers.Count -eq 1)
   }
 }
 

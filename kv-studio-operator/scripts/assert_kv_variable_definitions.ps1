@@ -58,6 +58,11 @@ foreach ($path in $TsvPath) {
         $errors = Get-KvVariableDefinitionErrors -Rows @($read.rows) -Scope $scopeItem -SourcePath $fullPath -ExpectedOwnerProgram $ExpectedOwnerProgram -AllowedCustomDataTypes $AllowedCustomDataTypes
         foreach ($errorItem in @($errors)) { $allErrors.Add($errorItem) }
       }
+      if ($scopesToCheck -contains 'local') {
+        foreach ($errorItem in @(Get-KvNoLocalVariablesMarkerErrors -Rows @($read.rows) -SourcePath $fullPath -ExpectedOwnerProgram $ExpectedOwnerProgram)) {
+          $allErrors.Add($errorItem)
+        }
+      }
     }
     $checked.Add([pscustomobject]@{ path = $fullPath })
   } catch {

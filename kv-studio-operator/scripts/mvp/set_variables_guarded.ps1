@@ -712,9 +712,7 @@ function Assert-NoKvsModalFast([int]$ProcessIdValue, [string]$Stage) {
 function Convert-GlobalRows([string]$Path) {
   $text = [IO.File]::ReadAllText($Path, [Text.Encoding]::Default)
   $rows = $text | ConvertFrom-Csv -Delimiter "`t"
-  $lines = foreach ($row in $rows) {
-    if ($row.scope -ne 'global') { continue }
-    if ($row.status -eq 'display_name') { continue }
+  $lines = foreach ($row in (Get-KvExecutableVariableRows -Rows @($rows) -Scope global)) {
     @(
       $row.name
       $row.data_type
@@ -769,9 +767,7 @@ function Assert-KvVariableDefinitionsBeforePaste([object[]]$Rows, [string]$Scope
 function Convert-LocalRows([string]$Path) {
   $text = [IO.File]::ReadAllText($Path, [Text.Encoding]::Default)
   $rows = $text | ConvertFrom-Csv -Delimiter "`t"
-  $lines = foreach ($row in $rows) {
-    if ($row.scope -ne 'local') { continue }
-    if ($row.status -eq 'display_name') { continue }
+  $lines = foreach ($row in (Get-KvExecutableVariableRows -Rows @($rows) -Scope local)) {
     if ($LocalPasteFormat -eq 'NameType') {
       @(
         $row.name
@@ -794,9 +790,7 @@ function Convert-LocalRows([string]$Path) {
 
 function Get-DefinedVariableRows([string]$Path, [string]$Scope) {
   $text = [IO.File]::ReadAllText($Path, [Text.Encoding]::Default)
-  @($text | ConvertFrom-Csv -Delimiter "`t" | Where-Object {
-    $_.scope -eq $Scope -and $_.status -ne 'display_name'
-  })
+  @(Get-KvExecutableVariableRows -Rows @($text | ConvertFrom-Csv -Delimiter "`t") -Scope $Scope)
 }
 
 function Assert-TextContainsNames([string]$Text, [string[]]$Names, [string]$Label) {

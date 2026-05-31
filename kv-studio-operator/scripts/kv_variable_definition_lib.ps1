@@ -9,6 +9,9 @@ $script:KvScalarVariableDataTypes = @(
   'TIME'
 )
 
+$script:KvNoLocalVariablesMarkerName = '__NO_LOCAL_VARIABLES__'
+$script:KvNoLocalVariablesMarkerStatus = 'no_local_variables'
+
 function Normalize-KvVariableCustomDataTypes([string[]]$AllowedCustomDataTypes = @()) {
   @(
     $AllowedCustomDataTypes |
@@ -71,6 +74,116 @@ function Test-KvVariableDataType([string]$DataType, [string[]]$AllowedCustomData
 function Test-KvSoftDeviceLikeVariableName([string]$Name) {
   if ([string]::IsNullOrWhiteSpace($Name)) { return $false }
   return ($Name -match '^(X|Y|R|MR|LR|CR|B|VB|DM|EM|FM|ZF|W|TM|TC|TS|CM|CC|CS|T|C)\d+([._][A-Za-z0-9]+)?$')
+}
+
+function Test-KvNoLocalVariablesMarkerRow([object]$Row) {
+  if ($null -eq $Row) { return $false }
+  return ([string]$Row.status -eq $script:KvNoLocalVariablesMarkerStatus)
+}
+
+function Get-KvExecutableVariableRows {
+  param(
+    [AllowEmptyCollection()]
+    [AllowNull()]
+    [object[]]$Rows,
+
+    [ValidateSet('global','local')]
+    [string]$Scope
+  )
+
+  if ($null -eq $Rows) { return @() }
+  @($Rows | Where-Object {
+    [string]$_.scope -eq $Scope -and
+    [string]$_.status -ne 'display_name' -and
+    [string]$_.status -ne $script:KvNoLocalVariablesMarkerStatus -and
+    [string]$_.name
+  })
+}
+
+function Get-KvNoLocalVariablesMarkerErrors {
+  param(
+    [AllowEmptyCollection()]
+    [AllowNull()]
+    [object[]]$Rows,
+
+    [string]$SourcePath = '',
+    [string]$ExpectedOwnerProgram = ''
+  )
+
+  if ($null -eq $Rows) { $Rows = @() }
+  $errors = [System.Collections.Generic.List[object]]::new()
+  $markers = @($Rows | Where-Object { Test-KvNoLocalVariablesMarkerRow $_ })
+  if ($markers.Count -eq 0) { return @() }
+
+  if ($markers.Count -gt 1) {
+    $errors.Add([pscustomobject]@{
+      code = 'KV_VARIABLE_NO_LOCAL_MARKER_DUPLICATE'
+      source = $SourcePath
+      message = 'Only one no_local_variables marker row is allowed per local variable TSV.'
+    })
+  }
+
+  $executableLocalRows = @(Get-KvExecutableVariableRows -Rows $Rows -Scope local)
+  if ($executableLocalRows.Count -gt 0) {
+    $errors.Add([pscustomobject]@{
+      code = 'KV_VARIABLE_NO_LOCAL_MARKER_CONFLICT'
+      source = $SourcePath
+      message = 'The no_local_variables marker cannot coexist with executable local variable rows.'
+    })
+  }
+
+  foreach ($marker in $markers) {
+    $scope = ([string]$marker.scope).Trim()
+    $owner = ([string]$marker.owner_program).Trim()
+    $name = ([string]$marker.name).Trim()
+    $dataType = ([string]$marker.data_type).Trim()
+    $device = ([string]$marker.device).Trim()
+    $initialValue = ([string]$marker.initial_value).Trim()
+    $comment = ([string]$marker.comment).Trim()
+    $evidence = ([string]$marker.evidence).Trim()
+
+    if ($scope -ne 'local') {
+      $errors.Add([pscustomobject]@{
+        code = 'KV_VARIABLE_NO_LOCAL_MARKER_SCOPE_INVALID'
+        source = $SourcePath
+        scope = $scope
+        message = 'The no_local_variables marker is valid only in local variable TSV rows.'
+      })
+    }
+    if ($ExpectedOwnerProgram -and $owner -ne $ExpectedOwnerProgram) {
+      $errors.Add([pscustomobject]@{
+        code = 'KV_VARIABLE_NO_LOCAL_MARKER_OWNER_MISMATCH'
+        source = $SourcePath
+        owner_program = $owner
+        expected_owner_program = $ExpectedOwnerProgram
+        message = 'The no_local_variables marker owner_program must match the target module/program.'
+      })
+    }
+    if ($name -ne $script:KvNoLocalVariablesMarkerName) {
+      $errors.Add([pscustomobject]@{
+        code = 'KV_VARIABLE_NO_LOCAL_MARKER_NAME_INVALID'
+        source = $SourcePath
+        name = $name
+        expected_name = $script:KvNoLocalVariablesMarkerName
+        message = 'The no_local_variables marker must use the reserved name __NO_LOCAL_VARIABLES__.'
+      })
+    }
+    if ($dataType -or $device -or $initialValue) {
+      $errors.Add([pscustomobject]@{
+        code = 'KV_VARIABLE_NO_LOCAL_MARKER_PAYLOAD_INVALID'
+        source = $SourcePath
+        message = 'The no_local_variables marker must not define data_type, device, or initial_value.'
+      })
+    }
+    if (-not $comment -or -not $evidence) {
+      $errors.Add([pscustomobject]@{
+        code = 'KV_VARIABLE_NO_LOCAL_MARKER_EVIDENCE_MISSING'
+        source = $SourcePath
+        message = 'The no_local_variables marker requires non-empty comment and evidence fields.'
+      })
+    }
+  }
+  return @($errors)
 }
 
 function New-KvVariableDefinition {
@@ -154,6 +267,9 @@ function Get-KvVariableDefinitionErrors {
   foreach ($row in @($Rows)) {
     if ([string]$row.scope -ne $Scope) { continue }
     if ([string]$row.status -eq 'display_name') { continue }
+    if ([string]$row.status -eq $script:KvNoLocalVariablesMarkerStatus) {
+      continue
+    }
 
     $name = ([string]$row.name).Trim()
     $dataType = ([string]$row.data_type).Trim()

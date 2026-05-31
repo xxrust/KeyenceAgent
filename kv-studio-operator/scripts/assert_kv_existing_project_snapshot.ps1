@@ -162,6 +162,13 @@ $variableFiles = @(Get-ChildItem -LiteralPath $variablesDir -File -Recurse -Erro
 if ($variableFiles.Count -eq 0) {
   Stop-Gate 'KV_SOURCE_SNAPSHOT_VARIABLES_EMPTY' "Snapshot must contain exported or verified variable manifests: $variablesDir" @($SnapshotManifestPath)
 }
+$stubVariableFiles = @($variableFiles | Where-Object {
+  $_.Name -match '(?i)stub|placeholder|dummy' -or
+  ((Get-Content -Raw -LiteralPath $_.FullName -ErrorAction SilentlyContinue) -match '(?i)stub|placeholder|dummy|CodexLocalProbe')
+})
+if ($stubVariableFiles.Count -gt 0) {
+  Stop-Gate 'KV_SOURCE_SNAPSHOT_VARIABLES_STUB' "Snapshot variable evidence contains stub/placeholder/dummy files and cannot prove the current project variables: $($stubVariableFiles.FullName -join ', ')" @($SnapshotManifestPath, @($stubVariableFiles | ForEach-Object { $_.FullName }))
+}
 
 $inventoryFiles = @(Get-ChildItem -LiteralPath $inventoryDir -File -Recurse -ErrorAction SilentlyContinue)
 if ($inventoryFiles.Count -eq 0) {

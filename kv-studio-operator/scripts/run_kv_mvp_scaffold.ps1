@@ -21,6 +21,9 @@ $ErrorActionPreference = 'Stop'
 $start = Get-Date
 $scriptRoot = Split-Path -Parent $PSCommandPath
 $mvpScriptRoot = Join-Path $scriptRoot 'mvp'
+$variableDefinitionLib = Join-Path $scriptRoot 'kv_variable_definition_lib.ps1'
+if (-not (Test-Path -LiteralPath $variableDefinitionLib -PathType Leaf)) { throw "KV variable definition library not found: $variableDefinitionLib" }
+. $variableDefinitionLib
 $configLoader = Join-Path $scriptRoot 'Import-KvStudioOperatorConfig.ps1'
 if (Test-Path -LiteralPath $configLoader -PathType Leaf) {
   $operatorConfig = & $configLoader -ConfigPath $ConfigPath -ScriptRoot $scriptRoot
@@ -54,7 +57,7 @@ function Read-VariableRows([string]$Path) {
 }
 
 function Get-ExecutableVariableRows([string]$Path, [string]$Scope) {
-  @(Read-VariableRows $Path | Where-Object { $_.scope -eq $Scope -and $_.status -ne 'display_name' -and $_.name })
+  @(Get-KvExecutableVariableRows -Rows @(Read-VariableRows $Path) -Scope $Scope)
 }
 
 function New-MergedGlobalVariablesTsv([object[]]$Entries, [string]$OutDir) {
