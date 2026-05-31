@@ -523,7 +523,7 @@ Current same-run validation evidence for this script is:
 
 The script is parameterized with `-DevicePath`. Stable evidence currently covers KEYENCE SV3 and a registered Beckhoff BK1120 EtherCAT Fieldbus coupler from the Beckhoff ESI sample. Do not claim automatic ESI registration support until a clean-project run registers the ESI file, adds the device, saves, and passes `Ctrl+F9` with copied conversion text.
 
-Runner-owned export probe:
+Runner-owned export probe, not a mature primitive:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\mvp\export_mnm_guarded.ps1" `
@@ -533,7 +533,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\mvp\expo
   -OutDir '<out>\export_mnm'
 ```
 
-Export route: open the target project, guarded `Alt+F`, `R`, `S`, confirm the export option dialog, select the requested folder, then accept the folder dialog. Success requires same-run `.mnm` files under `ExportDir` and `export_mnm_result.json.ok=true`.
+Export route: open the target project, guarded `Alt+F`, `R`, `S`, confirm the export option dialog, select the requested folder, then accept the folder dialog. Success requires same-run `.mnm` files under `ExportDir` and `export_mnm_result.json.ok=true`. Until that artifact exists for the exact invocation context, do not use the output as project-replication input. If the route succeeds only when called by a parent runner, record the parent runner and classify the export as `wrapper_dependent`.
 
 Child scripts under `scripts\mvp\` are runner-owned. Call them directly only when diagnosing a failed runner step.
 

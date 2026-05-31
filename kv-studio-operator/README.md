@@ -5,7 +5,7 @@ This skill operates KEYENCE KV STUDIO through script-owned Windows desktop autom
 ## Stable Scope
 
 - Create, validate, and run disposable KV STUDIO scaffolds.
-- Import/export MNM mnemonic-list programs.
+- Import MNM mnemonic-list programs; treat guarded MNM export as probe-only until same-run `export_mnm_result.json.ok=true` evidence exists for the exact invocation context.
 - Edit global/local variable tables through scaffold TSV files.
 - Compile/convert with KV STUDIO `Ctrl+F9` and copy same-run conversion results.
 - Configure verified EtherNet/IP and EtherCAT unit settings through project-tree unit configuration scripts.
@@ -87,7 +87,14 @@ Current validation evidence for `KV-SSC02` in `FB测试`:
 
 Project replication must not export/import official or library FBs as user source. KV STUDIO can auto-add official FBs when modules, EtherCAT, EtherNet/IP, or Universal Library devices are configured; many of those FBs are not editable.
 
-After raw MNM export, run:
+MNM export status:
+
+- `scripts\mvp\export_mnm_guarded.ps1` is `probe_only_until_success_artifact`.
+- Direct-call success requires current-run `.mnm` files under `ExportDir` and `export_mnm_result.json.ok=true`.
+- If export succeeds only inside a parent runner or wrapper, classify it as `wrapper_dependent` and record the parent runner plus upstream preconditions.
+- Without positive export evidence, do not start project replication from exported MNM.
+
+After a proven raw MNM export, run:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\filter_kv_mnm_user_sources.ps1" `
