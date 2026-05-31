@@ -54,6 +54,14 @@ $global:LASTEXITCODE = 0
 & $checklistGuard -ChecklistPath $ChecklistPath -SearchRoots @($OutDir, $ProjectPath, $GlobalVariablesTsv, $LocalVariablesTsv) -OperationName 'set KV STUDIO variables' | Out-Null
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+$script:AllowedCustomDataTypeNames = @(
+  $AllowedCustomDataTypes |
+    ForEach-Object { [string]$_ -split ',' } |
+    ForEach-Object { $_.Trim() } |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+    Select-Object -Unique
+)
+
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName UIAutomationClient
@@ -73,6 +81,10 @@ public class KvSetVarWin32 {
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+  [DllImport("user32.dll")] public static extern uint GetClipboardSequenceNumber();
+  [DllImport("user32.dll")] public static extern bool OpenClipboard(IntPtr hWndNewOwner);
+  [DllImport("user32.dll")] public static extern bool CloseClipboard();
+  [DllImport("user32.dll")] public static extern IntPtr GetOpenClipboardWindow();
   public delegate bool EnumWindowProc(IntPtr hWnd, IntPtr lParam);
   [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowProc lpEnumFunc, IntPtr lParam);
 }
@@ -608,6 +620,7 @@ function Invoke-GuardedVariablePaste($Form, [string]$Step, [string]$Text, [strin
   if ([string]::IsNullOrWhiteSpace($Text)) {
     Fail-Guard 'KV_VARIABLE_CHECKPOINT_FAILED' $Step 'Paste text is empty; guarded paste refused before touching clipboard.' @()
   }
+  Wait-ClipboardAvailable "$Step before clipboard paste" | Out-Null
   Invoke-KvGuardedClipboardPaste -TargetHwnd ([IntPtr]$Form.Current.NativeWindowHandle) -Step $Step -Text $Text -ExpectedTitleLike '*变量编辑*' -SleepMs $SleepMs
   Assert-NoKvsModal $script:ProcessIdForVariables "$Step paste result"
   return (Wait-VariableForm $script:ProcessIdForVariables 6)
@@ -748,15 +761,15 @@ function Assert-NoSoftDeviceLikeVariableNames([object[]]$Rows, [string]$Scope, [
 }
 
 function Assert-KvVariableDefinitionsBeforePaste([object[]]$Rows, [string]$Scope, [string]$SourcePath, [string]$ExpectedOwnerProgram = '') {
-  $errors = @(Get-KvVariableDefinitionErrors -Rows $Rows -Scope $Scope -SourcePath $SourcePath -ExpectedOwnerProgram $ExpectedOwnerProgram -AllowedCustomDataTypes $AllowedCustomDataTypes)
+  $errors = @(Get-KvVariableDefinitionErrors -Rows $Rows -Scope $Scope -SourcePath $SourcePath -ExpectedOwnerProgram $ExpectedOwnerProgram -AllowedCustomDataTypes $script:AllowedCustomDataTypeNames)
   if ($errors.Count -gt 0) {
     $evidencePath = Join-Path $OutDir "${Scope}_variable_definition_errors.json"
     [pscustomobject]@{
       ok = $false
       source = $SourcePath
       scope = $Scope
-      supported_type_pattern = Get-KvVariableSupportedTypePatternText -AllowedCustomDataTypes $AllowedCustomDataTypes
-      allowed_custom_data_types = @($AllowedCustomDataTypes)
+      supported_type_pattern = Get-KvVariableSupportedTypePatternText -AllowedCustomDataTypes $script:AllowedCustomDataTypeNames
+      allowed_custom_data_types = @($script:AllowedCustomDataTypeNames)
       errors = $errors
     } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $evidencePath -Encoding UTF8
     $first = $errors[0]
@@ -871,13 +884,76 @@ function Paste-IntoVerifiedGrid($Form, [string]$PageAid, [string]$Text, [string]
   Log "pasted $Label text length=$($Text.Length) into verified variable grid"
 }
 
-function Get-ClipboardTextAfterCopy([string]$Sentinel, [int]$Seconds = 4) {
+function Test-ClipboardOpenable {
+  $opened = [KvSetVarWin32]::OpenClipboard([IntPtr]::Zero)
+  if ($opened) {
+    [KvSetVarWin32]::CloseClipboard() | Out-Null
+    return [pscustomobject]@{ ok = $true; owner_hwnd = 0; owner_title = ''; owner_process_id = 0; owner_process_name = '' }
+  }
+  $owner = [KvSetVarWin32]::GetOpenClipboardWindow()
+  $ownerInfo = Get-WindowInfo $owner
+  return [pscustomobject]@{
+    ok = $false
+    owner_hwnd = $ownerInfo.hwnd
+    owner_title = $ownerInfo.title
+    owner_process_id = $ownerInfo.process_id
+    owner_process_name = $ownerInfo.process_name
+  }
+}
+
+function Wait-ClipboardAvailable([string]$Label, [int]$Seconds = 8) {
+  $deadline = (Get-Date).AddSeconds($Seconds)
+  $stableSince = $null
+  $observations = [System.Collections.Generic.List[object]]::new()
+  do {
+    Start-Sleep -Milliseconds 120
+    $probe = Test-ClipboardOpenable
+    $observations.Add([pscustomobject]@{
+      at = (Get-Date).ToString('o')
+      ok = [bool]$probe.ok
+      owner_hwnd = $probe.owner_hwnd
+      owner_title = $probe.owner_title
+      owner_process_id = $probe.owner_process_id
+      owner_process_name = $probe.owner_process_name
+      sequence = [KvSetVarWin32]::GetClipboardSequenceNumber()
+    })
+    if ($probe.ok) {
+      if (-not $stableSince) { $stableSince = Get-Date }
+      if (((Get-Date) - $stableSince).TotalMilliseconds -ge 500) {
+        $safe = ($Label -replace '[^A-Za-z0-9_.-]+', '_')
+        $path = Join-Path $OutDir ("clipboard_available_$safe.json")
+        [pscustomobject]@{
+          label = $Label
+          available = $true
+          observations = $observations
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $path -Encoding UTF8
+        Log "clipboard available for $Label evidence=$path"
+        return $true
+      }
+    } else {
+      $stableSince = $null
+    }
+  } while ((Get-Date) -lt $deadline)
+
+  $safe = ($Label -replace '[^A-Za-z0-9_.-]+', '_')
+  $path = Join-Path $OutDir ("clipboard_unavailable_$safe.json")
+  [pscustomobject]@{
+    label = $Label
+    available = $false
+    observations = $observations
+  } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $path -Encoding UTF8
+  Fail-Guard 'KV_CLIPBOARD_NOT_AVAILABLE' "$Label clipboard availability" "System clipboard was not continuously openable before asking KV STUDIO to copy or paste." @($path)
+}
+
+function Get-ClipboardTextAfterCopy([uint32]$BeforeSequence, [int]$Seconds = 4) {
   $deadline = (Get-Date).AddSeconds($Seconds)
   do {
     Start-Sleep -Milliseconds 200
     try {
+      $sequence = [KvSetVarWin32]::GetClipboardSequenceNumber()
+      if ($sequence -eq $BeforeSequence) { continue }
       $text = [Windows.Forms.Clipboard]::GetText()
-      if ($text -and $text -ne $Sentinel) { return $text }
+      if ($text) { return $text }
     } catch {
       Log "clipboard read retry after copy: $($_.Exception.Message)"
     }
@@ -885,18 +961,124 @@ function Get-ClipboardTextAfterCopy([string]$Sentinel, [int]$Seconds = 4) {
   return ''
 }
 
+function Get-VariableFormUiSignature($Form) {
+  $items = @($Form.FindAll(
+    [System.Windows.Automation.TreeScope]::Descendants,
+    [System.Windows.Automation.Condition]::TrueCondition
+  ))
+  $parts = [System.Collections.Generic.List[string]]::new()
+  foreach ($item in $items) {
+    try {
+      $parts.Add(('{0}|{1}|{2}|{3}|{4}' -f
+        [string]$item.Current.AutomationId,
+        [string]$item.Current.Name,
+        [string]$item.Current.ControlType.ProgrammaticName,
+        [string]$item.Current.IsEnabled,
+        [string]$item.Current.IsOffscreen))
+    } catch {
+      $parts.Add('uia-read-error')
+    }
+  }
+  $joined = [string]::Join("`n", $parts)
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $bytes = [Text.Encoding]::UTF8.GetBytes($joined)
+    $hash = [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-', '').ToLowerInvariant()
+  } finally {
+    $sha.Dispose()
+  }
+  [pscustomobject]@{
+    count = $items.Count
+    hash = $hash
+  }
+}
+
+function Wait-VariableFormUiStable($Form, [string]$Label, [int]$Seconds = 8) {
+  $deadline = (Get-Date).AddSeconds($Seconds)
+  $last = $null
+  $stableSince = $null
+  $observations = [System.Collections.Generic.List[object]]::new()
+  do {
+    Start-Sleep -Milliseconds 300
+    $formNow = Wait-VariableForm $script:ProcessIdForVariables 2
+    if (-not $formNow) { throw "KvVariableForm disappeared while waiting for UI stability for $Label." }
+    $sig = Get-VariableFormUiSignature $formNow
+    $observations.Add([pscustomobject]@{
+      at = (Get-Date).ToString('o')
+      count = $sig.count
+      hash = $sig.hash
+    })
+    $same = ($last -and $last.count -eq $sig.count -and $last.hash -eq $sig.hash)
+    if ($same) {
+      if (-not $stableSince) { $stableSince = Get-Date }
+      if (((Get-Date) - $stableSince).TotalMilliseconds -ge 900) {
+        $safe = ($Label -replace '[^A-Za-z0-9_.-]+', '_')
+        $path = Join-Path $OutDir ("ui_stable_$safe.json")
+        [pscustomobject]@{
+          label = $Label
+          stable = $true
+          observations = $observations
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $path -Encoding UTF8
+        Log "variable editor UI stable for $Label evidence=$path"
+        return $formNow
+      }
+    } else {
+      $stableSince = $null
+    }
+    $last = $sig
+  } while ((Get-Date) -lt $deadline)
+
+  $safe = ($Label -replace '[^A-Za-z0-9_.-]+', '_')
+  $path = Join-Path $OutDir ("ui_stable_timeout_$safe.json")
+  [pscustomobject]@{
+    label = $Label
+    stable = $false
+    observations = $observations
+  } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $path -Encoding UTF8
+  Fail-Guard 'KV_VARIABLE_UI_NOT_STABLE' "$Label UI stability" "Variable editor UI did not reach a stable state before copy/paste." @($path)
+}
+
 function Copy-VariableGridText($Form, [string]$PageAid, [string]$Label) {
-  $sentinel = '__KV_VARIABLE_GRID_COPY_SENTINEL__'
-  Invoke-KvGuardedClipboardSetText -TargetHwnd ([IntPtr]$Form.Current.NativeWindowHandle) -Step "$Label sentinel clipboard set" -Text $sentinel -ExpectedTitleLike '*变量编辑*'
   Focus-VariableGridArea $Form $PageAid $Label
   $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
+  $formNow = Wait-VariableFormUiStable $formNow "$Label before copy"
   $formNow = Invoke-GuardedVariableKeyAction $formNow "$Label Ctrl+A" '^a' "Ctrl+A selects $Label variable grid text" 200
+  Wait-ClipboardAvailable "$Label before Ctrl+C" | Out-Null
+  $beforeSequence = [KvSetVarWin32]::GetClipboardSequenceNumber()
   $formNow = Invoke-GuardedVariableKeyAction $formNow "$Label Ctrl+C" '^c' "Ctrl+C copies $Label variable grid text" 300
-  $text = Get-ClipboardTextAfterCopy $sentinel 5
+  $text = Get-ClipboardTextAfterCopy $beforeSequence 5
   if ([string]::IsNullOrWhiteSpace($text)) {
     Fail-Guard 'KV_VARIABLE_GRID_COPY_EMPTY' "$Label copy verification" "Variable grid copy returned empty text for $Label." @()
   }
   Log "copied $Label grid text length=$($text.Length)"
+  return $text
+}
+
+function Copy-LocalVariableGridTextByTabRoute($Form, [string]$ProgramName, [string]$Label) {
+  if (-not (Test-VariablePageSelected $Form '_tabPageLocal')) {
+    throw "Local variable page is not selected before copy audit for $Label."
+  }
+  Select-LocalProgram $Form $ProgramName
+  $formNow = Get-VariableForm $script:ProcessIdForVariables
+  if (-not $formNow) { throw "KvVariableForm missing after selecting local program before copy audit for $Label." }
+
+  Focus-LocalProgramCombo $formNow $ProgramName $Label
+  $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
+  if (-not $formNow) { throw "KvVariableForm missing after focusing local program combo before copy audit for $Label." }
+  $formNow = Wait-VariableFormUiStable $formNow "$Label before copy"
+
+  $formNow = Invoke-GuardedVariableKeyAction $formNow "$Label first-name Tab" '{TAB}' "Tab from local program combo to first variable name cell for $Label copy audit" 250
+  Start-Sleep -Milliseconds 300
+
+  $formNow = Invoke-GuardedVariableKeyAction $formNow "$Label Ctrl+A" '^a' "Ctrl+A selects local variable grid text for $Label" 250
+  Wait-ClipboardAvailable "$Label before Ctrl+C" | Out-Null
+  $beforeSequence = [KvSetVarWin32]::GetClipboardSequenceNumber()
+  $formNow = Invoke-GuardedVariableKeyAction $formNow "$Label Ctrl+C" '^c' "Ctrl+C copies local variable grid text for $Label" 400
+  $text = Get-ClipboardTextAfterCopy $beforeSequence 5
+  if ([string]::IsNullOrWhiteSpace($text)) {
+    Fail-Guard 'KV_VARIABLE_GRID_COPY_EMPTY' "$Label copy verification" "Local variable grid copy returned empty text for $Label." @()
+  }
+  Log "copied $Label local grid text length=$($text.Length) by combo Tab route"
   return $text
 }
 
@@ -971,7 +1153,7 @@ function Paste-LocalVariablesByTabPgDn($Form, [string]$Text, [string]$ProgramNam
   if (-not $formNow) { throw 'KvVariableForm missing after selecting local program.' }
 
   if ($script:ForbiddenLocalNames.Count -gt 0) {
-    $prePasteClipboardText = Copy-VariableGridText $formNow '_tabPageLocal' "local variables $ProgramName pre-paste isolation"
+    $prePasteClipboardText = Copy-LocalVariableGridTextByTabRoute $formNow $ProgramName "local variables $ProgramName pre-paste isolation"
     $prePasteClipboardPath = Join-Path $OutDir 'local_variables_pre_paste_clipboard.txt'
     Set-Content -LiteralPath $prePasteClipboardPath -Value $prePasteClipboardText -Encoding UTF8
     Assert-NameColumnNotInCopiedText $prePasteClipboardText $script:ForbiddenLocalNames "local variables $ProgramName before paste" $prePasteClipboardPath
@@ -990,6 +1172,7 @@ function Paste-LocalVariablesByTabPgDn($Form, [string]$Text, [string]$ProgramNam
   Log 'sent guarded PgDn to move to last local variable row'
 
   $formNow = Invoke-GuardedVariablePaste $formNow 'local variables Ctrl+V' $Text 'Ctrl+V local variables by Tab/PgDn route' 300
+  $formNow = Wait-VariableFormUiStable $formNow "local variables $ProgramName after paste"
   Log "pasted local variables by Tab/PgDn route text length=$($Text.Length)"
 }
 
@@ -1130,12 +1313,31 @@ try {
     $verifyForm = Select-VariableTabByAid $verifyForm '_tabPageLocal' 'local tab reopen verification'
     Select-LocalProgram $verifyForm $LocalProgramName
     $verifyForm = Get-VariableForm $process.Id
-    $localReopenClipboardText = Copy-VariableGridText $verifyForm '_tabPageLocal' 'local variables reopen verification'
-    $localReopenClipboardPath = Join-Path $OutDir 'local_variables_reopen_clipboard.txt'
-    Set-Content -LiteralPath $localReopenClipboardPath -Value $localReopenClipboardText -Encoding UTF8
-    Assert-ExpectedVariableRowsInCopiedText $localReopenClipboardText $localRows 'local variables after close/reopen' $localReopenClipboardPath
-    Assert-NameColumnNotInCopiedText $localReopenClipboardText $script:ForbiddenLocalNames 'local variables after close/reopen' $localReopenClipboardPath
-    Save-Shot '05_after_local_reopen_verification.png'
+    $verifyForm = Wait-VariableFormUiStable $verifyForm "local variables $LocalProgramName after reopen program select"
+    try {
+      $localReopenClipboardText = Copy-LocalVariableGridTextByTabRoute $verifyForm $LocalProgramName 'local variables reopen verification'
+      $localReopenClipboardPath = Join-Path $OutDir 'local_variables_reopen_clipboard.txt'
+      Set-Content -LiteralPath $localReopenClipboardPath -Value $localReopenClipboardText -Encoding UTF8
+      Assert-ExpectedVariableRowsInCopiedText $localReopenClipboardText $localRows 'local variables after close/reopen' $localReopenClipboardPath
+      Assert-NameColumnNotInCopiedText $localReopenClipboardText $script:ForbiddenLocalNames 'local variables after close/reopen' $localReopenClipboardPath
+      Save-Shot '05_after_local_reopen_verification.png'
+    }
+    catch {
+      $message = $_.Exception.Message
+      if ($message -like '*向剪贴板复制失败*') {
+        $diagnosisPath = Join-Path $OutDir 'local_copy_failure_root_cause_required.json'
+        [pscustomobject]@{
+          reason = 'KV_LOCAL_VARIABLE_COPY_FAILED_AFTER_UI_STABILITY_WAIT'
+          meaning = 'copy_or_table_state_failure_not_gate_pass'
+          program_name = $LocalProgramName
+          local_variables_tsv = $LocalVariablesTsv
+          message = $message
+          next_probe = 'isolate pasted row shape, commit timing, and custom data type rows before adding any exception'
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $diagnosisPath -Encoding UTF8
+        Log "local copy failed after UI stability wait; root-cause diagnosis required evidence=$diagnosisPath"
+      }
+      throw
+    }
     if (-not $KeepVariableEditorOpen) {
       Close-VariableEditor $process.Id
       Start-Sleep -Milliseconds 500
@@ -1166,7 +1368,7 @@ try {
     LocalNames = $definedLocalNames
     GlobalVariableFileScanOk = $globalFileScan.Ok
     GlobalPasteRoute = if ($globalRows.Count -gt 0) { if ($AppendGlobalVariables) { 'global tab -> Tab -> PgDn -> Ctrl+V' } else { 'global tab -> Tab -> Ctrl+V' } } else { 'skipped: no executable global variables' }
-    LocalVariableValidationBasis = if ($AuditPersistence) { 'guarded close/reopen/copy verification from the KV STUDIO local-variable grid' } else { 'fast mode: local persistence is deferred to compile gate unless AuditPersistence is enabled' }
+    LocalVariableValidationBasis = if ($AuditPersistence) { 'guarded close/reopen/copy verification from the KV STUDIO local-variable grid after UI stability evidence' } else { 'fast mode: local persistence is deferred to compile gate unless AuditPersistence is enabled' }
     LocalReopenClipboardPath = $localReopenClipboardPath
     LocalReopenClipboardContainsExpectedNames = if ($AuditPersistence -and $localRows.Count -gt 0) { $true } else { $null }
     ForbiddenLocalNames = @($script:ForbiddenLocalNames)

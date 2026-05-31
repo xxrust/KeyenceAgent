@@ -152,7 +152,9 @@ if (-not (Test-Path -LiteralPath $architecturePath -PathType Leaf)) {
   Stop-Gate 'KV_UPDATE_ARCHITECTURE_FILE_MISSING' "Open architecture file not found: $architecturePath" @($SnapshotManifestPath)
 }
 
-$mnmFiles = @(Get-ChildItem -LiteralPath $mnmDir -File -Filter '*.mnm' -ErrorAction SilentlyContinue)
+$mnmFiles = @(Get-ChildItem -LiteralPath $mnmDir -File -Filter '*.mnm' -Recurse -ErrorAction SilentlyContinue |
+  Where-Object { $_.FullName -notmatch '\\_kv_export_workspace\\' } |
+  Sort-Object FullName)
 if ($mnmFiles.Count -eq 0) {
   Stop-Gate 'KV_SOURCE_SNAPSHOT_MNM_EMPTY' "Snapshot must contain at least one exported or verified MNM file: $mnmDir" @($SnapshotManifestPath)
 }

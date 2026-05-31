@@ -96,6 +96,13 @@ EtherNet/IP:
 - Variable dialog handling is part of the stable script route.
 - EDS/XML member parsing is available through `scripts\get_kv_ethernet_ip_device_members.ps1`.
 
+## Variable Editor Gate
+
+- `-AuditVariablePersistence` requires close/reopen/copy evidence from each target local program.
+- Before variable-grid `Ctrl+C` or `Ctrl+V`, the script must verify foreground, target local program selection, stable variable-editor UIA signature, and continuously openable system clipboard.
+- A KV clipboard modal is a symptom. Diagnose table state, program switching, paste commit timing, clipboard availability, and clipboard sequencing before changing gates.
+- Do not replace enabled copy audit with compile-only proof unless a user-approved gate change and independent audit exist.
+
 EtherCAT:
 
 - Route: `单元配置 -> [0] KV-X310 -> EtherCAT -> 手动设定`.

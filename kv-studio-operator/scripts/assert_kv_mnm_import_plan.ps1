@@ -151,7 +151,9 @@ if (-not (Test-Path -LiteralPath $mnmDir -PathType Container)) {
 }
 
 $existingModules = @()
-foreach ($file in @(Get-ChildItem -LiteralPath $mnmDir -File -Filter '*.mnm' -ErrorAction SilentlyContinue | Sort-Object Name)) {
+foreach ($file in @(Get-ChildItem -LiteralPath $mnmDir -File -Filter '*.mnm' -Recurse -ErrorAction SilentlyContinue |
+  Where-Object { $_.FullName -notmatch '\\_kv_export_workspace\\' } |
+  Sort-Object FullName)) {
   $moduleName = Get-MnmModuleName $file.FullName
   if (-not [string]::IsNullOrWhiteSpace($moduleName)) {
     $existingModules += [pscustomobject]@{

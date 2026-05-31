@@ -384,15 +384,26 @@ $agentBoundaryContractPath = [string]$agentBoundaryResult.contract_path
 
 $mnmEntries = @($manifest.mnm_files)
 if ($mnmEntries.Count -eq 0) { throw 'scaffold.json must contain at least one mnm_files entry.' }
+$manifestCustomDataTypes = @()
+if ($manifest.variables -and $manifest.variables.allowed_custom_data_types) {
+  $manifestCustomDataTypes += @($manifest.variables.allowed_custom_data_types)
+}
+if ($manifest.allowed_custom_data_types) {
+  $manifestCustomDataTypes += @($manifest.allowed_custom_data_types)
+}
 $fbTypeNames = @(
-  $mnmEntries |
-    Where-Object {
-      $moduleTypeForCustom = if ($null -ne $_.module_type -and [string]$_.module_type -ne '') { [int]$_.module_type } else { 0 }
-      $moduleTypeForCustom -eq 2
-    } |
-    ForEach-Object {
-      if ($_.module_name) { [string]$_.module_name } else { [IO.Path]::GetFileNameWithoutExtension([string]$_.path) }
-    } |
+  @(
+    $mnmEntries |
+      Where-Object {
+        $moduleTypeForCustom = if ($null -ne $_.module_type -and [string]$_.module_type -ne '') { [int]$_.module_type } else { 0 }
+        $moduleTypeForCustom -eq 2
+      } |
+      ForEach-Object {
+        if ($_.module_name) { [string]$_.module_name } else { [IO.Path]::GetFileNameWithoutExtension([string]$_.path) }
+      }
+    $manifestCustomDataTypes
+  ) |
+    ForEach-Object { ([string]$_).Trim() } |
     Where-Object { $_ } |
     Select-Object -Unique
 )

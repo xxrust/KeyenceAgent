@@ -432,10 +432,21 @@ foreach ($entry in $mnmEntries) {
   }
 }
 
+$manifestCustomDataTypes = @()
+if ($manifest.variables -and $manifest.variables.allowed_custom_data_types) {
+  $manifestCustomDataTypes += @($manifest.variables.allowed_custom_data_types)
+}
+if ($manifest.allowed_custom_data_types) {
+  $manifestCustomDataTypes += @($manifest.allowed_custom_data_types)
+}
 $fbTypeNames = @(
-  $resolvedMnmFiles |
-    Where-Object { [int]$_.module_type -eq 2 } |
-    ForEach-Object { [string]$_.module_name } |
+  @(
+    $resolvedMnmFiles |
+      Where-Object { [int]$_.module_type -eq 2 } |
+      ForEach-Object { [string]$_.module_name }
+    $manifestCustomDataTypes
+  ) |
+    ForEach-Object { ([string]$_).Trim() } |
     Where-Object { $_ } |
     Select-Object -Unique
 )

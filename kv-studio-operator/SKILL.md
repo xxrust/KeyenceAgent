@@ -239,6 +239,36 @@ For multi-MNM stages that must prove local variables independently of compile, r
 
 Multi-MNM local-variable proof requires per-module first-column isolation: the copied local grid for module A must contain A's local names with their expected data types in the first two columns, and must not contain any other module's local names in the first column. The normal local paste route is: select local tab, select the target local program, focus the local program combo, send `Tab`, send `PgDn`, then paste the full local variable rows. If an audit copy is taken before paste, the script must refocus the local program combo before sending `Tab`.
 
+变量表复制/粘贴门限：
+
+```yaml
+variable_grid_gate:
+  symptom_is_not_root_cause:
+    - "向剪贴板复制失败"
+    - "paste/copy modal"
+  required_before_ctrl_c_or_ctrl_v:
+    - foreground_window == KvVariableForm
+    - local_program_combo.value == target_program
+    - variable_editor_uia_signature.stable_for_ms >= 900
+    - system_clipboard.openable_for_ms >= 500
+  required_after_local_paste:
+    - variable_editor_uia_signature.stable == true
+    - save_project
+    - close_reopen_copy_audit_when_AuditVariablePersistence
+  forbidden:
+    - dismiss_modal_as_success
+    - skip_local_copy_audit_because_custom_or_fb_type_exists
+    - add_compile_only_exception_without_user_approved_gate_change
+    - treat_compile_ok_as_replacement_for_enabled_copy_audit
+  evidence:
+    - ui_stable_*.json
+    - clipboard_available_*.json
+    - local_variables_reopen_clipboard.txt
+    - variable_persistence_validation.json
+```
+
+如果 KV STUDIO 在变量表 `Ctrl+C` 或 `Ctrl+V` 后弹出剪贴板错误，先定位为什么表格状态或系统剪贴板状态不允许复制/粘贴。优先检查 local program 是否已切换完成、粘贴后数据是否已提交、变量编辑器 UIA 子树是否稳定、系统剪贴板是否连续可打开、脚本是否过早输入。只有在门限本身被证明错误，并经过独立审核后，才能修改门限；不得把关闭弹窗、延长超时、跳过审计或仅靠编译成功当作修复。
+
 Run repeat gate:
 
 ```powershell
