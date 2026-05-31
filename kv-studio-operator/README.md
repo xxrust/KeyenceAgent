@@ -51,6 +51,22 @@ EtherCAT:
 - Verified non-SV3 route covers already registered ESI devices, including Beckhoff BK1120 from the local Beckhoff sample.
 - Automatic ESI registration is not stable. `esi_path` is reserved and rejected with `KV_ETHERCAT_ESI_REGISTRATION_UNSTABLE`.
 
+## User FB Export Filter
+
+Project replication must not export/import official or library FBs as user source. KV STUDIO can auto-add official FBs when modules, EtherCAT, EtherNet/IP, or Universal Library devices are configured; many of those FBs are not editable.
+
+After raw MNM export, run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\filter_kv_mnm_user_sources.ps1" `
+  -InputDir "<raw-mnm-dir>" `
+  -OutputDir "<filtered-mnm-dir>" `
+  -ProjectPath "<project.kpr>" `
+  -OutDir "<filter-report-dir>"
+```
+
+The filter copies non-FB MNM files, excludes project-tree official/library FBs and known official patterns such as `MC_*`, `_MC_*`, `[MC]_*`, `ModbusTCPClient_*`, and `SocketTCP_*`, then keeps only FBs with no official/library evidence. The report file is `mnm_user_source_filter_result.json`.
+
 ## Verification Rule
 
 Do not claim a route is stable unless a clean KV STUDIO run configures the project and a `Ctrl+F9` conversion result is copied from the same run.

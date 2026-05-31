@@ -215,11 +215,43 @@ Agents normally call only:
 - `scripts\assert_kv_mnm_import_plan.ps1`
 - `scripts\assert_kv_variable_definitions.ps1`
 - `scripts\validate_kv_mvp_scaffold.ps1`
+- `scripts\filter_kv_mnm_user_sources.ps1`
 - `scripts\run_kv_mvp_scaffold.ps1`
 - `scripts\run_kv_mvp_repair_existing_project.ps1`
 - `scripts\run_kv_mvp_repeat.ps1`
 - `scripts\configure_kv_network_from_config.ps1`
 - `scripts\configure_kv_expansion_units.ps1`
+
+## 官方/库 FB 过滤
+
+复刻项目时，官方/库 FB 是依赖，不是用户源码。
+
+模块、EtherCAT、EtherNet/IP、Universal Library 等操作可能自动导入官方 FB；其中很多不可编辑。不要把这类 FB 当作用户 FB 导出、重命名、再导入。
+
+导出 MNM 后必须先运行过滤器：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\filter_kv_mnm_user_sources.ps1" `
+  -InputDir '<raw-mnm-dir>' `
+  -OutputDir '<filtered-mnm-dir>' `
+  -ProjectPath '<project.kpr>' `
+  -OutDir '<filter-report-dir>'
+```
+
+过滤规则：
+
+```text
+if MODULE_TYPE != 2:
+  copy
+else if name in project WsTreeEnv official/library names:
+  exclude
+else if name matches ^(MC_|_MC_|\[MC\]_|_\[MC\]_|ModbusTCPClient_|SocketTCP_):
+  exclude
+else:
+  copy as user_fb
+```
+
+`MC_*` / `[MC]_*` 是 KEYENCE 运动控制官方/库 FB 模式；Universal Library 与通信库 FB 以项目树证据优先。禁止按单个用户 FB 名称做白名单。
 
 ## PLC Expansion Unit Configuration
 
