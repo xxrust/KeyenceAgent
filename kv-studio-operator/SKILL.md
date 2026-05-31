@@ -74,9 +74,32 @@ kv_compound_workflow:
   classification:
     unexpected_window_before_checkpoint: route_design_error
     unexpected_window_after_checkpoint: transition_failure
+    mature_script_changed_for_probe: mature_script_boundary_violation
 ```
 
 For a new KV STUDIO capability inside a larger workflow, do not explore from the initial project window when an existing script can reach the nearest precondition. Run the mature script to that checkpoint, assert the checkpoint artifact/window, then probe only the new transition. After that transition is verified, turn it into a small script segment and resume the next mature script. If a run enters an unrelated or never-seen window before the checkpoint is proven, treat it as `route_design_error`, not as evidence about the new feature.
+
+Primitive script boundary:
+
+```yaml
+primitive_scripts:
+  immutable_during_feature_probe:
+    - scripts/mvp/export_mnm_guarded.ps1
+    - scripts/mvp/import_mnm_guarded.ps1
+    - scripts/mvp/compile_and_copy_result_bounded.ps1
+    - scripts/filter_kv_mnm_user_sources.ps1
+  rule: run_or_restore
+  forbidden:
+    - add_new_workflow_logic_to_primitive
+    - replace_known_fast_path_with_unverified_ui_route
+    - widen_one_primitive_to_cover_multiple_goals
+  allowed_changes:
+    - fix_regression_in_the_same_original_goal
+    - add_observation_artifacts_without_changing_action_path
+    - create_new_versioned_probe_or_wrapper
+```
+
+If a primitive script is too coarse for a task, keep it unchanged and create an orchestrator or probe script. For example, `export_mnm_guarded.ps1` owns only "export MNM from an exact project to a directory"; project replication must call it as a stable segment, then perform filtering, scaffold construction, and import through separate scripts. A failed new route inside a primitive is not a reason to mutate that primitive during the task; restore it and move the experiment into a task-local probe.
 
 Create scaffold:
 
