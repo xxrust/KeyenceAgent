@@ -20,6 +20,9 @@ public class KvSharedUiGuardWin32 {
 "@
 }
 
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+
 $script:KvUiGuardOutDir = ''
 $script:KvUiGuardCheckpointDir = ''
 $script:KvUiGuardSeq = 0
@@ -59,6 +62,33 @@ function Get-KvForegroundSnapshot {
   }
 }
 
+function Get-KvFocusedElementSnapshot {
+  try {
+    $element = [System.Windows.Automation.AutomationElement]::FocusedElement
+    if (-not $element) { return $null }
+    $rect = $element.Current.BoundingRectangle
+    [pscustomobject]@{
+      name = [string]$element.Current.Name
+      automation_id = [string]$element.Current.AutomationId
+      control_type = [string]$element.Current.ControlType.ProgrammaticName
+      class_name = [string]$element.Current.ClassName
+      process_id = [int]$element.Current.ProcessId
+      is_enabled = [bool]$element.Current.IsEnabled
+      is_offscreen = [bool]$element.Current.IsOffscreen
+      bounds = [pscustomobject]@{
+        x = [int]$rect.X
+        y = [int]$rect.Y
+        width = [int]$rect.Width
+        height = [int]$rect.Height
+      }
+    }
+  } catch {
+    [pscustomobject]@{
+      error = $_.Exception.Message
+    }
+  }
+}
+
 function ConvertTo-KvUiGuardSafeName {
   param([string]$Value)
   $safe = $Value -replace '[^A-Za-z0-9_.-]+', '_'
@@ -94,6 +124,7 @@ function Write-KvUiGuardCheckpoint {
     expected = $Expected
     foreground_before = $Before
     foreground_after = $After
+    focused_element = Get-KvFocusedElementSnapshot
     error_code = $ErrorCode
     message = $Message
     evidence = $Evidence
@@ -347,6 +378,40 @@ function Invoke-KvGuardedVkTap {
   Start-Sleep -Milliseconds $SleepMs
   $after = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step "$Step postcondition" -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
   Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action 'virtual key tap' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk } -Before $before -After $after -Message 'Postcondition passed; target still owns foreground.' -Evidence @($beforePath) | Out-Null
+}
+
+function Invoke-KvGuardedCtrlChord {
+  param(
+    [Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,
+    [Parameter(Mandatory=$true)][string]$Step,
+    [Parameter(Mandatory=$true)][byte]$Vk,
+    [string]$ExpectedTitleLike = '',
+    [string]$Action = 'Ctrl chord',
+    [int]$SleepMs = 250,
+    [switch]$AllowModalAfter
+  )
+  $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
+  $beforePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk; ctrl = $true } -Before $before -Message 'Precondition passed; target owns foreground.'
+  [KvSharedUiGuardWin32]::keybd_event(0x11, 0, 0, 0)
+  Start-Sleep -Milliseconds 35
+  [KvSharedUiGuardWin32]::keybd_event($Vk, 0, 0, 0)
+  Start-Sleep -Milliseconds 35
+  [KvSharedUiGuardWin32]::keybd_event($Vk, 0, 2, 0)
+  Start-Sleep -Milliseconds 35
+  [KvSharedUiGuardWin32]::keybd_event(0x11, 0, 2, 0)
+  Start-Sleep -Milliseconds $SleepMs
+  $after = Get-KvForegroundSnapshot
+  if ($after.hwnd -eq $TargetHwnd.ToInt64() -and ((-not $ExpectedTitleLike) -or $after.title -like $ExpectedTitleLike)) {
+    Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk; ctrl = $true } -Before $before -After $after -Message 'Postcondition passed; target still owns foreground.' -Evidence @($beforePath) | Out-Null
+    return
+  }
+  if ($AllowModalAfter -and [string]$after.class_name -eq '#32770' -and [string]$after.process_name -eq 'Kvs') {
+    Write-KvUiGuardCheckpoint -Step $Step -Status 'after_modal' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk; ctrl = $true; modal_allowed_for_caller_evidence = $true } -Before $before -After $after -ErrorCode 'KV_MODAL_PRESENT' -Message 'Ctrl chord produced a KV modal; caller must capture modal evidence before any recovery.' -Evidence @($beforePath) | Out-Null
+    return
+  }
+  $code = Get-KvUiGuardForegroundErrorCode $after $TargetHwnd
+  $failurePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'failed' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk; ctrl = $true } -Before $before -After $after -ErrorCode $code -Message 'Ctrl chord did not leave target foreground.' -Evidence @($beforePath)
+  Stop-KvUiGuard -ErrorCode $code -Step $Step -Message "Ctrl chord postcondition failed. Actual foreground title='$($after.title)' class='$($after.class_name)' process='$($after.process_name)'." -Evidence @($beforePath, $failurePath)
 }
 
 function Invoke-KvGuardedAltVk {

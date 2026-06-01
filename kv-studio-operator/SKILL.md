@@ -251,23 +251,30 @@ variable_grid_gate:
     - local_program_combo.value == target_program
     - variable_editor_uia_signature.stable_for_ms >= 900
     - system_clipboard.openable_for_ms >= 500
+    - ctrl_chord_delivery == scripts/mvp/kv_ui_guard.ps1::Invoke-KvGuardedCtrlChord
   required_after_local_paste:
     - variable_editor_uia_signature.stable == true
     - save_project
     - close_reopen_copy_audit_when_AuditVariablePersistence
   forbidden:
+    - raw_SendKeys_or_keybd_event_in_child_business_script
     - dismiss_modal_as_success
     - skip_local_copy_audit_because_custom_or_fb_type_exists
     - add_compile_only_exception_without_user_approved_gate_change
     - treat_compile_ok_as_replacement_for_enabled_copy_audit
+    - treat_manual_copy_success_as_proof_without_script_owned_repeat_run
   evidence:
     - ui_stable_*.json
     - clipboard_available_*.json
+    - checkpoints/*Ctrl_A*.json focused_element
+    - checkpoints/*Ctrl_C*.json focused_element
     - local_variables_reopen_clipboard.txt
     - variable_persistence_validation.json
 ```
 
 如果 KV STUDIO 在变量表 `Ctrl+C` 或 `Ctrl+V` 后弹出剪贴板错误，先定位为什么表格状态或系统剪贴板状态不允许复制/粘贴。优先检查 local program 是否已切换完成、粘贴后数据是否已提交、变量编辑器 UIA 子树是否稳定、系统剪贴板是否连续可打开、脚本是否过早输入。只有在门限本身被证明错误，并经过独立审核后，才能修改门限；不得把关闭弹窗、延长超时、跳过审计或仅靠编译成功当作修复。
+
+如果用户在同一失败界面手动 `Ctrl+A`、`Ctrl+C` 成功，结论是“脚本发键/焦点/窗口状态路径不同”，不是“变量表不可复制”。修复必须留在脚本自有路线内：把全局 UI 输入收敛到 `kv_ui_guard.ps1` 的 guard primitive，记录 foreground 和 focused element，再用全新项目副本跑至少两次 `-AuditVariablePersistence` 全流程验证。业务脚本不得直接调用 `SendKeys`、`keybd_event`、`mouse_event`、`SetCursorPos` 或剪贴板粘贴 API；`scripts\assert_kv_mvp_ui_guard_usage.ps1` 是 KV STUDIO 启动前门限。
 
 Run repeat gate:
 

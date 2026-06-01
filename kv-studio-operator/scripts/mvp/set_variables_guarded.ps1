@@ -130,6 +130,33 @@ function Get-ForegroundSnapshot {
   }
 }
 
+function Get-FocusedElementSnapshot {
+  try {
+    $element = [System.Windows.Automation.AutomationElement]::FocusedElement
+    if (-not $element) { return $null }
+    $rect = $element.Current.BoundingRectangle
+    [pscustomobject]@{
+      name = [string]$element.Current.Name
+      automation_id = [string]$element.Current.AutomationId
+      control_type = [string]$element.Current.ControlType.ProgrammaticName
+      class_name = [string]$element.Current.ClassName
+      process_id = [int]$element.Current.ProcessId
+      is_enabled = [bool]$element.Current.IsEnabled
+      is_offscreen = [bool]$element.Current.IsOffscreen
+      bounds = [pscustomobject]@{
+        x = [int]$rect.X
+        y = [int]$rect.Y
+        width = [int]$rect.Width
+        height = [int]$rect.Height
+      }
+    }
+  } catch {
+    [pscustomobject]@{
+      error = $_.Exception.Message
+    }
+  }
+}
+
 function Get-VariableFormSnapshot($Form) {
   if (-not $Form) { return $null }
   $rect = $Form.Current.BoundingRectangle
@@ -182,6 +209,7 @@ function Write-StepCheckpoint(
     target = Get-VariableFormSnapshot $Form
     foreground_before = $Before
     foreground_after = $After
+    focused_element = Get-FocusedElementSnapshot
     error_code = $ErrorCode
     message = $Message
     evidence = $Evidence
@@ -234,10 +262,10 @@ function Set-CapsLockState([bool]$Enabled, [IntPtr]$TargetHwnd, [string]$Expecte
 }
 
 function Restore-KvForeground([System.Diagnostics.Process]$Process, [string]$ProjectNeedle, [string]$Action) {
-  [KvSetVarWin32]::ShowWindow($Process.MainWindowHandle, 9) | Out-Null
+  [KvSetVarWin32]::ShowWindow($Process.MainWindowHandle, 3) | Out-Null
   for ($i = 1; $i -le 10; $i++) {
     if ([KvSetVarWin32]::IsIconic($Process.MainWindowHandle)) {
-      [KvSetVarWin32]::ShowWindow($Process.MainWindowHandle, 9) | Out-Null
+      [KvSetVarWin32]::ShowWindow($Process.MainWindowHandle, 3) | Out-Null
     }
     [KvSetVarWin32]::SetForegroundWindow($Process.MainWindowHandle) | Out-Null
     Start-Sleep -Milliseconds 100
@@ -611,6 +639,22 @@ function Invoke-GuardedVariableKeyAction($Form, [string]$Step, [string]$Keys, [s
     Fail-Guard 'KV_VARIABLE_FORM_NOT_FOREGROUND' $Step 'KvVariableForm disappeared after guarded key action.' @($beforePath, $failurePath)
   }
   Assert-NoKvsModal $script:ProcessIdForVariables "$Step after key action"
+  $after = Assert-VariableFormForeground $formAfter "$Step postcondition" -AllowSingleRecovery
+  Write-StepCheckpoint $Step 'after' $Description $formAfter $before $after '' 'Postcondition passed; variable editor still owns foreground.' @($beforePath) | Out-Null
+  return $formAfter
+}
+
+function Invoke-GuardedVariableCtrlChord($Form, [string]$Step, [byte]$Vk, [string]$Description, [int]$SleepMs = 250) {
+  $before = Assert-VariableFormForeground $Form $Step -AllowSingleRecovery
+  $beforePath = Write-StepCheckpoint $Step 'before' $Description $Form $before $null '' 'Precondition passed; target variable editor owns foreground.' @()
+  Invoke-KvGuardedCtrlChord -TargetHwnd ([IntPtr]$Form.Current.NativeWindowHandle) -Step $Step -Vk $Vk -ExpectedTitleLike '*变量编辑*' -Action $Description -SleepMs $SleepMs -AllowModalAfter
+  $formAfter = Wait-VariableForm $script:ProcessIdForVariables 6
+  if (-not $formAfter) {
+    $after = Get-ForegroundSnapshot
+    $failurePath = Write-StepCheckpoint $Step 'failed' $Description $Form $before $after 'KV_VARIABLE_FORM_NOT_FOREGROUND' 'KvVariableForm disappeared after guarded Ctrl chord.' @($beforePath)
+    Fail-Guard 'KV_VARIABLE_FORM_NOT_FOREGROUND' $Step 'KvVariableForm disappeared after guarded Ctrl chord.' @($beforePath, $failurePath)
+  }
+  Assert-NoKvsModal $script:ProcessIdForVariables "$Step after Ctrl chord"
   $after = Assert-VariableFormForeground $formAfter "$Step postcondition" -AllowSingleRecovery
   Write-StepCheckpoint $Step 'after' $Description $formAfter $before $after '' 'Postcondition passed; variable editor still owns foreground.' @($beforePath) | Out-Null
   return $formAfter
@@ -1042,10 +1086,10 @@ function Copy-VariableGridText($Form, [string]$PageAid, [string]$Label) {
   Focus-VariableGridArea $Form $PageAid $Label
   $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
   $formNow = Wait-VariableFormUiStable $formNow "$Label before copy"
-  $formNow = Invoke-GuardedVariableKeyAction $formNow "$Label Ctrl+A" '^a' "Ctrl+A selects $Label variable grid text" 200
+  $formNow = Invoke-GuardedVariableCtrlChord $formNow "$Label Ctrl+A" 0x41 "Ctrl+A selects $Label variable grid text" 250
   Wait-ClipboardAvailable "$Label before Ctrl+C" | Out-Null
   $beforeSequence = [KvSetVarWin32]::GetClipboardSequenceNumber()
-  $formNow = Invoke-GuardedVariableKeyAction $formNow "$Label Ctrl+C" '^c' "Ctrl+C copies $Label variable grid text" 300
+  $formNow = Invoke-GuardedVariableCtrlChord $formNow "$Label Ctrl+C" 0x43 "Ctrl+C copies $Label variable grid text" 400
   $text = Get-ClipboardTextAfterCopy $beforeSequence 5
   if ([string]::IsNullOrWhiteSpace($text)) {
     Fail-Guard 'KV_VARIABLE_GRID_COPY_EMPTY' "$Label copy verification" "Variable grid copy returned empty text for $Label." @()
@@ -1070,10 +1114,10 @@ function Copy-LocalVariableGridTextByTabRoute($Form, [string]$ProgramName, [stri
   $formNow = Invoke-GuardedVariableKeyAction $formNow "$Label first-name Tab" '{TAB}' "Tab from local program combo to first variable name cell for $Label copy audit" 250
   Start-Sleep -Milliseconds 300
 
-  $formNow = Invoke-GuardedVariableKeyAction $formNow "$Label Ctrl+A" '^a' "Ctrl+A selects local variable grid text for $Label" 250
+  $formNow = Invoke-GuardedVariableCtrlChord $formNow "$Label Ctrl+A" 0x41 "Ctrl+A selects local variable grid text for $Label" 250
   Wait-ClipboardAvailable "$Label before Ctrl+C" | Out-Null
   $beforeSequence = [KvSetVarWin32]::GetClipboardSequenceNumber()
-  $formNow = Invoke-GuardedVariableKeyAction $formNow "$Label Ctrl+C" '^c' "Ctrl+C copies local variable grid text for $Label" 400
+  $formNow = Invoke-GuardedVariableCtrlChord $formNow "$Label Ctrl+C" 0x43 "Ctrl+C copies local variable grid text for $Label" 400
   $text = Get-ClipboardTextAfterCopy $beforeSequence 5
   if ([string]::IsNullOrWhiteSpace($text)) {
     Fail-Guard 'KV_VARIABLE_GRID_COPY_EMPTY' "$Label copy verification" "Local variable grid copy returned empty text for $Label." @()
@@ -1327,14 +1371,14 @@ try {
       if ($message -like '*向剪贴板复制失败*') {
         $diagnosisPath = Join-Path $OutDir 'local_copy_failure_root_cause_required.json'
         [pscustomobject]@{
-          reason = 'KV_LOCAL_VARIABLE_COPY_FAILED_AFTER_UI_STABILITY_WAIT'
-          meaning = 'copy_or_table_state_failure_not_gate_pass'
+          reason = 'KV_LOCAL_VARIABLE_COPY_FAILED_AFTER_SCRIPTED_CTRL_CHORD'
+          meaning = 'scripted_key_focus_or_selection_failure_not_gate_pass'
           program_name = $LocalProgramName
           local_variables_tsv = $LocalVariablesTsv
           message = $message
-          next_probe = 'isolate pasted row shape, commit timing, and custom data type rows before adding any exception'
+          next_probe = 'compare scripted Ctrl+A/Ctrl+C foreground, active control, window rect, and manual keyboard success at the same failed state'
         } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $diagnosisPath -Encoding UTF8
-        Log "local copy failed after UI stability wait; root-cause diagnosis required evidence=$diagnosisPath"
+        Log "local copy failed after scripted Ctrl chord; root-cause diagnosis required evidence=$diagnosisPath"
       }
       throw
     }

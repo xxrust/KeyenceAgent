@@ -102,6 +102,14 @@ EtherNet/IP:
 - Before variable-grid `Ctrl+C` or `Ctrl+V`, the script must verify foreground, target local program selection, stable variable-editor UIA signature, and continuously openable system clipboard.
 - A KV clipboard modal is a symptom. Diagnose table state, program switching, paste commit timing, clipboard availability, and clipboard sequencing before changing gates.
 - Do not replace enabled copy audit with compile-only proof unless a user-approved gate change and independent audit exist.
+- Variable-grid `Ctrl+A`/`Ctrl+C` must be delivered by `scripts\mvp\kv_ui_guard.ps1` guard primitives. Child MVP scripts must not call raw `SendKeys`, `keybd_event`, `mouse_event`, `SetCursorPos`, or clipboard paste APIs directly.
+- If manual `Ctrl+A`/`Ctrl+C` succeeds at the same failed UI state, classify the root cause as script-owned focus/key-delivery mismatch and prove the fix with fresh runner-owned repeats, not by weakening the copy audit.
+
+Current ST rewrite validation evidence for `台州检测机`:
+
+- `C:\Users\Public\KVSkillPractice\st_ladder_to_st_20260601\mvp_repair_runs_focusdiag_20260601_183752\台州检测机_ST重写验证\repair_result.json`
+- `C:\Users\Public\KVSkillPractice\st_ladder_to_st_20260601\mvp_repair_runs_repeat2_20260601_184619\台州检测机_ST重写验证\repair_result.json`
+- Result: both runs passed `Main`, `Axis_FB`, and `modbus` close/reopen local-variable copy audits, then copied `Ctrl+F9` conversion text with `转换结果 OK (错误数量:0 警告数量:0)`.
 
 EtherCAT:
 
