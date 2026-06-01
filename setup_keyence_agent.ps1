@@ -51,6 +51,19 @@ function Get-DefaultCredentialPath {
   return (Join-Path $appData 'Codex\kv-studio-operator\credentials.xml')
 }
 
+function Resolve-ConfigFilePath([string]$PathText) {
+  if ([string]::IsNullOrWhiteSpace($PathText)) { return Get-DefaultConfigPath }
+  $expanded = Expand-PathText $PathText
+  $full = [IO.Path]::GetFullPath($expanded)
+  $extension = [IO.Path]::GetExtension($full)
+  if ((Test-Path -LiteralPath $full -PathType Container) -or [string]::IsNullOrWhiteSpace($extension)) {
+    $resolved = Join-Path $full 'config.json'
+    Write-Host "Local config path is a directory; using file: $resolved"
+    return $resolved
+  }
+  return $full
+}
+
 function Copy-SkillDirectory([string]$SourceDir, [string]$TargetRoot) {
   $name = Split-Path -Leaf $SourceDir
   $target = Join-Path $TargetRoot $name
@@ -87,7 +100,7 @@ Write-Host 'This script installs local Codex skills, writes local machine config
 Write-Host ''
 
 $CodexSkillsRoot = Read-TextDefault 'Codex skills directory' $CodexSkillsRoot
-$ConfigPath = Read-TextDefault 'Local config path' $ConfigPath
+$ConfigPath = Resolve-ConfigFilePath (Read-TextDefault 'Local config file path or directory' $ConfigPath)
 
 $kvsExeDefault = First-ExistingPath @(
   'D:\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe',
