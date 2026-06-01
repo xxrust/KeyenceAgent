@@ -105,6 +105,35 @@ EtherNet/IP:
 - Variable-grid `Ctrl+A`/`Ctrl+C` must be delivered by `scripts\mvp\kv_ui_guard.ps1` guard primitives. Child MVP scripts must not call raw `SendKeys`, `keybd_event`, `mouse_event`, `SetCursorPos`, or clipboard paste APIs directly.
 - If manual `Ctrl+A`/`Ctrl+C` succeeds at the same failed UI state, classify the root cause as script-owned focus/key-delivery mismatch and prove the fix with fresh runner-owned repeats, not by weakening the copy audit.
 
+## Per-MNM Input Contract
+
+The MVP runners consume MNM and variable files from `scaffold.json.mnm_files[]`; module names are data, not script constants.
+
+Each entry must declare:
+
+```json
+{
+  "module_name": "Main",
+  "module_type": 0,
+  "category": "scan",
+  "path": "modules/Main/Main.mnm",
+  "variables": {
+    "global_tsv": "modules/Main/global_variables.tsv",
+    "local_tsv": "modules/Main/local_variables.tsv"
+  }
+}
+```
+
+Runner behavior:
+
+- Import every `mnm_files[]` entry by calling `import_mnm_guarded.ps1`.
+- Merge executable global rows from all `variables.global_tsv` files; fail on same-name conflicts with different type/device/initial value.
+- Set local variables per MNM/program from that entry's `variables.local_tsv`.
+- When `-AuditVariablePersistence` is enabled, close/reopen the variable editor for each entry and verify copied local-grid first-column names.
+- Accept a single `no_local_variables` marker row only when the module truly has no local variables; do not paste the marker.
+
+This is parameterized for arbitrary `mnm_files[]` length. Current fresh-run evidence covers three entries: `Main`, `Axis_FB`, and `modbus`; larger counts require their own repeat-run evidence before being called stable at that scale.
+
 Current ST rewrite validation evidence for `台州检测机`:
 
 - `C:\Users\Public\KVSkillPractice\st_ladder_to_st_20260601\mvp_repair_runs_focusdiag_20260601_183752\台州检测机_ST重写验证\repair_result.json`
