@@ -40,7 +40,7 @@ param(
   [string]$HolderId = 'codex-official-repro-103',
   [int]$Vmid = 103,
   [int]$TimeoutSeconds = 900,
-  [string]$HostName = '192.168.1.26',
+  [string]$HostName = $env:VM103_SSH_HOST,
   [string]$UserName = 'agent',
   [string]$Password = $env:VM103_SSH_PASSWORD,
   [switch]$SaveAfterImport,

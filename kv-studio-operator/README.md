@@ -92,7 +92,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\configure_kv_netw
 EtherNet/IP:
 
 - Route: `单元配置 -> [0] KV-X310 -> EtherNet/IP -> 手动设定`.
-- Verified with SR-2000, node `8`, IP `192.168.0.18`.
+- Verified with SR-2000, node `8`, using a caller-supplied private device IP.
 - Variable dialog handling is part of the stable script route.
 - EDS/XML member parsing is available through `scripts\get_kv_ethernet_ip_device_members.ps1`.
 

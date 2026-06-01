@@ -535,7 +535,7 @@ Supported `network_config.json` device entries:
       {
         "device_name_pattern": "SR-2000",
         "node_address": 8,
-        "ip_address": "192.168.0.18",
+        "ip_address": "<device-ip>",
         "variable_name_prefix": "eip_n008"
       }
     ]
@@ -568,7 +568,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configur
   -ProjectName '<open-project-name>' `
   -DeviceNamePattern 'SR-1000' `
   -NodeAddress 1 `
-  -IpAddress '192.168.0.11' `
+  -IpAddress '<device-ip>' `
   -VariableNamePrefix 'eip_n001' `
   -OutDir (Join-Path $WorkRoot 'kv_network_config_runs')
 ```

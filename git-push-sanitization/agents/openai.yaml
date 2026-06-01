@@ -1,0 +1,4 @@
+interface:
+  display_name: "Git Push Sanitization"
+  short_description: "Review sensitive data before git push."
+  default_prompt: "Before pushing, scan the repository for secrets, personal paths, private endpoints, and machine-specific values; redact or move required sensitive values into local config before committing."

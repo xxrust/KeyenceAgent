@@ -4,7 +4,7 @@ param(
 
   [string]$VmScriptPath = '',
   [string[]]$ScriptArguments = @(),
-  [string]$HostName = '192.168.1.26',
+  [string]$HostName = $env:VM103_SSH_HOST,
   [string]$UserName = 'agent',
   [string]$Password = $env:VM103_SSH_PASSWORD,
   [int]$TimeoutSeconds = 900
@@ -14,6 +14,9 @@ $ErrorActionPreference = 'Stop'
 
 if (-not (Test-Path -LiteralPath $LocalScriptPath)) {
   throw "LocalScriptPath not found: $LocalScriptPath"
+}
+if (-not $HostName) {
+  throw 'HostName was not supplied. Set VM103_SSH_HOST or pass -HostName.'
 }
 if (-not $Password) {
   throw 'Password was not supplied. Set VM103_SSH_PASSWORD or pass -Password.'

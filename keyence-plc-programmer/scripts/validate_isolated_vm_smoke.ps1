@@ -1,7 +1,7 @@
 param(
   [int[]]$VmIds = @(101, 102, 103),
   [string]$OperatorScript = "$env:USERPROFILE\.codex\skills\windows-vm-codex-operator\scripts\windows_vm_operator.py",
-  [string]$PveSsh = 'root@192.168.1.221',
+  [string]$PveSsh = $env:KV_PVE_SSH,
   [int]$PveSshPort = 22,
   [string]$HolderPrefix = 'codex-keyence-sync',
   [string]$IsolatedHomeRoot = 'C:\Users\Public\KVSkillPractice\isolated_codex_home',
@@ -10,6 +10,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+if (-not $PveSsh) {
+  throw 'PveSsh was not supplied. Set KV_PVE_SSH or pass -PveSsh.'
+}
 
 if (-not (Test-Path -LiteralPath $OperatorScript)) {
   throw "windows_vm_operator.py not found: $OperatorScript"

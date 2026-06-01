@@ -6,13 +6,17 @@ param(
   [string]$VmScriptPath,
 
   [string]$Api = 'http://127.0.0.1:8875',
-  [string]$PveSsh = 'root@192.168.1.221',
+  [string]$PveSsh = $env:KV_PVE_SSH,
   [int]$PveSshPort = 22,
   [string]$HolderId = 'codex-official-repro-103',
   [int]$TimeoutSeconds = 120
 )
 
 $ErrorActionPreference = 'Stop'
+
+if (-not $PveSsh) {
+  throw 'PveSsh was not supplied. Set KV_PVE_SSH or pass -PveSsh.'
+}
 
 $helper = Join-Path $env:USERPROFILE '.codex\skills\windows-vm-codex-operator\scripts\windows_vm_operator.py'
 if (-not (Test-Path -LiteralPath $helper)) {

@@ -10,7 +10,7 @@
 - `check_vm103_prereqs.ps1`: host-side guardrail before touching VM 103.
 - `stage_vm103_script_encoded.ps1`: validated bulk script staging helper for normal cases; when the PVE tunnel drops or QGA emits unexpected CLIXML, direct QGA base64 staging is the safer fallback.
 - `run_vm103_interactive_script.ps1`: VM-103 interactive Scheduled Task runner. It now launches child PowerShell hidden and propagates task exit code, but UI automation still depends on actual foreground desktop state.
-- `run_vm103_interactive_script_ssh.ps1`: validated SSH-based interactive Scheduled Task runner for VM 103. Use it when direct VM SSH `agent@192.168.1.26` is reachable; it avoids the older broken local PVE tunnel.
+- `run_vm103_interactive_script_ssh.ps1`: validated SSH-based interactive Scheduled Task runner for VM 103. Use it when direct VM SSH is reachable; supply the host through `-HostName` or `VM103_SSH_HOST`.
 - `collect_visible_convert_errors.ps1`: validated for the latest run after minimizing the variable editor. It copied the bottom conversion tree (`ConvertControl/outputTreeControl1`) and produced real `Ctrl+F9` error text.
 - `restore_local_vars.ps1`: opens the real standalone variable editor (`AutomationId=KvVariableForm`) and can paste local variable rows, but UI paste does not equal compiler acceptance. `-RegisterAfterPaste $true` is currently a failed probe: `_buttonRegistration` caused the variable editor to close/hide after several modules and the Scheduled Task had to be stopped.
 - `verify_project_names.ps1`: VM-side evidence collector for project variable persistence.
@@ -26,7 +26,7 @@
 
 ## Current Evidence Snapshot
 
-- LAN endpoint is available and preferred: `Invoke-RestMethod http://127.0.0.1:8875/v1/endpoint` returned `active_endpoint_name=lan`, `ssh_host=root@192.168.1.221`, `ssh_port=22`.
+- LAN endpoint is available and preferred when the local VM operator reports `active_endpoint_name=lan`; supply the PVE SSH endpoint through `-PveSsh` or `KV_PVE_SSH`.
 - VM 103 target project remains `C:\Users\Public\KVSkillPractice\official_repro\vm-103\udt_globals_rebuild4_20260505_0925\CodexOfficialReproKVX\CodexOfficialReproKVX.kpr`.
 - Latest visible conversion evidence: `C:\Users\Public\KVSkillPractice\official_repro\vm-103\visible_convert_errors_20260506_124401`.
 - Error comparison artifact: `C:\Users\Public\KVSkillPractice\official_repro\vm-103\convert_error_compare_20260506_124401.json`.
