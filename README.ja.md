@@ -136,6 +136,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1
 
 `setup_keyence_agent.ps1` は non-AI の対話式 setup script です。コマンドラインの質問で skill install、KV STUDIO path、work root、Wiki V2 knowledge-base path、default administrator user name、DPAPI credential storage を設定します。
 
+Useful setup modes:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1 -h
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1 -Status
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1 -Configure credential
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1 -Configure kvs_exe,wiki_root
+```
+
+`-Status` reports configured/missing items. `-Configure` accepts `all`, `skills`, `config`, `kvs_exe`, `work_root`, `wiki_root`, `admin_user`, `credential`, and `advanced`. The script detects Chinese/Japanese/English UI culture; prompts are kept ASCII-safe for Windows PowerShell compatibility, with Japanese instructions in this document.
+
 runner は既定で一時プロジェクトと証拠を `C:\Users\Public\KVSkillPractice` に書き込みます。このディレクトリはリポジトリ外に置き、生成された `.kpr`、スクリーンショット、ログ、compile artifacts を git に入れません。
 
 ## ローカル設定

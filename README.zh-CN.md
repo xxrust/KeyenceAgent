@@ -136,6 +136,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1
 
 `setup_keyence_agent.ps1` 是非 AI 交互式配置脚本。它会通过命令行问答完成 skill 安装、KV STUDIO 路径、工作目录、Wiki V2 知识库路径、默认管理员账号和 DPAPI 凭据写入。
 
+常用安装模式：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1 -h
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1 -Status
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1 -Configure credential
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1 -Configure kvs_exe,wiki_root
+```
+
+`-Status` 会报告哪些项目已配置、哪些项目缺失。`-Configure` 支持 `all`、`skills`、`config`、`kvs_exe`、`work_root`、`wiki_root`、`admin_user`、`credential`、`advanced`。脚本会检测中/日/英系统语言；为了兼容 Windows PowerShell，命令行提示保持 ASCII-safe，中文说明写在本文档中。
+
 runner 默认把一次性项目和证据写到 `C:\Users\Public\KVSkillPractice`。这个目录应放在仓库外，避免把 `.kpr`、截图、日志和编译 artifacts 提交进 git。
 
 ## 本机配置
