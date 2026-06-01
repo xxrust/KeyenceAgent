@@ -116,8 +116,9 @@ $credentialPathDefault = Get-DefaultCredentialPath
 $kvsExe = Read-TextDefault 'KV STUDIO Kvs.exe path' $kvsExeDefault
 $workRoot = Read-TextDefault 'Disposable work root' $workRootDefault
 $wikiRoot = Read-TextDefault 'KEYENCE Wiki V2 root' $wikiRootDefault
-$credentialPath = Read-TextDefault 'KV STUDIO administrator credential path' $credentialPathDefault
-$adminUserDefault = Read-TextDefault 'Default KV STUDIO administrator user name' 'Administrator'
+$credentialPath = $credentialPathDefault
+Write-Host "KV STUDIO administrator credential will be stored at: $credentialPath"
+$adminUserDefault = Read-TextDefault 'KV STUDIO administrator user name' 'Administrator'
 $advancedConfig = Read-YesNoDefault 'Configure advanced runner defaults' $false
 if ($advancedConfig) {
   $timeoutSecondsText = Read-TextDefault 'Runner timeout seconds' '600'
@@ -162,9 +163,8 @@ $credentialWritten = $false
 if (-not $SkipCredential) {
   $storeCredential = Read-YesNoDefault 'Store KV STUDIO administrator credential now' $true
   if ($storeCredential) {
-    $credentialUser = Read-TextDefault 'Credential user name' $adminUserDefault
-    $credentialPassword = Read-Host 'Credential password (stored with Windows DPAPI, not written to JSON)' -AsSecureString
-    Write-DpapiCredential -UserName $credentialUser -Password $credentialPassword -Path $credentialPath
+    $credentialPassword = Read-Host "KV STUDIO administrator password for $adminUserDefault (stored with Windows DPAPI, not written to JSON)" -AsSecureString
+    Write-DpapiCredential -UserName $adminUserDefault -Password $credentialPassword -Path $credentialPath
     $credentialWritten = $true
   }
 }
