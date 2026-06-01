@@ -168,7 +168,7 @@ The normal config stores only machine-specific roots. Derived paths are resolved
 
 ```json
 {
-  "kvs_exe": "D:\\KEYENCE\\KVS12G\\KVS12\\KVS\\Kvs.exe",
+  "kvs_exe": "C:\\Program Files (x86)\\KEYENCE\\KVS12G\\KVS12\\KVS\\Kvs.exe",
   "work_root": "C:\\Users\\Public\\KVSkillPractice",
   "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
   "admin_user_default": "Administrator",
@@ -178,7 +178,7 @@ The normal config stores only machine-specific roots. Derived paths are resolved
 
 `work_root` derives `mvp_runs`, `mvp_repair_runs`, and `mvp_repeat_runs`. `wiki_root` derives `wiki.v2.cleaned.db` and `scripts\wiki_query.py`. Advanced fields such as `timeout_seconds`, `local_paste_format`, `mvp_out_root`, `repair_out_root`, `repeat_out_root`, `wiki_cleaned_db` and `wiki_query_script` remain supported as explicit overrides, but the setup flow does not ask for them by default.
 
-For `Local config file path or directory`, press Enter for the default file or enter a directory such as `C:\kvtest`; setup will write `C:\kvtest\config.json`.
+For `Local config file path or directory`, press Enter for the default file or enter a directory such as `C:\KeyenceAgentConfig`; setup will write `C:\KeyenceAgentConfig\config.json`.
 
 Do not store KV STUDIO administrator passwords in JSON. During setup, `setup_keyence_agent.ps1` automatically uses `%APPDATA%\Codex\kv-studio-operator\credentials.xml`, asks for the KV STUDIO administrator user name and password, creates the directory/file, and stores the credential with Windows DPAPI. New users should leave the credential file path alone. You can also run the credential writer directly:
 

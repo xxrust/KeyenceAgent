@@ -38,12 +38,13 @@ function Write-Result([bool]$Ok, [string]$Code, [string]$Message, [object[]]$Mnm
 
 function Resolve-KvsExe {
   if ($KvsExe) { return $KvsExe }
-  $resolver = 'C:\Users\liangyuhang\.codex\skills\keyence-plc-programmer\scripts\resolve_kvstudio_local.ps1'
+  $skillRepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
+  $resolver = Join-Path $skillRepoRoot 'keyence-plc-programmer\scripts\resolve_kvstudio_local.ps1'
   if (Test-Path -LiteralPath $resolver -PathType Leaf) {
     $resolved = & powershell -NoProfile -ExecutionPolicy Bypass -File $resolver | ConvertFrom-Json
     return [string]$resolved.KvsExe
   }
-  return 'D:\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe'
+  throw "KV STUDIO resolver not found: $resolver"
 }
 
 Add-Type -AssemblyName System.Windows.Forms

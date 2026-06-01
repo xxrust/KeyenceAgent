@@ -21,9 +21,8 @@ function Resolve-KvStudioLocal {
     }
   }
 
-  $candidates.Add('D:\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe')
-  $candidates.Add('D:\KEYENCE\KVS12G\KVS11\KVS\Kvs.exe')
   $candidates.Add('C:\Program Files (x86)\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe')
+  $candidates.Add('C:\Program Files (x86)\KEYENCE\KVS11G\KVS11\KVS\Kvs.exe')
   $candidates.Add('C:\Program Files (x86)\KEYENCE\KVS12\KVS\Kvs.exe')
 
   $kvs = $candidates | Where-Object { $_ -and (Test-Path -LiteralPath $_) -and ((Split-Path -Leaf $_) -ieq 'Kvs.exe') } | Select-Object -First 1

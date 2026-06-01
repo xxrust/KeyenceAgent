@@ -93,7 +93,8 @@ function Get-CreateProjectErrorCode([string]$Message) {
 if (-not $KvsExe) {
   $resolver = Join-Path (Split-Path -Parent $PSCommandPath) 'resolve_kvstudio_local.ps1'
   if (-not (Test-Path -LiteralPath $resolver)) {
-    $resolver = 'C:\Users\liangyuhang\.codex\skills\keyence-plc-programmer\scripts\resolve_kvstudio_local.ps1'
+    $skillRepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
+    $resolver = Join-Path $skillRepoRoot 'keyence-plc-programmer\scripts\resolve_kvstudio_local.ps1'
   }
   if (-not (Test-Path -LiteralPath $resolver)) {
     throw "KV STUDIO resolver not found: $resolver"

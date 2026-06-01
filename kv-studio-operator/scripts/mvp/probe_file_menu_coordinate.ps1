@@ -2,7 +2,7 @@ param(
   [Parameter(Mandatory=$true)]
   [string]$ProjectPath,
   [string]$OutDir = 'C:\Users\Public\KVSkillPractice\menu_probe',
-  [string]$KvsExe = 'D:\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe',
+  [string]$KvsExe = '',
   [int]$MenuOffsetX = 45,
   [int]$MenuOffsetY = 62
 )
@@ -145,6 +145,13 @@ function Get-PopupWindows {
 }
 
 try {
+  if (-not $KvsExe) {
+    $skillRepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
+    $resolver = Join-Path $skillRepoRoot 'keyence-plc-programmer\scripts\resolve_kvstudio_local.ps1'
+    if (-not (Test-Path -LiteralPath $resolver)) { throw "KV STUDIO resolver not found: $resolver" }
+    $resolved = (& powershell -NoProfile -ExecutionPolicy Bypass -File $resolver | ConvertFrom-Json)
+    $KvsExe = [string]$resolved.KvsExe
+  }
   Get-Process Kvs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
   Start-Sleep -Seconds 1
   Start-Process -FilePath $KvsExe -ArgumentList ('"' + $ProjectPath + '"') | Out-Null

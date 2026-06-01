@@ -43,7 +43,8 @@ function ConvertTo-BoolValue([object]$Value, [bool]$Default) {
 }
 
 if (-not $KvsExe) {
-  $resolver = 'C:\Users\liangyuhang\.codex\skills\keyence-plc-programmer\scripts\resolve_kvstudio_local.ps1'
+  $skillRepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
+  $resolver = Join-Path $skillRepoRoot 'keyence-plc-programmer\scripts\resolve_kvstudio_local.ps1'
   if (-not (Test-Path -LiteralPath $resolver)) { throw "KV STUDIO resolver not found: $resolver" }
   $resolved = (& powershell -NoProfile -ExecutionPolicy Bypass -File $resolver | ConvertFrom-Json)
   $KvsExe = $resolved.KvsExe

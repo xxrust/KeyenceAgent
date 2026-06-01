@@ -8,7 +8,7 @@
   [string]$CpuModel = 'KV-X550',
   [string]$KvsExe = '',
   [string]$AdminUser = 'admin',
-  [string]$AdminPassword = 'a82701767',
+  [string]$AdminPassword = '',
   [string]$OutDir = '',
   [int]$TimeoutSeconds = 120,
   [switch]$RestartKvs
@@ -32,6 +32,9 @@ if (-not $KvsExe) {
   $KvsExe = $resolved.KvsExe
 }
 if (-not (Test-Path -LiteralPath $KvsExe)) { throw "KvsExe not found: $KvsExe" }
+if ([string]::IsNullOrWhiteSpace($AdminPassword)) {
+  throw 'AdminPassword is required. Pass -AdminPassword or use the guarded DPAPI credential workflow.'
+}
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName UIAutomationClient

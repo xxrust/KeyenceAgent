@@ -168,7 +168,7 @@ kv-studio-operator\config\kv-studio-operator.local.json
 
 ```json
 {
-  "kvs_exe": "D:\\KEYENCE\\KVS12G\\KVS12\\KVS\\Kvs.exe",
+  "kvs_exe": "C:\\Program Files (x86)\\KEYENCE\\KVS12G\\KVS12\\KVS\\Kvs.exe",
   "work_root": "C:\\Users\\Public\\KVSkillPractice",
   "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
   "admin_user_default": "Administrator",
@@ -178,7 +178,7 @@ kv-studio-operator\config\kv-studio-operator.local.json
 
 `work_root` 会派生 `mvp_runs`、`mvp_repair_runs` 和 `mvp_repeat_runs`。`wiki_root` 会派生 `wiki.v2.cleaned.db` 和 `scripts\wiki_query.py`。`timeout_seconds`、`local_paste_format`、`mvp_out_root`、`repair_out_root`、`repeat_out_root`、`wiki_cleaned_db`、`wiki_query_script` 等高级字段仍可作为显式覆盖，但安装流程默认不询问这些字段。
 
-`Local config file path or directory` 可以直接回车使用默认配置文件，也可以输入目录，例如 `C:\kvtest`；安装脚本会写入 `C:\kvtest\config.json`。
+`Local config file path or directory` 可以直接回车使用默认配置文件，也可以输入目录，例如 `C:\KeyenceAgentConfig`；安装脚本会写入 `C:\KeyenceAgentConfig\config.json`。
 
 不要把 KV STUDIO 管理员密码写入 JSON。安装时，`setup_keyence_agent.ps1` 会自动使用 `%APPDATA%\Codex\kv-studio-operator\credentials.xml`，只要求用户输入 KV STUDIO 管理员账号和密码，并自动创建目录/文件，再用 Windows DPAPI 保存凭据。新用户不需要填写凭据文件路径。也可以单独运行：
 

@@ -1,6 +1,6 @@
 ﻿param(
   [string]$ProjectPath = 'C:\Users\Public\KVSkillPractice\Projects\TrafficLightMinST_20260526_MVP5\TrafficLightMinST_20260526_MVP5.kpr',
-  [string]$OutDir = 'E:\personal_project\rust_plc\out\traffic_light_min_loop_20260525\validation\159_compile_and_copy_result_bounded',
+  [string]$OutDir = 'C:\Users\Public\KVSkillPractice\validation\compile_and_copy_result_bounded',
   [string]$ChecklistPath = '',
   [int]$WaitSeconds = 40,
   [switch]$AuditCompileWait,

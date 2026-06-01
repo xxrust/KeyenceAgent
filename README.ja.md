@@ -168,7 +168,7 @@ kv-studio-operator\config\kv-studio-operator.local.json
 
 ```json
 {
-  "kvs_exe": "D:\\KEYENCE\\KVS12G\\KVS12\\KVS\\Kvs.exe",
+  "kvs_exe": "C:\\Program Files (x86)\\KEYENCE\\KVS12G\\KVS12\\KVS\\Kvs.exe",
   "work_root": "C:\\Users\\Public\\KVSkillPractice",
   "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
   "admin_user_default": "Administrator",
@@ -178,7 +178,7 @@ kv-studio-operator\config\kv-studio-operator.local.json
 
 `work_root` derives `mvp_runs`, `mvp_repair_runs`, and `mvp_repeat_runs`. `wiki_root` derives `wiki.v2.cleaned.db` and `scripts\wiki_query.py`. Advanced fields such as `timeout_seconds`, `local_paste_format`, `mvp_out_root`, `repair_out_root`, `repeat_out_root`, `wiki_cleaned_db` and `wiki_query_script` remain supported as explicit overrides, but setup does not ask for them by default.
 
-`Local config file path or directory` は既定 file のまま Enter できます。`C:\kvtest` のような directory を入力した場合、setup は `C:\kvtest\config.json` に書き込みます。
+`Local config file path or directory` は既定 file のまま Enter できます。`C:\KeyenceAgentConfig` のような directory を入力した場合、setup は `C:\KeyenceAgentConfig\config.json` に書き込みます。
 
 KV STUDIO 管理者パスワードは JSON に保存しません。setup 時、`setup_keyence_agent.ps1` は `%APPDATA%\Codex\kv-studio-operator\credentials.xml` を自動使用し、KV STUDIO 管理者ユーザー名とパスワードだけを求め、directory/file を作成して Windows DPAPI で保存します。新規ユーザーが credential file path を入力する必要はありません。credential writer を単独で実行することもできます。
 

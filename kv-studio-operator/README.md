@@ -134,10 +134,10 @@ Runner behavior:
 
 This is parameterized for arbitrary `mnm_files[]` length. Current fresh-run evidence covers three entries: `Main`, `Axis_FB`, and `modbus`; larger counts require their own repeat-run evidence before being called stable at that scale.
 
-Current ST rewrite validation evidence for `台州检测机`:
+Current ST rewrite validation evidence:
 
-- `C:\Users\Public\KVSkillPractice\st_ladder_to_st_20260601\mvp_repair_runs_focusdiag_20260601_183752\台州检测机_ST重写验证\repair_result.json`
-- `C:\Users\Public\KVSkillPractice\st_ladder_to_st_20260601\mvp_repair_runs_repeat2_20260601_184619\台州检测机_ST重写验证\repair_result.json`
+- `C:\Users\Public\KVSkillPractice\st_ladder_to_st_<yyyymmdd>\run_001\repair_result.json`
+- `C:\Users\Public\KVSkillPractice\st_ladder_to_st_<yyyymmdd>\run_002\repair_result.json`
 - Result: both runs passed `Main`, `Axis_FB`, and `modbus` close/reopen local-variable copy audits, then copied `Ctrl+F9` conversion text with `转换结果 OK (错误数量:0 警告数量:0)`.
 
 EtherCAT:
@@ -153,8 +153,8 @@ Use `scripts\configure_kv_unit_start_addresses.ps1` for verified start-address e
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\configure_kv_unit_start_addresses.ps1" `
-  -ProjectName "FB测试" `
-  -ProjectPath "C:\Users\liangyuhang\Documents\FB测试\FB测试.kpr" `
+  -ProjectName "<project-name>" `
+  -ProjectPath "<project.kpr>" `
   -UnitName "KV-SSC02" `
   -Slot 1 `
   -FirstDm 1000 `
@@ -171,7 +171,7 @@ Verified route:
 - Edit `首继电器编号(按通道设定)` with the channel value. `R1000` is entered as `10`, following the UI rule `R30000 -> 300`.
 - Click unit-editor `OK`, save, then read `WsTreeEnv.xml`.
 
-Current validation evidence for `KV-SSC02` in `FB测试`:
+Current validation evidence for `KV-SSC02`:
 
 - `C:\Users\Public\KVSkillPractice\kv_unit_address_runs\20260531_155121_360_configure_kv_unit_start_addresses.json`
 - Result: `[1] KV-SSC02 R1000 DM1000` in `WsTreeEnv.xml`
@@ -203,7 +203,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\mvp\export_mnm_pr
 
 `WorkRoot` defaults to `<raw-mnm-dir>\_kv_export_workspace`. If supplied, it must be inside `ExportDir` unless `-AllowWorkRootOutsideExportDir` is explicitly passed for diagnosis. This keeps KV STUDIO's actual first export path and the final raw MNM files inside the caller's file framework.
 
-Validation evidence from `台州检测机`: three clean core runs and one promoted wrapper run produced 12 same-run `.mnm` files. Evidence root: `C:\Users\Public\KVSkillPractice\kv_clone_taizhou_20260531\stable_export_run1`.
+Validation evidence: three clean core runs and one promoted wrapper run produced 12 same-run `.mnm` files. Evidence root pattern: `C:\Users\Public\KVSkillPractice\kv_clone_<task>_<yyyymmdd>\stable_export_run1`.
 
 After a proven raw MNM export, run:
 

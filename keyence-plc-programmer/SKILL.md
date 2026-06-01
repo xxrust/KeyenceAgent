@@ -13,7 +13,7 @@ For a new simple clean-room task, hand off implementation through the `kv-studio
 
 Default official reference project:
 
-`C:\Users\liangyuhang\Documents\KEYENCE\KVS12G\KVS12\KVS\PROJECT\KVX鏍蜂緥绋嬪簭_v100`
+Use the official KEYENCE sample project installed on the current machine. Resolve it from the local KV STUDIO installation or user-supplied project path; do not rely on a committed personal user directory.
 
 
 Stable KV STUDIO automation is bundled under this skill. These scripts are the only reusable automation source for this skill:

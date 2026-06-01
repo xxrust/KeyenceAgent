@@ -2,7 +2,7 @@
   [string]$MnmPath = '',
   [string]$ProjectPath = 'C:\Users\Public\KVSkillPractice\Projects\CodexUiCompileSmoke\CodexUiCompileSmoke.kpr',
   [string]$OutDir = 'C:\Users\Public\KVSkillPractice\vm-103\mnm_import_validation',
-  [string]$KvsExe = 'D:\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe',
+  [string]$KvsExe = '',
   [string]$ExpectedModuleName = '',
   [switch]$SaveAfterImport,
   [string]$ProjectSearchRoot = '',
@@ -1796,6 +1796,13 @@ try{
   Log ('DeleteExistingModuleBeforeImport='+$DeleteExistingModuleBeforeImport.IsPresent)
   Log ('ProjectSearchRoot='+$ProjectSearchRoot)
   if(-not (Test-Path -LiteralPath $project)){ throw "ProjectPath not found: $project" }
+  if(-not $kvs){
+    $skillRepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
+    $resolver = Join-Path $skillRepoRoot 'keyence-plc-programmer\scripts\resolve_kvstudio_local.ps1'
+    if(-not (Test-Path -LiteralPath $resolver)){ throw "KV STUDIO resolver not found: $resolver" }
+    $resolved = (& powershell -NoProfile -ExecutionPolicy Bypass -File $resolver | ConvertFrom-Json)
+    $kvs = [string]$resolved.KvsExe
+  }
   if(-not (Test-Path -LiteralPath $kvs)){ throw "KvsExe not found: $kvs" }
   if($MnmPath -and -not (Test-Path -LiteralPath $MnmPath)){ throw "MnmPath not found: $MnmPath" }
   AssertMnmChineseEncoding $MnmPath

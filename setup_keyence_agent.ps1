@@ -35,7 +35,7 @@ function New-HelpText {
     '  advanced     Configure advanced runner defaults.',
     '',
     'Notes:',
-    '  Local config accepts a file path or directory. C:\kvtest becomes C:\kvtest\config.json.',
+    '  Local config accepts a file path or directory. C:\KeyenceAgentConfig becomes C:\KeyenceAgentConfig\config.json.',
     '  The credential path is automatic: %APPDATA%\Codex\kv-studio-operator\credentials.xml.'
   ) -join [Environment]::NewLine
 }
@@ -282,11 +282,10 @@ if (($Configure -contains 'all') -or ($Configure -contains 'config')) {
 }
 
 $kvsExeDefault = First-ExistingPath @(
-  'D:\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe',
-  'D:\KEYENCE\KVS12G\KVS11\KVS\Kvs.exe',
   'C:\Program Files (x86)\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe',
+  'C:\Program Files (x86)\KEYENCE\KVS11G\KVS11\KVS\Kvs.exe',
   'C:\Program Files (x86)\KEYENCE\KVS12\KVS\Kvs.exe'
-) 'D:\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe'
+) 'C:\Program Files (x86)\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe'
 if ($existingConfig -and $existingConfig.kvs_exe) { $kvsExeDefault = [string]$existingConfig.kvs_exe }
 
 $htmlhelpCandidates = @(

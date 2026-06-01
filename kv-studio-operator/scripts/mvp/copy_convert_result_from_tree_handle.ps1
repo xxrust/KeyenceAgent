@@ -1,6 +1,6 @@
 ﻿param(
   [string]$ProjectNeedle = 'TrafficLightMinST_20260526_MVP5',
-  [string]$OutDir = 'E:\personal_project\rust_plc\out\traffic_light_min_loop_20260525\validation\177_copy_convert_result_from_tree_handle',
+  [string]$OutDir = 'C:\Users\Public\KVSkillPractice\validation\copy_convert_result_from_tree_handle',
   [string]$ChecklistPath = '',
   [int]$MaxLookupMs = 1000
 )

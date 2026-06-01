@@ -1,6 +1,6 @@
 ﻿{
     "generated_at":  "2026-05-15T17:04:01",
-    "authoritative_root":  "C:\\Users\\liangyuhang\\.codex\\skills\\keyence-plc-programmer",
+    "authoritative_root":  "$CODEX_HOME\\skills\\keyence-plc-programmer",
     "evidence_roots_not_automation":  [
                                           "C:\\Users\\Public\\KVSkillPractice",
                                           "C:\\Users\\Public\\CodexRemoteTasks"
@@ -8,7 +8,7 @@
     "scripts":  [
                     {
                         "Name":  "import_mnm.ps1",
-                        "FullName":  "C:\\Users\\liangyuhang\\.codex\\skills\\keyence-plc-programmer\\scripts\\import_mnm.ps1",
+                        "FullName":  "scripts\\import_mnm.ps1",
                         "Length":  36484,
                         "LastWriteTime":  "2026-05-14T18:45:09",
                         "HardNeedleGate":  true,
@@ -17,7 +17,7 @@
                     },
                     {
                         "Name":  "export_mnm.ps1",
-                        "FullName":  "C:\\Users\\liangyuhang\\.codex\\skills\\keyence-plc-programmer\\scripts\\export_mnm.ps1",
+                        "FullName":  "scripts\\export_mnm.ps1",
                         "Length":  17460,
                         "LastWriteTime":  "2026-05-07T18:43:42",
                         "HardNeedleGate":  false,
@@ -26,7 +26,7 @@
                     },
                     {
                         "Name":  "roundtrip_mnm.ps1",
-                        "FullName":  "C:\\Users\\liangyuhang\\.codex\\skills\\keyence-plc-programmer\\scripts\\roundtrip_mnm.ps1",
+                        "FullName":  "scripts\\roundtrip_mnm.ps1",
                         "Length":  6230,
                         "LastWriteTime":  "2026-05-14T18:48:14",
                         "HardNeedleGate":  false,
@@ -35,7 +35,7 @@
                     },
                     {
                         "Name":  "convert_collect.ps1",
-                        "FullName":  "C:\\Users\\liangyuhang\\.codex\\skills\\keyence-plc-programmer\\scripts\\convert_collect.ps1",
+                        "FullName":  "scripts\\convert_collect.ps1",
                         "Length":  5416,
                         "LastWriteTime":  "2026-05-08T08:18:48",
                         "HardNeedleGate":  false,

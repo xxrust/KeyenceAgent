@@ -25,7 +25,7 @@
 
   [string]$ChecklistPath = '',
 
-  [string]$OutDir = ('E:\personal_project\rust_plc\out\traffic_light_min_loop_20260525\validation\set_variables_' + (Get-Date -Format 'yyyyMMdd_HHmmss'))
+  [string]$OutDir = ('C:\Users\Public\KVSkillPractice\validation\set_variables_' + (Get-Date -Format 'yyyyMMdd_HHmmss'))
 )
 
 $ErrorActionPreference = 'Stop'

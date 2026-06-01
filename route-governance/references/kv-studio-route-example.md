@@ -58,8 +58,8 @@ Use this example when the user gives a fixed KV STUDIO workflow.
 ## Example Commands
 
 ```powershell
-python C:\Users\liangyuhang\.codex\skills\route-governance\scripts\route_guard.py init `
-  --state E:\personal_project\rust_plc\out\traffic_light_min_loop_20260525\route-state.json `
+python "$env:USERPROFILE\.codex\skills\route-governance\scripts\route_guard.py" init `
+  --state C:\Users\Public\KVSkillPractice\route-state\kv-mnm-import-route-state.json `
   --task "KV STUDIO MNM import MVP" `
   --route-id kv_mnm_import_accelerator_v1 `
   --owner user_specified `
