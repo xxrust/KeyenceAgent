@@ -75,6 +75,13 @@ function Get-RelativePathCompat([string]$BasePath, [string]$ChildPath) {
   return [Uri]::UnescapeDataString($baseUri.MakeRelativeUri($childUri).ToString()).Replace('/', '\')
 }
 
+function Test-IgnoredInputRelativePath([string]$RelativePath) {
+  foreach ($part in @($RelativePath -split '[\\/]')) {
+    if ($part -eq '_kv_export_workspace') { return $true }
+  }
+  return $false
+}
+
 if (-not (Test-Path -LiteralPath $InputDir -PathType Container)) {
   throw "InputDir not found: $InputDir"
 }
@@ -91,6 +98,7 @@ $classifications = @()
 foreach ($file in Get-ChildItem -LiteralPath $inputRoot -Recurse -Filter '*.mnm' -File) {
   $info = Get-ModuleInfo $file.FullName
   $relative = Get-RelativePathCompat $inputRoot $file.FullName
+  if (Test-IgnoredInputRelativePath $relative) { continue }
   $target = Join-Path $outputRoot $relative
   $targetDir = Split-Path -Parent $target
   if ($targetDir) { New-Item -ItemType Directory -Force -Path $targetDir | Out-Null }

@@ -5,12 +5,45 @@ This skill operates KEYENCE KV STUDIO through script-owned Windows desktop autom
 ## Stable Scope
 
 - Create, validate, and run disposable KV STUDIO scaffolds.
-- Import MNM mnemonic-list programs; export existing-project MNM through `scripts\mvp\export_mnm_project_copy_default_folder.ps1`.
-- Edit global/local variable tables through scaffold TSV files.
-- Compile/convert with KV STUDIO `Ctrl+F9` and copy same-run conversion results.
+- Import MNM mnemonic-list programs through published scaffold/repair workflows; export existing-project MNM through `scripts\workflows\export_mnm_project_copy_default_folder.ps1`.
+- Edit global/local variable tables through scaffold TSV files and published workflows.
+- Compile/convert with KV STUDIO `Ctrl+F9` and copy same-run conversion results through published workflows.
 - Configure verified EtherNet/IP and EtherCAT unit settings through project-tree unit configuration scripts.
 - Configure verified PLC unit start addresses through the target unit's project-tree item.
 - Extract a read-only project replication inventory with `scripts\export_kv_project_inventory.ps1`.
+
+## Script Classification
+
+`scripts\script_manifest.json` is the source of truth for script roles.
+
+```yaml
+customer_workflow: customer-callable orchestration
+customer_scaffold_tool: customer-callable scaffold/preflight tools
+runner_child_approved: internal steps callable by workflows and regression harnesses
+runner_child_pending: internal steps not yet promoted by validation
+guard_library: shared UI-input primitives
+probe_research: research-only scripts
+gate: non-UI validation scripts
+```
+
+Scripts are physically separated by role: customer workflows in `scripts\workflows`, internal UI runner children in `scripts\runner_children`, shared UI guard primitives in `scripts\guards`, research probes in `scripts\probes`, non-UI gates in `scripts\gates`, and scaffold/preflight tools in `scripts\scaffold_tools`. Legacy `scripts\mvp\*.ps1` paths are thin compatibility wrappers only. Do not duplicate runner-child UI logic inside a workflow.
+
+## Validation 2026-06-04
+
+Specimen: `C:\Users\Public\KVSkillPractice\full_atomic_tests\taizhou_20260604_035218`, copied from the Taizhou test project.
+
+Passed:
+
+- `scripts\workflows\export_mnm_project_copy_default_folder.ps1`: exported 12 top-level MNM files, closed the KV STUDIO completion dialog, and passed `postcheck_kvstudio_ui_safe.json`.
+- `scripts\filter_kv_mnm_user_sources.ps1`: ignored `_kv_export_workspace`, classified 12 MNM files, copied 3 non-official sources, and excluded 9 official/library FB files.
+- Internal runner child `scripts\runner_children\compile_and_copy_result_bounded.ps1`: sent `Ctrl+F9`, found the output area when audit wait was enabled, and ended with clean KV STUDIO state.
+- Internal runner child `scripts\runner_children\copy_convert_result_from_tree_handle.ps1`: live watch retest copied conversion-result text with `lookup_ms=133`, `line_count=7`, and `contains_ok=true`.
+- Internal runner child `scripts\runner_children\set_variables_guarded.ps1`: on disposable project `C:\Users\Public\KVSkillPractice\full_atomic_tests\taizhou_var_20260604_123634`, inserted one global variable and two `Main` local variables, saved, closed/reopened the variable editor, copied the local grid, matched expected local names, found the global name in the saved project files, and passed `postcheck_kvstudio_ui_safe.json`.
+
+Variable-route fixes proven in the same run:
+
+- Single executable variable rows must be wrapped as arrays before `.Count` checks; otherwise a one-row global TSV can be decoded but skipped.
+- Opening the variable editor must normalize accelerator state inside `Ensure-VariableEditorOpen`; it cannot depend on CapsLock state left by a previous step.
 
 ## Project Replication Scope
 
@@ -102,7 +135,7 @@ EtherNet/IP:
 - Before variable-grid `Ctrl+C` or `Ctrl+V`, the script must verify foreground, target local program selection, stable variable-editor UIA signature, and continuously openable system clipboard.
 - A KV clipboard modal is a symptom. Diagnose table state, program switching, paste commit timing, clipboard availability, and clipboard sequencing before changing gates.
 - Do not replace enabled copy audit with compile-only proof unless a user-approved gate change and independent audit exist.
-- Variable-grid `Ctrl+A`/`Ctrl+C` must be delivered by `scripts\mvp\kv_ui_guard.ps1` guard primitives. Child MVP scripts must not call raw `SendKeys`, `keybd_event`, `mouse_event`, `SetCursorPos`, or clipboard paste APIs directly.
+- Variable-grid `Ctrl+A`/`Ctrl+C` must be delivered by `scripts\guards\kv_ui_guard.ps1` guard primitives. Child scripts must not call raw `SendKeys`, `keybd_event`, `mouse_event`, `SetCursorPos`, or clipboard paste APIs directly.
 - If manual `Ctrl+A`/`Ctrl+C` succeeds at the same failed UI state, classify the root cause as script-owned focus/key-delivery mismatch and prove the fix with fresh runner-owned repeats, not by weakening the copy audit.
 
 ## Per-MNM Input Contract
@@ -126,9 +159,9 @@ Each entry must declare:
 
 Runner behavior:
 
-- Import every `mnm_files[]` entry by calling `import_mnm_guarded.ps1`.
+- Published scaffold/repair workflows import every `mnm_files[]` entry by invoking the internal runner child `import_mnm_guarded.ps1`.
 - Merge executable global rows from all `variables.global_tsv` files; fail on same-name conflicts with different type/device/initial value.
-- Set local variables per MNM/program from that entry's `variables.local_tsv`.
+- Published workflows invoke the variable runner child to set local variables per MNM/program from that entry's `variables.local_tsv`.
 - When `-AuditVariablePersistence` is enabled, close/reopen the variable editor for each entry and verify copied local-grid first-column names.
 - Accept a single `no_local_variables` marker row only when the module truly has no local variables; do not paste the marker.
 
@@ -184,17 +217,17 @@ Project replication must not export/import official or library FBs as user sourc
 
 MNM export status:
 
-- `scripts\mvp\export_mnm_project_copy_default_folder.ps1` is the stable export entry for existing projects. It copies the project to `ExportDir\_kv_export_workspace` by default, removes old `.mnm` files in the copy, opens the copy in KV STUDIO, accepts the Browse Folder default project directory inside that framework, then copies same-run `.mnm` files to `ExportDir`.
-- `scripts\mvp\export_mnm_browse_default_folder_guarded.ps1` is the internal UI core for the default-folder route.
-- `scripts\mvp\export_mnm_guarded.ps1` is `probe_only_until_success_artifact`.
-- Direct-call success requires current-run `.mnm` files under `ExportDir` and `export_mnm_result.json.ok=true`.
+- `scripts\workflows\export_mnm_project_copy_default_folder.ps1` is the stable customer workflow entry for existing-project MNM export. It creates the project-copy workspace, calls approved internal runner child scripts, collects same-run `.mnm` files, writes result JSON, and verifies the clean end state.
+- `scripts\runner_children\export_mnm_browse_default_folder_guarded.ps1` is an internal runner child used by that workflow. It keeps the verified KV STUDIO UI route and is not a customer entrypoint.
+- Customer workflows compose approved internal runner children; they do not duplicate or rewrite the child UI route.
+- Workflow success requires current-run `.mnm` files under `ExportDir` and `export_mnm_project_copy_result.json.ok=true`.
 - If export succeeds only inside a parent runner or wrapper, classify it as `wrapper_dependent` and record the parent runner plus upstream preconditions.
 - Without positive export evidence, do not start project replication from exported MNM.
 
 Stable export command:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\mvp\export_mnm_project_copy_default_folder.ps1" `
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\workflows\export_mnm_project_copy_default_folder.ps1" `
   -ProjectPath "<project.kpr>" `
   -ExportDir "<raw-mnm-dir>" `
   -OutDir "<run-evidence-dir>" `

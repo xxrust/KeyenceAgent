@@ -1,4 +1,4 @@
 interface:
-  display_name: "KV STUDIO Operator"
-  short_description: "Run KV STUDIO through scaffold, guard, and artifact gates."
-  default_prompt: "Use this skill to create or validate a KV STUDIO scaffold, run the guarded scaffold runner, and report same-run artifacts."
+  display_name: "KV STUDIO 操作"
+  short_description: "通过脚手架、门限和同次运行产物操作 KV STUDIO。"
+  default_prompt: "使用 $kv-studio-operator 创建或验证 KV STUDIO 脚手架，运行 guarded runner，并只根据同次运行 artifacts 汇报结果。"

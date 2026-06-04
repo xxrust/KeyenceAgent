@@ -1,412 +1,336 @@
 ---
 name: kv-studio-operator
-description: Operate KEYENCE KV STUDIO through script-owned Windows desktop automation. Use when the task requires creating KV STUDIO projects, importing/exporting MNM mnemonic lists, editing global/local variables, compiling/converting, copying KV STUDIO result text, or running the scaffold runner workflow for a disposable PLC project.
+description: 通过脚本控制 KEYENCE KV STUDIO 桌面软件时使用。适用于创建 KV STUDIO 项目、导入/导出 MNM、编辑全局/局部变量、运行转换/编译、复制转换结果、配置 PLC 扩展单元、EtherNet/IP、EtherCAT、复刻或修复现有 `.kpr` 项目，以及运行脚手架 runner 的任务。
 ---
 
-# KV STUDIO Operator
+# KV STUDIO 操作
 
-## Contract
-
-Use scripts, not ad hoc UI operation.
-
-Set these paths before running commands:
-
-- `SkillRoot`: this skill directory.
-- `WorkRoot`: disposable working directory, normally `C:\Users\Public\KVSkillPractice`.
-- `ScaffoldRoot`: one task's scaffold directory under `WorkRoot\scaffolds`.
-- `OutRoot`: runner output directory under `WorkRoot\mvp_runs`.
-
-Terms:
-
-- `Scaffold`: source files that define one KV STUDIO project task.
-- `Runner`: `scripts\run_kv_mvp_scaffold.ps1` for fresh projects or `scripts\run_kv_mvp_repair_existing_project.ps1` for existing project repair; the runner owns KV STUDIO operation.
-- `Same-run artifact`: evidence written under the current runner output directory during the current command.
-
-## Route
-
-Use this route for new simple KV STUDIO projects:
-
-| Step | Command | Pass condition | Stop condition |
-| --- | --- | --- | --- |
-| Create scaffold | `scripts\new_kv_mvp_scaffold.ps1` | `scaffold.json` and `CHECKLIST.md` exist | Script exits nonzero |
-| Edit scaffold | Agent edits scaffold files only | Each MNM and its paired variable TSVs, task notes, version notes reflect the task | Required files missing or ambiguous |
-| Validate scaffold | `scripts\validate_kv_mvp_scaffold.ps1` | `scaffold_validation.json.ok=true` | Any `KV_SCAFFOLD_*` or checklist error |
-| Run KV STUDIO | `scripts\run_kv_mvp_scaffold.ps1` | `mvp_result.json.ok=true` | Any child step fails |
-| Prove repeatability | `scripts\run_kv_mvp_repeat.ps1` | `repeat_result.json.ok=true` after 3 consecutive passes | Any failed attempt resets consecutive pass count |
-| Report | Read current-run artifacts | Report result path and evidence paths | Do not use old run artifacts |
-
-Use this route for existing project updates, including user-requested feature additions to a `.kpr`:
-
-| Step | Command | Pass condition | Stop condition |
-| --- | --- | --- | --- |
-| Create/update workspace | `scripts\new_kv_existing_project_update_workspace.ps1` | `source_snapshot_manifest.json.status=ready` | `KV_SOURCE_SNAPSHOT_EXPORT_REQUIRED` or script exits nonzero |
-| Verify current source snapshot | `scripts\assert_kv_existing_project_snapshot.ps1` | `existing_project_snapshot_gate.json.ok=true` and project fingerprint matches | `KV_SOURCE_SNAPSHOT_STALE`, missing MNM, missing variable manifest, or missing architecture file |
-| Plan MNM import | `scripts\assert_kv_mnm_import_plan.ps1` | Same-name incoming MNM conflicts are absent, or `-DeleteExistingModulesBeforeImport` is explicitly planned | `KV_MNM_SAME_NAME_IMPORT_REQUIRES_PREDELETE`, duplicate incoming module names, stale/export-required snapshot |
-| Edit update scaffold | Agent edits scaffold/model files before KV STUDIO opens | Logic and variables are derived from the verified snapshot plus task request | Snapshot is stale or architecture intent is ambiguous |
-| Run existing-project update | `scripts\run_kv_mvp_repair_existing_project.ps1 -SourceSnapshotManifestPath <manifest>` | `repair_result.json.ok=true` and source snapshot gate is included in result | Any child step fails |
-| Verify | Read same-run artifacts | Compile text contains `转换结果 OK` and result references the snapshot manifest | Do not use old exports or old compile text |
-
-Agent participation boundary:
-
-- Before KV STUDIO opens, the agent may create/edit scaffold files, run validation, and start `run_kv_mvp_scaffold.ps1`, `run_kv_mvp_repair_existing_project.ps1`, or `run_kv_mvp_repeat.ps1`.
-- From the first KV STUDIO launch through compile-result copy, operation is script-owned. The agent must not inspect the live UI, decide the next UI action, paste into KV STUDIO, click, type, or call child MVP scripts as a normal path.
-- After the runner exits, the agent may verify only same-run artifacts such as `mvp_result.json`, `repeat_result.json`, copied compile text, variable persistence JSON, and guard checkpoints.
-- If the runner fails, diagnose from result JSON and artifacts first. Any further KV STUDIO operation must start as a fresh runner command after scaffold/script repair, not as an in-window manual continuation.
-
-Compound workflows:
+## 合同
 
 ```yaml
-kv_compound_workflow:
-  rule: mature_script_segments_first
-  segment_order:
-    - mature_script_to_checkpoint
-    - unknown_ui_transition_probe
-    - mature_script_to_next_checkpoint
-  checkpoint_required:
-    - same_run_result_json
-    - target_window_or_artifact_identity
-    - editable_mode_when_project_editing
-    - selected_project_tree_object_when_relevant
-  stop_conditions:
-    - mature_script_checkpoint_missing
-    - unexpected_window_before_unknown_probe
-    - probe_attempt_starts_from_initial_ui_when_mature_prefix_exists
-  classification:
-    unexpected_window_before_checkpoint: route_design_error
-    unexpected_window_after_checkpoint: transition_failure
-    mature_script_changed_for_probe: mature_script_boundary_violation
+contract:
+  rule: workflow_owns_kvstudio_ui
+  agent_may:
+    - edit_scaffold_files_before_KV_STUDIO_opens
+    - run_published_workflow
+    - run_non_ui_gate_script
+    - inspect_same_run_artifacts_after_runner_exits
+  agent_must_not:
+    - manually_click_or_type_in_live_KV_STUDIO
+    - continue_a_failed_runner_inside_existing_window
+    - call_child_mvp_scripts_as_customer_operation
+    - compose_unclassified_ui_scripts_as_workflow
+    - edit_stable_scripts_in_operate_mode
+    - use_old_artifacts_as_success_proof
+  primary_paths:
+    SkillRoot: this_skill_directory
+    WorkRoot: C:\Users\Public\KVSkillPractice
+    ScaffoldRoot: WorkRoot\scaffolds\<task-id>
+    OutRoot: WorkRoot\mvp_runs
 ```
 
-For a new KV STUDIO capability inside a larger workflow, do not explore from the initial project window when an existing script can reach the nearest precondition. Run the mature script to that checkpoint, assert the checkpoint artifact/window, then probe only the new transition. After that transition is verified, turn it into a small script segment and resume the next mature script. If a run enters an unrelated or never-seen window before the checkpoint is proven, treat it as `route_design_error`, not as evidence about the new feature.
+KV STUDIO 一旦启动，操作权属于发布 workflow；agent 只从同次运行产物判断结果。客户操作态失败后输出 evidence 和稳定错误码，进入研发态处理路线，不在现有窗口内探究、扫描或修改脚本。
 
-Primitive script boundary:
+## 新项目脚手架流程
 
 ```yaml
-primitive_scripts:
-  status:
-    scripts/mvp/export_mnm_guarded.ps1: probe_only_until_success_artifact
-    scripts/mvp/export_mnm_browse_default_folder_guarded.ps1: internal_core_for_default_browse_folder_route
-    scripts/mvp/export_mnm_project_copy_default_folder.ps1: independent_mature_for_existing_project_mnm_export
-    scripts/mvp/import_mnm_guarded.ps1: immutable_during_feature_probe
-    scripts/mvp/compile_and_copy_result_bounded.ps1: immutable_during_feature_probe
-    scripts/filter_kv_mnm_user_sources.ps1: immutable_during_feature_probe
-  maturity_states:
-    independent_mature:
-      requires:
-        - direct_invocation_ok_artifact
-        - documented_preconditions_created_by_script_itself
-    wrapper_dependent:
-      requires:
-        - parent_runner_or_wrapper
-        - upstream_preconditions
-        - same_run_ok_artifact_from_parent_context
-      direct_call_failure_classification: missing_or_unproven_precondition
-    probe_only:
-      requires:
-        - no_ok_artifact_yet
-  maturity_required:
-    - export_mnm_result_json_ok_true
-    - same_run_mnm_files
-    - invocation_context_or_parent_runner
-  rule: run_or_restore
-  forbidden:
-    - add_new_workflow_logic_to_primitive
-    - replace_known_fast_path_with_unverified_ui_route
-    - widen_one_primitive_to_cover_multiple_goals
-  allowed_changes:
-    - fix_regression_in_the_same_original_goal
-    - add_observation_artifacts_without_changing_action_path
-    - create_new_versioned_probe_or_wrapper
+new_project_route:
+  - step: create_scaffold
+    command: scripts\scaffold_tools\new_kv_mvp_scaffold.ps1
+    pass: scaffold.json_and_CHECKLIST_exist
+  - step: edit_scaffold
+    files:
+      - scaffold.model.json
+      - modules\<module>\*.mnm
+      - scaffold.json.mnm_files[].variables.global_tsv
+      - scaffold.json.mnm_files[].variables.local_tsv
+      - architecture\*.json
+      - TASK.md
+      - VERSION.md
+      - CHECKLIST.md
+  - step: validate_scaffold
+    command: scripts\scaffold_tools\validate_kv_mvp_scaffold.ps1
+    pass: scaffold_validation.json.ok == true
+  - step: run_kvstudio
+    command: scripts\workflows\run_kv_mvp_scaffold.ps1
+    pass: mvp_result.json.ok == true
+  - step: repeat_gate
+    command: scripts\workflows\run_kv_mvp_repeat.ps1
+    pass: repeat_result.json.ok == true and consecutive_passes >= 3
 ```
 
-If a primitive script is too coarse for a task, keep it unchanged and create an orchestrator or probe script. `export_mnm_guarded.ps1` owns only "export MNM from an exact project to a directory", but it is not an independent mature segment until an `export_mnm_result.json.ok=true` artifact exists for the exact invocation context. If the only success evidence is inside a parent runner, classify it as `wrapper_dependent` and record the parent runner plus the upstream preconditions it creates, such as foreground KV STUDIO window, edit mode, project tree focus, keyboard state, and absence of modal dialogs. Project replication must call proven stable segments, then perform filtering, scaffold construction, and import through separate scripts. A failed route inside a primitive is not a reason to mutate that primitive during the task; restore it, inspect git history and caller context, then move experiments into a task-local probe.
+结构化脚手架优先编辑 `scaffold.model.json`，再运行 `scripts\render_kv_mvp_scaffold_model.ps1`。生成的 MNM/TSV 是 KV STUDIO adapter artifact；只有诊断或旧脚手架才直接编辑。
 
-MNM export stable route:
+## 现有项目修复流程
 
 ```yaml
-script: scripts/mvp/export_mnm_project_copy_default_folder.ps1
-route:
-  - set_WorkRoot_to_ExportDir/_kv_export_workspace_unless_explicitly_inside_ExportDir
-  - copy_source_project_directory_to_WorkRoot
-  - remove_mnm_files_from_project_copy
-  - open_copied_kpr
-  - Alt+F
-  - R
-  - S
-  - confirm_export_option_dialog
-  - accept_browse_folder_default_selected_project_directory
-  - copy_same_run_mnm_files_to_ExportDir
-success:
-  - export_mnm_project_copy_result.json.ok == true
-  - mnm_files.count > 0
-  - actual_kv_export_dir starts_with ExportDir
-  - core_result_path points_to_same_run_browse_folder_export_result
-rejected:
-  - BFFM_SETSELECTIONW_as_custom_folder_selection
-  - direct_export_mnm_guarded_as_stable_without_ok_artifact
-evidence:
-  - C:\Users\Public\KVSkillPractice\kv_clone_taizhou_20260531\export_mnm_browse_probe9_default_copy_yes\browse_folder_export_result.json
-  - C:\Users\Public\KVSkillPractice\kv_clone_taizhou_20260531\export_mnm_browse_probe10_default_copy_repeat\browse_folder_export_result.json
-  - C:\Users\Public\KVSkillPractice\kv_clone_taizhou_20260531\export_mnm_browse_probe11_default_copy_repeat\browse_folder_export_result.json
-  - C:\Users\Public\KVSkillPractice\kv_clone_taizhou_20260531\stable_export_run1\out\export_mnm_project_copy_result.json
+existing_project_route:
+  - create_or_update_workspace: scripts\new_kv_existing_project_update_workspace.ps1
+  - verify_snapshot: scripts\assert_kv_existing_project_snapshot.ps1
+  - plan_mnm_import: scripts\scaffold_tools\assert_kv_mnm_import_plan.ps1
+  - edit_scaffold_from_verified_snapshot
+  - run_repair: scripts\workflows\run_kv_mvp_repair_existing_project.ps1
+  - verify_same_run_artifacts
+required_gates:
+  - source_snapshot_manifest.status == ready
+  - project_fingerprint_matches
+  - MNM_and_variable_manifest_exist
+  - same_name_MNM_conflict_planned_or_predeleted
 ```
 
-Do not use `BFFM_SETSELECTIONW` as the folder-selection mechanism for KV STUDIO MNM export. In verified runs it left the tree selection on the default project folder or destabilized KV STUDIO. To export into an arbitrary caller directory, control the project copy location inside `ExportDir`, accept the Browse Folder default selection inside that file framework, then copy the produced `.mnm` files to the requested `ExportDir`.
+不要用旧 `.mnm`、旧 `.csv`、旧 `.lbl` 或 sidecar 文件冒充当前项目快照。项目目录 hash 变化后必须重新导出。
 
-Create scaffold:
-
-```powershell
-$SkillRoot = '<path-to-kv-studio-operator-skill>'
-$WorkRoot = 'C:\Users\Public\KVSkillPractice'
-$ScaffoldRoot = Join-Path $WorkRoot 'scaffolds\<task-id>'
-
-powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\new_kv_mvp_scaffold.ps1" `
-  -ScaffoldRoot $ScaffoldRoot `
-  -ProjectName '<project-name>' `
-  -CpuModel KV-X310 `
-  -ModuleName Main_MVP `
-  -Template Minimal `
-  -TaskSummary '<task summary>'
-```
-
-Validate scaffold:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\validate_kv_mvp_scaffold.ps1" `
-  -ScaffoldRoot $ScaffoldRoot `
-  -OutDir (Join-Path $ScaffoldRoot '_validation')
-```
-
-Validate variable definition files directly:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\assert_kv_variable_definitions.ps1" `
-  -TsvPath '<module-global.tsv>','<module-local.tsv>' `
-  -Scope any `
-  -ExpectedOwnerProgram '<module-name>' `
-  -OutPath '<out>\variable_definition_validation.json'
-```
-
-Run scaffold:
-
-Configure the local KV STUDIO administrator credential once per Windows user before project creation:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\set_kv_admin_credential.ps1"
-```
-
-The default credential file is `%APPDATA%\Codex\kv-studio-operator\credentials.xml`. It is a Windows DPAPI `Export-Clixml` file and must not be committed. Runners may also pass `-AdminUser/-AdminPassword` or `-AdminCredentialPath`; do not store passwords in scaffold files, skill text, README files, or git.
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_mvp_scaffold.ps1" `
-  -ScaffoldRoot $ScaffoldRoot `
-  -OutRoot (Join-Path $WorkRoot 'mvp_runs') `
-  -TimeoutSeconds 600
-```
-
-Repair an existing project from a corrected scaffold:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\new_kv_existing_project_update_workspace.ps1" `
-  -ProjectPath '<existing-project.kpr>' `
-  -WorkspaceRoot (Join-Path $WorkRoot 'existing_project_updates') `
-  -TaskId '<task-id>'
-
-powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\assert_kv_existing_project_snapshot.ps1" `
-  -ProjectPath '<existing-project.kpr>' `
-  -SnapshotManifestPath (Join-Path $WorkRoot 'existing_project_updates\<task-id>\source_snapshot_manifest.json') `
-  -OutDir (Join-Path $WorkRoot 'existing_project_updates\<task-id>\validation\source_snapshot_gate')
-
-powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\assert_kv_mnm_import_plan.ps1" `
-  -ScaffoldRoot $ScaffoldRoot `
-  -SourceSnapshotManifestPath (Join-Path $WorkRoot 'existing_project_updates\<task-id>\source_snapshot_manifest.json') `
-  -SourceSnapshotGateResultPath (Join-Path $WorkRoot 'existing_project_updates\<task-id>\validation\source_snapshot_gate\existing_project_snapshot_gate.json') `
-  -OutDir (Join-Path $WorkRoot 'existing_project_updates\<task-id>\validation\mnm_import_plan_gate')
-
-powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_mvp_repair_existing_project.ps1" `
-  -ProjectPath '<existing-project.kpr>' `
-  -ScaffoldRoot $ScaffoldRoot `
-  -SourceSnapshotManifestPath (Join-Path $WorkRoot 'existing_project_updates\<task-id>\source_snapshot_manifest.json') `
-  -OutRoot (Join-Path $WorkRoot 'mvp_repair_runs') `
-  -DeleteExistingModulesBeforeImport `
-  -LocalPasteFormat NameType `
-  -TimeoutSeconds 600
-```
-
-For projects not created by this skill, do not use `-SeedScaffoldRoot` as proof. Export current MNM files and variable manifests from the exact project into the workspace snapshot, record inventory evidence, then set `source_snapshot_manifest.json.status` to `ready`. If the project directory hash differs from the last parsed snapshot, the gate fails and a fresh export is required. `-SeedTrust SameRunSkillBaseline` is reserved for `run_kv_mvp_scaffold.ps1` baseline snapshots produced immediately after that same runner creates and compiles the project.
-
-For multi-MNM stages that must prove local variables independently of compile, run the scaffold with `-AuditVariablePersistence`. The runner will close/reopen the variable editor, copy each module's local grid, and match expected local names before compile.
-
-Multi-MNM local-variable proof requires per-module first-column isolation: the copied local grid for module A must contain A's local names with their expected data types in the first two columns, and must not contain any other module's local names in the first column. The normal local paste route is: select local tab, select the target local program, focus the local program combo, send `Tab`, send `PgDn`, then paste the full local variable rows. If an audit copy is taken before paste, the script must refocus the local program combo before sending `Tab`.
-
-变量表复制/粘贴门限：
+## 操作态 Workflow 与原子性
 
 ```yaml
-variable_grid_gate:
-  symptom_is_not_root_cause:
-    - "向剪贴板复制失败"
-    - "paste/copy modal"
-  required_before_ctrl_c_or_ctrl_v:
-    - foreground_window == KvVariableForm
-    - local_program_combo.value == target_program
-    - variable_editor_uia_signature.stable_for_ms >= 900
-    - system_clipboard.openable_for_ms >= 500
-    - ctrl_chord_delivery == scripts/mvp/kv_ui_guard.ps1::Invoke-KvGuardedCtrlChord
-  required_after_local_paste:
-    - variable_editor_uia_signature.stable == true
-    - save_project
-    - close_reopen_copy_audit_when_AuditVariablePersistence
-  forbidden:
-    - raw_SendKeys_or_keybd_event_in_child_business_script
-    - dismiss_modal_as_success
-    - skip_local_copy_audit_because_custom_or_fb_type_exists
-    - add_compile_only_exception_without_user_approved_gate_change
-    - treat_compile_ok_as_replacement_for_enabled_copy_audit
-    - treat_manual_copy_success_as_proof_without_script_owned_repeat_run
-  evidence:
-    - ui_stable_*.json
-    - clipboard_available_*.json
-    - checkpoints/*Ctrl_A*.json focused_element
-    - checkpoints/*Ctrl_C*.json focused_element
-    - local_variables_reopen_clipboard.txt
-    - variable_persistence_validation.json
+operate_mode:
+  entrypoint_type: published_workflow
+  allowed:
+    - scripts\workflows\run_kv_mvp_scaffold.ps1
+    - scripts\workflows\run_kv_mvp_repair_existing_project.ps1
+    - scripts\workflows\run_kv_mvp_repeat.ps1
+    - scripts\workflows\export_mnm_project_copy_default_folder.ps1
+    - non_ui_gate_scripts
+  blocked:
+    - direct_child_ui_script_chain
+    - ad_hoc_UIA_scan_after_failure
+    - script_patch_after_operation_failure
+    - probe_script_in_customer_project
+  failure_result:
+    status: ROUTE_RESEARCH_REQUIRED
+    required_fields: [workflow, current_step, error_code, evidence, clean_end_state]
 ```
 
-如果 KV STUDIO 在变量表 `Ctrl+C` 或 `Ctrl+V` 后弹出剪贴板错误，先定位为什么表格状态或系统剪贴板状态不允许复制/粘贴。优先检查 local program 是否已切换完成、粘贴后数据是否已提交、变量编辑器 UIA 子树是否稳定、系统剪贴板是否连续可打开、脚本是否过早输入。只有在门限本身被证明错误，并经过独立审核后，才能修改门限；不得把关闭弹窗、延长超时、跳过审计或仅靠编译成功当作修复。
+workflow 是客户操作态的最小执行单位。workflow 可以串联多个已批准原子脚本，但必须由 runner 负责步骤顺序、超时、失败收口、同次运行证据和结束环境检查。agent 在客户操作态只传参、运行 workflow、读取结果。
 
-如果用户在同一失败界面手动 `Ctrl+A`、`Ctrl+C` 成功，结论是“脚本发键/焦点/窗口状态路径不同”，不是“变量表不可复制”。修复必须留在脚本自有路线内：把全局 UI 输入收敛到 `kv_ui_guard.ps1` 的 guard primitive，记录 foreground 和 focused element，再用全新项目副本跑至少两次 `-AuditVariablePersistence` 全流程验证。业务脚本不得直接调用 `SendKeys`、`keybd_event`、`mouse_event`、`SetCursorPos` 或剪贴板粘贴 API；`scripts\assert_kv_mvp_ui_guard_usage.ps1` 是 KV STUDIO 启动前门限。
-
-Run repeat gate:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\run_kv_mvp_repeat.ps1" `
-  -ScaffoldRoot $ScaffoldRoot `
-  -OutRoot (Join-Path $WorkRoot 'mvp_repeat_runs') `
-  -AuditVariablePersistence `
-  -RequiredConsecutivePasses 3 `
-  -MaxAttempts 6 `
-  -StopAfterSameFailureCount 3 `
-  -TimeoutSeconds 600
+```yaml
+workflow_composition_contract:
+  classification_source: scripts/script_manifest.json
+  current_layout_policy: role_directories_with_legacy_wrappers
+  role_layout:
+    scaffold_tools: customer_callable_non_UI_preparation
+    workflows: customer_callable_orchestration
+    runner_children: workflow_called_UI_or_KV_STUDIO_steps
+    guards: shared_UI_input_libraries
+    probes: research_only
+    gates: non_UI_validation
+  customer_workflow:
+    role: orchestration_only
+    must:
+      - compose_approved_internal_runner_child_scripts
+      - own_parameters_workspace_timeout_result_json_and_clean_end_state
+      - preserve_child_script_route_implementation
+    must_not:
+      - duplicate_internal_UI_steps
+      - rewrite_child_script_logic_inside_workflow
+      - expose_child_script_as_customer_entrypoint
+  internal_runner_child:
+    role: verified_UI_or_KV_STUDIO_atomic_step
+    callable_by:
+      - customer_workflow
+      - regression_test_harness
+    not_callable_by:
+      - customer_operate_mode_agent_directly
 ```
 
-## Scaffold Files
+不要仅靠目录名或脚本名判断脚本权限；读取 `scripts/script_manifest.json`。正式路径按 role 分离：`workflows` 编排，`runner_children` 执行内部 UI 原子步骤，`guards` 提供输入原语，`probes` 只用于研发态。`scripts\mvp\*.ps1` 只保留为 legacy compatibility wrapper，不作为客户态正式入口。
 
-Edit only scaffold source files before running KV STUDIO:
+```yaml
+atomic_operation_contract:
+  precondition:
+    - target_project_identity_known
+    - checklist_gate_passed
+    - if_KV_STUDIO_already_running: assert_kvstudio_ui_safe.ok == true
+  postcondition:
+    - no_KV_STUDIO_modal_dialog
+    - no_unit_editor_network_editor_variable_editor_left_open
+    - no_inline_ladder_edit_bar
+    - project_saved_or_disposable_project_closed_by_workflow
+    - result_json_written
+    - evidence_dir_written
+  failure_postcondition:
+    - failure_json_written
+    - current_step_written
+    - evidence_paths_written
+    - no_further_UI_action_after_failure
+  clean_end_state_check:
+    command: scripts\assert_kvstudio_ui_safe.ps1
+    required_when: workflow_leaves_KV_STUDIO_running
+```
 
-- `scaffold.model.json` when present. This is the source of truth for structured scaffolds.
-- `modules\<module>\*.mnm` for new structured scaffolds; `mnm\*.mnm` is a legacy-compatible layout only.
-- `scaffold.json.mnm_files[].variables.global_tsv`
-- `scaffold.json.mnm_files[].variables.local_tsv`
-- `architecture\*.json` for open-ended project/update configuration such as source snapshot binding, IO map, unit map, safety notes, acceptance, and future categories.
-- `architecture\network_config.json` for EtherCAT and EtherNet/IP unit configuration intent. Network/unit configuration belongs here, not in `TASK.md`, `VERSION.md`, MNM comments, or variable TSV files.
-- `TASK.md`
-- `VERSION.md`
-- `CHECKLIST.md`
+当前脚本原子性分级：
 
-Do not hand-edit generated runner artifacts.
+```yaml
+atomicity_audit_2026_06_04:
+  tested_on_this_machine:
+    assert_kvstudio_ui_safe.ps1:
+      result: passed
+      note: current desktop had no visible KV_STUDIO hazard
+    real_KV_STUDIO_UI_workflows:
+      result: partial_pass
+      specimen: C:\Users\Public\KVSkillPractice\full_atomic_tests\taizhou_20260604_035218
+      passed:
+        - export_mnm_project_copy_default_folder.ps1 exported 12 MNM and postcheck ok
+        - export_mnm_project_copy_default_folder.ps1 default resolver fresh pass on C:\Users\Public\KVSkillPractice\export_mnm_default_resolver_retest_20260604 with 12 top-level MNM files under caller ExportDir and postcheck ok
+        - compile_and_copy_result_bounded.ps1 sent Ctrl+F9 and postcheck ok
+        - set_variables_guarded.ps1 passed on C:\Users\Public\KVSkillPractice\full_atomic_tests\taizhou_var_20260604_123634 with 1 global variable, 2 Main local variables, close/reopen local-grid copy audit, saved-project global-name scan, and postcheck ok
+        - create_project_local_guarded.ps1 default resolver fresh pass on C:\Users\Public\KVSkillPractice\script_coverage_20260604_141514\06_fresh_published_script_tests\01_create_eip_project and 03_create_ec_project
+        - configure_kv_ethercat_device.ps1 fresh pass for registered Beckhoff BK1120 on C:\Users\Public\KVSkillPractice\script_coverage_20260604_141514\06_fresh_published_script_tests\04_configure_ec_bk1120
+        - copy_convert_result_from_tree_handle.ps1 live watch pass after Ctrl+F9 on C:\Users\Public\KVSkillPractice\copy_convert_live_watch_20260604_1615\03_copy_convert_result with lookup_ms=133, line_count=7, contains_ok=true
+      blocked:
+        - configure_kv_ethernet_ip_device.ps1 fresh run selected SR-2000 and set node/IP but failed at variable setting OK enable condition; post-failure clean-state check passed
+      note: compile result copy is protected atomic after Ctrl+F9 precondition creates a visible non-empty conversion result tree
+  customer_workflow_entrypoints:
+    - scripts\workflows\run_kv_mvp_scaffold.ps1
+    - scripts\workflows\run_kv_mvp_repair_existing_project.ps1
+    - scripts\workflows\run_kv_mvp_repeat.ps1
+    - scripts\workflows\export_mnm_project_copy_default_folder.ps1
+  runner_child_scripts:
+    - scripts\runner_children\import_mnm_guarded.ps1
+    - scripts\runner_children\compile_and_copy_result_bounded.ps1
+    - scripts\runner_children\set_variables_guarded.ps1
+    - scripts\runner_children\copy_convert_result_from_tree_handle.ps1
+    - scripts\runner_children\create_project_local_guarded.ps1
+    - scripts\runner_children\export_mnm_browse_default_folder_guarded.ps1
+  pending_runner_child_scripts:
+    - scripts\runner_children\set_fb_arguments_guarded.ps1
+  protected_atomic_scripts:
+    - scripts\workflows\export_mnm_project_copy_default_folder.ps1
+    - scripts\runner_children\copy_convert_result_from_tree_handle.ps1
+  protected_atomic_rule:
+    - do_not_modify_for_new_feature_probe
+    - rerun_same_route_regression_before_patch
+    - preserve_precondition_CtrlF9_visible_non_empty_conversion_result_tree
+  project_configuration_atomic_if_KeepWindowOpen_absent_and_postcheck_passes:
+    - scripts/configure_kv_expansion_units.ps1
+    - scripts/configure_kv_unit_start_addresses.ps1
+    - scripts/configure_kv_ethercat_device.ps1
+  project_configuration_route_lab_until_fixed:
+    - scripts/configure_kv_ethernet_ip_device.ps1
+  non_ui_atomic:
+    - scripts/filter_kv_mnm_user_sources.ps1
+    - scripts/get_kv_ethernet_ip_device_members.ps1
+    - scripts/export_kv_project_inventory.ps1
+    - scripts/assert_*.ps1
+  non_ui_atomic_notes:
+    filter_kv_mnm_user_sources.ps1: ignores _kv_export_workspace before classifying MNM
+  route_lab_only:
+    - scripts\probes\probe_file_menu_coordinate.ps1
+```
 
-For structured scaffolds, edit `scaffold.model.json` first and then run `scripts\render_kv_mvp_scaffold_model.ps1`. Treat generated MNM and TSV files as KV STUDIO adapter artifacts. New scaffolds place each module under `modules\<module>\` with that module's MNM, global TSV, local TSV, and optional FB argument TSV together. Edit generated MNM/TSV directly only for diagnosis or for legacy scaffolds without `scaffold.model.json`.
+子脚本变成客户 workflow 步骤的条件：
 
-Variable files are per MNM/module. Do not assume one project-level `variables\global_variables.tsv` or `variables\local_variables.tsv`. For each `scaffold.json.mnm_files[]` entry, edit the MNM file named by `path`, then edit that entry's paired `variables.global_tsv` and `variables.local_tsv`; in new scaffolds these files should live in the same module folder.
+```yaml
+promotion_to_customer_workflow_step:
+  required:
+    - explicit_parameters
+    - result_json_schema
+    - stable_error_codes
+    - same_run_evidence_dir
+    - timeout
+    - clean_end_state_check
+    - no_probe_branch
+    - no_script_self_modification
+    - repeat_pass_on_disposable_project >= 2
+```
 
-Minimum TSV header:
+研发态可以使用 `ui-automation-breakthrough` 探究未知 transition；客户操作态只接收通过 promotion 的 workflow。
+
+变量脚本门限：
+
+```yaml
+set_variables_guarded_required:
+  row_collection: always_wrap_Get-DefinedVariableRows_result_with_array_before_Count
+  open_variable_editor: normalize_CapsLock_or_accelerator_state_inside_Ensure-VariableEditorOpen
+  persistence_audit:
+    local: close_reopen_select_program_copy_grid_match_expected_names
+    global: saved_project_scan_or_stronger_global_grid_copy_oracle
+  customer_entry: runner_child_only_until_wrapped_by_workflow_with_project_copy_identity
+```
+
+## 硬门限
+
+```yaml
+hard_gates:
+  checklist: scripts\assert_kv_operation_checklist.ps1
+  variable_definitions: scripts\assert_kv_variable_definitions.ps1
+  scaffold: scripts\scaffold_tools\validate_kv_mvp_scaffold.ps1
+  existing_project_snapshot: scripts\assert_kv_existing_project_snapshot.ps1
+  mnm_import_plan: scripts\scaffold_tools\assert_kv_mnm_import_plan.ps1
+  ui_guard: scripts\gates\assert_kv_mvp_ui_guard_usage.ps1
+  agent_boundary: scripts\gates\assert_kv_mvp_agent_boundary.ps1
+forbidden:
+  - dummy_variable_rows_to_satisfy_non_empty_tsv
+  - placeholder_or_stub_snapshot_files_as_evidence
+  - weakening_or_deleting_validation_rules_to_continue
+  - treating_compile_after_bypassed_gate_as_valid
+  - closing_modal_or_extending_timeout_as_root_cause_fix
+```
+
+只有能证明门限本身错误，并经过独立严格审核后，才允许改门限；否则必须修产物或停止。
+
+## 脚手架文件
+
+```yaml
+editable_before_runner:
+  - scaffold.model.json
+  - modules\<module>\*.mnm
+  - scaffold.json.mnm_files[].variables.global_tsv
+  - scaffold.json.mnm_files[].variables.local_tsv
+  - architecture\*.json
+  - architecture\network_config.json
+  - TASK.md
+  - VERSION.md
+  - CHECKLIST.md
+forbidden:
+  - hand_edit_generated_runner_artifacts
+  - put_network_config_in_TASK_or_MNM_comments
+```
+
+变量文件按 MNM/module 配对，不要假设一个项目只有一个 `variables\global_variables.tsv` 或 `variables\local_variables.tsv`。
+
+最小 TSV header：
 
 ```text
 scope	owner_program	name	data_type	device	initial_value	comment	evidence	status
 ```
 
-Executable variable rows use `status` other than `display_name` or `no_local_variables`.
-
-No-local marker row:
+无局部变量时使用唯一 marker 行，runner 不得粘贴该 marker：
 
 ```tsv
 scope	owner_program	name	data_type	device	initial_value	comment	evidence	status
 local	<module>	__NO_LOCAL_VARIABLES__				Confirmed no local variables.	<source snapshot or audit evidence>	no_local_variables
 ```
 
-Use exactly one marker row only when the module/program has no local variables. The marker is gate evidence, not a KV STUDIO variable; runners must not paste it.
-
-MNM module type:
-
-- `;MODULE_TYPE:0` means ordinary program MNM. It does not by itself distinguish scan-executed and standby modules.
-- `;MODULE_TYPE:2` means user function block.
-- `scaffold.json.mnm_files[].category` should be `scan`, `standby`, or `function_block`. If omitted, `0` maps to `scan` and `2` maps to `function_block`.
-- Function-block instance variables use the FB module name as `data_type`. The variable validator allows only FB names declared by `module_type=2` in the same scaffold.
-- `standby` is represented by scaffold metadata, not a unique MNM module type. During MNM import, `import_mnm_guarded.ps1` must select `后备模块` in the `选择程序种类` dialog before OK. Current proof: `C:\Users\Public\KVSkillPractice\standby_module_20260529\runs\standby_import_program_kind_fix\StandbyImportProbe\mvp_result.json`.
-- `interrupt` remains gated with `KV_SCAFFOLD_MODULE_CATEGORY_SUPPORT_INCOMPLETE`: Wiki evidence says interrupt modules also require CPU system settings for fixed-cycle/user-interrupt factors plus interrupt enable, not just MNM import.
-- The value in each MNM file must match `scaffold.json.mnm_files[].module_type`.
-
-## Hard Gates
-
-Gate integrity:
+## 变量表复制/粘贴门限
 
 ```yaml
-gate_integrity:
-  invariant: gate_semantics_are_correctness
-  pass_condition: required_semantic_evidence_present_in_same_run
+variable_grid_gate:
+  symptom_is_not_root_cause:
+    - clipboard_copy_failed
+    - paste_or_copy_modal
+  required_before_ctrl_c_or_ctrl_v:
+    - foreground_window == KvVariableForm
+    - local_program_combo.value == target_program
+    - variable_editor_uia_signature.stable_for_ms >= 900
+    - system_clipboard.openable_for_ms >= 500
+    - ctrl_chord_delivery == scripts/guards/kv_ui_guard.ps1::Invoke-KvGuardedCtrlChord
+  required_after_local_paste:
+    - variable_editor_uia_signature.stable == true
+    - save_project
+    - close_reopen_copy_audit_when_AuditVariablePersistence
   forbidden:
-    - dummy_variable_rows_to_satisfy_non_empty_tsv
-    - placeholder_or_stub_snapshot_files_as_project_evidence
-    - weakening_or_deleting_validation_rules_to_continue
-    - treating_file_presence_as_semantic_completeness
-    - continuing_after_gate_failure_by_relabeling_the_failure
-  exception_only_if:
-    suspected_wrong_gate:
-      required:
-        - written_failure_evidence
-        - exact_gate_rule_under_challenge
-        - why_artifact_is_valid_despite_gate_failure
-        - task_local_patch_or_wrapper_only
-        - independent_subagent_strict_audit_before_execution
-      audit_must_answer:
-        - gate_wrong_or_artifact_incomplete
-        - exception_preserves_original_acceptance_semantics
-        - downstream_compile_import_evidence_would_be_polluted
-      if_subagent_unavailable: stop_and_report_gate_blocker
-  failure_boundary:
-    variable_manifest_incomplete: stop
-    source_snapshot_stub: stop
-    scaffold_dummy_rows: stop
-    compile_after_bypassed_gate: invalid_evidence
+    - raw_SendKeys_or_keybd_event_in_business_script
+    - dismiss_modal_as_success
+    - skip_local_copy_audit_because_custom_or_fb_type_exists
+    - treat_compile_ok_as_replacement_for_enabled_copy_audit
 ```
 
-- Checklist gate: every KV STUDIO operation must pass `scripts\assert_kv_operation_checklist.ps1`.
-- Variable definition gate: every generated or edited variable TSV must pass `scripts\assert_kv_variable_definitions.ps1` or the equivalent shared validator before KV STUDIO opens.
-- Existing-project source gate: before modifying an existing `.kpr`, `scripts\assert_kv_existing_project_snapshot.ps1` must prove that the current project fingerprint matches a ready source snapshot containing MNM files, variable manifests, inventory evidence, and an open architecture file.
-- MNM import plan gate: before modifying an existing `.kpr`, `scripts\assert_kv_mnm_import_plan.ps1` compares incoming `scaffold.json.mnm_files[].module_name` values with the verified source snapshot MNM inventory. Direct import is forbidden when a same-name module already exists. If a conflict exists, the top-level runner must be invoked with `-DeleteExistingModulesBeforeImport`, and the child import step must pre-delete that module before importing its replacement. If the project fingerprint no longer matches the snapshot, export current MNM first and re-plan.
-- Scaffold gate: an existing scaffold must pass `scripts\validate_kv_mvp_scaffold.ps1` before runner use. This gate requires `architecture\network_config.json` and rejects structured network payload keys such as `node_address`, `ip_address`, `device_path`, or `esi_path` in `TASK.md`, `VERSION.md`, MNM comments, or variable TSV files with `KV_SCAFFOLD_NETWORK_CONFIG_LEAK`.
-- UI guard gate: the runner must pass `scripts\assert_kv_mvp_ui_guard_usage.ps1` before touching KV STUDIO.
-- Agent boundary gate: the runner must pass `scripts\assert_kv_mvp_agent_boundary.ps1` before touching KV STUDIO; this rejects interactive prompts/manual decision points in runner-owned scripts.
-- Program construction uses MNM files. If MNM import fails, fix the scaffold or stop; do not type program text into the ladder/editor.
-- Variables are mandatory per MNM entry. `variables.local_tsv` must contain executable local rows for that module/program, or exactly one `no_local_variables` marker row when the module/program has no local variables. `variables.global_tsv` may be header-only only when that MNM uses no global variables.
-- Executable global variable rows must be referenced by their paired MNM file. The compile gate proves the variables used by the imported program. Local variable close/reopen/copy verification is an audit path, not the default fast path.
-- Success must come from the current run's `mvp_result.json`, not screenshots or old compile text.
-
-## Script Ownership
-
-Agents normally call only:
-
-- `scripts\new_kv_mvp_scaffold.ps1`
-- `scripts\new_kv_mvp_multi_mnm_scaffold.ps1`
-- `scripts\new_kv_existing_project_update_workspace.ps1`
-- `scripts\assert_kv_existing_project_snapshot.ps1`
-- `scripts\assert_kv_mnm_import_plan.ps1`
-- `scripts\assert_kv_variable_definitions.ps1`
-- `scripts\validate_kv_mvp_scaffold.ps1`
-- `scripts\filter_kv_mnm_user_sources.ps1`
-- `scripts\run_kv_mvp_scaffold.ps1`
-- `scripts\run_kv_mvp_repair_existing_project.ps1`
-- `scripts\run_kv_mvp_repeat.ps1`
-- `scripts\configure_kv_network_from_config.ps1`
-- `scripts\configure_kv_expansion_units.ps1`
+如果用户在失败界面手动 `Ctrl+A`、`Ctrl+C` 成功，结论是脚本焦点/窗口状态/发键路径不同，不是变量表不可复制。修复必须在脚本自有路径内完成，并用全新项目副本至少两次 `-AuditVariablePersistence` 验证。
 
 ## 官方/库 FB 过滤
 
-复刻项目时，官方/库 FB 是依赖，不是用户源码。
-
-模块、EtherCAT、EtherNet/IP、Universal Library 等操作可能自动导入官方 FB；其中很多不可编辑。不要把这类 FB 当作用户 FB 导出、重命名、再导入。
-
-导出 MNM 后必须先运行过滤器：
+项目复刻时，官方/库 FB 是依赖，不是用户源码。模块、EtherCAT、EtherNet/IP、Universal Library 可能自动导入官方 FB，其中很多不可编辑。导出 MNM 后必须先过滤：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\filter_kv_mnm_user_sources.ps1" `
@@ -415,8 +339,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\filter_k
   -ProjectPath '<project.kpr>' `
   -OutDir '<filter-report-dir>'
 ```
-
-过滤规则：
 
 ```text
 if MODULE_TYPE != 2:
@@ -429,19 +351,11 @@ else:
   copy as user_fb
 ```
 
-`MC_*` / `[MC]_*` 是 KEYENCE 运动控制官方/库 FB 模式；Universal Library 与通信库 FB 以项目树证据优先。禁止按单个用户 FB 名称做白名单。
+禁止按单个用户 FB 名称硬编码白名单。
 
-## PLC Expansion Unit Configuration
+## PLC 扩展单元
 
-Use `scripts\configure_kv_expansion_units.ps1` only for adding registered KV expansion units through the project-tree unit configuration route:
-
-```text
-单元配置 -> [0] KV-X310 -> 单元编辑器 - 编辑模式 -> Alt+1 选择单元
-```
-
-Open `[0] KV-X310` with `Enter`; do not enter EtherCAT, EtherNet/IP, or communication settings. The script focuses the unit list with `Alt+1`, scans by reading the current selection detail fields, presses `Enter` on matched unit names, clicks the unit editor `OK`, saves the project, and reads `WsTreeEnv.xml` for slot/address evidence.
-
-Use comma-separated patterns when invoking through `powershell -File`:
+添加已注册 KV 扩展单元使用：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configure_kv_expansion_units.ps1" `
@@ -452,30 +366,23 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configur
   -OutDir (Join-Path $WorkRoot 'kv_unit_config_runs')
 ```
 
-Stable clean-project evidence currently covers adding `KV-B16X*` and `KV-AD40V` in 29.233 seconds, then passing `Ctrl+F9` conversion with copied result text. The parsed unit tree entries were:
+路线：
 
 ```text
-[1] KV-B16X*  R33000  -----
-[2] KV-AD40V  R34000  DM10300
+单元配置 -> [0] KV-X310 -> 单元编辑器 - 编辑模式 -> Alt+1 选择单元
 ```
 
-Treat `WsTreeEnv.xml` entries as the readable project evidence for unit slot and start-address parameters. Use `UnitSet.ue2` only as auxiliary binary evidence.
+不要进入 EtherCAT、EtherNet/IP 或通信设置。`WsTreeEnv.xml` 是槽位和首地址的可读证据。
 
-## PLC Unit Start Address Configuration
+## PLC 单元首地址
 
-Use `scripts\configure_kv_unit_start_addresses.ps1` only for editing start-address fields of an already imported PLC unit through its exact project-tree unit item:
-
-```text
-单元配置 -> [<slot>] <unit> -> 单元编辑器 - 编辑模式 -> 设定单元(2)
-```
-
-Do not open `[0] KV-X310` and then move inside the unit editor for this task. Verified evidence showed that CPU-entry editing can drift to `[0] KV-X310` while the property table still exposes similar address rows.
+编辑已导入单元首地址使用：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configure_kv_unit_start_addresses.ps1" `
   -ProjectName '<open-project-name>' `
   -ProjectPath '<project.kpr>' `
-  -UnitName 'KV-SSC02' `
+  -UnitName '<unit-name>' `
   -Slot 1 `
   -FirstDm 1000 `
   -FirstRelay 1000 `
@@ -483,41 +390,27 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configur
   -OutDir (Join-Path $WorkRoot 'kv_unit_address_runs')
 ```
 
-Address entry rules:
+路线：
 
 ```text
-首 DM 编号: input 1000 -> saved DM1000
-首继电器编号(按通道设定): input 10 -> saved R1000
-relay_channel = FirstRelay / 100
+单元配置 -> [<slot>] <unit> -> 单元编辑器 - 编辑模式 -> 设定单元(2)
 ```
 
-The script rejects `FirstRelay` values not divisible by `100`. It closes stale `转换结果` dialogs before opening the unit editor. It refuses to reuse an already-open unit editor, because the stable precondition is direct project-tree selection of the target unit.
+`FirstDm=1000` 保存为 `DM1000`。`FirstRelay=1000` 需要输入通道值 `10`，规则为 `relay_channel = FirstRelay / 100`。
 
-Current same-run evidence:
+`UnitName`、`Slot`、首地址值是 workflow 参数。`KV-SSC02` 只可作为特定 benchmark 输入；通用 skill 必须先确认目标项目已存在该单元，再执行首地址修改。
+
+## EtherNet/IP 配置
+
+网络配置意图写入：
 
 ```text
-C:\Users\Public\KVSkillPractice\kv_unit_address_runs\20260531_155121_360_configure_kv_unit_start_addresses.json
-[1] KV-SSC02 R1000 DM1000
-elapsed 15.921s
-Ctrl+F9: 转换结果 OK (错误数量:0 警告数量:0)
+architecture\network_config.json
 ```
 
-## EtherNet/IP Unit Configuration
+不要把 EtherCAT 或 EtherNet/IP 配置写进 MNM、变量 TSV、`TASK.md` 或 `VERSION.md`。
 
-Scaffolds generated by this skill include `architecture\network_config.json` with this route:
-
-```json
-{
-  "schema_version": 1,
-  "route": "project_tree_unit_configuration",
-  "ethernet_ip": { "devices": [] },
-  "ethercat": { "devices": [] }
-}
-```
-
-This file is the scaffold-side declaration of network/unit configuration. The KV STUDIO project is still changed by the dedicated unit-configuration scripts below; do not put EtherCAT or EtherNet/IP setup instructions in MNM source or variable TSV files.
-
-Run the network config against an already open project with:
+调度入口：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configure_kv_network_from_config.ps1" `
@@ -526,42 +419,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configur
   -OutDir (Join-Path $WorkRoot 'kv_network_config_runs')
 ```
 
-Supported `network_config.json` device entries:
-
-```json
-{
-  "ethernet_ip": {
-    "devices": [
-      {
-        "device_name_pattern": "SR-2000",
-        "node_address": 8,
-        "ip_address": "<device-ip>",
-        "variable_name_prefix": "eip_n008"
-      }
-    ]
-  },
-  "ethercat": {
-    "devices": [
-      {
-        "device_path": ["KEYENCE CORPORATION", "Servo Drives", "SV3"],
-        "batch_axis_registration": "No"
-      }
-    ]
-  }
-}
-```
-
-`ethercat.devices[].esi_path` is reserved but intentionally rejected with `KV_ETHERCAT_ESI_REGISTRATION_UNSTABLE`. The stable route currently requires ESI files to be registered before running device-add automation.
-
-Use `scripts\configure_kv_ethernet_ip_device.ps1` only for the project-tree unit configuration route:
-
-```text
-单元配置 -> [0] KV-X310 -> EtherNet/IP -> 手动设定
-```
-
-Do not use toolbar/menu communication settings for this task; that configures PC-to-PLC debugging communication, not project EtherNet/IP scanner/device setup.
-
-The script selects an existing EtherNet/IP device-list entry by reading the device detail fields after `Alt+1` focuses the list. It then opens the adapter initial setting dialog, writes node address and IP address, confirms the adapter dialog, confirms the main EtherNet/IP setting window, confirms the unit editor, and fills the `EtherNet/IP设备 变量设置` dialog with per-row variable names.
+单设备入口：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configure_kv_ethernet_ip_device.ps1" `
@@ -573,11 +431,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configur
   -OutDir (Join-Path $WorkRoot 'kv_network_config_runs')
 ```
 
-`DeviceNamePattern` without `*` or `?` uses prefix-boundary matching, so `SR-200` does not match `SR-2000`. Use explicit wildcards only when fuzzy matching is intentional, for example `'*Code Reader*'`.
+正确路线：
 
-If `-VariableNames` is omitted, the script generates two names from `-VariableNamePrefix` or from `-NodeAddress`: `<prefix>_in100` and `<prefix>_out101`. The variable-name grid does not accept bulk paste reliably; the script focuses the grid, moves to the variable-name column, and types names one cell at a time.
+```text
+单元配置 -> [0] KV-X310 -> EtherNet/IP -> 手动设定
+```
 
-After registration, the generated names are global structured variables. Use `scripts\get_kv_ethernet_ip_device_members.ps1` to read the local KV STUDIO EDS/XML cache and list valid ST member references before writing code:
+不要使用工具栏/菜单里的通信设置；那是 PC 连接 PLC 调试用，不是项目 EtherNet/IP scanner/device 设置。变量名弹窗不能可靠批量粘贴，脚本必须逐格输入。
+
+注册后生成的是全局结构体变量。写 ST 前用 EDS/XML cache 查询成员：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\get_kv_ethernet_ip_device_members.ps1" `
@@ -587,36 +449,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\get_kv_e
   -Json
 ```
 
-For SR-2000 local evidence, the OUT101 clear bit is `ErrClear`, not `ErrorClr`. Treat the parsed `IOComment/ENG` names in `C:\ProgramData\KEYENCE\KVS\EIP_Eds\*.xml` as the source of truth. Example ST references:
+`Ctrl+F9` 是本任务族的转换/编译验证。`Ctrl+F2` 可能进入模拟器/监视模式，不是有效 compile oracle。
 
-```text
-eip_n008_out101.ErrClear
-eip_n008_out101.ReadReq
-eip_n008_out101.ReadCmpltClr
-eip_n008_in100.ReadCmplt
-```
+## EtherCAT 配置
 
-For compile verification in this task family, use KV STUDIO conversion `Ctrl+F9`. `Ctrl+F2` can enter simulator/monitor mode and is not a valid compile oracle for network configuration usage validation. If KV STUDIO is already in simulator mode, return to editor mode before continuing and verify the title contains `[编辑器: <CPU>]`.
-
-## EtherCAT Unit Configuration
-
-Use `scripts\configure_kv_ethercat_device.ps1` only for the project-tree unit configuration route:
-
-```text
-单元配置 -> [0] KV-X310 -> EtherCAT -> 手动设定
-```
-
-The verified SV3 route is keyboard-based:
-
-1. Open EtherCAT from the project tree unit configuration branch.
-2. Choose manual setting.
-3. In the device tree, expand `KEYENCE CORPORATION -> Servo Drives`.
-4. Select the `SV3` leaf item.
-5. Press `Enter` to add the device. Do not use drag/drop for this route.
-6. Click the EtherCAT setting window `OK`.
-7. Confirm the Universal Library import dialog for `KEYENCE_SV3`.
-8. For the batch axis registration prompt, choose according to `-BatchAxisRegistration`; the validated default is `No`.
-9. Save the project and verify with `Ctrl+F9`, then copy the conversion result with `scripts\mvp\copy_convert_result_from_tree_handle.ps1`.
+单设备入口：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configure_kv_ethercat_device.ps1" `
@@ -626,43 +463,68 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\configur
   -OutDir (Join-Path $WorkRoot 'kv_network_config_runs')
 ```
 
-Current same-run validation evidence for this script is:
+正确路线：
 
-- `C:\Users\Public\KVSkillPractice\ethercat_ethernet_kvstudio_script_20260529\entry_probe\ec_enter_config_20260530_121616\20260530_121647_771_configure_kv_ethercat_device.json`
-- `C:\Users\Public\KVSkillPractice\ethercat_ethernet_kvstudio_script_20260529\entry_probe\ec_enter_copy_result_20260530_121811\result.json`
-- Non-SV3 registered-ESI evidence: `C:\Users\Public\KVSkillPractice\ethercat_ethernet_kvstudio_script_20260529\entry_probe\beckhoff_enter_config_20260530_122537\20260530_122608_138_configure_kv_ethercat_device.json` and `C:\Users\Public\KVSkillPractice\ethercat_ethernet_kvstudio_script_20260529\entry_probe\beckhoff_enter_copy_result_20260530_122642\result.json`
-- `network_config.json` dispatcher evidence: `C:\Users\Public\KVSkillPractice\ethercat_ethernet_kvstudio_script_20260529\entry_probe\network_config_beckhoff_run_20260530_124738\configure_kv_network_from_config_result.json` and `C:\Users\Public\KVSkillPractice\ethercat_ethernet_kvstudio_script_20260529\entry_probe\network_config_beckhoff_copy_result_20260530_124850\result.json`
+```text
+单元配置 -> [0] KV-X310 -> EtherCAT -> 手动设定
+```
 
-The script is parameterized with `-DevicePath`. Stable evidence currently covers KEYENCE SV3 and a registered Beckhoff BK1120 EtherCAT Fieldbus coupler from the Beckhoff ESI sample. Do not claim automatic ESI registration support until a clean-project run registers the ESI file, adds the device, saves, and passes `Ctrl+F9` with copied conversion text.
+SV3 验证路线：
 
-Stable existing-project MNM export:
+1. 进入 EtherCAT 手动设定。
+2. 展开 `KEYENCE CORPORATION -> Servo Drives`。
+3. 选中 `SV3`。
+4. 按 `Enter` 添加设备；不要拖拽。
+5. 确认 EtherCAT 设置窗口。
+6. 确认 Universal Library 导入 `KEYENCE_SV3`。
+7. 根据 `-BatchAxisRegistration` 处理批量轴注册；默认验证值是 `No`。
+8. 保存并用 `Ctrl+F9` 验证。
+
+`ethercat.devices[].esi_path` 目前故意拒绝并返回 `KV_ETHERCAT_ESI_REGISTRATION_UNSTABLE`。自动 ESI 注册在干净项目中未形成稳定证据前，不要声称支持。
+
+## MNM 导出稳定路线
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\mvp\export_mnm_project_copy_default_folder.ps1" `
+powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\workflows\export_mnm_project_copy_default_folder.ps1" `
   -ProjectPath '<project.kpr>' `
   -ExportDir '<out>\exported_mnm' `
   -OutDir '<out>\export_mnm_project_copy' `
   -WorkRoot '<out>\exported_mnm\_kv_export_workspace'
 ```
 
-Export route: keep `WorkRoot` inside `ExportDir` by default, copy the source project directory to `WorkRoot`, remove `.mnm` files from the copy, open the copied `.kpr`, guarded `Alt+F`, `R`, `S`, confirm the export option dialog, accept the Browse Folder default selected project directory inside the file framework, then copy same-run `.mnm` files from the copied project directory to `ExportDir`. Success requires `export_mnm_project_copy_result.json.ok=true`, `actual_kv_export_dir` under `ExportDir`, and same-run `.mnm` files under `ExportDir`. Do not use `export_mnm_guarded.ps1` as the stable export entry for project replication.
+路线：
 
-## Project Replication Inventory
+```yaml
+export_route:
+  - keep_WorkRoot_inside_ExportDir
+  - copy_source_project_directory_to_WorkRoot
+  - remove_old_mnm_files_from_copy
+  - open_copied_kpr
+  - Alt+F
+  - R
+  - S
+  - confirm_export_option_dialog
+  - accept_Browse_Folder_default_project_directory
+  - copy_same_run_mnm_files_to_ExportDir
+success:
+  - export_mnm_project_copy_result.json.ok == true
+  - actual_kv_export_dir under ExportDir
+  - same_run_mnm_files under ExportDir
+  - core postcheck_kvstudio_ui_safe.json.ok == true
+```
 
-1:1 project replication is configuration-first, not MNM-only.
+不要用 `BFFM_SETSELECTIONW` 选择任意文件夹；已验证会不稳定。通过把项目副本放进 `ExportDir` 框架并接受默认选择来控制导出位置。
+下游 MNM 解析脚本必须忽略 `ExportDir\_kv_export_workspace`，只把顶层导出 MNM 当作用户源码输入。
+
+## 1:1 项目复刻 Inventory
 
 ```yaml
 source_assets_required:
-  plc_units:
-    evidence: [WsTreeEnv.xml, UnitSet_string_evidence, ui_probe_if_needed]
-  ethercat:
-    evidence: [WsTreeEnv.xml_nodes, registered_device_or_esi_origin, mapping_parameter_probe]
-  ethernet_ip:
-    evidence: [WsTreeEnv.xml_nodes, local_eds_xml, node_ip_variable_probe]
-  motion_axis:
-    evidence: [WsTreeEnv.xml_axis_names, axis_setting_probe]
-  mnm:
-    evidence: [fresh_export, official_fb_filter]
+  plc_units: [WsTreeEnv.xml, UnitSet_string_evidence, ui_probe_if_needed]
+  ethercat: [WsTreeEnv.xml_nodes, registered_device_or_esi_origin, mapping_parameter_probe]
+  ethernet_ip: [WsTreeEnv.xml_nodes, local_eds_xml, node_ip_variable_probe]
+  motion_axis: [WsTreeEnv.xml_axis_names, axis_setting_probe]
+  mnm: [fresh_export, official_fb_filter]
 import_order:
   - create_clean_project_matching_cpu
   - configure_plc_units
@@ -674,7 +536,7 @@ import_order:
   - ctrl_f9_and_compare_inventory
 ```
 
-Use the read-only extractor before attempting a clone import:
+只做 MNM 导入不是 1:1 复刻。先导出 inventory：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\export_kv_project_inventory.ps1" `
@@ -683,66 +545,40 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$SkillRoot\scripts\export_k
   -OutDir '<run>\source_assets'
 ```
 
-`project_inventory.json` is a checkpoint. If `clone_readiness.ready_for_full_1_to_1_import=false`, do not start a full clone import. Open missing categories as small UI breakthrough tasks. Known missing categories include detailed axis settings, EtherCAT mapping/parameters, and EtherNet/IP IP/variable details.
+如果 `project_inventory.json.clone_readiness.ready_for_full_1_to_1_import=false`，不要开始完整复刻；把缺失类别拆成小 UI 突破任务。
 
-Do not feed recursive filters with an MNM export directory that contains `_kv_export_workspace`; use a top-level-only MNM directory or an orchestration wrapper that excludes the internal workspace.
+## 结果合同
 
-Child scripts under `scripts\mvp\` are runner-owned. Call them directly only when diagnosing a failed runner step.
-
-All global keyboard, mouse, menu accelerator, and paste operations must be implemented through `scripts\mvp\kv_ui_guard.ps1`. Read `references\ui-guard-contract.md` only when modifying or diagnosing UI guard behavior.
-
-When KV STUDIO is open, agent reasoning is outside the control loop. The runner must carry all ordered steps, waits, focus checks, recovery hypotheses, and stop conditions. Agent verification resumes only after the runner exits and writes result artifacts.
-
-## Result Contract
-
-Primary result:
-
-```text
-<OutRoot>\<ProjectName>\mvp_result.json
+```yaml
+success_requires:
+  mvp:
+    - mvp_result.json.ok == true
+    - mvp_result.json.compile_result_contains_ok == true
+    - same_run_copy_result_exists
+    - variable_sets_exact_TSV_paths_recorded
+  repeat:
+    - repeat_result.json.ok == true
+    - consecutive_passes >= 3
+  existing_project_update:
+    - repair_result.json.ok == true
+    - source_snapshot_gate.ok == true
+    - project_fingerprint_matches_current_gate
 ```
 
-Report success only when:
+失败时停止并报告：
 
-- `mvp_result.json.ok` is `true`.
-- `mvp_result.json.compile_result_contains_ok` is `true`.
-- `artifacts\module_placement\*.json` shows expected module category.
-- `artifacts\set_variables\variable_persistence_validation.json` exists and reports success. In fast mode, local persistence is accepted through the variable script plus compile gate; close/reopen/copy evidence is required only when `set_variables_guarded.ps1 -AuditPersistence` is used.
-- `mvp_result.json.variable_sets[]` lists each MNM entry's exact global/local TSV paths used in the run.
-- `mvp_result.json.baseline_source_snapshot.source_snapshot_manifest` points to a reusable source snapshot for future updates when the project fingerprint still matches.
-- `mvp_result.json.agent_boundary_contract_path` points to the same-run agent-boundary contract.
-- `artifacts\copy_result\compile_result_copied.txt` was written in the current run.
+- 稳定 error code。
+- 当前 step。
+- evidence path。
+- 下一步具体修复动作。
 
-Report repeatable MVP success only when `run_kv_mvp_repeat.ps1` writes `repeat_result.json.ok=true` and `repeat_result.json.consecutive_passes` is at least `3`. A failed attempt resets the consecutive pass counter to `0`; do not count non-consecutive passes. If the same failure signature appears three times, the repeat runner stops for route review.
+常见 gate code 保持英文，例如 `KV_CHECKLIST_MISSING`、`KV_SOURCE_SNAPSHOT_STALE`、`KV_MNM_SAME_NAME_IMPORT_REQUIRES_PREDELETE`、`KV_VARIABLE_PASTE_NOT_PERSISTED`。
 
-Report existing-project update success only when `repair_result.json.ok=true`, `repair_result.json.source_snapshot_gate.ok=true`, and `repair_result.json.source_snapshot_gate.project_fingerprint.hash` matches the current project snapshot gate result. If the snapshot gate is missing from the repair result, the update is not accepted.
+## 参考
 
-For artifact layout and JSON fields, read `references\mvp-runner-contract.md`.
-
-## Failure Reporting
-
-If a command exits nonzero, stop and report:
-
-- Stable error code from stderr or result JSON.
-- Current step.
-- Evidence path.
-- Next concrete repair action.
-
-Common gate codes:
-
-- `KV_CHECKLIST_MISSING`, `KV_CHECKLIST_EMPTY`, `KV_CHECKLIST_INVALID`
-- `KV_SCAFFOLD_REQUIRED_FILE_MISSING`, `KV_SCAFFOLD_TSV_SCHEMA_INVALID`, `KV_SCAFFOLD_MNM_MODULE_TYPE_MISMATCH`
-- `KV_SCAFFOLD_NETWORK_CONFIG_MISSING`, `KV_SCAFFOLD_NETWORK_CONFIG_INVALID_JSON`, `KV_SCAFFOLD_NETWORK_CONFIG_LEAK`
-- `KV_SCAFFOLD_MODULE_CATEGORY_UNSUPPORTED`, `KV_SCAFFOLD_MODULE_CATEGORY_MISMATCH`, `KV_SCAFFOLD_MODULE_CATEGORY_SUPPORT_INCOMPLETE`
-- `KV_UIA_OPERATION_TIMEOUT`, `KV_CREATE_PROJECT_DIALOG_MISSING`
-- `KV_SOURCE_SNAPSHOT_MANIFEST_MISSING`, `KV_SOURCE_SNAPSHOT_NOT_READY`, `KV_SOURCE_SNAPSHOT_STALE`, `KV_SOURCE_SNAPSHOT_MNM_EMPTY`, `KV_SOURCE_SNAPSHOT_VARIABLES_EMPTY`, `KV_SOURCE_SNAPSHOT_VARIABLES_STUB`, `KV_UPDATE_ARCHITECTURE_FILE_MISSING`
-- `KV_MNM_SAME_NAME_IMPORT_REQUIRES_PREDELETE`, `KV_MNM_INCOMING_DUPLICATE_MODULE_NAME`
-- `KV_VARIABLE_DATA_TYPE_UNSUPPORTED`, `KV_VARIABLE_TSV_SCHEMA_INVALID`, `KV_VARIABLE_NAME_SOFT_DEVICE_CONFLICT`, `KV_VARIABLE_LOCAL_OWNER_MISSING`, `KV_VARIABLE_LOCAL_OWNER_MISMATCH`
-- `KV_UI_GUARD_STATIC_VIOLATION`
-- `KV_FOCUS_LOST`, `KV_FOCUS_LOST_TERMINAL`, `KV_MODAL_PRESENT`
-- `KV_VARIABLE_PASTE_NOT_PERSISTED`
-
-## References
-
-- `references\ui-guard-contract.md`: read when changing or diagnosing guarded UI input.
-- `references\mvp-runner-contract.md`: read when interpreting runner artifacts or result schema.
-- `references\variable-editor.md`: read when changing variable TSV schema or diagnosing variable editor paste.
+```yaml
+references:
+  ui-guard-contract.md: 修改或诊断 guarded UI input 时读取
+  mvp-runner-contract.md: 解释 runner artifact/result schema 时读取
+  variable-editor.md: 修改变量 TSV schema 或诊断变量编辑器粘贴时读取
+```
