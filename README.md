@@ -1,102 +1,101 @@
 ﻿# KeyenceAgent
 
 <p align="center">
-  <img src="docs/images/keyenceagent-harness-overview.png" alt="KeyenceAgent architecture overview">
+  <img src="docs/images/keyenceagent-harness-overview.png" alt="KeyenceAgent 架构概览">
 </p>
 
 <p align="center">
-  <a href="https://github.com/xxrust/KeyenceAgent/commits/master"><img alt="Last commit" src="https://img.shields.io/github/last-commit/xxrust/KeyenceAgent?style=flat-square&logo=git"></a>
-  <a href="https://github.com/xxrust/KeyenceAgent"><img alt="Repository size" src="https://img.shields.io/github/repo-size/xxrust/KeyenceAgent?style=flat-square"></a>
+  <a href="https://github.com/xxrust/KeyenceAgent/commits/master"><img alt="最近提交" src="https://img.shields.io/github/last-commit/xxrust/KeyenceAgent?style=flat-square&logo=git"></a>
+  <a href="https://github.com/xxrust/KeyenceAgent"><img alt="仓库大小" src="https://img.shields.io/github/repo-size/xxrust/KeyenceAgent?style=flat-square"></a>
   <img alt="PowerShell" src="https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?style=flat-square&logo=powershell&logoColor=white">
-  <img alt="KV STUDIO" src="https://img.shields.io/badge/KV%20STUDIO-script--owned-008C95?style=flat-square">
-  <img alt="MVP" src="https://img.shields.io/badge/MVP-3x%20repeat%20passed-22A06B?style=flat-square">
-  <img alt="UI guard" src="https://img.shields.io/badge/UI%20guard-shared%20library-0B5FFF?style=flat-square">
+  <img alt="KV STUDIO" src="https://img.shields.io/badge/KV%20STUDIO-%E8%84%9A%E6%9C%AC%E6%89%98%E7%AE%A1-008C95?style=flat-square">
+  <img alt="MVP" src="https://img.shields.io/badge/MVP-3%E6%AC%A1%E8%BF%9E%E7%BB%AD%E9%80%9A%E8%BF%87-22A06B?style=flat-square">
+  <img alt="UI guard" src="https://img.shields.io/badge/UI%E9%97%A8%E7%A6%81-%E5%85%B1%E4%BA%AB%E5%BA%93-0B5FFF?style=flat-square">
 </p>
 
 <p align="center">
-  <a href="README.md"><img alt="English" src="https://img.shields.io/badge/English-0B5FFF?style=for-the-badge"></a>
-  <a href="README.zh-CN.md"><img alt="Chinese" src="https://img.shields.io/badge/%E4%B8%AD%E6%96%87-008C95?style=for-the-badge"></a>
-  <a href="README.ja.md"><img alt="Japanese" src="https://img.shields.io/badge/%E6%97%A5%E6%9C%AC%E8%AA%9E-22A06B?style=for-the-badge"></a>
+  <a href="README.md"><img alt="中文" src="https://img.shields.io/badge/%E4%B8%AD%E6%96%87-008C95?style=for-the-badge"></a>
+  <a href="README.ja.md"><img alt="日本語" src="https://img.shields.io/badge/%E6%97%A5%E6%9C%AC%E8%AA%9E-22A06B?style=for-the-badge"></a>
 </p>
 
-KeyenceAgent is a script-owned harness for creating, updating, and validating KEYENCE KV STUDIO PLC projects with agent assistance.
+KeyenceAgent 是面向 KEYENCE KV STUDIO 的脚本托管执行框架，用于在智能体参与下创建、更新和验证 PLC 项目。
 
-The agent prepares intent and checks evidence. The runner owns every KV STUDIO UI action from project creation through compile-result capture.
+智能体负责准备意图和验收证据。KV STUDIO 打开之后，从创建项目到捕获编译结果，全部由 runner 脚本执行。
 
-Validated target environment:
+已验证目标环境：
 
 - Windows 10
 - Windows 11
 - KEYENCE KV STUDIO KVS12
 
-KV STUDIO is Windows-only. KVS12 is the documented and tested target for this repository; other KV STUDIO versions may work, but they are outside the current validation contract.
+KV STUDIO 本身只适用于 Windows。本仓库以 KVS12 作为说明和测试边界；其他 KV STUDIO 版本可能可用，但不在当前验证承诺内。
 
-The deployable Codex skill is the single package `keyence-kv-studio/`. Its `SKILL.md` is the only KV STUDIO skill entry; programming, knowledge-base, and desktop-operation material lives inside that package under `references/` and `scripts/`.
+对外部署的 Codex skill 是单个打包目录 `keyence-kv-studio/`。它的 `SKILL.md` 是唯一的 KV STUDIO skill 入口；编程、知识库和桌面操作资料都在该目录的 `references/` 与 `scripts/` 内。
 
-## Architecture
+## 架构
 
-KeyenceAgent separates reasoning, execution, and verification into explicit boundaries.
+KeyenceAgent 把推理、执行和验收分成明确边界。
 
 ```text
-Task request
-  -> scaffold model
-  -> scaffold renderer
-  -> static gates
-  -> guarded KV runner
-  -> same-run artifacts
-  -> agent verification
+任务请求
+  -> 脚手架模型
+  -> 脚手架渲染器
+  -> 静态门禁
+  -> 受保护 KV runner
+  -> 同次运行 artifacts
+  -> 智能体验收
 ```
 
-| Layer | Responsibility | Main artifacts |
+| 层级 | 职责 | 主要产物 |
 | --- | --- | --- |
-| Scaffold model | Describes modules, MNM sources, variables, FB arguments, project metadata, and acceptance notes. | `scaffold.model.json`, `TASK.md`, `VERSION.md` |
-| Renderer | Converts structured model data into KV STUDIO adapter files. | `modules/<module>/*.mnm`, `modules/<module>/*.tsv`, `scaffold.json` |
-| Static gates | Reject unsafe or incomplete input before KV STUDIO opens. | checklist, variable validation, import plan, scaffold validation |
-| Guarded runner | Creates or opens the project, imports MNM, writes variables, writes FB arguments, compiles, and captures result text. | `mvp_result.json`, `repair_result.json`, `artifacts/` |
-| Route governance | Records the active route and prevents uncontrolled switching between keyboard, UIA, mouse, and script strategies. | `route-state.json` |
+| 脚手架模型 | 描述模块、MNM 源、变量、功能块自变量、项目元数据和验收说明。 | `scaffold.model.json`、`TASK.md`、`VERSION.md` |
+| 渲染器 | 把结构化模型转换为 KV STUDIO 可导入文件。 | `modules/<module>/*.mnm`、`modules/<module>/*.tsv`、`scaffold.json` |
+| 静态门禁 | 在 KV STUDIO 打开前拒绝危险或不完整输入。 | checklist、变量验证、导入计划、脚手架验证 |
+| 受保护 runner | 创建或打开项目、导入 MNM、写入变量、写入功能块自变量、编译并捕获结果文本。 | `mvp_result.json`、`repair_result.json`、`artifacts/` |
+| 路线治理 | 记录当前执行路线，防止在键盘、UIA、鼠标和脚本策略之间无证据切换。 | `route-state.json` |
 
-## Core Mechanism
+## 核心机制
 
-KeyenceAgent uses a hard execution contract.
+KeyenceAgent 使用硬执行协议。
 
-| Phase | Owner | Contract |
+| 阶段 | 责任方 | 协议 |
 | --- | --- | --- |
-| Before KV STUDIO opens | Agent | Edit scaffold files, run validation gates, then launch one runner command. |
-| While KV STUDIO is open | Scripts | Use shared guarded UI actions for focus checks, keyboard input, mouse input, paste, modal detection, and recovery boundaries. |
-| After runner exits | Agent | Read only same-run artifacts and decide the next change from result JSON and copied KV STUDIO text. |
+| KV STUDIO 打开前 | 智能体 | 编辑脚手架文件，运行验证门禁，然后启动一个 runner 命令。 |
+| KV STUDIO 打开期间 | 脚本 | 通过共享 UI guard 执行焦点检查、键盘、鼠标、粘贴、弹窗识别和失败边界控制。 |
+| runner 退出后 | 智能体 | 只读取同次运行 artifacts，并根据结果 JSON 与 KV STUDIO 文本决定下一次修改。 |
 
-This contract prevents the main failure mode of desktop IDE automation: an agent watching a live UI, improvising actions, and misattributing stale errors to the latest operation.
+这个协议控制桌面 IDE 自动化的主要失败模式：智能体一边观察实时 UI，一边临时操作，一边把旧错误错误归因到新动作。
 
-## Current Capabilities
+## 当前能力
 
-| Capability | Status |
+| 能力 | 状态 |
 | --- | --- |
-| Fresh project creation | Verified through repeat runner. |
-| Multi-MNM import | Supports multiple modules with per-module variable files. |
-| Global and local variable reconstruction | Validated before paste and checked through runner evidence. |
-| Existing-project update flow | Uses snapshot and import-plan gates before modifying a `.kpr`. |
-| Compile result capture | Extracts result-tree text into `compile_result_copied.txt`; clipboard mirroring is optional evidence. |
-| Function block creation | Imports `MODULE_TYPE:2` MNM files as user function blocks. |
-| Function block argument table | Writes the required argument columns through guarded runner operation. |
-| Function block instance and call path | Verified in a compile-passing smooth-filter project. |
-| Standby module import | Verified through `category=standby`; the runner selects `后备模块` in KV STUDIO's program-kind dialog. |
-| Repeatability gate | Requires consecutive passing runs; the latest FB MVP passed three consecutive attempts. |
+| 新建项目 | 已通过 repeat runner 验证。 |
+| 多 MNM 导入 | 支持多模块，并使用每个模块独立的变量文件。 |
+| 全局与局部变量重建 | 粘贴前验证，粘贴后通过 runner 证据验收。 |
+| 已有项目更新 | 修改 `.kpr` 前使用快照门禁和导入计划门禁。 |
+| 编译结果捕获 | 从结果树提取文本写入 `compile_result_copied.txt`，剪贴板只是可选镜像证据。 |
+| 功能块创建 | `MODULE_TYPE:2` 的 MNM 可导入为用户功能块。 |
+| 功能块自变量表 | 已通过受保护 runner 写入必需列。 |
+| 功能块实例和调用链路 | 已在可编译通过的平滑滤波功能块项目中验证。 |
+| 后备模块导入 | 已通过 `category=standby` 验证；runner 在 KV STUDIO 的“选择程序种类”窗口选择“后备模块”。 |
+| 重复性门禁 | 要求连续成功；最新 FB MVP 已连续 3 次通过。 |
 
-## Runner Workflow
+## Runner 流程
 
 <p align="center">
-  <img src="docs/images/kv-repair-loop.png" alt="Deterministic KV STUDIO runner loop">
+  <img src="docs/images/kv-repair-loop.png" alt="确定性 KV STUDIO runner 闭环">
 </p>
 
-1. Build or update a scaffold model.
-2. Render MNM and variable adapter files.
-3. Run static gates before KV STUDIO opens.
-4. Run `run_kv_mvp_scaffold.ps1` for a fresh project or `run_kv_mvp_repair_existing_project.ps1` for an existing project.
-5. Stop at the first failed child step and inspect the same-run artifact directory.
-6. Accept success only from result JSON plus copied compile text.
-7. Prove stability with `run_kv_mvp_repeat.ps1`.
+1. 创建或更新脚手架模型。
+2. 渲染 MNM 和变量适配文件。
+3. 在 KV STUDIO 打开前运行静态门禁。
+4. 新项目运行 `run_kv_mvp_scaffold.ps1`，已有项目运行 `run_kv_mvp_repair_existing_project.ps1`。
+5. 子步骤第一次失败时停止，并检查同次 artifact 目录。
+6. 只用结果 JSON 和编译结果文本判定成功。
+7. 使用 `run_kv_mvp_repeat.ps1` 证明稳定性。
 
-## Repository Layout
+## 仓库结构
 
 ```text
 .
@@ -115,23 +114,23 @@ This contract prevents the main failure mode of desktop IDE automation: an agent
 `-- route-governance/
 ```
 
-## Windows Deployment
+## Windows 本机部署
 
-Deploy the repository as a text-first harness on the Windows machine that runs KV STUDIO. This can be a physical Windows PC or a Windows VM.
+KeyenceAgent 在运行 KV STUDIO 的 Windows 机器上作为文本化 harness 部署；这台机器可以是物理 Windows 电脑，也可以是 Windows 虚拟机。
 
-For KV STUDIO work, install or copy the single packaged skill `keyence-kv-studio/`.
+KV STUDIO 相关工作安装或复制单个打包 skill `keyence-kv-studio/` 即可。
 
-Copy or clone these runtime folders:
+需要拷贝或克隆这些运行目录：
 
-| Folder | Required | Purpose |
+| 目录 | 是否必须 | 作用 |
 | --- | --- | --- |
-| `keyence-kv-studio/` | Yes | Single deployable KV STUDIO package with routing, references, scripts, and sample assets. |
-| `agent-harness-project-standard/` | Recommended | Harness rules for agent-owned preparation, script-owned execution, and artifact-owned verification. |
-| `route-governance/` | Recommended | Route-change discipline for fragile UI automation and repeated-failure review. |
-| `llm-wiki-v2-keyence/` | Required for programming evidence | Local Wiki V2 database and query script. It may stay under KEYENCE `htmlhelp` or be copied beside the harness if the config points to it. |
-| `docs/` and `README*.md` | Recommended | Human deployment and architecture documentation. |
+| `keyence-kv-studio/` | 必须 | KV STUDIO 路由、references、scripts 和样例 assets 的单一发布包。 |
+| `agent-harness-project-standard/` | 建议 | agent 准备、脚本执行、artifact 验收的 harness 标准。 |
+| `route-governance/` | 建议 | 脆弱 UI 自动化和重复失败复盘中的路线变更约束。 |
+| `llm-wiki-v2-keyence/` | 编程依据必需 | 本地 Wiki V2 数据库和查询脚本。它可以保留在 KEYENCE `htmlhelp` 下，也可以拷贝到 harness 旁边，只要配置文件指向实际路径。 |
+| `docs/` 与 `README*.md` | 建议 | 人类部署说明和架构文档。 |
 
-The safe default is to copy the whole repository to the target Windows machine, for example:
+最稳妥的部署方式是直接复制或克隆整个仓库：
 
 ```powershell
 git clone https://github.com/xxrust/KeyenceAgent.git "$env:USERPROFILE\KeyenceAgent"
@@ -139,9 +138,9 @@ cd "$env:USERPROFILE\KeyenceAgent"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1
 ```
 
-`setup_keyence_agent.ps1` is a non-AI interactive setup script. It asks command-line questions and installs the packaged `keyence-kv-studio` skill, writes KV STUDIO paths, writes the work root, writes Wiki V2 knowledge-base paths, records the default administrator user name, and stores the administrator credential with DPAPI.
+`setup_keyence_agent.ps1` 是非 AI 交互式配置脚本。它会通过命令行问答完成 `keyence-kv-studio` 打包 skill 安装、KV STUDIO 路径、工作目录、Wiki V2 知识库路径、默认管理员账号和 DPAPI 凭据写入。
 
-Useful setup modes:
+常用安装模式：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1 -h
@@ -150,26 +149,26 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1 -C
 powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1 -Configure kvs_exe,wiki_root
 ```
 
-`-Status` reports which items are configured or missing. `-Configure` accepts `all`, `skills`, `config`, `kvs_exe`, `work_root`, `wiki_root`, `admin_user`, `credential`, and `advanced`. The script detects Chinese/Japanese/English UI culture; command prompts are kept ASCII-safe for Windows PowerShell compatibility, with localized instructions in `README.zh-CN.md` and `README.ja.md`.
+`-Status` 会报告哪些项目已配置、哪些项目缺失。`-Configure` 支持 `all`、`skills`、`config`、`kvs_exe`、`work_root`、`wiki_root`、`admin_user`、`credential`、`advanced`。脚本会检测中/日/英系统语言；为了兼容 Windows PowerShell，命令行提示保持 ASCII-safe，中文说明写在本文档中。
 
-The runner writes disposable projects and evidence under `%LOCALAPPDATA%\KeyenceAgent\Work` by default. Keep that directory outside the repository so generated `.kpr` projects, screenshots, logs, and compile artifacts are not committed.
+runner 默认把一次性项目和证据写到 `%LOCALAPPDATA%\KeyenceAgent\Work`。这个目录应放在仓库外，避免把 `.kpr`、截图、日志和编译 artifacts 提交进 git。
 
-## Local Configuration
+## 本机配置
 
-Create one non-secret config file per Windows user. Start from:
+每个 Windows 用户需要一个本机配置文件。模板在：
 
 ```text
 keyence-kv-studio\scripts\kv-studio-operator\config\kv-studio-operator.example.json
 ```
 
-Place the local copy at either path:
+本机配置文件放在以下任一路径：
 
 ```text
 %APPDATA%\Codex\kv-studio-operator\config.json
 keyence-kv-studio\scripts\kv-studio-operator\config\kv-studio-operator.local.json
 ```
 
-The normal config stores only machine-specific roots. Derived paths are resolved by scripts:
+普通配置只保存机器相关根路径。派生路径由脚本解析：
 
 ```json
 {
@@ -181,17 +180,17 @@ The normal config stores only machine-specific roots. Derived paths are resolved
 }
 ```
 
-`work_root` derives `mvp_runs`, `mvp_repair_runs`, and `mvp_repeat_runs`. `wiki_root` derives `wiki.v2.cleaned.db` and `scripts\wiki_query.py`. Advanced fields such as `timeout_seconds`, `local_paste_format`, `mvp_out_root`, `repair_out_root`, `repeat_out_root`, `wiki_cleaned_db` and `wiki_query_script` remain supported as explicit overrides, but the setup flow does not ask for them by default.
+`work_root` 会派生 `mvp_runs`、`mvp_repair_runs` 和 `mvp_repeat_runs`。`wiki_root` 会派生 `wiki.v2.cleaned.db` 和 `scripts\wiki_query.py`。`timeout_seconds`、`local_paste_format`、`mvp_out_root`、`repair_out_root`、`repeat_out_root`、`wiki_cleaned_db`、`wiki_query_script` 等高级字段仍可作为显式覆盖，但安装流程默认不询问这些字段。
 
-For `Local config file path or directory`, press Enter for the default file or enter a directory such as `$env:LOCALAPPDATA\KeyenceAgent\Config`; setup will write `config.json` in that directory.
+`Local config file path or directory` 可以直接回车使用默认配置文件，也可以输入目录，例如 `$env:LOCALAPPDATA\KeyenceAgent\Config`；安装脚本会在该目录写入 `config.json`。
 
-Do not store KV STUDIO administrator passwords in JSON. During setup, `setup_keyence_agent.ps1` automatically uses `%APPDATA%\Codex\kv-studio-operator\credentials.xml`, asks for the KV STUDIO administrator user name and password, creates the directory/file, and stores the credential with Windows DPAPI. New users should leave the credential file path alone. You can also run the credential writer directly:
+不要把 KV STUDIO 管理员密码写入 JSON。安装时，`setup_keyence_agent.ps1` 会自动使用 `%APPDATA%\Codex\kv-studio-operator\credentials.xml`，只要求用户输入 KV STUDIO 管理员账号和密码，并自动创建目录/文件，再用 Windows DPAPI 保存凭据。新用户不需要填写凭据文件路径。也可以单独运行：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\KeyenceAgent\keyence-kv-studio\scripts\kv-studio-operator\set_kv_admin_credential.ps1"
 ```
 
-Runner commands can use the config automatically from `%APPDATA%`, or explicitly:
+runner 会自动读取 `%APPDATA%` 下的配置，也可以显式传入：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\KeyenceAgent\keyence-kv-studio\scripts\kv-studio-operator\run_kv_mvp_scaffold.ps1" `
@@ -199,43 +198,43 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\KeyenceAge
   -ScaffoldRoot "$env:LOCALAPPDATA\KeyenceAgent\Work\scaffolds\example"
 ```
 
-Knowledge-base queries use the same config automatically:
+知识库查询也自动读取同一份配置：
 
 ```powershell
-python "$env:USERPROFILE\KeyenceAgent\keyence-kv-studio\scripts\kv-studio-kb-programming\query_keyence_kb.py" "ST assignment" --limit 5 --evidence
+python "$env:USERPROFILE\KeyenceAgent\keyence-kv-studio\scripts\kv-studio-kb-programming\query_keyence_kb.py" "ST 赋值语句" --limit 5 --evidence
 ```
 
-Override order for Wiki paths is: command-line `--db/--query-script`, `KEYENCE_WIKI_*` environment variables, shared KeyenceAgent config, then built-in defaults.
+Wiki 路径优先级是：命令行 `--db/--query-script`、`KEYENCE_WIKI_*` 环境变量、共享 KeyenceAgent 配置、脚本内置默认路径。
 
-## Key Scripts
+## 关键脚本
 
-| Script | Purpose |
+| 脚本 | 用途 |
 | --- | --- |
-| `setup_keyence_agent.ps1` | One-command local setup after clone: installs skills, writes local config, stores DPAPI credential, and sets config-path environment variables. |
-| `keyence-kv-studio/scripts/kv-studio-operator/Import-KvStudioOperatorConfig.ps1` | Loads local KV STUDIO path, output roots, timeout, and credential file path. |
-| `keyence-kv-studio/scripts/kv-studio-operator/render_kv_mvp_scaffold_model.ps1` | Renders structured project models into per-module MNM and variable files. |
-| `keyence-kv-studio/scripts/kv-studio-operator/validate_kv_mvp_scaffold.ps1` | Validates checklist, schema, module type, variables, FB declarations, and scaffold consistency. |
-| `keyence-kv-studio/scripts/kv-studio-operator/assert_kv_mnm_import_plan.ps1` | Blocks same-name MNM imports unless pre-delete is explicitly planned. |
-| `keyence-kv-studio/scripts/kv-studio-operator/run_kv_mvp_scaffold.ps1` | Creates a fresh KV STUDIO project and runs the full MVP path. |
-| `keyence-kv-studio/scripts/kv-studio-operator/run_kv_mvp_repair_existing_project.ps1` | Applies a scaffold update to an existing project with snapshot gating. |
-| `keyence-kv-studio/scripts/kv-studio-operator/run_kv_mvp_repeat.ps1` | Requires consecutive successful full runs. |
-| `keyence-kv-studio/scripts/kv-studio-operator/guards/kv_ui_guard.ps1` | Shared focus, modal, keyboard, mouse, and clipboard guard library for all KV UI scripts. |
+| `setup_keyence_agent.ps1` | clone 后的一键本机配置入口：安装 skills、生成本机 config、保存 DPAPI 凭据、设置配置路径环境变量。 |
+| `keyence-kv-studio/scripts/kv-studio-operator/Import-KvStudioOperatorConfig.ps1` | 读取本机 KV STUDIO 路径、输出目录、超时和凭据文件路径。 |
+| `keyence-kv-studio/scripts/kv-studio-operator/render_kv_mvp_scaffold_model.ps1` | 把结构化项目模型渲染为按模块分组的 MNM 与变量文件。 |
+| `keyence-kv-studio/scripts/kv-studio-operator/validate_kv_mvp_scaffold.ps1` | 验证 checklist、schema、模块类型、变量、功能块声明和脚手架一致性。 |
+| `keyence-kv-studio/scripts/kv-studio-operator/assert_kv_mnm_import_plan.ps1` | 同名 MNM 导入前要求明确预删除计划。 |
+| `keyence-kv-studio/scripts/kv-studio-operator/run_kv_mvp_scaffold.ps1` | 创建全新 KV STUDIO 项目并运行完整 MVP 路径。 |
+| `keyence-kv-studio/scripts/kv-studio-operator/run_kv_mvp_repair_existing_project.ps1` | 基于快照门禁把脚手架更新应用到已有项目。 |
+| `keyence-kv-studio/scripts/kv-studio-operator/run_kv_mvp_repeat.ps1` | 执行连续成功门禁。 |
+| `keyence-kv-studio/scripts/kv-studio-operator/guards/kv_ui_guard.ps1` | 所有 KV UI 子脚本共用的焦点、弹窗、键盘、鼠标和剪贴板保护库。 |
 
-## Validation Evidence
+## 验证证据
 
-The latest function-block MVP completed the full path:
+最新功能块 MVP 已完成完整链路：
 
 ```text
-FB MNM import
--> scan module MNM import
--> FB argument table paste
--> global/local variable paste
--> compile
--> result-tree text capture
--> baseline snapshot write
+功能块 MNM 导入
+-> 扫描模块 MNM 导入
+-> 功能块自变量表粘贴
+-> 全局/局部变量粘贴
+-> 编译
+-> 结果树文本捕获
+-> 基线快照写入
 ```
 
-Latest repeat gate:
+最新 repeat gate：
 
 ```text
 required_consecutive_passes: 3
@@ -244,33 +243,33 @@ consecutive_passes: 3
 status: pass
 ```
 
-The compile oracle is the same-run KV STUDIO result text:
+编译 oracle 是同次运行的 KV STUDIO 结果文本：
 
 ```text
-Conversion result OK
-error count: 0
-warning count: 0
+转换结果 OK
+错误数量: 0
+警告数量: 0
 ```
 
-## Design Principles
+## 设计原则
 
-| Principle | Meaning |
+| 原则 | 含义 |
 | --- | --- |
-| Harness first | A successful manual route becomes a script-owned harness before it becomes a skill claim. |
-| Checklist before UI | KV STUDIO scripts fail fast when the required checklist is missing. |
-| Same-run evidence | Old screenshots, logs, and project state are not success proof. |
-| Shared UI guard | Focus and modal handling live in one library instead of per-script patches. |
-| Fileized oracles | Compile and paste results are written as artifacts before the agent reasons about them. |
-| Route governance | Route changes require evidence about the failed mechanism and the new control. |
+| 先构建 harness | 手工成功路线必须变成脚本托管 harness，才能进入 skill 承诺。 |
+| UI 前置 checklist | 缺少 checklist 时 KV STUDIO 脚本直接失败。 |
+| 同次证据 | 旧截图、旧日志和旧项目状态不作为成功证明。 |
+| 共享 UI guard | 焦点和弹窗处理放在同一套库里，而不是每个脚本局部修补。 |
+| 文件化 oracle | 编译与粘贴结果先落成 artifacts，再由智能体推理。 |
+| 路线治理 | 路线变化必须说明失败机制和新控制手段。 |
 
-## Roadmap
+## 未来规划
 
-| Area | Planned work |
+| 方向 | 计划 |
 | --- | --- |
-| Function blocks | Expand FB argument support to comments and richer optional columns after format probes prove stable paste behavior. |
-| Existing projects | Complete stronger export/import snapshots for projects not created by the harness. |
-| Module categories | Standby modules are verified; interrupt programs remain gated until CPU-system interrupt settings and enable path are scripted. |
-| Function block composition | Cover nested FB instances, multiple call sites, and instance scope audits. |
-| Speed | Reduce unnecessary waits after each guarded step while keeping bounded failure behavior. |
-| Sub-agent validation | Require independent agents to complete the same MVP through the skill without live-UI reasoning. |
-| Documentation | Add architecture diagrams, failure taxonomy, and runner contract examples for new contributors. |
+| 功能块 | 在格式探针证明稳定后，扩展功能块自变量注释和更多可选列。 |
+| 已有项目 | 为非 harness 创建的项目建立更完整的导出/导入快照闭环。 |
+| 模块类别 | 后备模块已验证；中断程序仍需完成 CPU 系统中断设置与中断允许路径脚本化。 |
+| 功能块组合 | 覆盖嵌套 FB 实例、多调用点和实例作用域审计。 |
+| 速度 | 在保持 bounded 失败行为的前提下减少不必要等待。 |
+| 子智能体验证 | 要求独立子智能体只按 skill 调用 runner，完成同一 MVP 的连续成功。 |
+| 文档 | 增加架构图、失败分类和 runner contract 示例。 |
