@@ -1,0 +1,214 @@
+﻿{
+  "schema_version": 1,
+  "layout_policy": "role_directories",
+  "notes": [
+    "Scripts are physically separated by role.",
+    "Customer workflows compose runner children; they do not duplicate runner-child UI routes.",
+    "Customer-mode entrypoints are the manifest paths with customer_callable=true."
+  ],
+  "customer_entry_policy": {
+    "allowed_classes": [
+      "customer_workflow",
+      "regression_harness",
+      "customer_scaffold_tool",
+      "customer_non_ui_tool",
+      "gate"
+    ],
+    "internal_classes": [
+      "workflow_tool",
+      "runner_child_approved",
+      "runner_child_pending",
+      "guard_library",
+      "probe_research"
+    ],
+    "unlisted_root_scripts": "unclassified_until_added_to_manifest",
+    "project_configuration_without_customer_workflow": "ROUTE_RESEARCH_REQUIRED",
+    "requires_research_mode_patterns": [
+      "configure_kv_*.ps1",
+      "workflow_tools/*.ps1",
+      "runner_children/*.ps1",
+      "probes/*.ps1",
+      "guards/*.ps1",
+      "set_kv_admin_credential.ps1"
+    ]
+  },
+  "classes": {
+    "customer_scaffold_tool": [
+      {
+        "path": "scaffold_tools/new_kv_mvp_scaffold.ps1",
+        "status": "published",
+        "customer_callable": true
+      },
+      {
+        "path": "scaffold_tools/new_kv_mvp_multi_mnm_scaffold.ps1",
+        "status": "published",
+        "customer_callable": true
+      },
+      {
+        "path": "scaffold_tools/validate_kv_mvp_scaffold.ps1",
+        "status": "published",
+        "customer_callable": true
+      },
+      {
+        "path": "scaffold_tools/assert_kv_mnm_import_plan.ps1",
+        "status": "published",
+        "customer_callable": true
+      }
+    ],
+    "customer_non_ui_tool": [
+      {
+        "path": "render_kv_mvp_scaffold_model.ps1",
+        "status": "published",
+        "customer_callable": true
+      },
+      {
+        "path": "new_kv_existing_project_update_workspace.ps1",
+        "status": "published",
+        "customer_callable": true
+      },
+      {
+        "path": "assert_kv_existing_project_snapshot.ps1",
+        "status": "published",
+        "customer_callable": true
+      },
+      {
+        "path": "export_kv_project_inventory.ps1",
+        "status": "published",
+        "customer_callable": true
+      },
+      {
+        "path": "filter_kv_mnm_user_sources.ps1",
+        "status": "published",
+        "customer_callable": true
+      },
+      {
+        "path": "get_kv_ethernet_ip_device_members.ps1",
+        "status": "published",
+        "customer_callable": true
+      }
+    ],
+    "customer_workflow": [
+      {
+        "path": "workflows/run_kv_mvp_scaffold.ps1",
+        "status": "published",
+        "customer_callable": true
+      },
+      {
+        "path": "workflows/run_kv_mvp_repair_existing_project.ps1",
+        "status": "published",
+        "customer_callable": true
+      },
+      {
+        "path": "workflows/export_mnm_project_copy_default_folder.ps1",
+        "status": "published",
+        "customer_callable": true
+      }
+    ],
+    "regression_harness": [
+      {
+        "path": "harnesses/run_kv_mvp_repeat.ps1",
+        "status": "published",
+        "customer_callable": true
+      }
+    ],
+    "runner_child_approved": [
+      {
+        "path": "runner_children/create_project_local_guarded.ps1",
+        "status": "approved",
+        "customer_callable": false,
+        "ui_guard_required": true
+      },
+      {
+        "path": "runner_children/import_mnm_guarded.ps1",
+        "status": "approved",
+        "customer_callable": false,
+        "ui_guard_required": true
+      },
+      {
+        "path": "runner_children/set_variables_guarded.ps1",
+        "status": "approved",
+        "customer_callable": false,
+        "ui_guard_required": true
+      },
+      {
+        "path": "runner_children/compile_and_copy_result_bounded.ps1",
+        "status": "approved",
+        "customer_callable": false,
+        "ui_guard_required": true
+      },
+      {
+        "path": "runner_children/copy_convert_result_from_tree_handle.ps1",
+        "status": "approved",
+        "customer_callable": false,
+        "ui_guard_required": false
+      },
+      {
+        "path": "runner_children/export_mnm_browse_default_folder_guarded.ps1",
+        "status": "approved",
+        "customer_callable": false,
+        "ui_guard_required": true
+      }
+    ],
+    "runner_child_pending": [
+      {
+        "path": "runner_children/set_fb_arguments_guarded.ps1",
+        "status": "pending_validation",
+        "customer_callable": false,
+        "ui_guard_required": true
+      }
+    ],
+    "workflow_tool": [
+      {
+        "path": "workflow_tools/new_kv_mvp_execution_plan.ps1",
+        "status": "approved",
+        "customer_callable": false
+      },
+      {
+        "path": "workflow_tools/invoke_kv_flat_execution_plan.ps1",
+        "status": "approved",
+        "customer_callable": false
+      },
+      {
+        "path": "workflow_tools/assert_kv_module_placement.ps1",
+        "status": "approved",
+        "customer_callable": false
+      },
+      {
+        "path": "workflow_tools/new_kv_mnm_export_workspace.ps1",
+        "status": "approved",
+        "customer_callable": false
+      },
+      {
+        "path": "workflow_tools/collect_kv_mnm_export_workspace.ps1",
+        "status": "approved",
+        "customer_callable": false
+      }
+    ],
+    "guard_library": [
+      {
+        "path": "guards/kv_ui_guard.ps1",
+        "status": "library",
+        "customer_callable": false
+      }
+    ],
+    "probe_research": [
+      {
+        "path": "probes/probe_file_menu_coordinate.ps1",
+        "status": "research_only",
+        "customer_callable": false
+      }
+    ],
+    "gate": [
+      {
+        "path": "gates/assert_kv_mvp_agent_boundary.ps1",
+        "status": "gate",
+        "customer_callable": true
+      },
+      {
+        "path": "gates/assert_kv_mvp_ui_guard_usage.ps1",
+        "status": "gate",
+        "customer_callable": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WindowInfo xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+  <GlobalVariable>
+    <GroupFilters>
+      <Name>(Default)</Name>
+    </GroupFilters>
+  </GlobalVariable>
+  <Motion>
+    <TargetAxisNoForAutoTuning xmlns:d3p1="http://schemas.microsoft.com/2003/10/Serialization/Arrays" i:nil="true" />
+    <TargetAxisNoForMultiTrial xmlns:d3p1="http://schemas.microsoft.com/2003/10/Serialization/Arrays" i:nil="true" />
+  </Motion>
+</WindowInfo>

@@ -1,0 +1,46 @@
+﻿{
+    "generated_at":  "2026-05-15T17:04:01",
+    "authoritative_root":  "$CODEX_HOME\\skills\\keyence-plc-programmer",
+    "evidence_roots_not_automation":  [
+                                          "<configured-work-root>",
+                                          "<remote-task-root-from-config>"
+                                      ],
+    "scripts":  [
+                    {
+                        "Name":  "import_mnm.ps1",
+                        "FullName":  "scripts\\import_mnm.ps1",
+                        "Length":  36484,
+                        "LastWriteTime":  "2026-05-14T18:45:09",
+                        "HardNeedleGate":  true,
+                        "RoundtripFingerprint":  false,
+                        "Sha256":  "72F40199932046D77FC4C4EB2F6A00BF5925B0B40142319521FB24828D792BD9"
+                    },
+                    {
+                        "Name":  "export_mnm.ps1",
+                        "FullName":  "scripts\\export_mnm.ps1",
+                        "Length":  17460,
+                        "LastWriteTime":  "2026-05-07T18:43:42",
+                        "HardNeedleGate":  false,
+                        "RoundtripFingerprint":  false,
+                        "Sha256":  "611C17D86AD8B84695BAE73646B0E89F6430E64B971FA07125B49A34BD37A7E9"
+                    },
+                    {
+                        "Name":  "roundtrip_mnm.ps1",
+                        "FullName":  "scripts\\roundtrip_mnm.ps1",
+                        "Length":  6230,
+                        "LastWriteTime":  "2026-05-14T18:48:14",
+                        "HardNeedleGate":  false,
+                        "RoundtripFingerprint":  true,
+                        "Sha256":  "71919D8639B25FB3F4EB588EF40AA3F1EBA1F7BB28BDCE4A07869DC8BFDE5B3D"
+                    },
+                    {
+                        "Name":  "convert_collect.ps1",
+                        "FullName":  "scripts\\convert_collect.ps1",
+                        "Length":  5416,
+                        "LastWriteTime":  "2026-05-08T08:18:48",
+                        "HardNeedleGate":  false,
+                        "RoundtripFingerprint":  false,
+                        "Sha256":  "8E2EB8F2037217A3F65F5CD5F6E1D0C6BBD9CE8E947F09594F8F39C704262EC9"
+                    }
+                ]
+}

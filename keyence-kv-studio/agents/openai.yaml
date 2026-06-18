@@ -1,0 +1,4 @@
+interface:
+  display_name: "KEYENCE KV STUDIO"
+  short_description: "KEYENCE KV STUDIO 统一任务路由入口"
+  default_prompt: "请根据我的 KEYENCE KV STUDIO 任务，路由到知识库查询、PLC 编程或 KV STUDIO workflow 操作。"

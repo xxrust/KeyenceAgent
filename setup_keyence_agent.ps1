@@ -25,7 +25,7 @@ function New-HelpText {
     '',
     'Configure values:',
     '  all          Full setup flow.',
-    '  skills       Install/update local Codex skills only.',
+    '  skills       Install/update the packaged keyence-kv-studio skill only.',
     '  config       Configure normal machine paths.',
     '  kvs_exe      Configure KV STUDIO Kvs.exe path.',
     '  work_root    Configure disposable work root.',
@@ -35,7 +35,7 @@ function New-HelpText {
     '  advanced     Configure advanced runner defaults.',
     '',
     'Notes:',
-    '  Local config accepts a file path or directory. C:\KeyenceAgentConfig becomes C:\KeyenceAgentConfig\config.json.',
+    '  Local config accepts a file path or directory. %LOCALAPPDATA%\KeyenceAgent\Config becomes %LOCALAPPDATA%\KeyenceAgent\Config\config.json.',
     '  The credential path is automatic: %APPDATA%\Codex\kv-studio-operator\credentials.xml.'
   ) -join [Environment]::NewLine
 }
@@ -43,7 +43,7 @@ function New-HelpText {
 $Messages = @{
   'en' = @{
     title = 'KeyenceAgent local setup'
-    intro = 'Installs local Codex skills, writes local machine config, and optionally stores the KV STUDIO administrator credential with Windows DPAPI.'
+    intro = 'Installs the packaged keyence-kv-studio Codex skill, writes local machine config, and optionally stores the KV STUDIO administrator credential with Windows DPAPI.'
   }
   'zh-CN' = @{
     title = 'KeyenceAgent setup [zh-CN]'
@@ -197,9 +197,11 @@ function Get-SetupStatus([string]$RepoRoot, [string]$SkillsRoot, [string]$Config
   $items.Add((New-StatusItem 'config_file' (Test-Path -LiteralPath $ConfigFile -PathType Leaf) $ConfigFile))
   $items.Add((New-StatusItem 'codex_skills_root' (Test-Path -LiteralPath $SkillsRoot -PathType Container) $SkillsRoot))
 
-  $skillDirs = @(Get-ChildItem -LiteralPath $RepoRoot -Directory -ErrorAction SilentlyContinue | Where-Object {
-      Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md')
-    })
+  $skillDirs = @()
+  $singleSkill = Join-Path $RepoRoot 'keyence-kv-studio'
+  if (Test-Path -LiteralPath (Join-Path $singleSkill 'SKILL.md') -PathType Leaf) {
+    $skillDirs = @([IO.DirectoryInfo]::new($singleSkill))
+  }
   $missingSkills = @()
   foreach ($skill in $skillDirs) {
     if (-not (Test-Path -LiteralPath (Join-Path (Join-Path $SkillsRoot $skill.Name) 'SKILL.md') -PathType Leaf)) {
@@ -283,7 +285,6 @@ if (($Configure -contains 'all') -or ($Configure -contains 'config')) {
 
 $kvsExeDefault = First-ExistingPath @(
   'C:\Program Files (x86)\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe',
-  'C:\Program Files (x86)\KEYENCE\KVS11G\KVS11\KVS\Kvs.exe',
   'C:\Program Files (x86)\KEYENCE\KVS12\KVS\Kvs.exe'
 ) 'C:\Program Files (x86)\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe'
 if ($existingConfig -and $existingConfig.kvs_exe) { $kvsExeDefault = [string]$existingConfig.kvs_exe }
@@ -303,7 +304,8 @@ $wikiRootDefault = First-ExistingPath @(
 ) (Join-Path $htmlhelpDefault 'llm-wiki-v2-keyence')
 if ($existingConfig -and $existingConfig.wiki_root) { $wikiRootDefault = [string]$existingConfig.wiki_root }
 
-$workRootDefault = if ($existingConfig -and $existingConfig.work_root) { [string]$existingConfig.work_root } else { 'C:\Users\Public\KVSkillPractice' }
+$defaultLocalAppData = if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) { Join-Path $env:USERPROFILE 'AppData\Local' } else { $env:LOCALAPPDATA }
+$workRootDefault = if ($existingConfig -and $existingConfig.work_root) { [string]$existingConfig.work_root } else { Join-Path $defaultLocalAppData 'KeyenceAgent\Work' }
 $credentialPathDefault = if ($existingConfig -and $existingConfig.admin_credential_path) { [string]$existingConfig.admin_credential_path } else { Get-DefaultCredentialPath }
 $adminUserDefault = if ($existingConfig -and $existingConfig.admin_user_default) { [string]$existingConfig.admin_user_default } else { 'Administrator' }
 $timeoutSecondsText = if ($existingConfig -and $null -ne $existingConfig.timeout_seconds) { [string]$existingConfig.timeout_seconds } else { '600' }
@@ -337,9 +339,11 @@ if (Test-Selected 'advanced') {
 $installedSkills = @()
 if ((Test-Selected 'skills') -and -not $SkipSkillInstall) {
   New-Item -ItemType Directory -Force -Path $CodexSkillsRoot | Out-Null
-  $skillDirs = @(Get-ChildItem -LiteralPath $repoRoot -Directory | Where-Object {
-      Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md')
-    })
+  $singleSkillRoot = Join-Path $repoRoot 'keyence-kv-studio'
+  $skillDirs = @()
+  if (Test-Path -LiteralPath (Join-Path $singleSkillRoot 'SKILL.md') -PathType Leaf) {
+    $skillDirs = @([IO.DirectoryInfo]::new($singleSkillRoot))
+  }
   foreach ($skill in $skillDirs) {
     $installedSkills += Copy-SkillDirectory -SourceDir $skill.FullName -TargetRoot $CodexSkillsRoot
   }

@@ -1,0 +1,7 @@
+{
+  "kvs_exe": "<path-to-Kvs.exe>",
+  "work_root": "<disposable-work-root>",
+  "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
+  "admin_user_default": "Administrator",
+  "wiki_root": "<path-to-keyence-wiki-root>"
+}

@@ -1,0 +1,9 @@
+-ProjectName
+BenchKvtool_022429
+-ProjectRoot
+<work-root>\bench_create_kvtool
+-CpuModel
+KV-X550
+-OutDir
+<work-root>\bench_create_kvtool_out_022429
+-RestartKvs

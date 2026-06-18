@@ -1,7 +1,0 @@
-{
-  "kvs_exe": "C:\\Program Files (x86)\\KEYENCE\\KVS12G\\KVS12\\KVS\\Kvs.exe",
-  "work_root": "C:\\Users\\Public\\KVSkillPractice",
-  "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
-  "admin_user_default": "Administrator",
-  "wiki_root": "C:\\Users\\Public\\Documents\\KEYENCE\\KVS12\\ManualHelp\\2052\\htmlhelp\\llm-wiki-v2-keyence"
-}
