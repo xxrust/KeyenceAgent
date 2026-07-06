@@ -1,0 +1,4 @@
+interface:
+  display_name: "KV STUDIO 知识库编程"
+  short_description: "用本地 KEYENCE Wiki V2 辅助 KV STUDIO 编程。"
+  default_prompt: "使用 $kv-studio-kb-programming 查询本地 KEYENCE Wiki V2，再回答或草拟 KV STUDIO 程序。"

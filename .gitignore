@@ -1,0 +1,110 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# KeyenceAgent specific
+# Work directory (contains temporary projects and logs)
+work_root/
+**/work_root/
+
+# User-specific configuration
+*.local.json
+config.local.json
+
+# Credentials
+credentials.xml
+**/credentials.xml
+
+# Artifacts from runner execution
+artifacts/
+**/artifacts/
+
+# KV STUDIO project files (optional - uncomment if you don't want to track)
+# *.kpr
+# *.kvbak
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Logs
+*.log
+runner.log
+
+# Screenshots (generated during debugging)
+screenshot_*.png
+
+# Test outputs
+test_output/
+**/test_output/
+
+# Backup files
+README.old.md
+*.old.md
+
+# Windows
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*

@@ -1,0 +1,4 @@
+interface:
+  display_name: "KEYENCE PLC 编程"
+  short_description: "编写并验证可在 KV STUDIO 编译的 PLC 逻辑。"
+  default_prompt: "使用 $keyence-plc-programmer 基于 Wiki V2、当前项目快照和官方参考证据设计 KEYENCE PLC 逻辑，通过 MNM 重建程序、重建变量，并通过 KV STUDIO 转换/编译验证。"
