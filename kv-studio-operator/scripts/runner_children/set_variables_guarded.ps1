@@ -31,7 +31,7 @@
 
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-$script:CheckpointDir = Join-Path $OutDir 'checkpoints'
+$script:CheckpointDir = Join-Path $OutDir 'cp'
 New-Item -ItemType Directory -Force -Path $script:CheckpointDir | Out-Null
 $script:CheckpointSeq = 0
 $script:LastErrorCode = ''
@@ -187,6 +187,22 @@ function Convert-SafeFileName([string]$Value) {
   return $safe
 }
 
+function New-StepCheckpointPath([string]$Step, [string]$Status) {
+  $prefix = ('{0:D3}_' -f $script:CheckpointSeq)
+  $suffix = '_' + (Convert-SafeFileName $Status) + '.json'
+  $safeStep = Convert-SafeFileName $Step
+  $maxFullPathLength = 240
+  $availableStepLength = $maxFullPathLength - $script:CheckpointDir.Length - 1 - $prefix.Length - $suffix.Length
+  if ($availableStepLength -lt 1) {
+    throw "KV_CHECKPOINT_PATH_TOO_LONG: checkpoint directory leaves no safe filename budget: $script:CheckpointDir"
+  }
+  if ($safeStep.Length -gt $availableStepLength) {
+    $safeStep = $safeStep.Substring(0, $availableStepLength).Trim('_')
+  }
+  if ([string]::IsNullOrWhiteSpace($safeStep)) { $safeStep = 's' }
+  return (Join-Path $script:CheckpointDir ($prefix + $safeStep + $suffix))
+}
+
 function Write-StepCheckpoint(
   [string]$Step,
   [string]$Status,
@@ -199,8 +215,7 @@ function Write-StepCheckpoint(
   [string[]]$Evidence = @()
 ) {
   $script:CheckpointSeq += 1
-  $fileName = ('{0:D3}_{1}_{2}.json' -f $script:CheckpointSeq, (Convert-SafeFileName $Step), (Convert-SafeFileName $Status))
-  $path = Join-Path $script:CheckpointDir $fileName
+  $path = New-StepCheckpointPath $Step $Status
   $payload = [ordered]@{
     timestamp = (Get-Date).ToString('o')
     step = $Step
@@ -1465,7 +1480,7 @@ try {
     evidence = @($script:LastErrorEvidence + @((Join-Path $OutDir 'fail.txt')) | Where-Object { $_ })
     remediation = @(
       'Do not send any keyboard input until the checkpoint foreground_before.hwnd equals the KvVariableForm target hwnd.',
-      'Inspect checkpoints under artifacts/set_variables/checkpoints to identify the foreground owner.',
+      'Inspect the current set_variables step output and its cp checkpoint directory to identify the foreground owner.',
       'If foreground recovery failed, close interfering modal/window or restart from the previous safe harness checkpoint.'
     )
   } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'set_variables_result.json') -Encoding UTF8

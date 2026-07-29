@@ -11,8 +11,11 @@ param(
   [switch]$AuditVariablePersistence,
   [ValidateSet('Full','NameType')]
   [string]$LocalPasteFormat = 'NameType',
+  [ValidateRange(1,100)]
   [int]$RequiredConsecutivePasses = 3,
+  [ValidateRange(1,100)]
   [int]$MaxAttempts = 6,
+  [ValidateRange(0,100)]
   [int]$StopAfterSameFailureCount = 3
 )
 
@@ -40,6 +43,9 @@ if ([string]::IsNullOrWhiteSpace($OutRoot)) {
 
 $ScaffoldRoot = [IO.Path]::GetFullPath($ScaffoldRoot)
 $OutRoot = [IO.Path]::GetFullPath($OutRoot)
+if ($MaxAttempts -lt $RequiredConsecutivePasses) {
+  throw "MaxAttempts ($MaxAttempts) must be at least RequiredConsecutivePasses ($RequiredConsecutivePasses)."
+}
 New-Item -ItemType Directory -Force -Path $OutRoot | Out-Null
 
 $manifestPath = Join-Path $ScaffoldRoot 'scaffold.json'
@@ -125,7 +131,39 @@ for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
     try { $result = Get-Content -Raw -LiteralPath $resultPath -Encoding UTF8 | ConvertFrom-Json } catch { $result = $null }
   }
   $compilePath = if ($result) { [string]$result.compile_result_path } else { '' }
-  $setVariableValidation = Join-Path (Join-Path (Join-Path $attemptOutRoot $attemptName) 'artifacts') 'set_variables\variable_persistence_validation.json'
+  $setVariableValidations = @()
+  if ($result -and $result.steps) {
+    foreach ($step in @($result.steps | Where-Object { [string]$_.name -like '*set_variables*' })) {
+      $validationPath = if ($step.out_dir) { Join-Path ([string]$step.out_dir) 'variable_persistence_validation.json' } else { '' }
+      $validation = $null
+      if ($validationPath -and (Test-Path -LiteralPath $validationPath -PathType Leaf)) {
+        try { $validation = Get-Content -Raw -LiteralPath $validationPath -Encoding UTF8 | ConvertFrom-Json } catch { $validation = $null }
+      }
+      $localNames = if ($validation) { @($validation.LocalNames | Where-Object { $_ }) } else { @() }
+      $auditEvidenceOk = (
+        -not $AuditVariablePersistence -or
+        $localNames.Count -eq 0 -or
+        (
+          [bool]$validation.LocalReopenClipboardContainsExpectedNames -and
+          $validation.LocalReopenClipboardPath -and
+          (Test-Path -LiteralPath ([string]$validation.LocalReopenClipboardPath) -PathType Leaf)
+        )
+      )
+      $setVariableValidations += [pscustomobject]@{
+        step_name = [string]$step.name
+        path = $validationPath
+        exists = [bool]($validationPath -and (Test-Path -LiteralPath $validationPath -PathType Leaf))
+        parsed = [bool]($null -ne $validation)
+        ok = [bool]($validation -and [bool]$validation.Ok -and $auditEvidenceOk)
+        audit_persistence_required = [bool]$AuditVariablePersistence
+        audit_evidence_ok = [bool]$auditEvidenceOk
+      }
+    }
+  }
+  $setVariableEvidenceOk = (
+    $setVariableValidations.Count -gt 0 -and
+    @($setVariableValidations | Where-Object { -not $_.ok }).Count -eq 0
+  )
   $pass = (
     $exitCode -eq 0 -and
     $result -and
@@ -133,16 +171,34 @@ for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
     [bool]$result.compile_result_contains_ok -and
     $compilePath -and
     (Test-Path -LiteralPath $compilePath -PathType Leaf) -and
-    (Test-Path -LiteralPath $setVariableValidation -PathType Leaf)
+    $setVariableEvidenceOk
   )
+
+  $repeatErrorCode = ''
+  $repeatCurrentStep = if ($result -and $result.current_step) { [string]$result.current_step } else { '' }
+  if ($timedOut) {
+    $repeatErrorCode = 'KV_MVP_REPEAT_ATTEMPT_TIMEOUT'
+    $repeatCurrentStep = 'repeat_attempt'
+  } elseif (-not $result) {
+    $repeatErrorCode = 'KV_MVP_REPEAT_RESULT_MISSING_OR_INVALID'
+    $repeatCurrentStep = 'verify_repeat_result'
+  } elseif (-not [bool]$result.ok) {
+    $repeatErrorCode = if ($result.error_code) { [string]$result.error_code } else { 'KV_MVP_REPEAT_WORKFLOW_FAILED' }
+  } elseif (-not [bool]$result.compile_result_contains_ok -or -not $compilePath -or -not (Test-Path -LiteralPath $compilePath -PathType Leaf)) {
+    $repeatErrorCode = 'KV_MVP_REPEAT_COMPILE_EVIDENCE_INVALID'
+    $repeatCurrentStep = 'verify_repeat_compile_evidence'
+  } elseif (-not $setVariableEvidenceOk) {
+    $repeatErrorCode = 'KV_MVP_REPEAT_VARIABLE_EVIDENCE_INVALID'
+    $repeatCurrentStep = 'verify_repeat_variable_evidence'
+  }
 
   if ($pass) { $consecutive++ } else { $consecutive = 0 }
   $failureSignature = ''
   $sameFailureCount = 0
   if (-not $pass) {
     $failureSignature = @(
-      if ($timedOut) { 'repeat_attempt' } elseif ($result -and $result.current_step) { [string]$result.current_step } else { 'unknown_step' }
-      if ($timedOut) { 'KV_MVP_REPEAT_ATTEMPT_TIMEOUT' } elseif ($result -and $result.error_code) { [string]$result.error_code } else { 'unknown_error' }
+      if ($repeatCurrentStep) { $repeatCurrentStep } else { 'unknown_step' }
+      if ($repeatErrorCode) { $repeatErrorCode } else { 'unknown_error' }
     ) -join ':'
     if (-not $failureCounts.ContainsKey($failureSignature)) { $failureCounts[$failureSignature] = 0 }
     $failureCounts[$failureSignature] = [int]$failureCounts[$failureSignature] + 1
@@ -162,10 +218,11 @@ for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
     stderr_path = $stderrPath
     timeout_result_path = if ($timedOut) { Join-Path $attemptOutRoot 'timeout_result.json' } else { '' }
     result_path = $resultPath
-    error_code = if ($timedOut) { 'KV_MVP_REPEAT_ATTEMPT_TIMEOUT' } elseif ($result -and $result.error_code) { [string]$result.error_code } else { '' }
-    current_step = if ($timedOut) { 'repeat_attempt' } elseif ($result -and $result.current_step) { [string]$result.current_step } else { '' }
+    error_code = $repeatErrorCode
+    current_step = $repeatCurrentStep
     compile_result_path = $compilePath
-    set_variable_validation_path = $setVariableValidation
+    set_variable_validation_path = if ($setVariableValidations.Count -gt 0) { [string]$setVariableValidations[0].path } else { '' }
+    set_variable_validations = @($setVariableValidations)
     failure_signature = $failureSignature
     same_failure_count = $sameFailureCount
   }

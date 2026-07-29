@@ -69,7 +69,8 @@ if (-not $failedStep) {
   $gitExitCode = $LASTEXITCODE
   $ErrorActionPreference = $previousErrorActionPreference
   $gitLog = Join-Path $OutDir 'git_diff_check.txt'
-  @($gitOutput | ForEach-Object { [string]$_ }) | Set-Content -LiteralPath $gitLog -Encoding UTF8
+  $gitText = @($gitOutput | ForEach-Object { [string]$_ }) -join [Environment]::NewLine
+  [IO.File]::WriteAllText($gitLog, $gitText, [Text.Encoding]::UTF8)
   $gitStep = [pscustomobject]@{
     name = 'git_diff_check'
     ok = ($gitExitCode -eq 0)
