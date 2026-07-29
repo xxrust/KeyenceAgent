@@ -350,6 +350,11 @@ if (Test-Selected 'advanced') {
 
 $installedSkills = @()
 if ((Test-Selected 'skills') -and -not $SkipSkillInstall) {
+  $repoRootFull = [IO.Path]::GetFullPath($repoRoot).TrimEnd('\')
+  $skillsRootFull = [IO.Path]::GetFullPath($CodexSkillsRoot).TrimEnd('\')
+  if ($repoRootFull.Equals($skillsRootFull, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'KEYENCE_REPOSITORY_EQUALS_SKILLS_ROOT: Clone KeyenceAgent into a standalone directory, then run setup. Developers should use scripts\install_keyence_dev_links.ps1.'
+  }
   New-Item -ItemType Directory -Force -Path $CodexSkillsRoot | Out-Null
   $skillDirs = Get-KeyenceSkillDirectories $repoRoot
   foreach ($skill in $skillDirs) {

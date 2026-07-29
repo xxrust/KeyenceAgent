@@ -1,0 +1,30 @@
+* text=auto
+
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.md text eol=lf
+*.py text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+*.png binary
+*.kpr binary
+*.kvbak binary
+*.ue2 binary
+*.dky binary
+*.kmu binary
+*.acw binary
+*.cm1 binary
+*.cm2 binary
+*.cm3 binary
+*.cm4 binary
+*.cm5 binary
+*.cm6 binary
+*.cm7 binary
+*.cm8 binary
+*.ftc binary
+*.hxm binary
+*.lbl binary
+*.mil binary
+*.oua binary
