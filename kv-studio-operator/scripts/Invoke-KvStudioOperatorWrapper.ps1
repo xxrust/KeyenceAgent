@@ -2,7 +2,9 @@ param(
   [Parameter(Mandatory=$true)]
   [string]$TargetName,
 
-  [string[]]$TargetClasses = @()
+  [string[]]$TargetClasses = @(),
+
+  [object[]]$RemainingArgs = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,5 +14,5 @@ if (-not (Test-Path -LiteralPath $resolver -PathType Leaf)) { throw "Script reso
 
 $scriptRoot = Get-KvStudioOperatorScriptsRoot -StartPath $PSCommandPath
 $target = Resolve-KvStudioOperatorScriptPath -ScriptRoot $scriptRoot -Name $TargetName -Classes $TargetClasses
-& $target @args
+& $target @RemainingArgs
 exit $LASTEXITCODE
