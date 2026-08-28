@@ -56,28 +56,26 @@ function Fail-Step([string]$ErrorCode, [string]$Step, [string]$Message, [string[
   throw "[$ErrorCode] $Message"
 }
 
-function Get-VisibleKvsProcess([string]$ProjectNeedle) {
-  $process = Get-Process Kvs -ErrorAction SilentlyContinue |
-    Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like "*$ProjectNeedle*" } |
-    Sort-Object StartTime -Descending |
-    Select-Object -First 1
-  if ($process) { return $process }
-  Get-Process Kvs -ErrorAction SilentlyContinue |
-    Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' } |
-    Sort-Object StartTime -Descending |
-    Select-Object -First 1
+function Get-VisibleKvsProcess([string]$ProjectNeedle, [int]$WaitSeconds = 10) {
+  $deadline = (Get-Date).AddSeconds($WaitSeconds)
+  do {
+    $process = Get-Process Kvs -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like "*$ProjectNeedle*" } |
+      Sort-Object StartTime -Descending |
+      Select-Object -First 1
+    if ($process) { return $process }
+    Start-Sleep -Milliseconds 250
+  } while ((Get-Date) -lt $deadline)
+  return $null
 }
 
 function Restore-KvForeground([System.Diagnostics.Process]$Process, [string]$ProjectNeedle, [string]$Step) {
-  if ([KvSharedUiGuardWin32]::IsIconic($Process.MainWindowHandle)) {
-    [KvSharedUiGuardWin32]::ShowWindow($Process.MainWindowHandle, 9) | Out-Null
+  for ($i = 1; $i -le 10; $i++) {
+    [void](Invoke-KvUiGuardForceForeground -TargetHwnd ([IntPtr]$Process.MainWindowHandle))
+    $snapshot = Get-KvForegroundSnapshot
+    if ($snapshot.title -like 'KV STUDIO*' -and $snapshot.title -like "*$ProjectNeedle*" -and -not [KvSharedUiGuardWin32]::IsIconic($Process.MainWindowHandle)) { return }
   }
-  [KvSharedUiGuardWin32]::SetForegroundWindow($Process.MainWindowHandle) | Out-Null
-  Start-Sleep -Milliseconds 180
-  $snapshot = Get-KvForegroundSnapshot
-  if ($snapshot.title -notlike 'KV STUDIO*' -or $snapshot.title -notlike "*$ProjectNeedle*") {
-    Fail-Step 'KV_FOCUS_LOST' $Step "KV STUDIO target project is not foreground. title=$($snapshot.title)" @()
-  }
+  Fail-Step 'KV_FOCUS_LOST' $Step "KV STUDIO target project is not foreground after 10 attempts. title=$($snapshot.title)" @()
 }
 
 function Find-DescByAid($RootElement, [string]$AutomationId) {
@@ -119,11 +117,42 @@ function FindProjectModuleTreeItem([int]$ProcessIdValue, [string]$ModuleName) {
   for ($i = 0; $i -lt $items.Count; $i++) {
     $item = $items.Item($i)
     $name = [string]$item.Current.Name
-    if ($name -eq $ModuleName -or $name -match ('^' + [regex]::Escape($ModuleName) + '\s+\[\d+\]$')) {
+    if ($name -eq $ModuleName -or
+        $name -match ('^' + [regex]::Escape($ModuleName) + '\s+\[\d+\]$') -or
+        $name.StartsWith($ModuleName + ':', [System.StringComparison]::Ordinal) -or
+        $name.StartsWith($ModuleName + [char]0xFF1A, [System.StringComparison]::Ordinal)) {
       return $item
     }
   }
   return $null
+}
+
+function Bring-ProjectTreeItemIntoView($Item, [int]$ProcessIdValue) {
+  if (-not $Item) { return }
+  try {
+    $scrollItem = $null
+    if ($Item.TryGetCurrentPattern([System.Windows.Automation.ScrollItemPattern]::Pattern, [ref]$scrollItem)) {
+      $scrollItem.ScrollIntoView()
+    }
+  } catch {}
+  try {
+    $tree = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst(
+      [System.Windows.Automation.TreeScope]::Descendants,
+      (New-Object System.Windows.Automation.AndCondition(
+        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $ProcessIdValue)),
+        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'ProjectTreeView'))
+      ))
+    )
+    $scroll = $null
+    if ($tree -and $tree.TryGetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern, [ref]$scroll)) {
+      for ($n = 0; $n -lt 12; $n++) {
+        $r = $Item.Current.BoundingRectangle
+        if ($r.Y -ge 0 -and ($r.Y + $r.Height) -le [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Bottom) { break }
+        $scroll.Scroll([System.Windows.Automation.ScrollAmount]::NoAmount, [System.Windows.Automation.ScrollAmount]::LargeIncrement)
+        Start-Sleep -Milliseconds 100
+      }
+    }
+  } catch {}
 }
 
 function Write-ProcessWindowDump([int]$ProcessIdValue, [string]$FileName) {
@@ -520,8 +549,8 @@ try {
   $pastePath = Join-Path $OutDir 'fb_arguments_paste.tsv'
   [IO.File]::WriteAllText($pastePath, $pastePayload.text, [Text.Encoding]::Default)
 
-  $process = Get-VisibleKvsProcess $projectNeedle
-  if (-not $process) { throw 'No visible KV STUDIO process for FB argument entry.' }
+  $process = Get-VisibleKvsProcess $projectNeedle 10
+  if (-not $process) { Fail-Step 'KV_PROJECT_PROCESS_NOT_FOUND' 'find target KV STUDIO project' "No visible KV STUDIO process matched project needle '$projectNeedle'. Refusing to operate another project window." @() }
   Restore-KvForeground $process $projectNeedle 'set FB arguments start'
   Assert-NoKvsModal $process.Id 'before FB argument route'
 
@@ -530,10 +559,7 @@ try {
     $dumpPath = Write-ProcessWindowDump $process.Id 'missing_fb_module_tree_item.json'
     Fail-Step 'KV_FB_MODULE_TREE_ITEM_MISSING' 'select FB module' "Function-block tree item was not found: $FbModuleName" @($dumpPath)
   }
-  try {
-    $scrollPattern = $null
-    if ($item.TryGetCurrentPattern([System.Windows.Automation.ScrollItemPattern]::Pattern, [ref]$scrollPattern)) { $scrollPattern.ScrollIntoView() }
-  } catch {}
+  Bring-ProjectTreeItemIntoView $item $process.Id
   try {
     $selectPattern = $null
     if ($item.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selectPattern)) { $selectPattern.Select() }
@@ -542,13 +568,15 @@ try {
   Start-Sleep -Milliseconds 180
   $rect = $item.Current.BoundingRectangle
   if ($rect.Width -lt 10 -or $rect.Height -lt 10) { Fail-Step 'KV_FB_MODULE_TREE_ITEM_BOUNDS_INVALID' 'select FB module' "Function-block tree item has invalid bounds: $FbModuleName" @() }
-  $clickX = [int]($rect.X + [math]::Min(80, [math]::Max(12, $rect.Width / 2)))
-  $clickY = [int]($rect.Y + ($rect.Height / 2))
-  Invoke-KvGuardedMouseRightClick -TargetHwnd $process.MainWindowHandle -Step "FB module right click $FbModuleName" -X $clickX -Y $clickY -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 250
+  # The tree can report a virtualized row below the physical work area.  Use
+  # the item's keyboard context menu invocation instead of a screen coordinate
+  # right-click so off-screen rows are handled deterministically.
+  Invoke-KvGuardedVkTap -TargetHwnd $process.MainWindowHandle -Step "FB module context menu $FbModuleName" -Vk 0x5D -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 250
 
   $fg = Get-KvForegroundSnapshot
   $menuTarget = if ([string]$fg.class_name -eq '#32768') { [IntPtr]$fg.hwnd } else { $process.MainWindowHandle }
   $menuTitle = if ([string]$fg.class_name -eq '#32768') { '*' } else { "KV STUDIO*$projectNeedle*" }
+  Write-ProcessWindowDump $process.Id 'fb_context_menu_before_open_argument_table.json' | Out-Null
   Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $menuTarget -Step "open FB argument table by Z $FbModuleName" -Keys 'z' -ExpectedTitleLike $menuTitle -SuccessTitleLike @('*自变量*','*变量*',"KV STUDIO*$projectNeedle*") -Action 'press Z on FB context menu to open self-variable table' -SleepMs 900
   Start-Sleep -Milliseconds 500
   Assert-NoKvsModal $process.Id 'after FB argument table open'

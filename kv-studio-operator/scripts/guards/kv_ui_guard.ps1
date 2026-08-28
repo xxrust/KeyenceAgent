@@ -7,12 +7,17 @@ using System.Runtime.InteropServices;
 public class KvSharedUiGuardWin32 {
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern IntPtr SetActiveWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern IntPtr SetFocus(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
   [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+  [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+  [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
   [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);
   [DllImport("user32.dll")] public static extern void mouse_event(int dwFlags, int dx, int dy, int dwData, int dwExtraInfo);
   [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
@@ -193,6 +198,43 @@ function Invoke-KvUiGuardAltForegroundUnlock {
   Start-Sleep -Milliseconds 80
   [KvSharedUiGuardWin32]::keybd_event(0x12, 0, 2, 0)
   Start-Sleep -Milliseconds 80
+}
+
+function Invoke-KvUiGuardForceForeground {
+  param(
+    [Parameter(Mandatory=$true)][IntPtr]$TargetHwnd
+  )
+  if ($TargetHwnd -eq [IntPtr]::Zero -or -not [KvSharedUiGuardWin32]::IsWindow($TargetHwnd)) { return $false }
+  if ([KvSharedUiGuardWin32]::IsIconic($TargetHwnd)) {
+    # SW_RESTORE: never change a normally sized or maximized KV STUDIO window.
+    [KvSharedUiGuardWin32]::ShowWindow($TargetHwnd, 9) | Out-Null
+  }
+  $foreground = [KvSharedUiGuardWin32]::GetForegroundWindow()
+  $targetPid = [uint32]0
+  $foregroundPid = [uint32]0
+  $targetThread = [KvSharedUiGuardWin32]::GetWindowThreadProcessId($TargetHwnd, [ref]$targetPid)
+  $foregroundThread = [KvSharedUiGuardWin32]::GetWindowThreadProcessId($foreground, [ref]$foregroundPid)
+  $currentThread = [KvSharedUiGuardWin32]::GetCurrentThreadId()
+  $attachedTarget = $false
+  $attachedForeground = $false
+  try {
+    if ($targetThread -ne 0 -and $targetThread -ne $currentThread) {
+      $attachedTarget = [KvSharedUiGuardWin32]::AttachThreadInput($currentThread, $targetThread, $true)
+    }
+    if ($foregroundThread -ne 0 -and $foregroundThread -ne $currentThread -and $foregroundThread -ne $targetThread) {
+      $attachedForeground = [KvSharedUiGuardWin32]::AttachThreadInput($currentThread, $foregroundThread, $true)
+    }
+    Invoke-KvUiGuardAltForegroundUnlock
+    [KvSharedUiGuardWin32]::BringWindowToTop($TargetHwnd) | Out-Null
+    [KvSharedUiGuardWin32]::SetActiveWindow($TargetHwnd) | Out-Null
+    [KvSharedUiGuardWin32]::SetFocus($TargetHwnd) | Out-Null
+    [KvSharedUiGuardWin32]::SetForegroundWindow($TargetHwnd) | Out-Null
+  } finally {
+    if ($attachedForeground) { [KvSharedUiGuardWin32]::AttachThreadInput($currentThread, $foregroundThread, $false) | Out-Null }
+    if ($attachedTarget) { [KvSharedUiGuardWin32]::AttachThreadInput($currentThread, $targetThread, $false) | Out-Null }
+  }
+  Start-Sleep -Milliseconds 180
+  return (([KvSharedUiGuardWin32]::GetForegroundWindow()) -eq $TargetHwnd)
 }
 
 function Assert-KvUiForegroundHwnd {
