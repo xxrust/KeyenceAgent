@@ -325,6 +325,64 @@ function Assert-FbArgumentFormTarget($Form, [string]$FbName) {
   }
 }
 
+function Find-FbArgumentSurface([int]$ProcessIdValue) {
+  # KV STUDIO 12 hosts the FB self-variable editor inside the main editor
+  # window.  It is not a top-level dialog, so do not treat absence of a
+  # separate window as absence of the argument table.
+  $root = [System.Windows.Automation.AutomationElement]::RootElement
+  $surface = $root.FindFirst(
+    [System.Windows.Automation.TreeScope]::Descendants,
+    (New-Object System.Windows.Automation.AndCondition(
+      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $ProcessIdValue)),
+      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'FuncBlockParamVariableControl'))
+    ))
+  )
+  if (-not $surface -or $surface.Current.IsOffscreen) { return $null }
+  $grid = Find-DescByAid $surface '_grid'
+  if (-not $grid -or $grid.Current.IsOffscreen) { return $null }
+  return $surface
+}
+
+function Wait-FbArgumentSurface([int]$ProcessIdValue, [int]$Seconds) {
+  $deadline = (Get-Date).AddSeconds($Seconds)
+  do {
+    $surface = Find-FbArgumentSurface $ProcessIdValue
+    if ($surface) { return $surface }
+    Start-Sleep -Milliseconds 200
+  } while ((Get-Date) -lt $deadline)
+  return $null
+}
+
+function Assert-FbArgumentSurfaceTarget($Surface, [int]$ProcessIdValue, [IntPtr]$MainHwnd, [string]$FbName) {
+  if (-not $Surface) { Fail-Step 'KV_FB_ARGUMENT_SURFACE_MISSING' 'verify embedded FB argument target' 'Embedded function-block argument surface is missing.' @() }
+  $grid = Find-DescByAid $Surface '_grid'
+  if (-not $grid) {
+    $dump = Write-ElementDescendantDump $Surface 'fb_argument_surface_missing_grid.json'
+    Fail-Step 'KV_FB_ARGUMENT_GRID_MISSING' 'verify embedded FB argument target' 'Embedded function-block argument surface does not expose _grid.' @($dump)
+  }
+  $tabNeedle = New-Utf16Text @(0x81EA,0x53D8,0x91CF)
+  # The tab item is a sibling of FuncBlockParamVariableControl in KV STUDIO's
+  # UIA tree, rather than a descendant of it.  Verify it in the same target
+  # process; do not weaken this to a global name lookup.
+  $root = [System.Windows.Automation.AutomationElement]::RootElement
+  $selfVariableTab = $root.FindFirst(
+    [System.Windows.Automation.TreeScope]::Descendants,
+    (New-Object System.Windows.Automation.AndCondition(
+      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $ProcessIdValue)),
+      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, $tabNeedle)),
+      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::TabItem))
+    ))
+  )
+  if (-not $selfVariableTab) {
+    $dump = Write-ElementDescendantDump $Surface 'fb_argument_surface_missing_self_variable_tab.json'
+    Fail-Step 'KV_FB_ARGUMENT_TAB_MISSING' 'verify embedded FB argument target' 'Embedded function-block editor does not expose its self-variable tab.' @($dump)
+  }
+  # The FB was selected in ProjectTreeView immediately before the command that
+  # exposed this surface.  Keep the main project window as the sole input
+  # owner: an embedded pane has no foreground window of its own.
+  if ($MainHwnd -eq [IntPtr]::Zero) { Fail-Step 'KV_TARGET_WINDOW_MISSING' 'verify embedded FB argument target' "Target KV STUDIO window is missing for $FbName." @() }
+}
+
 function Get-TopLevelWindowsForProcess([int]$ProcessIdValue) {
   $root = [System.Windows.Automation.AutomationElement]::RootElement
   $windows = $root.FindAll(
@@ -484,6 +542,14 @@ function Convert-FbArgumentRowsToPasteText([string]$Path, [string]$ExpectedOwner
       [string]$row.default_value
       $retain
       $hidden
+      [string]$row.comment1
+      [string]$row.comment2
+      [string]$row.comment3
+      [string]$row.comment4
+      [string]$row.comment5
+      [string]$row.comment6
+      [string]$row.comment7
+      [string]$row.comment8
     ) -join "`t"
   }
   [pscustomobject]@{
@@ -506,11 +572,11 @@ function Get-ClipboardTextAfterCopy([string]$Sentinel, [int]$Seconds = 4) {
   return ''
 }
 
-function Test-FbArgumentPasteVisible([IntPtr]$FormHwnd, [object[]]$ExpectedRows, [string]$FbName, [string]$AttemptName) {
+function Test-FbArgumentPasteVisible([IntPtr]$FormHwnd, [string]$ProjectNeedle, [object[]]$ExpectedRows, [string]$FbName, [string]$AttemptName) {
   $sentinel = '__KV_FB_ARGUMENT_COPY_SENTINEL__'
-  Invoke-KvGuardedClipboardSetText -TargetHwnd $FormHwnd -Step "FB arguments copy sentinel $AttemptName $FbName" -Text $sentinel -ExpectedTitleLike '*'
-  Invoke-KvGuardedSendKeys -TargetHwnd $FormHwnd -Step "FB arguments Ctrl+A verify $AttemptName $FbName" -Keys '^a' -ExpectedTitleLike '*' -Action 'Ctrl+A selects FB argument table for copy verification' -SleepMs 200
-  Invoke-KvGuardedSendKeys -TargetHwnd $FormHwnd -Step "FB arguments Ctrl+C verify $AttemptName $FbName" -Keys '^c' -ExpectedTitleLike '*' -Action 'Ctrl+C copies FB argument table for paste verification' -SleepMs 300
+  Invoke-KvGuardedClipboardSetText -TargetHwnd $FormHwnd -Step "FB arguments copy sentinel $AttemptName $FbName" -Text $sentinel -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*"
+  Invoke-KvGuardedSendKeys -TargetHwnd $FormHwnd -Step "FB arguments Ctrl+A verify $AttemptName $FbName" -Keys '^a' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action 'Ctrl+A selects embedded FB argument table for copy verification' -SleepMs 200
+  Invoke-KvGuardedSendKeys -TargetHwnd $FormHwnd -Step "FB arguments Ctrl+C verify $AttemptName $FbName" -Keys '^c' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action 'Ctrl+C copies embedded FB argument table for paste verification' -SleepMs 300
   $copied = Get-ClipboardTextAfterCopy $sentinel 5
   $copyPath = Join-Path $OutDir ("fb_arguments_copied_after_paste_$AttemptName.txt")
   Set-Content -LiteralPath $copyPath -Value $copied -Encoding UTF8
@@ -547,51 +613,42 @@ function Test-FbArgumentPasteVisible([IntPtr]$FormHwnd, [object[]]$ExpectedRows,
   }
 }
 
-function Focus-FbArgumentGrid($Form, [string]$Label) {
-  Assert-FbArgumentFormForeground $Form "$Label foreground"
-  $formHwnd = [IntPtr]$Form.Current.NativeWindowHandle
-  for ($i = 1; $i -le 8; $i++) {
-    Invoke-KvGuardedSendKeys -TargetHwnd $formHwnd -Step "$Label keyboard Tab $i" -Keys '{TAB}' -ExpectedTitleLike '*' -Action 'Tab advances focus inside FB argument form toward the self-variable grid' -SleepMs 120
-    $dumpPath = Write-ElementDescendantDump $Form ("fb_argument_focus_after_tab_{0}.json" -f $i)
-    $focused = @($Form.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)) |
-      Where-Object { $_.Current.HasKeyboardFocus } |
-      Select-Object -First 1
-    if ($focused) {
-      $aid = [string]$focused.Current.AutomationId
-      if ($aid -eq '_fbParamVariableGrid' -or $aid -eq '_grid') {
-        Invoke-KvGuardedSendKeys -TargetHwnd $formHwnd -Step "$Label Ctrl+Home first cell" -Keys '^{HOME}' -ExpectedTitleLike '*' -Action 'Ctrl+Home positions the active FB argument grid cell at the first row and first column before paste' -SleepMs 120
-        $grid = Find-DescByAid $Form '_fbParamVariableGrid'
-        if (-not $grid) { $grid = Find-DescByAid $Form '_grid' }
-        if ($grid) {
-          $rect = $grid.Current.BoundingRectangle
-          if (Test-FiniteRect $rect) {
-            $x = [int]($rect.X + 60)
-            $y = [int]($rect.Y + 44)
-            Invoke-KvGuardedMouseClick -TargetHwnd $formHwnd -Step "$Label first editable cell click" -X $x -Y $y -ExpectedTitleLike '*' -SleepMs 120
-          }
-        }
-        return $dumpPath
-      }
-    }
+function Focus-FbArgumentGrid($Surface, [IntPtr]$MainHwnd, [string]$ProjectNeedle, [string]$Label) {
+  $grid = Find-DescByAid $Surface '_grid'
+  if (-not $grid) {
+    $dump = Write-ElementDescendantDump $Surface 'fb_argument_grid_focus_failed.json'
+    Fail-Step 'KV_FB_ARGUMENT_GRID_MISSING' $Label 'Could not find the embedded FB argument grid before paste.' @($dump)
   }
-  $finalDump = Write-ElementDescendantDump $Form 'fb_argument_grid_focus_failed.json'
-  Fail-Step 'KV_FB_ARGUMENT_GRID_FOCUS_MISSING' $Label 'Could not move keyboard focus to the FB argument grid before paste; paste was not sent.' @($finalDump)
+  $rect = $grid.Current.BoundingRectangle
+  if (-not (Test-FiniteRect $rect) -or $rect.Width -lt 140 -or $rect.Height -lt 60) {
+    $dump = Write-ElementDescendantDump $Surface 'fb_argument_grid_invalid_bounds.json'
+    Fail-Step 'KV_FB_ARGUMENT_GRID_BOUNDS_INVALID' $Label 'Embedded FB argument grid has invalid bounds before paste.' @($dump)
+  }
+  # First editable column is the argument name.  Return to the first row and
+  # then step downward beyond any practical argument-table length.  Navigation
+  # stops at the one blank append row; unlike Ctrl+End this uses KV's actual
+  # row navigation semantics and cannot overwrite an existing row.
+  $x = [int]($rect.X + 105)
+  $y = [int]($rect.Y + 31)
+  Invoke-KvGuardedMouseClick -TargetHwnd $MainHwnd -Step "$Label name-column cell click" -X $x -Y $y -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -SleepMs 160
+  Invoke-KvGuardedSendKeys -TargetHwnd $MainHwnd -Step "$Label Ctrl+Home first argument" -Keys '^{HOME}' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action 'Ctrl+Home returns the embedded FB argument grid to row one and the argument-name column' -SleepMs 140
+  Invoke-KvGuardedSendKeys -TargetHwnd $MainHwnd -Step "$Label move to blank append row" -Keys '{DOWN 200}' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action 'Down moves past existing FB argument rows and stops at the blank append row' -SleepMs 220
+  Invoke-KvGuardedSendKeys -TargetHwnd $MainHwnd -Step "$Label Home name column" -Keys '{HOME}' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action 'Home confirms the embedded FB argument grid is at its argument-name column' -SleepMs 140
 }
 
-function Invoke-FbArgumentPasteAttempt($Form, [string]$AttemptName, [string]$PasteText, [object[]]$ExpectedRows, [string]$FbName, [switch]$FocusGridFirst) {
-  $formHwnd = [IntPtr]$Form.Current.NativeWindowHandle
-  Assert-FbArgumentFormForeground $Form "FB arguments $AttemptName foreground $FbName"
+function Invoke-FbArgumentPasteAttempt($Form, [IntPtr]$MainHwnd, [string]$ProjectNeedle, [string]$AttemptName, [string]$PasteText, [object[]]$ExpectedRows, [string]$FbName, [switch]$FocusGridFirst) {
+  $formHwnd = $MainHwnd
   if ($FocusGridFirst) {
-    Focus-FbArgumentGrid $Form "FB arguments $AttemptName $FbName"
+    Focus-FbArgumentGrid $Form $MainHwnd $ProjectNeedle "FB arguments $AttemptName $FbName"
   }
-  Invoke-KvGuardedClipboardPaste -TargetHwnd $formHwnd -Step "FB arguments $AttemptName Ctrl+V $FbName" -Text $PasteText -ExpectedTitleLike '*' -SleepMs 500
+  Invoke-KvGuardedClipboardPaste -TargetHwnd $formHwnd -Step "FB arguments $AttemptName Ctrl+V $FbName" -Text $PasteText -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -SleepMs 500
   $modal = Find-KvsModal $process.Id
   if ($modal) {
     $modalInfo = Write-KvsModalText $modal "after FB argument $AttemptName paste"
     if ([string]$modalInfo.code -eq 'KV_FB_ARGUMENT_PASTE_DATA_ERROR') {
       Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd ([IntPtr]$modalInfo.hwnd) -Step "dismiss FB argument paste data error $FbName" -Keys '{ENTER}' -ExpectedTitleLike 'KV STUDIO' -SuccessTitleLike @('*自变量*','*变量*') -Action 'Enter dismisses paste-data-error modal so the runner can copy partial table state' -SleepMs 400
-      Assert-FbArgumentFormForeground $Form "FB arguments partial-copy foreground $FbName"
-      $partial = Test-FbArgumentPasteVisible $formHwnd $ExpectedRows $FbName ($AttemptName + '_partial_after_data_error')
+      Assert-KvUiForegroundHwnd -ExpectedHwnd $formHwnd -Step "FB arguments partial-copy foreground $FbName" -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -AllowSingleRecovery | Out-Null
+      $partial = Test-FbArgumentPasteVisible $formHwnd $ProjectNeedle $ExpectedRows $FbName ($AttemptName + '_partial_after_data_error')
       return [pscustomobject]@{
         ok = $false
         paste_data_error = $true
@@ -603,7 +660,7 @@ function Invoke-FbArgumentPasteAttempt($Form, [string]$AttemptName, [string]$Pas
     }
     Fail-Step ([string]$modalInfo.code) "after FB argument $AttemptName paste" "KV STUDIO modal dialog detected. text=$($modalInfo.text)" @([string]$modalInfo.path)
   }
-  return (Test-FbArgumentPasteVisible $formHwnd $ExpectedRows $FbName $AttemptName)
+  return (Test-FbArgumentPasteVisible $formHwnd $ProjectNeedle $ExpectedRows $FbName $AttemptName)
 }
 
 try {
@@ -680,19 +737,17 @@ try {
   Start-Sleep -Milliseconds 500
   Assert-NoKvsModal $process.Id 'after FB argument table open'
 
-  $selfVariableNeedle = New-Utf16Text @(0x81EA,0x53D8,0x91CF)
-  $variableNeedle = New-Utf16Text @(0x53D8,0x91CF)
-  $form = Wait-FbArgumentForm $process.Id $FbModuleName 8
+  $form = Wait-FbArgumentSurface $process.Id 8
   if (-not $form) {
-    $dumpPath = Write-ProcessWindowDump $process.Id 'missing_fb_argument_form_after_z.json'
-    Fail-Step 'KV_FB_ARGUMENT_FORM_MISSING' 'open FB argument table' "Function-block argument table did not appear after right-click Z for $FbModuleName." @($dumpPath)
+    $dumpPath = Write-ProcessWindowDump $process.Id 'missing_fb_argument_surface_after_z.json'
+    Fail-Step 'KV_FB_ARGUMENT_SURFACE_MISSING' 'open FB argument table' "Embedded function-block argument surface did not appear after right-click Z for $FbModuleName." @($dumpPath)
   }
-  $formDumpPath = Write-ElementDescendantDump $form 'fb_argument_window_uia_before_paste.json'
-  Assert-FbArgumentFormTarget $form $FbModuleName
+  $formDumpPath = Write-ElementDescendantDump $form 'fb_argument_surface_uia_before_paste.json'
+  Assert-FbArgumentSurfaceTarget $form $process.Id ([IntPtr]$process.MainWindowHandle) $FbModuleName
   Start-Sleep -Milliseconds 700
 
   $attempts = [System.Collections.Generic.List[object]]::new()
-  $visible = Invoke-FbArgumentPasteAttempt $form 'uia_grid_first_cell' $pastePayload.text $pastePayload.rows $FbModuleName -FocusGridFirst
+  $visible = Invoke-FbArgumentPasteAttempt $form ([IntPtr]$process.MainWindowHandle) $projectNeedle 'embedded_grid_append_row' $pastePayload.text $pastePayload.rows $FbModuleName -FocusGridFirst
   $attempts.Add($visible)
   if (-not $visible.ok) {
     $evidence = @($formDumpPath)
@@ -700,8 +755,8 @@ try {
     Fail-Step 'KV_FB_ARGUMENT_PASTE_NOT_VISIBLE' 'verify FB argument paste' "FB argument paste was not visible in copyback. missing=$($visible.missing -join ','); mismatch=$($visible.mismatch -join ',')" $evidence
   }
 
-  $formHwnd = [IntPtr]$form.Current.NativeWindowHandle
-  Invoke-KvGuardedSendKeys -TargetHwnd $formHwnd -Step "save after FB arguments Ctrl+S $FbModuleName" -Keys '^s' -ExpectedTitleLike '*' -Action 'Ctrl+S saves project after verified FB argument paste' -SleepMs 500
+  $formHwnd = [IntPtr]$process.MainWindowHandle
+  Invoke-KvGuardedSendKeys -TargetHwnd $formHwnd -Step "save after FB arguments Ctrl+S $FbModuleName" -Keys '^s' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -Action 'Ctrl+S saves project after verified embedded FB argument paste' -SleepMs 500
   Assert-NoKvsModal $process.Id 'after FB argument save'
 
   [pscustomobject]@{
@@ -714,7 +769,7 @@ try {
     copyback_path = $visible.copy_path
     paste_attempts = @($attempts)
     argument_names = @($pastePayload.rows | ForEach-Object { [string]$_.argument_name })
-    route = 'project tree select FB -> guarded right click -> Z -> self-variable form UIA dump -> Tab to _fbParamVariableGrid -> Ctrl+Home first cell -> Ctrl+V -> copyback verify -> Ctrl+S'
+    route = 'project tree select FB -> guarded right click -> Z -> embedded FuncBlockParamVariableControl/_grid -> Ctrl+Home then Down to blank append row -> Home name column -> Ctrl+V -> copyback verify -> Ctrl+S'
   } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'set_fb_arguments_result.json') -Encoding UTF8
   '0' | Set-Content -LiteralPath (Join-Path $OutDir 'exit_code.txt') -Encoding ASCII
   Log 'done set FB arguments'
@@ -732,7 +787,7 @@ try {
     evidence = @($script:LastErrorEvidence + @((Join-Path $OutDir 'fail.txt')) | Where-Object { $_ })
     remediation = @(
       'Inspect same-run UIA dumps and modal_text files under this OutDir.',
-      'If right-click Z opens a differently named form, update Find-FbArgumentForm with that AutomationId/title.',
+      'If right-click Z does not expose FuncBlockParamVariableControl/_grid, inspect the target project UIA dump before changing the route.',
       'If KV reports paste data error, stop and repair arguments.tsv generation before any compile attempt.'
     )
   } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'set_fb_arguments_result.json') -Encoding UTF8
