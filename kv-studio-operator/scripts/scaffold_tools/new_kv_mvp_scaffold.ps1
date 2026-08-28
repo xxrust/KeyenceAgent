@@ -90,6 +90,11 @@ END
 ENDH
 "@.TrimStart()
 
+  # Keep executable identifiers aligned with the global TSV rows.  The
+  # display-name rows above are documentation-only; the MNM body must prove
+  # that each executable global definition is actually referenced.
+  $mnmText = $mnmText.Replace('StartIn', 'G_StartIn').Replace('RedLed', 'G_RedLed').Replace('YellowLed', 'G_YellowLed').Replace('GreenLed', 'G_GreenLed')
+
   $globalText = @"
 scope	owner_program	name	data_type	device	initial_value	comment	evidence	status
 global		$cnStart	BOOL		FALSE	Input display name requested by task; executable sample uses direct device R000.	scaffold	display_name
