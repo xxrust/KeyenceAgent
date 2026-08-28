@@ -36,7 +36,8 @@ function New-HelpText {
     '',
     'Notes:',
     '  Local config accepts a file path or directory. %LOCALAPPDATA%\KeyenceAgent\Config becomes %LOCALAPPDATA%\KeyenceAgent\Config\config.json.',
-    '  The credential path is automatic: %APPDATA%\Codex\kv-studio-operator\credentials.xml.'
+    '  The credential path is automatic: %APPDATA%\Codex\kv-studio-operator\credentials.xml.',
+    '  KV STUDIO administrator passwords must be 8-64 characters and use at least two character types: lowercase, uppercase, digits, or symbols.'
   ) -join [Environment]::NewLine
 }
 
@@ -67,7 +68,7 @@ $CommonText = @{
   prompt_timeout = 'Runner timeout seconds'
   prompt_paste = 'Local variable paste format'
   prompt_store_credential = 'Store KV STUDIO administrator credential now'
-  prompt_password = 'KV STUDIO administrator password for {0} (stored with Windows DPAPI, not written to JSON)'
+  prompt_password = 'KV STUDIO administrator password for {0}, 8-64 characters and at least two types (lowercase, uppercase, digits, symbols); stored with Windows DPAPI, not written to JSON'
   config_dir_resolved = 'Local config path is a directory; using file: {0}'
   credential_auto = 'KV STUDIO administrator credential will be stored at: {0}'
   status_header = 'Configuration status'
@@ -187,11 +188,48 @@ function Get-KeyenceSkillDirectories([string]$RepoRoot) {
 
 function Write-DpapiCredential([string]$UserName, [securestring]$Password, [string]$Path) {
   if ([string]::IsNullOrWhiteSpace($UserName)) { throw 'Credential user name is empty.' }
-  if ($null -eq $Password -or $Password.Length -le 0) { throw 'Credential password is empty.' }
+  Assert-KvStudioPassword -Password $Password
   $parent = Split-Path -Parent $Path
   New-Item -ItemType Directory -Force -Path $parent | Out-Null
   $credential = [System.Management.Automation.PSCredential]::new($UserName, $Password)
   $credential | Export-Clixml -LiteralPath $Path
+}
+
+function Test-KvStudioExecutable([string]$Path) {
+  if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+  $expanded = Expand-PathText $Path
+  return ((Test-Path -LiteralPath $expanded -PathType Leaf) -and
+    ([IO.Path]::GetFileName($expanded).Equals('Kvs.exe', [StringComparison]::OrdinalIgnoreCase)))
+}
+
+function Assert-KvStudioExecutable([string]$Path) {
+  if (-not (Test-KvStudioExecutable $Path)) {
+    throw "KV_STUDIO_EXE_INVALID: Kvs.exe was not found at '$Path'. Supply the full path to an existing Kvs.exe file."
+  }
+}
+
+function Assert-KvStudioPassword([securestring]$Password) {
+  if ($null -eq $Password -or $Password.Length -le 0) { throw 'Credential password is empty.' }
+
+  $bstr = [IntPtr]::Zero
+  try {
+    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
+    $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+    if ($plain.Length -lt 8 -or $plain.Length -gt 64) {
+      throw 'KV STUDIO administrator password must be 8-64 characters.'
+    }
+
+    $types = 0
+    if ($plain -cmatch '[a-z]') { $types++ }
+    if ($plain -cmatch '[A-Z]') { $types++ }
+    if ($plain -match '[0-9]') { $types++ }
+    if ($plain -match '[^A-Za-z0-9]') { $types++ }
+    if ($types -lt 2) {
+      throw 'KV STUDIO administrator password must use at least two character types: lowercase, uppercase, digits, or symbols.'
+    }
+  } finally {
+    if ($bstr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+  }
 }
 
 function Test-Selected([string]$Name) {
@@ -223,7 +261,7 @@ function Get-SetupStatus([string]$RepoRoot, [string]$SkillsRoot, [string]$Config
   $items.Add((New-StatusItem 'skills_installed' ($missingSkills.Count -eq 0 -and $skillDirs.Count -gt 0) $SkillsRoot (($missingSkills -join ','))))
 
   $kvsPath = if ($Config -and $Config.kvs_exe) { [string]$Config.kvs_exe } else { '' }
-  $items.Add((New-StatusItem 'kvs_exe' ((-not [string]::IsNullOrWhiteSpace($kvsPath)) -and (Test-Path -LiteralPath $kvsPath -PathType Leaf)) $kvsPath))
+  $items.Add((New-StatusItem 'kvs_exe' (Test-KvStudioExecutable $kvsPath) $kvsPath))
 
   $workRoot = if ($Config -and $Config.work_root) { [string]$Config.work_root } else { '' }
   $items.Add((New-StatusItem 'work_root' (-not [string]::IsNullOrWhiteSpace($workRoot)) $workRoot))
@@ -296,10 +334,13 @@ if (($Configure -contains 'all') -or ($Configure -contains 'config')) {
 }
 
 $kvsExeDefault = First-ExistingPath @(
+  'H:\Keyence\KVS12\KVS\Kvs.exe',
   'C:\Program Files (x86)\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe',
   'C:\Program Files (x86)\KEYENCE\KVS12\KVS\Kvs.exe'
 ) 'C:\Program Files (x86)\KEYENCE\KVS12G\KVS12\KVS\Kvs.exe'
-if ($existingConfig -and $existingConfig.kvs_exe) { $kvsExeDefault = [string]$existingConfig.kvs_exe }
+if ($existingConfig -and $existingConfig.kvs_exe -and (Test-KvStudioExecutable ([string]$existingConfig.kvs_exe))) {
+  $kvsExeDefault = [string]$existingConfig.kvs_exe
+}
 
 $htmlhelpCandidates = @(
   'C:\Users\Public\Documents\KEYENCE\KVS12\ManualHelp\2052\htmlhelp',
@@ -375,6 +416,7 @@ if ((Test-Selected 'advanced') -or ($Configure -contains 'all')) {
 }
 
 if ((Test-Selected 'config') -or (Test-Selected 'kvs_exe') -or (Test-Selected 'work_root') -or (Test-Selected 'wiki_root') -or (Test-Selected 'admin_user') -or (Test-Selected 'advanced')) {
+  Assert-KvStudioExecutable $kvsExe
   $configParent = Split-Path -Parent $ConfigPath
   New-Item -ItemType Directory -Force -Path $configParent | Out-Null
   $configObject | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ConfigPath -Encoding UTF8
