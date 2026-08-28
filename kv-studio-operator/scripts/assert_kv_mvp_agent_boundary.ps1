@@ -1,2 +1,5 @@
-& (Join-Path $PSScriptRoot 'Invoke-KvStudioOperatorWrapper.ps1') -TargetName 'assert_kv_mvp_agent_boundary.ps1' -TargetClasses @('gate') @args
+$resolver = Join-Path $PSScriptRoot 'Resolve-KvStudioOperatorScript.ps1'; . $resolver
+$root = Get-KvStudioOperatorScriptsRoot -StartPath $PSCommandPath
+$target = Resolve-KvStudioOperatorScriptPath -ScriptRoot $root -Name 'assert_kv_mvp_agent_boundary.ps1' -Classes @('gate')
+& $target @args
 exit $LASTEXITCODE

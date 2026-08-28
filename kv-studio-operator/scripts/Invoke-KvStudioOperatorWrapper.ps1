@@ -4,6 +4,7 @@ param(
 
   [string[]]$TargetClasses = @(),
 
+  [Parameter(ValueFromRemainingArguments=$true)]
   [object[]]$RemainingArgs = @()
 )
 

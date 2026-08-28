@@ -1,3 +1,5 @@
-param([Parameter(ValueFromRemainingArguments=$true)][object[]]$RemainingArgs)
-& (Join-Path $PSScriptRoot 'Invoke-KvStudioOperatorWrapper.ps1') -TargetName 'run_kv_mvp_repeat.ps1' -TargetClasses @('regression_harness') -RemainingArgs $RemainingArgs
+$resolver = Join-Path $PSScriptRoot 'Resolve-KvStudioOperatorScript.ps1'; . $resolver
+$root = Get-KvStudioOperatorScriptsRoot -StartPath $PSCommandPath
+$target = Resolve-KvStudioOperatorScriptPath -ScriptRoot $root -Name 'run_kv_mvp_repeat.ps1' -Classes @('regression_harness')
+& $target @args
 exit $LASTEXITCODE
