@@ -1233,6 +1233,10 @@ function Paste-LocalVariablesByTabPgDn($Form, [string]$Text, [string]$ProgramNam
   $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
   if (-not $formNow) { throw 'KvVariableForm missing after focusing local variable grid for local paste.' }
 
+  # The local grid selects an existing row after program selection.  Move to
+  # the first blank append row so a new definition cannot overwrite it.
+  $formNow = Invoke-GuardedVariableKeyAction $formNow 'local variable append row Ctrl+End' '^{END}' 'Ctrl+End moves to the append row in the selected local-variable grid' 150
+  $formNow = Invoke-GuardedVariableKeyAction $formNow 'local variable append row Home' '{HOME}' 'Home returns the append row selection to its first name column before paste' 150
   $formNow = Invoke-GuardedVariablePaste $formNow 'local variables Ctrl+V' $Text 'Ctrl+V local variables into verified grid cell' 300
   $formNow = Wait-VariableFormUiStable $formNow "local variables $ProgramName after paste"
   Log "pasted local variables into verified grid cell text length=$($Text.Length)"
@@ -1487,3 +1491,4 @@ try {
   } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'set_variables_result.json') -Encoding UTF8
   exit 1
 }
+
