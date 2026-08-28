@@ -289,19 +289,22 @@ function Find-ResultArea {
 }
 
 try {
-  $process = Get-Process Kvs -ErrorAction Stop |
-    Where-Object { $_.MainWindowHandle -ne 0 } |
-    Select-Object -First 1
-  if (-not $process) { throw 'No visible Kvs process.' }
   $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
+  $process = Get-Process Kvs -ErrorAction Stop |
+    Where-Object {
+      $_.MainWindowHandle -ne 0 -and
+      $_.MainWindowTitle -like 'KV STUDIO*' -and
+      $_.MainWindowTitle -like "*$projectNeedle*"
+    } |
+    Sort-Object StartTime -Descending |
+    Select-Object -First 1
+  if (-not $process) { throw "No visible Kvs process matched target project '$projectNeedle'. Refusing to operate another project window." }
 
   Assert-NoBlockingPopup $process.Id
-  [KvCompileBoundedWin32]::ShowWindow($process.MainWindowHandle, 3) | Out-Null
-  Start-Sleep -Milliseconds 500
-  Log 'maximized KV STUDIO before conversion'
+  Log "selected target KV STUDIO pid=$($process.Id) title=$($process.MainWindowTitle) without changing window size"
   for ($i = 1; $i -le 10; $i++) {
     Invoke-KvUiGuardAltForegroundUnlock
-    [KvCompileBoundedWin32]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
+    [void](Invoke-KvUiGuardForceForeground -TargetHwnd ([IntPtr]$process.MainWindowHandle))
     Start-Sleep -Milliseconds 150
     $title = Get-ForegroundTitle
     Log "foreground compile try=$i title=$title"
