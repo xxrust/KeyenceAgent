@@ -127,6 +127,27 @@ function FindProjectModuleTreeItem([int]$ProcessIdValue, [string]$ModuleName) {
   return $null
 }
 
+function Convert-UiaPointToPhysicalScreen([int]$ProcessIdValue, [double]$X, [double]$Y) {
+  $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+  $root = [System.Windows.Automation.AutomationElement]::RootElement
+  $window = $root.FindFirst(
+    [System.Windows.Automation.TreeScope]::Descendants,
+    (New-Object System.Windows.Automation.AndCondition(
+      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $ProcessIdValue)),
+      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Window))
+    ))
+  )
+  if (-not $window) { return [pscustomobject]@{ x = [int]$X; y = [int]$Y; scale = 1.0 } }
+  $rect = $window.Current.BoundingRectangle
+  $scaleX = if ($rect.Width -gt $screen.Width -and $rect.Width -gt 0) { [double]$screen.Width / [double]$rect.Width } else { 1.0 }
+  $scaleY = if ($rect.Height -gt $screen.Height -and $rect.Height -gt 0) { [double]$screen.Height / [double]$rect.Height } else { 1.0 }
+  [pscustomobject]@{
+    x = [int][math]::Round($X * $scaleX)
+    y = [int][math]::Round($Y * $scaleY)
+    scale = [math]::Min($scaleX, $scaleY)
+  }
+}
+
 function Bring-ProjectTreeItemIntoView($Item, [int]$ProcessIdValue) {
   if (-not $Item) { return }
   try {
@@ -153,6 +174,53 @@ function Bring-ProjectTreeItemIntoView($Item, [int]$ProcessIdValue) {
       }
     }
   } catch {}
+}
+
+function Move-FocusToProjectTreeItemByArrows($Tree, $TargetItem, [IntPtr]$MainHwnd, [string]$ProjectNeedle, [string]$ModuleName) {
+  $items = @($Tree.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::TreeItem))))
+  if (-not $items.Count) { return $false }
+  $screenBottom = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Bottom
+  $visible = @($items | Where-Object {
+    $r = $_.Current.BoundingRectangle
+    -not $_.Current.IsOffscreen -and $r.Height -ge 10 -and $r.Width -ge 10 -and $r.Y -ge 0 -and ($r.Y + $r.Height) -le $screenBottom
+  })
+  if (-not $visible.Count) { return $false }
+  $targetIndex = -1
+  for ($ti = 0; $ti -lt $items.Count; $ti++) {
+    if ([string]$items[$ti].Current.Name -eq [string]$TargetItem.Current.Name) { $targetIndex = $ti; break }
+  }
+  if ($targetIndex -lt 0) { return $false }
+  $start = $visible | Sort-Object { $_.Current.BoundingRectangle.Y } -Descending | Select-Object -First 1
+  $startIndex = -1
+  for ($si = 0; $si -lt $items.Count; $si++) {
+    if ($items[$si].Current.Name -eq $start.Current.Name) { $startIndex = $si; break }
+  }
+  if ($startIndex -lt 0) { return $false }
+  $sr = $start.Current.BoundingRectangle
+  try {
+    Invoke-KvGuardedMouseClick -TargetHwnd $MainHwnd -Step "focus visible FB tree neighbor" -X ([int]($sr.X + [math]::Min(100, $sr.Width / 2))) -Y ([int]($sr.Y + $sr.Height / 2)) -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -SleepMs 100
+  } catch { try { $start.SetFocus() } catch { return $false } }
+  Start-Sleep -Milliseconds 150
+  $directionVk = if ($targetIndex -ge $startIndex) { 0x28 } else { 0x26 }
+  $remaining = [math]::Min(240, [math]::Abs($targetIndex - $startIndex) + 8)
+  for ($i = 0; $i -lt $remaining; $i++) {
+    $currentTarget = FindProjectModuleTreeItem ([int]$Tree.Current.ProcessId) $ModuleName
+    if ($currentTarget) {
+      $tr = $currentTarget.Current.BoundingRectangle
+      if (-not $currentTarget.Current.IsOffscreen -and $tr.Y -ge 0 -and ($tr.Y + $tr.Height) -le ($screenBottom - 30) -and $tr.Height -ge 10) {
+        try { $currentTarget.SetFocus() } catch {}
+        return $true
+      }
+    }
+    $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+    $name = if ($focused) { [string]$focused.Current.Name } else { '' }
+    if ($name -eq $ModuleName -or $name.StartsWith($ModuleName + ':', [System.StringComparison]::Ordinal) -or $name.StartsWith($ModuleName + [char]0xFF1A, [System.StringComparison]::Ordinal)) {
+      return $true
+    }
+    Invoke-KvGuardedVkTap -TargetHwnd $MainHwnd -Step "navigate FB tree arrow $($i + 1) $ModuleName" -Vk $directionVk -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -SleepMs 55
+  }
+  return $false
 }
 
 function Write-ProcessWindowDump([int]$ProcessIdValue, [string]$FileName) {
@@ -560,6 +628,35 @@ try {
     Fail-Step 'KV_FB_MODULE_TREE_ITEM_MISSING' 'select FB module' "Function-block tree item was not found: $FbModuleName" @($dumpPath)
   }
   Bring-ProjectTreeItemIntoView $item $process.Id
+  $itemRectAfterScroll = $item.Current.BoundingRectangle
+  $treeForArrow = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst(
+    [System.Windows.Automation.TreeScope]::Descendants,
+    (New-Object System.Windows.Automation.AndCondition(
+      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $process.Id)),
+      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'ProjectTreeView'))
+    ))
+  )
+  $screenBottom = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Bottom
+  if ($itemRectAfterScroll.Y -lt 0 -or ($itemRectAfterScroll.Y + $itemRectAfterScroll.Height) -gt ($screenBottom - 30)) {
+    if (-not (Move-FocusToProjectTreeItemByArrows $treeForArrow $item ([IntPtr]$process.MainWindowHandle) $projectNeedle $FbModuleName)) {
+      $dumpPath = Write-ProcessWindowDump $process.Id 'fb_tree_arrow_navigation_failed.json'
+      Fail-Step 'KV_FB_MODULE_TREE_NAVIGATION_FAILED' 'navigate to FB module' "Could not reach FB module '$FbModuleName' using tree arrow navigation." @($dumpPath)
+    }
+    $item = FindProjectModuleTreeItem $process.Id $FbModuleName
+    if (-not $item) { Fail-Step 'KV_FB_MODULE_TREE_ITEM_MISSING' 'select FB module' "Function-block tree item disappeared while navigating: $FbModuleName" @() }
+  } else {
+    try { $item.SetFocus() } catch {}
+  }
+  # Re-read the virtualized row after navigation and invoke the context menu
+  # from the selected tree item.  The tree may expose logical coordinates
+  # larger than the physical desktop (DPI scaling); keyboard invocation avoids
+  # sending a click outside the desktop while still honoring the user's
+  # near-node + arrow navigation route.
+  $rect = $item.Current.BoundingRectangle
+  if ($rect.Y -lt 0 -or ($rect.Y + $rect.Height) -gt ($screenBottom + 200)) {
+    $dumpPath = Write-ProcessWindowDump $process.Id 'fb_tree_target_still_out_of_view.json'
+    Fail-Step 'KV_FB_MODULE_TREE_NAVIGATION_FAILED' 'navigate to FB module' "FB module '$FbModuleName' remained outside the reachable tree after arrow navigation." @($dumpPath)
+  }
   try {
     $selectPattern = $null
     if ($item.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selectPattern)) { $selectPattern.Select() }
@@ -568,10 +665,12 @@ try {
   Start-Sleep -Milliseconds 180
   $rect = $item.Current.BoundingRectangle
   if ($rect.Width -lt 10 -or $rect.Height -lt 10) { Fail-Step 'KV_FB_MODULE_TREE_ITEM_BOUNDS_INVALID' 'select FB module' "Function-block tree item has invalid bounds: $FbModuleName" @() }
-  # The tree can report a virtualized row below the physical work area.  Use
-  # the item's keyboard context menu invocation instead of a screen coordinate
-  # right-click so off-screen rows are handled deterministically.
-  Invoke-KvGuardedVkTap -TargetHwnd $process.MainWindowHandle -Step "FB module context menu $FbModuleName" -Vk 0x5D -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 250
+  if ($rect.Y -ge 0 -and $rect.Height -ge 10 -and $rect.Width -ge 10) {
+    $physical = Convert-UiaPointToPhysicalScreen $process.Id ($rect.X + [math]::Min(100, [math]::Max(12, $rect.Width / 2))) ($rect.Y + ($rect.Height / 2))
+    Invoke-KvGuardedMouseRightClick -TargetHwnd $process.MainWindowHandle -Step "FB module context menu $FbModuleName" -X $physical.x -Y $physical.y -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 250
+  } else {
+    Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step "FB module context menu $FbModuleName" -Keys '+{F10}' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -Action 'Shift+F10 opens the selected FB module context menu' -SleepMs 250
+  }
 
   $fg = Get-KvForegroundSnapshot
   $menuTarget = if ([string]$fg.class_name -eq '#32768') { [IntPtr]$fg.hwnd } else { $process.MainWindowHandle }
