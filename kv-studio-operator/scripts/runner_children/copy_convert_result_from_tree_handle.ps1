@@ -124,6 +124,31 @@ function Get-WindowRectObject {
   $rect
 }
 
+function Get-ConversionResultDialog {
+  param([int]$ProcessIdValue)
+  $convertResultTitle = -join ([char[]](0x8F6C,0x6362,0x7ED3,0x679C))
+  foreach ($window in @(Get-KvWindows $ProcessIdValue)) {
+    if ([string]$window.Current.Name -ne $convertResultTitle) { continue }
+    if ([string]$window.Current.ClassName -ne '#32770') { continue }
+    return $window
+  }
+  return $null
+}
+
+function Get-ConversionResultDialogText {
+  param([Windows.Automation.AutomationElement]$Dialog)
+  $dialogHwnd = [IntPtr]$Dialog.Current.NativeWindowHandle
+  $lines = [System.Collections.Generic.List[string]]::new()
+  $lines.Add(([string]$Dialog.Current.Name).Trim())
+  foreach ($child in @([KvTreeHandleWin32]::EnumChildren($dialogHwnd))) {
+    if (-not [KvTreeHandleWin32]::IsWindowVisible($child)) { continue }
+    if ((Get-ClassName $child) -ne 'Static') { continue }
+    $text = (Get-WindowTitle $child).Trim()
+    if ($text) { $lines.Add($text) }
+  }
+  @($lines | Select-Object -Unique)
+}
+
 try {
   $process = Get-Process Kvs -ErrorAction Stop |
     Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectNeedle*" } |
@@ -142,7 +167,12 @@ try {
   $mainRect = Get-WindowRectObject $process.MainWindowHandle
   $treeCandidates = @()
   $allVisibleChildren = @()
+  $conversionDialog = $null
   do {
+    # KV STUDIO 12 presents the authoritative result in a modal dialog.  Read
+    # it first; the main window's bottom SysTreeView32 is often a blank shell.
+    $conversionDialog = Get-ConversionResultDialog $process.Id
+    if ($conversionDialog) { break }
     $children = [KvTreeHandleWin32]::EnumChildren($process.MainWindowHandle)
     $candidateList = [System.Collections.Generic.List[object]]::new()
     $visibleList = [System.Collections.Generic.List[object]]::new()
@@ -185,37 +215,49 @@ try {
     Start-Sleep -Milliseconds 150
   } while ($lookupWatch.ElapsedMilliseconds -lt $MaxLookupMs)
 
-  if ($treeCandidates.Count -eq 0) {
+  if (-not $conversionDialog -and $treeCandidates.Count -eq 0) {
     $allVisibleChildren |
       Sort-Object top,left |
       ConvertTo-Json -Depth 5 |
       Set-Content -LiteralPath (Join-Path $OutDir 'visible_children_no_result_tree.json') -Encoding UTF8
     throw "No visible result SysTreeView32 candidates found under KV STUDIO within ${MaxLookupMs}ms."
   }
-  $candidate = $treeCandidates |
-    Sort-Object @{ Expression = { $_.distance_to_bottom }; Ascending = $true }, @{ Expression = { $_.width }; Ascending = $false } |
-    Select-Object -First 1
-  Log "candidate hwnd=$($candidate.hwnd) class=$($candidate.class) rect=$($candidate.left),$($candidate.top),$($candidate.width),$($candidate.height) distance_to_bottom=$($candidate.distance_to_bottom)"
-
-  $treeElement = [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$candidate.hwnd)
-  if (-not $treeElement) { throw 'AutomationElement.FromHandle returned null for result tree.' }
-
-  $treeItemCondition = New-Object Windows.Automation.PropertyCondition(
-    [Windows.Automation.AutomationElement]::ControlTypeProperty,
-    [Windows.Automation.ControlType]::TreeItem
-  )
-  $items = @($treeElement.FindAll([Windows.Automation.TreeScope]::Descendants, $treeItemCondition))
-  $lookupWatch.Stop()
-  Log "lookup_ms=$($lookupWatch.ElapsedMilliseconds) treeitem_count=$($items.Count)"
-  if ($lookupWatch.ElapsedMilliseconds -gt $MaxLookupMs) {
-    throw "Result tree handle lookup exceeded ${MaxLookupMs}ms: $($lookupWatch.ElapsedMilliseconds)ms"
-  }
-  if ($items.Count -eq 0) { throw 'Result tree has no TreeItem descendants.' }
-
   $lines = [System.Collections.Generic.List[string]]::new()
-  foreach ($item in $items) {
-    $name = ([string]$item.Current.Name).TrimEnd()
-    if ($name) { $lines.Add($name) }
+  $route = ''
+  if ($conversionDialog) {
+    $dialogLines = @(Get-ConversionResultDialogText $conversionDialog)
+    $successMessage = -join ([char[]](0x8F6C,0x6362,0x6210,0x529F,0x3002))
+    if ($dialogLines -contains $successMessage) {
+      $lines.Add(((-join ([char[]](0x8F6C,0x6362,0x7ED3,0x679C))) + ' OK'))
+    }
+    foreach ($line in $dialogLines) { if ($line) { $lines.Add($line) } }
+    $lookupWatch.Stop()
+    Log "lookup_ms=$($lookupWatch.ElapsedMilliseconds) conversion_dialog_hwnd=$($conversionDialog.Current.NativeWindowHandle) static_line_count=$($dialogLines.Count)"
+    $route = 'conversion_result_dialog_static_text_to_file_clipboard_optional'
+  } else {
+    $candidate = $treeCandidates |
+      Sort-Object @{ Expression = { $_.distance_to_bottom }; Ascending = $true }, @{ Expression = { $_.width }; Ascending = $false } |
+      Select-Object -First 1
+    Log "candidate hwnd=$($candidate.hwnd) class=$($candidate.class) rect=$($candidate.left),$($candidate.top),$($candidate.width),$($candidate.height) distance_to_bottom=$($candidate.distance_to_bottom)"
+
+    $treeElement = [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$candidate.hwnd)
+    if (-not $treeElement) { throw 'AutomationElement.FromHandle returned null for result tree.' }
+    $treeItemCondition = New-Object Windows.Automation.PropertyCondition(
+      [Windows.Automation.AutomationElement]::ControlTypeProperty,
+      [Windows.Automation.ControlType]::TreeItem
+    )
+    $items = @($treeElement.FindAll([Windows.Automation.TreeScope]::Descendants, $treeItemCondition))
+    $lookupWatch.Stop()
+    Log "lookup_ms=$($lookupWatch.ElapsedMilliseconds) treeitem_count=$($items.Count)"
+    if ($items.Count -eq 0) { throw 'Result tree has no TreeItem descendants.' }
+    foreach ($item in $items) {
+      $name = ([string]$item.Current.Name).TrimEnd()
+      if ($name) { $lines.Add($name) }
+    }
+    $route = 'win32_child_hwnd_to_uia_treeitem_to_file_clipboard_optional'
+  }
+  if ($lookupWatch.ElapsedMilliseconds -gt $MaxLookupMs) {
+    throw "Result handle lookup exceeded ${MaxLookupMs}ms: $($lookupWatch.ElapsedMilliseconds)ms"
   }
   if ($lines.Count -eq 0) { throw 'Result tree items had no text.' }
 
@@ -240,7 +282,7 @@ try {
       ok = $false
       error_code = 'KV_COMPILE_RESULT_NG'
       message = 'KV STUDIO conversion result is NG.'
-      route = 'win32_child_hwnd_to_uia_treeitem_to_file_clipboard_optional'
+      route = $route
       lookup_ms = $lookupWatch.ElapsedMilliseconds
       line_count = $lines.Count
       clipboard_length = $clipboard.Length
@@ -255,7 +297,7 @@ try {
 
   [pscustomobject]@{
     ok = $true
-    route = 'win32_child_hwnd_to_uia_treeitem_to_file_clipboard_optional'
+    route = $route
     lookup_ms = $lookupWatch.ElapsedMilliseconds
     line_count = $lines.Count
     clipboard_length = $clipboard.Length
