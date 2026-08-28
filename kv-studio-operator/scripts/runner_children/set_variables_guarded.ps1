@@ -278,10 +278,10 @@ function Set-CapsLockState([bool]$Enabled, [IntPtr]$TargetHwnd, [string]$Expecte
 }
 
 function Restore-KvForeground([System.Diagnostics.Process]$Process, [string]$ProjectNeedle, [string]$Action) {
-  [KvSetVarWin32]::ShowWindow($Process.MainWindowHandle, 3) | Out-Null
   for ($i = 1; $i -le 10; $i++) {
     if ([KvSetVarWin32]::IsIconic($Process.MainWindowHandle)) {
-      [KvSetVarWin32]::ShowWindow($Process.MainWindowHandle, 3) | Out-Null
+      # Restore a minimized window without changing the user's normal/maximized size.
+      [KvSetVarWin32]::ShowWindow($Process.MainWindowHandle, 9) | Out-Null
     }
     [KvSetVarWin32]::SetForegroundWindow($Process.MainWindowHandle) | Out-Null
     Start-Sleep -Milliseconds 100
@@ -1115,7 +1115,7 @@ function Copy-VariableGridText($Form, [string]$PageAid, [string]$Label) {
   return $text
 }
 
-function Copy-LocalVariableGridTextByTabRoute($Form, [string]$ProgramName, [string]$Label) {
+function Copy-LocalVariableGridTextByTabRoute($Form, [string]$ProgramName, [string]$Label, [switch]$AllowEmpty) {
   if (-not (Test-VariablePageSelected $Form '_tabPageLocal')) {
     throw "Local variable page is not selected before copy audit for $Label."
   }
@@ -1123,13 +1123,13 @@ function Copy-LocalVariableGridTextByTabRoute($Form, [string]$ProgramName, [stri
   $formNow = Get-VariableForm $script:ProcessIdForVariables
   if (-not $formNow) { throw "KvVariableForm missing after selecting local program before copy audit for $Label." }
 
-  Focus-LocalProgramCombo $formNow $ProgramName $Label
+  # The local-program combo is not the variable grid.  A Tab/PgDn route from
+  # that combo can leave focus on a non-copyable control in an empty/new table.
+  # Focus the verified local grid cell directly before selecting and copying.
+  Focus-VariableGridArea $formNow '_tabPageLocal' $Label
   $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
-  if (-not $formNow) { throw "KvVariableForm missing after focusing local program combo before copy audit for $Label." }
+  if (-not $formNow) { throw "KvVariableForm missing after focusing local variable grid before copy audit for $Label." }
   $formNow = Wait-VariableFormUiStable $formNow "$Label before copy"
-
-  $formNow = Invoke-GuardedVariableKeyAction $formNow "$Label first-name Tab" '{TAB}' "Tab from local program combo to first variable name cell for $Label copy audit" 250
-  Start-Sleep -Milliseconds 300
 
   $formNow = Invoke-GuardedVariableCtrlChord $formNow "$Label Ctrl+A" 0x41 "Ctrl+A selects local variable grid text for $Label" 250
   Wait-ClipboardAvailable "$Label before Ctrl+C" | Out-Null
@@ -1137,6 +1137,10 @@ function Copy-LocalVariableGridTextByTabRoute($Form, [string]$ProgramName, [stri
   $formNow = Invoke-GuardedVariableCtrlChord $formNow "$Label Ctrl+C" 0x43 "Ctrl+C copies local variable grid text for $Label" 400
   $text = Get-ClipboardTextAfterCopy $beforeSequence 5
   if ([string]::IsNullOrWhiteSpace($text)) {
+    if ($AllowEmpty) {
+      Log "copied $Label local grid text is empty; accepted because this is a pre-paste isolation check on a new/empty local-variable set"
+      return ''
+    }
     Fail-Guard 'KV_VARIABLE_GRID_COPY_EMPTY' "$Label copy verification" "Local variable grid copy returned empty text for $Label." @()
   }
   Log "copied $Label local grid text length=$($text.Length) by combo Tab route"
@@ -1214,7 +1218,7 @@ function Paste-LocalVariablesByTabPgDn($Form, [string]$Text, [string]$ProgramNam
   if (-not $formNow) { throw 'KvVariableForm missing after selecting local program.' }
 
   if ($script:ForbiddenLocalNames.Count -gt 0) {
-    $prePasteClipboardText = Copy-LocalVariableGridTextByTabRoute $formNow $ProgramName "local variables $ProgramName pre-paste isolation"
+    $prePasteClipboardText = Copy-LocalVariableGridTextByTabRoute $formNow $ProgramName "local variables $ProgramName pre-paste isolation" -AllowEmpty
     $prePasteClipboardPath = Join-Path $OutDir 'local_variables_pre_paste_clipboard.txt'
     Set-Content -LiteralPath $prePasteClipboardPath -Value $prePasteClipboardText -Encoding UTF8
     Assert-NameColumnNotInCopiedText $prePasteClipboardText $script:ForbiddenLocalNames "local variables $ProgramName before paste" $prePasteClipboardPath
@@ -1222,19 +1226,16 @@ function Paste-LocalVariablesByTabPgDn($Form, [string]$Text, [string]$ProgramNam
     if (-not $formNow) { throw 'KvVariableForm missing after local pre-paste isolation copy.' }
   }
 
-  Focus-LocalProgramCombo $formNow $ProgramName "local variables $ProgramName"
+  # Directly target the local variable grid's first editable row.  Do not
+  # derive grid focus from the combo box with Tab/PgDn: that route is unstable
+  # for a newly-created program whose local table is initially empty.
+  Focus-VariableGridArea $formNow '_tabPageLocal' "local variables $ProgramName"
   $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
-  if (-not $formNow) { throw 'KvVariableForm missing after focusing local program combo for local paste.' }
+  if (-not $formNow) { throw 'KvVariableForm missing after focusing local variable grid for local paste.' }
 
-  $formNow = Invoke-GuardedVariableKeyAction $formNow 'local first-name Tab' '{TAB}' 'Tab to select first local variable name cell' 150
-  Log 'sent guarded Tab to select first local variable name cell'
-
-  $formNow = Invoke-GuardedVariableKeyAction $formNow 'local last-row PgDn' '{PGDN}' 'PgDn to move to last local variable row' 250
-  Log 'sent guarded PgDn to move to last local variable row'
-
-  $formNow = Invoke-GuardedVariablePaste $formNow 'local variables Ctrl+V' $Text 'Ctrl+V local variables by Tab/PgDn route' 300
+  $formNow = Invoke-GuardedVariablePaste $formNow 'local variables Ctrl+V' $Text 'Ctrl+V local variables into verified grid cell' 300
   $formNow = Wait-VariableFormUiStable $formNow "local variables $ProgramName after paste"
-  Log "pasted local variables by Tab/PgDn route text length=$($Text.Length)"
+  Log "pasted local variables into verified grid cell text length=$($Text.Length)"
 }
 
 function Enter-VariablesCellByCell($Form, [string]$PageAid, [object[]]$Rows, [string[]]$Columns, [string]$Label) {
@@ -1449,7 +1450,7 @@ try {
     LocalReopenClipboardContainsExpectedNames = if ($AuditPersistence -and $localRows.Count -gt 0) { $true } else { $null }
     ForbiddenLocalNames = @($script:ForbiddenLocalNames)
     LocalReopenClipboardExcludesForbiddenNames = if ($AuditPersistence -and $script:ForbiddenLocalNames.Count -gt 0) { $true } else { $null }
-    LocalPasteRoute = if ($localRows.Count -gt 0) { "local tab -> $LocalProgramName -> Tab -> PgDn -> Ctrl+V" } else { 'skipped: no executable local variables' }
+    LocalPasteRoute = if ($localRows.Count -gt 0) { "local tab -> $LocalProgramName -> verified local grid cell -> Ctrl+V" } else { 'skipped: no executable local variables' }
     ScreenshotAfterLocalPaste = if ($localRows.Count -gt 0) { (Join-Path $OutDir '02_after_local_paste.png') } else { '' }
     ProjectFileScan = $globalFileScan
   }
