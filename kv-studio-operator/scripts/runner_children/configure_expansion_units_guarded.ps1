@@ -86,9 +86,12 @@ function Open-UnitEditor([System.Diagnostics.Process]$Process) {
 function Set-FlatCatalog([IntPtr]$Editor) {
   $tab=Get-Child $Editor '' 501 -VisibleOnly
   if($tab -eq [IntPtr]::Zero){ throw 'KV_UNIT_CATALOG_TAB_NOT_FOUND' }
+  # The catalog tab remains present even while an existing-unit page is shown.
+  # Its first tab position is stable for this editor; resolve the tab HWND and
+  # scale its screen rectangle rather than relying on the editor window size.
   Click-Relative $Editor $tab 43 12 'select unit catalog tab'
-  $toolbar=Get-Child $Editor 'ToolbarWindow32' 59392 -VisibleOnly;if($toolbar-eq[IntPtr]::Zero){throw 'KV_UNIT_CATALOG_TOOLBAR_NOT_FOUND'}
-  # Four direct toolbar positions are the verified category/list presentation controls.
+  $toolbar=Get-Child $Editor 'ToolbarWindow32' 59392 -VisibleOnly
+  if($toolbar-eq[IntPtr]::Zero){throw 'KV_UNIT_CATALOG_TOOLBAR_NOT_FOUND'}
   foreach($offset in @(12,38,64,90)){ Click-Relative $Editor $toolbar $offset 12 "select flat catalog presentation x$offset" }
   $grid=Wait-VisibleChild $Editor 'SysListView32' 568 1800;if($grid-eq[IntPtr]::Zero){throw 'KV_FLAT_UNIT_CATALOG_NOT_VISIBLE'};return $grid
 }
