@@ -44,6 +44,18 @@ $CpuPattern = '^\[0\]\s+KV-'
 $projectLeaf = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
 $unitSetPath = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($ProjectPath))) 'UnitSet.ue2'
 
+function Normalize-Models {
+  $normalized=@()
+  foreach($item in @($Models)) {
+    foreach($part in ([string]$item -split ',')) {
+      $name=$part.Trim()
+      if($name){$normalized += ($name -replace '\*$','')}
+    }
+  }
+  if($normalized.Count -eq 0){throw 'KV_MODELS_EMPTY'}
+  $script:Models=$normalized
+}
+
 function Write-Result($Value) { $Value | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $OutDir 'result.json') -Encoding UTF8 }
 function Test-ModelPersisted([string]$Model) {
   if(-not (Test-Path -LiteralPath $unitSetPath -PathType Leaf)){return $false}
@@ -125,6 +137,7 @@ function Add-One([IntPtr]$Editor,[string]$Model) {
 }
 
 try {
+  Normalize-Models
   if(-not(Test-Path -LiteralPath $ProjectPath -PathType Leaf)){throw "KV_PROJECT_MISSING:$ProjectPath"}
   $process=Get-KvsMain
   $beforeLength=(Get-Item -LiteralPath $unitSetPath).Length
@@ -147,6 +160,16 @@ try {
   if($ok-eq[IntPtr]::Zero){throw 'KV_UNIT_EDITOR_OK_BUTTON_NOT_FOUND'}
   # Direct control invocation is permitted because the button identity is resolved first; no global input is used.
   [void][KvExpansionGuardedWin32]::SendMessage($ok,[KvExpansionGuardedWin32]::BM_CLICK,[IntPtr]::Zero,[IntPtr]::Zero)
+  # A duplicate/invalid address can produce a modal “relay/DM/address error”.
+  # Surface it as a stable workflow failure instead of leaving the dialog open.
+  $modalDeadline=(Get-Date).AddSeconds(2); do {
+    $modal=Get-Child $editor '#32770' 0 -VisibleOnly
+    if($modal -ne [IntPtr]::Zero){
+      $msg=Get-ChildText $modal 65535
+      if($msg -match '地址中有错误|继电器|DM'){throw "KV_UNIT_ADDRESS_CONFLICT: $msg"}
+    }
+    Start-Sleep -Milliseconds 80
+  } while((Get-Date)-lt$modalDeadline)
   $modelPattern='(?i)'+(($Models|ForEach-Object {[regex]::Escape($_)}) -join '|')+'\*?'
   $deadline=(Get-Date).AddSeconds(8);do{Start-Sleep -Milliseconds 100;$matchCount=@(rg -a -o -N $modelPattern $unitSetPath | Sort-Object -Unique).Count}while($matchCount -lt $Models.Count -and (Get-Date)-lt$deadline)
   $persisted=@(rg -a -o -N ('(?i)'+(($Models|ForEach-Object {[regex]::Escape($_)}) -join '|')+'\*?') $unitSetPath | Sort-Object -Unique)
