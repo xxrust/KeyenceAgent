@@ -55,7 +55,7 @@ function Get-KvsMain {
 }
 function Find-UnitEditor([int]$ProcessId) {
   $script:found=[IntPtr]::Zero
-  $cb=[KvExpansionGuardedWin32+CB]{param($h,$l);$s=[Text.StringBuilder]::new(512);[void][KvExpansionGuardedWin32]::GetWindowText($h,$s,512);$pid=[uint32]0;[void][KvExpansionGuardedWin32]::GetWindowThreadProcessId($h,[ref]$pid);if($pid -eq $ProcessId -and $s.ToString().Contains($UnitEditorNeedle)){$script:found=$h;return $false};$true}
+  $cb=[KvExpansionGuardedWin32+CB]{param($h,$l);$s=[Text.StringBuilder]::new(512);[void][KvExpansionGuardedWin32]::GetWindowText($h,$s,512);$windowPid=[uint32]0;[void][KvExpansionGuardedWin32]::GetWindowThreadProcessId($h,[ref]$windowPid);if($windowPid -eq $ProcessId -and $s.ToString().Contains($UnitEditorNeedle)){$script:found=$h;return $false};$true}
   [void][KvExpansionGuardedWin32]::EnumWindows($cb,[IntPtr]::Zero); return $script:found
 }
 function Get-Child([IntPtr]$Parent,[string]$Class,[int]$Id,[switch]$VisibleOnly) {
@@ -96,12 +96,10 @@ function Add-One([IntPtr]$Editor,[string]$Model) {
   $row=@{'KV-B16X'=13;'KV-C32X'=31}[$Model]
   Click-Relative $Editor $grid 200 $row "select flat-catalog $Model tile"
   if((Get-ChildText $Editor 698) -notlike "$Model*"){throw "KV_CATALOG_MODEL_ORACLE_FAILED: expected $Model, selected '$(Get-ChildText $Editor 698)'"}
-  # Switch the selected model to its detailed list, then double-click the selected row to insert it.
-  Click-Relative $Editor $grid 12 -16 "open selected $Model detail list"
-  $list=Wait-VisibleChild $Editor 'SysListView32' 566 1200;if($list-eq[IntPtr]::Zero){throw "KV_UNIT_DETAIL_LIST_NOT_VISIBLE:$Model"}
-  $detailRow=if($Model -eq 'KV-B16X'){13}else{31}
-  Click-Relative $Editor $list 100 $detailRow "insert $Model first double-click"
-  Click-Relative $Editor $list 100 $detailRow "insert $Model second double-click"
+  # The flat list is stable and already exposes the exact model rows. Double-click
+  # the selected tile itself; switching presentation modes changes row geometry.
+  Click-Relative $Editor $grid 200 $row "insert $Model first double-click"
+  Click-Relative $Editor $grid 200 $row "insert $Model second double-click"
   $elapsed=[math]::Round($sw.Elapsed.TotalSeconds,3)
   if($elapsed -ge $PerModuleBudgetSeconds){throw "KV_EXPANSION_UNIT_TIMEOUT: $Model took $elapsed seconds (budget $PerModuleBudgetSeconds)."}
   return [pscustomobject]@{model=$Model;elapsed_seconds=$elapsed;catalog_oracle=$Model;flat_catalog_control_id=568}
