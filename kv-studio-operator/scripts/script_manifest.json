@@ -147,16 +147,15 @@
         "status": "approved",
         "customer_callable": false,
         "ui_guard_required": true
-      }
-    ],
-    "runner_child_pending": [
+      },
       {
         "path": "runner_children/set_fb_arguments_guarded.ps1",
-        "status": "pending_validation",
+        "status": "approved",
         "customer_callable": false,
         "ui_guard_required": true
       }
     ],
+    "runner_child_pending": [],
     "workflow_tool": [
       {
         "path": "workflow_tools/new_kv_mvp_execution_plan.ps1",
