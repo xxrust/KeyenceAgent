@@ -68,8 +68,10 @@ function Get-Scale {
   finally { [void][KvExpansionGuardedWin32]::ReleaseDC([IntPtr]::Zero,$dc) }
 }
 function Get-KvsMain {
-  $p=Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$projectLeaf*"} | Select-Object -First 1
-  if(-not $p){ throw "KV_PROJECT_NOT_OPEN: open '$ProjectPath' in KV STUDIO before running this workflow." }; return $p
+  $matches=@(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$projectLeaf*"})
+  if($matches.Count -eq 0){ throw "KV_PROJECT_NOT_OPEN: open '$ProjectPath' in KV STUDIO before running this workflow." }
+  if($matches.Count -gt 1){ throw "KV_PROJECT_WINDOW_AMBIGUOUS: found $($matches.Count) visible Kvs windows matching '$projectLeaf'; close duplicate project instances before running." }
+  return $matches[0]
 }
 function Find-UnitEditor([int]$ProcessId) {
   $script:found=[IntPtr]::Zero
