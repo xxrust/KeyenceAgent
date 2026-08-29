@@ -45,6 +45,11 @@ $projectLeaf = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
 $unitSetPath = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($ProjectPath))) 'UnitSet.ue2'
 
 function Write-Result($Value) { $Value | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $OutDir 'result.json') -Encoding UTF8 }
+function Test-ModelPersisted([string]$Model) {
+  if(-not (Test-Path -LiteralPath $unitSetPath -PathType Leaf)){return $false}
+  $matches=@(rg -a -o -N ('(?i)'+[regex]::Escape($Model)+'\*?') $unitSetPath 2>$null | Sort-Object -Unique)
+  return ($matches -match ('^'+[regex]::Escape($Model)+'\*?$')).Count -gt 0
+}
 function Get-Scale {
   $dc=[KvExpansionGuardedWin32]::GetDC([IntPtr]::Zero)
   try { return [double][KvExpansionGuardedWin32]::GetDeviceCaps($dc,118) / [double][KvExpansionGuardedWin32]::GetSystemMetrics(0) }
@@ -122,9 +127,22 @@ function Add-One([IntPtr]$Editor,[string]$Model) {
 try {
   if(-not(Test-Path -LiteralPath $ProjectPath -PathType Leaf)){throw "KV_PROJECT_MISSING:$ProjectPath"}
   $process=Get-KvsMain
-  $editor=Open-UnitEditor $process
-  $actions=@();foreach($model in $Models){$actions += Add-One $editor $model}
   $beforeLength=(Get-Item -LiteralPath $unitSetPath).Length
+  $actions=@();$missing=@()
+  foreach($model in $Models){
+    if(Test-ModelPersisted $model){$actions += [pscustomobject]@{model=$model;status='already_present';elapsed_seconds=0}}
+    else{$missing += $model}
+  }
+  if($missing.Count -gt 0){
+    $editor=Open-UnitEditor $process
+    foreach($model in $missing){$actions += Add-One $editor $model}
+  }
+  else {$editor=Find-UnitEditor $process.Id}
+  if($missing.Count -eq 0){
+    $persisted=@($Models|ForEach-Object {$_+'*'})
+    $result=[ordered]@{ok=$true;project_path=[IO.Path]::GetFullPath($ProjectPath);models=$Models;actions=$actions;unitset_path=$unitSetPath;unitset_length_before=$beforeLength;unitset_length_after=$beforeLength;persisted_models=$persisted;clean_end_state=(Get-KvForegroundSnapshot)}
+    Write-Result $result; $result | ConvertTo-Json -Depth 12; return
+  }
   $ok=Get-Child $editor 'Button' 23017
   if($ok-eq[IntPtr]::Zero){throw 'KV_UNIT_EDITOR_OK_BUTTON_NOT_FOUND'}
   # Direct control invocation is permitted because the button identity is resolved first; no global input is used.
