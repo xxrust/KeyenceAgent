@@ -35,7 +35,8 @@ configuration_script_status:
   plc_units:
     evidence_source: references\capability-status.md
     customer_mode: configure_kv_expansion_units workflow
-    supported_models: [KV-B16X, KV-C32X]
+    supported_models: runtime catalog lookup (any model exposed by the compatible KV STUDIO catalog)
+    verified_models: [KV-B16X, KV-C32X, KV-C64X]
     required_success_evidence: [UnitSet.ue2 same-run readback, project-tree/UI confirmation, clean main-window end state]
   ethercat:
     evidence_source: references\capability-status.md
