@@ -153,7 +153,11 @@ function Invoke-FlatWorkflowStep([object]$Step) {
   $stdoutPath = if ($outDir) { Join-Path $outDir 'step_stdout.txt' } else { Join-Path ([IO.Path]::GetTempPath()) "$($Step.name)_stdout.txt" }
   $stderrPath = if ($outDir) { Join-Path $outDir 'step_stderr.txt' } else { Join-Path ([IO.Path]::GetTempPath()) "$($Step.name)_stderr.txt" }
   $arguments = @($Step.arguments | ForEach-Object { [string]$_ })
-  $command = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath) + $arguments
+  # KV STUDIO's WinForms grids, clipboard and SendKeys paths require an STA
+  # apartment.  Running every flat child in STA keeps the UI runner children
+  # on the same execution contract as the published workflow/harness entry
+  # points; non-UI gates remain compatible with STA.
+  $command = @('-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath) + $arguments
   $stepStart = Get-Date
   $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $command -NoNewWindow -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
   $stepTimeoutSeconds = Get-StepTimeoutSeconds $Step
