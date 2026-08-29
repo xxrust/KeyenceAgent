@@ -84,6 +84,10 @@ function Get-Child([IntPtr]$Parent,[string]$Class,[int]$Id,[switch]$VisibleOnly)
   [void][KvExpansionGuardedWin32]::EnumChildWindows($Parent,$cb,[IntPtr]::Zero); return $script:found
 }
 function Get-ChildText([IntPtr]$Parent,[int]$Id) { $h=Get-Child $Parent 'Static' $Id -VisibleOnly; if($h -eq [IntPtr]::Zero){return ''};$s=[Text.StringBuilder]::new(512);[void][KvExpansionGuardedWin32]::GetWindowText($h,$s,$s.Capacity);return $s.ToString() }
+function Get-VisibleDialogMessage([IntPtr]$Editor) {
+  $dialogs=@();$cb=[KvExpansionGuardedWin32+CB]{param($h,$l);$s=[Text.StringBuilder]::new(128);[void][KvExpansionGuardedWin32]::GetClassName($h,$s,128);if($s.ToString() -eq '#32770' -and [KvExpansionGuardedWin32]::IsWindowVisible($h)){$script:dialogs += $h};$true};[void][KvExpansionGuardedWin32]::EnumChildWindows($Editor,$cb,[IntPtr]::Zero)
+  foreach($d in $dialogs){$m=Get-ChildText $d 65535;if($m){return $m}};return ''
+}
 function Click-Relative([IntPtr]$Target,[IntPtr]$RectHwnd,[int]$Dx,[int]$Dy,[string]$Step) {
   $r=New-Object KvExpansionGuardedWin32+RECT;[void][KvExpansionGuardedWin32]::GetWindowRect($RectHwnd,[ref]$r);$scale=Get-Scale
   Invoke-KvGuardedMouseClick -TargetHwnd $Target -Step $Step -X ([int](($r.left+$Dx)*$scale)) -Y ([int](($r.top+$Dy)*$scale)) -ExpectedTitleLike ('*'+$UnitEditorNeedle+'*') -SleepMs 140
@@ -180,11 +184,8 @@ try {
   # A duplicate/invalid address can produce a modal “relay/DM/address error”.
   # Surface it as a stable workflow failure instead of leaving the dialog open.
   $modalDeadline=(Get-Date).AddSeconds(2); do {
-    $modal=Get-Child $editor '#32770' 0 -VisibleOnly
-    if($modal -ne [IntPtr]::Zero){
-      $msg=Get-ChildText $modal 65535
-      if($msg -match '地址中有错误|继电器|DM'){throw "KV_UNIT_ADDRESS_CONFLICT: $msg"}
-    }
+    $msg=Get-VisibleDialogMessage $editor
+    if($msg -match '地址中有错误|继电器|DM'){throw "KV_UNIT_ADDRESS_CONFLICT: $msg"}
     Start-Sleep -Milliseconds 80
   } while((Get-Date)-lt$modalDeadline)
   $modelPattern='(?i)'+(($Models|ForEach-Object {[regex]::Escape($_)}) -join '|')+'\*?'
