@@ -73,7 +73,7 @@ function Get-KvsMain {
 }
 function Find-UnitEditor([int]$ProcessId) {
   $script:found=[IntPtr]::Zero
-  $cb=[KvExpansionGuardedWin32+CB]{param($h,$l);$s=[Text.StringBuilder]::new(512);[void][KvExpansionGuardedWin32]::GetWindowText($h,$s,512);$windowPid=[uint32]0;[void][KvExpansionGuardedWin32]::GetWindowThreadProcessId($h,[ref]$windowPid);if($windowPid -eq $ProcessId -and $s.ToString().Contains($UnitEditorNeedle)){$script:found=$h;return $false};$true}
+  $cb=[KvExpansionGuardedWin32+CB]{param($h,$l);$s=[Text.StringBuilder]::new(512);[void][KvExpansionGuardedWin32]::GetWindowText($h,$s,512);$windowPid=[uint32]0;[void][KvExpansionGuardedWin32]::GetWindowThreadProcessId($h,[ref]$windowPid);if($windowPid -eq $ProcessId -and [KvExpansionGuardedWin32]::IsWindowVisible($h) -and $s.ToString().Contains($UnitEditorNeedle)){$script:found=$h;return $false};$true}
   [void][KvExpansionGuardedWin32]::EnumWindows($cb,[IntPtr]::Zero); return $script:found
 }
 function Get-Child([IntPtr]$Parent,[string]$Class,[int]$Id,[switch]$VisibleOnly) {
