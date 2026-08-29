@@ -6,6 +6,8 @@
     "lookup": { "mode": "runtime_keyboard_scan", "oracle_control_id": 698, "catalog_control_id": 568 },
     "KV-B16X": { "status": "verified" },
     "KV-C32X": { "status": "verified" },
-    "KV-C64X": { "status": "verified", "observed_row": 4 }
+    "KV-C64X": { "status": "verified", "observed_row": 4 },
+    "KV-B8RC": { "status": "verified", "observed_row": 5 },
+    "KV-B16T": { "status": "verified", "observed_row": 7 }
   }
 }
