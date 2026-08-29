@@ -110,7 +110,13 @@ function Set-FlatCatalog([IntPtr]$Editor) {
   $toolbar=Get-Child $Editor 'ToolbarWindow32' 59392 -VisibleOnly
   if($toolbar-eq[IntPtr]::Zero){throw 'KV_UNIT_CATALOG_TOOLBAR_NOT_FOUND'}
   foreach($offset in @(12,38,64,90)){ Click-Relative $Editor $toolbar $offset 12 "select flat catalog presentation x$offset" }
-  $grid=Wait-VisibleChild $Editor 'SysListView32' 568 1800;if($grid-eq[IntPtr]::Zero){throw 'KV_FLAT_UNIT_CATALOG_NOT_VISIBLE'};return $grid
+  $grid=Wait-VisibleChild $Editor 'SysListView32' 568 1800
+  if($grid-eq[IntPtr]::Zero){
+    # Some KV STUDIO builds expose the same flat owner-data catalog as id 566
+    # after the tab has been activated; accept it only when visible.
+    $grid=Wait-VisibleChild $Editor 'SysListView32' 566 800
+  }
+  if($grid-eq[IntPtr]::Zero){throw 'KV_FLAT_UNIT_CATALOG_NOT_VISIBLE'};return $grid
 }
 function Find-CatalogRow([IntPtr]$Editor,[IntPtr]$Grid,[string]$Model) {
   # The catalog is an owner-data list: native/UIA item text is unavailable.
