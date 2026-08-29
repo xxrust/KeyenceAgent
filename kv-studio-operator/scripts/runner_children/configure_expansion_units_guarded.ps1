@@ -101,6 +101,10 @@ function Open-UnitEditor([System.Diagnostics.Process]$Process) {
   $deadline=(Get-Date).AddSeconds(5);do{$e=Find-UnitEditor $Process.Id;if($e-ne[IntPtr]::Zero){return $e};Start-Sleep -Milliseconds 60}while((Get-Date)-lt$deadline);throw 'KV_UNIT_EDITOR_OPEN_TIMEOUT'
 }
 function Set-FlatCatalog([IntPtr]$Editor) {
+  # If the selectable catalog is already active, preserve that state; this is
+  # common when the same editor is reused for several requested modules.
+  $existing=Get-Child $Editor 'SysListView32' 568 -VisibleOnly
+  if($existing-ne[IntPtr]::Zero){return $existing}
   $tab=Get-Child $Editor '' 501 -VisibleOnly
   if($tab -eq [IntPtr]::Zero){ throw 'KV_UNIT_CATALOG_TAB_NOT_FOUND' }
   # The catalog tab remains present even while an existing-unit page is shown.
@@ -124,11 +128,16 @@ function Find-CatalogRow([IntPtr]$Editor,[IntPtr]$Grid,[string]$Model) {
   Click-Relative $Editor $Grid 200 20 'focus flat catalog for dynamic model lookup'
   $count=[KvExpansionGuardedWin32]::SendMessage($Grid,[KvExpansionGuardedWin32]::LVM_GETITEMCOUNT,[IntPtr]::Zero,[IntPtr]::Zero).ToInt32()
   if($count -le 0 -or $count -gt 4096){$count=256}
+  # Establish the first row once, then advance sequentially.  Repeating
+  # Ctrl+Home for every candidate made late catalog entries unnecessarily
+  # slow (and could exceed the per-module budget on large catalogs).
+  Invoke-KvGuardedSendKeys -TargetHwnd $Editor -Step "start catalog scan for $Model" -Keys '^{HOME}' -ExpectedTitleLike ('*'+$UnitEditorNeedle+'*') -Action 'position catalog scan at first row' -SleepMs 35
   for($i=0;$i -lt $count;$i++) {
-    $keys = if($i -eq 0){'^{HOME}'}else{'^{HOME}'+('{DOWN}' * $i)}
-    Invoke-KvGuardedSendKeys -TargetHwnd $Editor -Step ("lookup catalog row $i for $Model") -Keys $keys -ExpectedTitleLike ('*'+$UnitEditorNeedle+'*') -Action 'select catalog row by guarded keyboard navigation' -SleepMs 35
     $actual=Get-ChildText $Editor 698
     if($actual -like ($Model+'*')) { return [pscustomobject]@{row=$i;actual=$actual;count=$count} }
+    if($i -lt ($count-1)) {
+      Invoke-KvGuardedSendKeys -TargetHwnd $Editor -Step ("advance catalog scan to row $($i+1) for $Model") -Keys '{DOWN}' -ExpectedTitleLike ('*'+$UnitEditorNeedle+'*') -Action 'advance catalog scan by one row' -SleepMs 35
+    }
   }
   throw "KV_MODEL_NOT_FOUND_IN_CATALOG: '$Model' (catalog_count=$count)"
 }
