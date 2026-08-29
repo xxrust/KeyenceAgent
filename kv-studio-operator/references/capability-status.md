@@ -47,7 +47,10 @@ project_configuration:
   plc_units:
     customer_callable: true
     customer_workflow: scripts\workflows\configure_kv_expansion_units.ps1
-    supported_models: [KV-B16X, KV-C32X]
+    supported_models: dynamic_catalog_lookup
+    verified_models: [KV-B16X, KV-C32X, KV-C64X]
+    lookup_method: owner-data flat catalog keyboard scan with static 698 model oracle
+    dynamic_catalog_status: runtime lookup; any model currently exposed by the compatible flat catalog is eligible
     verification: UnitSet.ue2 same-run readback plus clean main-window end state
     per_module_budget_seconds: 10
   ethercat:

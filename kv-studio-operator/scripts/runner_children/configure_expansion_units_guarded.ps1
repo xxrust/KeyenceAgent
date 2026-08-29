@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory=$true)][string]$ProjectPath,
-  [Parameter(Mandatory=$true)][ValidateSet('KV-B16X','KV-C32X')][string[]]$Models,
+  [Parameter(Mandatory=$true)][string[]]$Models,
   [string]$OutDir = '',
   [int]$PerModuleBudgetSeconds = 10
 )
@@ -34,6 +34,7 @@ public static class KvExpansionGuardedWin32 {
  [DllImport("user32.dll")] public static extern int ReleaseDC(IntPtr h, IntPtr dc);
  [DllImport("gdi32.dll")] public static extern int GetDeviceCaps(IntPtr dc, int index);
  public const int BM_CLICK = 0x00F5;
+ public const int LVM_FIRST = 0x1000, LVM_GETITEMCOUNT = LVM_FIRST + 4;
 }
 '@
 }
@@ -91,18 +92,28 @@ function Set-FlatCatalog([IntPtr]$Editor) {
   foreach($offset in @(12,38,64,90)){ Click-Relative $Editor $toolbar $offset 12 "select flat catalog presentation x$offset" }
   $grid=Wait-VisibleChild $Editor 'SysListView32' 568 1800;if($grid-eq[IntPtr]::Zero){throw 'KV_FLAT_UNIT_CATALOG_NOT_VISIBLE'};return $grid
 }
+function Find-CatalogRow([IntPtr]$Editor,[IntPtr]$Grid,[string]$Model) {
+  # The catalog is an owner-data list: native/UIA item text is unavailable.
+  # Use the supported keyboard selection path and treat static 698 as the oracle.
+  Click-Relative $Editor $Grid 200 20 'focus flat catalog for dynamic model lookup'
+  $count=[KvExpansionGuardedWin32]::SendMessage($Grid,[KvExpansionGuardedWin32]::LVM_GETITEMCOUNT,[IntPtr]::Zero,[IntPtr]::Zero).ToInt32()
+  if($count -le 0 -or $count -gt 4096){$count=256}
+  for($i=0;$i -lt $count;$i++) {
+    $keys = if($i -eq 0){'^{HOME}'}else{'^{HOME}'+('{DOWN}' * $i)}
+    Invoke-KvGuardedSendKeys -TargetHwnd $Editor -Step ("lookup catalog row $i for $Model") -Keys $keys -ExpectedTitleLike ('*'+$UnitEditorNeedle+'*') -Action 'select catalog row by guarded keyboard navigation' -SleepMs 35
+    $actual=Get-ChildText $Editor 698
+    if($actual -like ($Model+'*')) { return [pscustomobject]@{row=$i;actual=$actual;count=$count} }
+  }
+  throw "KV_MODEL_NOT_FOUND_IN_CATALOG: '$Model' (catalog_count=$count)"
+}
 function Add-One([IntPtr]$Editor,[string]$Model) {
   $sw=[Diagnostics.Stopwatch]::StartNew();$grid=Set-FlatCatalog $Editor
-  $row=@{'KV-B16X'=13;'KV-C32X'=31}[$Model]
-  Click-Relative $Editor $grid 200 $row "select flat-catalog $Model tile"
+  $lookup=Find-CatalogRow $Editor $grid $Model; $row=$lookup.row
   if((Get-ChildText $Editor 698) -notlike "$Model*"){throw "KV_CATALOG_MODEL_ORACLE_FAILED: expected $Model, selected '$(Get-ChildText $Editor 698)'"}
-  # The flat list is stable and already exposes the exact model rows. Double-click
-  # the selected tile itself; switching presentation modes changes row geometry.
-  Click-Relative $Editor $grid 200 $row "insert $Model first double-click"
-  Click-Relative $Editor $grid 200 $row "insert $Model second double-click"
+  Invoke-KvGuardedSendKeys -TargetHwnd $Editor -Step "insert $Model selected catalog row" -Keys '{ENTER}' -ExpectedTitleLike ('*'+$UnitEditorNeedle+'*') -Action 'insert dynamically resolved catalog row' -SleepMs 220
   $elapsed=[math]::Round($sw.Elapsed.TotalSeconds,3)
   if($elapsed -ge $PerModuleBudgetSeconds){throw "KV_EXPANSION_UNIT_TIMEOUT: $Model took $elapsed seconds (budget $PerModuleBudgetSeconds)."}
-  return [pscustomobject]@{model=$Model;elapsed_seconds=$elapsed;catalog_oracle=$Model;flat_catalog_control_id=568}
+  return [pscustomobject]@{model=$Model;elapsed_seconds=$elapsed;catalog_oracle=$Model;catalog_row=$row;catalog_count=$lookup.count;flat_catalog_control_id=568}
 }
 
 try {
@@ -115,9 +126,10 @@ try {
   if($ok-eq[IntPtr]::Zero){throw 'KV_UNIT_EDITOR_OK_BUTTON_NOT_FOUND'}
   # Direct control invocation is permitted because the button identity is resolved first; no global input is used.
   [void][KvExpansionGuardedWin32]::SendMessage($ok,[KvExpansionGuardedWin32]::BM_CLICK,[IntPtr]::Zero,[IntPtr]::Zero)
-  $deadline=(Get-Date).AddSeconds(8);do{Start-Sleep -Milliseconds 100;$matchCount=@(rg -a -o -N 'KV-(B16X|C32X)\*?' $unitSetPath | Sort-Object -Unique).Count}while($matchCount -lt $Models.Count -and (Get-Date)-lt$deadline)
-  $persisted=@(rg -a -o -N 'KV-(B16X|C32X)\*?' $unitSetPath | Sort-Object -Unique)
-  foreach($model in $Models){if($persisted -notcontains ($model+'*')){throw "KV_UNITSET_PERSISTENCE_FAILED:$model"}}
+  $modelPattern='(?i)'+(($Models|ForEach-Object {[regex]::Escape($_)}) -join '|')+'\*?'
+  $deadline=(Get-Date).AddSeconds(8);do{Start-Sleep -Milliseconds 100;$matchCount=@(rg -a -o -N $modelPattern $unitSetPath | Sort-Object -Unique).Count}while($matchCount -lt $Models.Count -and (Get-Date)-lt$deadline)
+  $persisted=@(rg -a -o -N ('(?i)'+(($Models|ForEach-Object {[regex]::Escape($_)}) -join '|')+'\*?') $unitSetPath | Sort-Object -Unique)
+  foreach($model in $Models){if(-not($persisted -match ('^'+[regex]::Escape($model)+'\*?$'))){throw "KV_UNITSET_PERSISTENCE_FAILED:$model"}}
   if(-not(Invoke-KvUiGuardForceForeground -TargetHwnd ([IntPtr]$process.MainWindowHandle))){throw 'KV_MAIN_FOREGROUND_RESTORE_FAILED_AFTER_COMMIT'}
   Invoke-KvGuardedSendKeys -TargetHwnd ([IntPtr]$process.MainWindowHandle) -Step 'save project after unit configuration' -Keys '^s' -ExpectedTitleLike 'KV STUDIO*' -Action 'save committed unit layout' -SleepMs 500
   $result=[ordered]@{ok=$true;project_path=[IO.Path]::GetFullPath($ProjectPath);models=$Models;actions=$actions;unitset_path=$unitSetPath;unitset_length_before=$beforeLength;unitset_length_after=(Get-Item $unitSetPath).Length;persisted_models=$persisted;clean_end_state=(Get-KvForegroundSnapshot)}

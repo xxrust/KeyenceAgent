@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory=$true)][string]$ProjectPath,
-  [Parameter(Mandatory=$true)][ValidateSet('KV-B16X','KV-C32X')][string[]]$Models,
+  [Parameter(Mandatory=$true)][string[]]$Models,
   [string]$OutDir = '',
   [int]$PerModuleBudgetSeconds = 10
 )
