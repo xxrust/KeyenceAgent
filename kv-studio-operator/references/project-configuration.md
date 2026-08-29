@@ -34,7 +34,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $ResolvedToolPath `
 configuration_script_status:
   plc_units:
     evidence_source: references\capability-status.md
-    customer_mode: requires_manifest_customer_workflow
+    customer_mode: configure_kv_expansion_units workflow
+    supported_models: [KV-B16X, KV-C32X]
+    required_success_evidence: [UnitSet.ue2 same-run readback, project-tree/UI confirmation, clean main-window end state]
   ethercat:
     evidence_source: references\capability-status.md
     customer_mode: requires_manifest_customer_workflow

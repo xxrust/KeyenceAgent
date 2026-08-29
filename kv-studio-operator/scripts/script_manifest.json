@@ -102,6 +102,15 @@
         "path": "workflows/export_mnm_project_copy_default_folder.ps1",
         "status": "published",
         "customer_callable": true
+      },
+      {
+        "path": "workflows/configure_kv_expansion_units.ps1",
+        "status": "published",
+        "customer_callable": true,
+        "capabilities": [
+          "configure_plc_expansion_units",
+          "verify_plc_expansion_units_persistence"
+        ]
       }
     ],
     "regression_harness": [
@@ -150,6 +159,12 @@
       },
       {
         "path": "runner_children/set_fb_arguments_guarded.ps1",
+        "status": "approved",
+        "customer_callable": false,
+        "ui_guard_required": true
+      },
+      {
+        "path": "runner_children/configure_expansion_units_guarded.ps1",
         "status": "approved",
         "customer_callable": false,
         "ui_guard_required": true

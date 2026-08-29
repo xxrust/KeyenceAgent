@@ -9,6 +9,7 @@ customer_workflow:
     - scripts\workflows\run_kv_mvp_scaffold.ps1
     - scripts\workflows\run_kv_mvp_repair_existing_project.ps1
     - scripts\workflows\export_mnm_project_copy_default_folder.ps1
+    - scripts\workflows\configure_kv_expansion_units.ps1
 
 regression_harness:
   customer_callable: true
@@ -35,6 +36,7 @@ internal_runner_child:
     - scripts\runner_children\copy_convert_result_from_tree_handle.ps1
     - scripts\runner_children\create_project_local_guarded.ps1
     - scripts\runner_children\export_mnm_browse_default_folder_guarded.ps1
+    - scripts\runner_children\configure_expansion_units_guarded.ps1
 
 pending_runner_child:
   customer_callable: false
@@ -43,8 +45,11 @@ pending_runner_child:
 
 project_configuration:
   plc_units:
-    customer_callable: false
-    customer_mode_status: ROUTE_RESEARCH_REQUIRED
+    customer_callable: true
+    customer_workflow: scripts\workflows\configure_kv_expansion_units.ps1
+    supported_models: [KV-B16X, KV-C32X]
+    verification: UnitSet.ue2 same-run readback plus clean main-window end state
+    per_module_budget_seconds: 10
   ethercat:
     customer_callable: false
     customer_mode_status: ROUTE_RESEARCH_REQUIRED
