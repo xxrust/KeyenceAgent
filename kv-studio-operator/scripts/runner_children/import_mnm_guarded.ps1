@@ -73,6 +73,7 @@ public class W{
 [DllImport("user32.dll")] public static extern bool SetCursorPos(int X,int Y);
 [DllImport("user32.dll")] public static extern void mouse_event(int dwFlags,int dx,int dy,int dwData,int dwExtraInfo);
 [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern bool IsWindow(IntPtr hWnd);
 [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
 [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
 [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr hWnd);
@@ -958,12 +959,25 @@ function InvokeOrClickMenuItem($item, [string]$label){
   $rect=GetElementRectObject $item
   Log ('menu target '+$label+' name='+$item.Current.Name+' access='+$item.Current.AccessKey+' rect='+$rect.Left+','+$rect.Top+','+$rect.Width+','+$rect.Height+' patterns='+((GetElementPatternNames $item) -join ','))
   if($script:AllowBoundTargetWithoutForeground -and $label -eq 'mnemonic-list read'){
-    $needle=$script:BoundProjectNeedle
-    $targets=@(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.Responding -and $_.MainWindowTitle -like 'KV STUDIO*' -and ([string]::IsNullOrWhiteSpace($needle) -or $_.MainWindowTitle -like ('*'+$needle+'*')) })
-    if($targets.Count -ne 1){ throw 'KV_IMPORT_FOREGROUND_REQUIRED: unique current PID-bound target missing before MNM read invoke' }
-    $target=$targets[0]
-    $script:KvGuardTargetHwnd=[IntPtr]$target.MainWindowHandle
-    Log ('rebound target before MNM read invoke pid='+$target.Id+' hwnd='+$target.MainWindowHandle+' title='+$target.MainWindowTitle)
+    $elementPid=[int]$item.Current.ProcessId
+    $target=Get-Process -Id $elementPid -ErrorAction SilentlyContinue
+    if(-not $target -or $target.ProcessName -ne 'Kvs'){ throw 'KV_IMPORT_FOREGROUND_REQUIRED: MNM read element is not owned by Kvs' }
+    $walker=[System.Windows.Automation.TreeWalker]::ControlViewWalker
+    $ancestor=$item
+    $top=$item
+    while($ancestor){
+      $top=$ancestor
+      try{$ancestor=$walker.GetParent($ancestor)}catch{$ancestor=$null}
+    }
+    $topHwnd=[IntPtr]$top.Current.NativeWindowHandle
+    if($topHwnd -eq [IntPtr]::Zero){$topHwnd=[IntPtr]$target.MainWindowHandle}
+    $ownerPid=[uint32]0
+    [void][W]::GetWindowThreadProcessId($topHwnd,[ref]$ownerPid)
+    $topTitle=[string]$top.Current.Name
+    [ordered]@{element_process_id=$elementPid;top_ancestor_hwnd=[int64]$topHwnd;top_ancestor_title=$topTitle;win32_owner_pid=$ownerPid;bound_project=$script:BoundProjectNeedle}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $out 'mnm_read_element_binding.json') -Encoding UTF8
+    if(-not [W]::IsWindow($topHwnd) -or [int]$ownerPid -ne $elementPid){ throw 'KV_IMPORT_FOREGROUND_REQUIRED: MNM read element top-window ownership validation failed' }
+    $script:KvGuardTargetHwnd=$topHwnd
+    Log ('verified MNM read element binding pid='+$elementPid+' hwnd='+[int64]$topHwnd+' title='+$topTitle)
     $helper=Join-Path (Split-Path -Parent $PSCommandPath) 'invoke_kv_mnm_read_menu_helper.ps1'
     $helperResult=Join-Path $out 'mnm_read_menu_helper_result.json'
     $args=@('-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',$helper,'-ExpectedProcessId',([string]$target.Id),'-ResultPath',$helperResult)
