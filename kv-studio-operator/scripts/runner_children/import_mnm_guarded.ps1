@@ -17,10 +17,13 @@
   [switch]$VerboseUiDump,
   [switch]$AuditImportWaits,
   [switch]$AuditProjectTextScan,
-  [switch]$AuditUiNameScan
+  [switch]$AuditUiNameScan,
+  [Alias('AllowBoundWindowWithoutForeground')]
+  [switch]$AllowBoundTargetWithoutForeground
 )
 
 $ErrorActionPreference='Continue'
+$script:AllowBoundTargetWithoutForeground = $AllowBoundTargetWithoutForeground.IsPresent
 $out=$OutDir
 $project=$ProjectPath
 $kvs=$KvsExe
@@ -215,6 +218,12 @@ function AssertKvStudioForeground([string]$action, [string]$projectNeedle=''){
   if($projectNeedle -and $fg.Title -notlike ('*'+$projectNeedle+'*')){
     throw ('Refusing '+$action+': foreground KV STUDIO project does not match '+$projectNeedle+'. Title='+$fg.Title)
   }
+}
+function AssertBoundTargetWindow([string]$action, [string]$projectNeedle=''){
+  $targets=@(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and (!$projectNeedle -or $_.MainWindowTitle -like ('*'+$projectNeedle+'*')) })
+  if($targets.Count -ne 1 -or -not $targets[0].Responding){ throw 'KV_IMPORT_FOREGROUND_REQUIRED: unique responding PID-bound target window unavailable for '+$action }
+  $script:KvGuardTargetHwnd=[IntPtr]$targets[0].MainWindowHandle
+  return $targets[0]
 }
 function ClickPoint([int]$x, [int]$y, [string]$label){
   Invoke-KvGuardedMouseClick -TargetHwnd $script:KvGuardTargetHwnd -Step ('MNM import click '+$label) -X $x -Y $y -ExpectedTitleLike $script:KvGuardExpectedTitleLike -SleepMs 120
@@ -949,7 +958,7 @@ function InvokeOrClickMenuItem($item, [string]$label){
   return $true
 }
 function InvokeMnemonicImportMenuByUia(){
-  AssertKvStudioForeground 'UIA mnemonic import menu route'
+  if(-not $script:AllowBoundTargetWithoutForeground){ AssertKvStudioForeground 'UIA mnemonic import menu route' } else { AssertBoundTargetWindow 'UIA mnemonic import menu route' $script:KvGuardExpectedTitleLike }
   if(-not (OpenFileMenuByUia)){
     SaveVisibleTopWindowSnapshot 'top_windows_uia_file_menu_not_found.json'
     Log 'UIA mnemonic import route failed: file menu was not opened'
@@ -988,6 +997,11 @@ function InvokeMnemonicImportMenuByUia(){
   return $true
 }
 function InvokeMnemonicImportMenu(){
+  if($script:AllowBoundTargetWithoutForeground -and (GetForegroundTitle).Title -notlike 'KV STUDIO*'){
+    Log 'system foreground is unavailable; using PID-bound UIA-only MNM route'
+    if(InvokeMnemonicImportMenuByUia){ return }
+    throw 'KV_IMPORT_FOREGROUND_REQUIRED: PID-bound UIA MNM route unavailable without system foreground'
+  }
   AssertKvStudioForeground 'Alt+F,R,R mnemonic import route'
   SetCapsLockState $true
   Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $script:KvGuardTargetHwnd -Step 'MNM import Alt+F,R,R' -Keys '%frr' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -SuccessTitleLike @('打开','KV STUDIO*') -Action 'Alt+F,R,R opens MNM read dialog' -SleepMs 300
@@ -1851,7 +1865,12 @@ try{
     throw "Kvs target project title did not become visible before startup guard: expected=$expectedProjectNeedle actual=$($p.MainWindowTitle)"
   }
   SetKvGuardTarget ([IntPtr]$p.MainWindowHandle) ('KV STUDIO*'+$expectedProjectNeedle+'*')
-  AssertKvStudioForeground 'MNM import startup' $expectedProjectNeedle
+  if($script:AllowBoundTargetWithoutForeground){
+    $bound=AssertBoundTargetWindow 'MNM import startup' $expectedProjectNeedle
+    Log ('bound target accepted without system foreground pid='+$bound.Id+' hwnd='+$bound.MainWindowHandle+' title='+$bound.MainWindowTitle)
+  } else {
+    AssertKvStudioForeground 'MNM import startup' $expectedProjectNeedle
+  }
   if($RestartKvs){ Start-Sleep -Seconds 2 } else { Start-Sleep -Milliseconds 200 }
   Shot '00_before_import.png'
   DismissInstructionErrorDialogs 'before_import'
@@ -1863,7 +1882,12 @@ try{
   }elseif($ExpectedModuleName){
     Log ('skipping project-tree module open before MNM import; full MNM import must create/update module: '+$ExpectedModuleName)
   }
-  AssertKvStudioForeground 'MNM import route' $expectedProjectNeedle
+  if($script:AllowBoundTargetWithoutForeground){
+    $bound=AssertBoundTargetWindow 'MNM import route' $expectedProjectNeedle
+    Log ('bound target verified for MNM route pid='+$bound.Id+' hwnd='+$bound.MainWindowHandle)
+  } else {
+    AssertKvStudioForeground 'MNM import route' $expectedProjectNeedle
+  }
   $routeOpened=$false
   for($attempt=1;$attempt -le 2 -and -not $routeOpened;$attempt++){
     InvokeMnemonicImportMenu
