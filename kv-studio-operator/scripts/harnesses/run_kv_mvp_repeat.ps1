@@ -87,7 +87,10 @@ for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
   if ($ConfigPath) { $args += @('-ConfigPath', $ConfigPath) }
   if ($KvsExe) { $args += @('-KvsExe', $KvsExe) }
   if ($ChecklistPath) { $args += @('-ChecklistPath', $ChecklistPath) }
-  if ($AuditVariablePersistence) { $args += '-AuditVariablePersistence' }
+  # Variable writes are only accepted when close/reopen persistence evidence is
+  # collected. Keep this mandatory for the regression harness even if callers
+  # omit the legacy switch.
+  $args += '-AuditVariablePersistence'
   $args += @('-LocalPasteFormat', $LocalPasteFormat)
 
   $attemptStart = Get-Date
@@ -140,14 +143,19 @@ for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
         try { $validation = Get-Content -Raw -LiteralPath $validationPath -Encoding UTF8 | ConvertFrom-Json } catch { $validation = $null }
       }
       $localNames = if ($validation) { @($validation.LocalNames | Where-Object { $_ }) } else { @() }
+      $globalNames = if ($validation) { @($validation.GlobalNames | Where-Object { $_ }) } else { @() }
+      $globalSkipped = [bool]($validation -and $validation.GlobalPasteSkipped)
       $auditEvidenceOk = (
-        -not $AuditVariablePersistence -or
-        $localNames.Count -eq 0 -or
-        (
+        ($globalSkipped -or $globalNames.Count -eq 0 -or (
+          [bool]$validation.GlobalReopenClipboardContainsExpectedNames -and
+          $validation.GlobalReopenClipboardPath -and
+          (Test-Path -LiteralPath ([string]$validation.GlobalReopenClipboardPath) -PathType Leaf)
+        )) -and
+        ($localNames.Count -eq 0 -or (
           [bool]$validation.LocalReopenClipboardContainsExpectedNames -and
           $validation.LocalReopenClipboardPath -and
           (Test-Path -LiteralPath ([string]$validation.LocalReopenClipboardPath) -PathType Leaf)
-        )
+        ))
       )
       $setVariableValidations += [pscustomobject]@{
         step_name = [string]$step.name
@@ -155,7 +163,7 @@ for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
         exists = [bool]($validationPath -and (Test-Path -LiteralPath $validationPath -PathType Leaf))
         parsed = [bool]($null -ne $validation)
         ok = [bool]($validation -and [bool]$validation.Ok -and $auditEvidenceOk)
-        audit_persistence_required = [bool]$AuditVariablePersistence
+        audit_persistence_required = $true
         audit_evidence_ok = [bool]$auditEvidenceOk
       }
     }

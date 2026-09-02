@@ -829,16 +829,61 @@ function Convert-GlobalRows([string]$Path) {
     @(
       $row.name
       $row.data_type
-      $row.device
-      ''
-      'False'
-      'False'
-      '闈炲叕寮€'
-      'False'
-      $row.comment
     ) -join "`t"
   }
   ($lines -join "`r`n") + "`r`n"
+}
+
+function Assert-KvVariablePastePayloadSchema(
+  [string]$Text,
+  [object[]]$Rows,
+  [ValidateSet('global','local')][string]$Scope,
+  [ValidateSet('Full','NameType')][string]$Format,
+  [string]$SourcePath
+) {
+  $expectedRows = @(Get-KvExecutableVariableRows -Rows $Rows -Scope $Scope)
+  $payloadLines = @($Text -split "`r?`n" | Where-Object { $_ -ne '' })
+  $expectedColumnCount = if ($Scope -eq 'global' -or $Format -eq 'NameType') { 2 } else { 7 }
+  $errors = [System.Collections.Generic.List[object]]::new()
+
+  if ($payloadLines.Count -ne $expectedRows.Count) {
+    $errors.Add([pscustomobject]@{ code='ROW_COUNT_MISMATCH'; expected=$expectedRows.Count; actual=$payloadLines.Count })
+  }
+  for ($i = 0; $i -lt $payloadLines.Count; $i++) {
+    $fields = @($payloadLines[$i] -split "`t", -1)
+    if ($fields.Count -ne $expectedColumnCount) {
+      $errors.Add([pscustomobject]@{ code='COLUMN_COUNT_INVALID'; row=$i+1; expected=$expectedColumnCount; actual=$fields.Count; text=$payloadLines[$i] })
+      continue
+    }
+    if ($i -lt $expectedRows.Count) {
+      $expectedName = [string]$expectedRows[$i].name
+      $expectedType = [string]$expectedRows[$i].data_type
+      if ($fields[0] -ne $expectedName -or $fields[1] -ne $expectedType) {
+        $errors.Add([pscustomobject]@{ code='NAME_TYPE_MISMATCH'; row=$i+1; expected_name=$expectedName; actual_name=$fields[0]; expected_data_type=$expectedType; actual_data_type=$fields[1] })
+      }
+    }
+    if ($payloadLines[$i].Contains([char]0xFFFD) -or $payloadLines[$i].Contains('闈炲叕寮€')) {
+      $errors.Add([pscustomobject]@{ code='ENCODING_CORRUPTION'; row=$i+1; text=$payloadLines[$i] })
+    }
+  }
+
+  $gatePath = Join-Path $OutDir "${Scope}_paste_schema_gate.json"
+  $gate = [pscustomobject]@{
+    ok = ($errors.Count -eq 0)
+    scope = $Scope
+    format = if ($Scope -eq 'global') { 'NameType' } else { $Format }
+    expected_column_count = $expectedColumnCount
+    expected_row_count = $expectedRows.Count
+    actual_row_count = $payloadLines.Count
+    source_path = $SourcePath
+    payload_path = Join-Path $OutDir $(if ($Scope -eq 'global') { 'global_paste.tsv' } else { 'local_paste.tsv' })
+    errors = @($errors)
+  }
+  $gate | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $gatePath -Encoding UTF8
+  if ($errors.Count -gt 0) {
+    Fail-Guard 'KV_VARIABLE_PAYLOAD_SCHEMA_INVALID' "preflight $Scope paste payload" "Generated $Scope paste payload does not match the verified KV STUDIO schema ($expectedColumnCount columns)." @($SourcePath, $gatePath)
+  }
+  Log "${Scope} paste payload schema gate passed columns=$expectedColumnCount rows=$($expectedRows.Count) evidence=$gatePath"
 }
 
 function Test-SoftDeviceLikeVariableName([string]$Name) {
@@ -1223,7 +1268,8 @@ function Assert-ExpectedVariableRowsInCopiedText([string]$Text, [object[]]$Expec
     if ($match.Count -eq 0) { $missing += "$expectedName/$expectedType" }
   }
   if ($missing.Count -gt 0) {
-    Fail-Guard 'KV_LOCAL_VARIABLE_REOPEN_VERIFICATION_FAILED' "$Label copied-text verification" "$Label copied text is missing expected variable name/type row(s) in the first two columns: $($missing -join ', ')" @($EvidencePath)
+    $code = if ($Label -like 'global*') { 'KV_GLOBAL_VARIABLE_REOPEN_VERIFICATION_FAILED' } else { 'KV_LOCAL_VARIABLE_REOPEN_VERIFICATION_FAILED' }
+    Fail-Guard $code "$Label copied-text verification" "$Label copied text is missing expected variable name/type row(s) in the first two columns: $($missing -join ', ')" @($EvidencePath)
   }
   Log "$Label copied-text first-column verification passed: $(@($ExpectedRows | ForEach-Object { [string]$_.name }) -join ',')"
 }
@@ -1372,19 +1418,8 @@ try {
   if (-not (Test-Path -LiteralPath $GlobalVariablesTsv)) { throw "GlobalVariablesTsv not found: $GlobalVariablesTsv" }
   if (-not (Test-Path -LiteralPath $LocalVariablesTsv)) { throw "LocalVariablesTsv not found: $LocalVariablesTsv" }
 
-  $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
-  $projectRoot = Split-Path -Parent $ProjectPath
-  $process = if ($AllowBoundWindowWithoutForeground) { Get-BoundKvsProcess $projectNeedle } else { Get-VisibleKvsProcess }
-  if (-not $process) { throw 'No visible KV STUDIO process.' }
-  $script:ProcessIdForVariables = $process.Id
-  if ($AllowBoundWindowWithoutForeground) {
-    Log 'skipped startup system-foreground requirement under explicit unique PID-bound mode'
-  } else {
-    Restore-KvForeground $process $projectNeedle 'set variables start'
-    Set-CapsLockState $true $process.MainWindowHandle "KV STUDIO*$projectNeedle*" 'set variables start'
-  }
-  Assert-NoDirectInputFast $process.Id 'before variable editing'
-
+  # Build and reject malformed adapter payloads before resolving, focusing, or
+  # otherwise interacting with a KV STUDIO window.
   $globalRows = @(Get-DefinedVariableRows $GlobalVariablesTsv 'global')
   $localRows = @(Get-DefinedVariableRows $LocalVariablesTsv 'local')
   if ($localRows.Count -gt 0 -and [string]::IsNullOrWhiteSpace($LocalProgramName)) {
@@ -1400,6 +1435,21 @@ try {
   Log "decoded executable local variable rows=$($definedLocalNames.Count): $($definedLocalNames -join ',')"
   Set-Content -LiteralPath (Join-Path $OutDir 'global_paste.tsv') -Value $globalText -Encoding UTF8
   Set-Content -LiteralPath (Join-Path $OutDir 'local_paste.tsv') -Value $localText -Encoding UTF8
+  Assert-KvVariablePastePayloadSchema $globalText $globalRows 'global' 'NameType' $GlobalVariablesTsv
+  Assert-KvVariablePastePayloadSchema $localText $localRows 'local' $LocalPasteFormat $LocalVariablesTsv
+
+  $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
+  $projectRoot = Split-Path -Parent $ProjectPath
+  $process = if ($AllowBoundWindowWithoutForeground) { Get-BoundKvsProcess $projectNeedle } else { Get-VisibleKvsProcess }
+  if (-not $process) { throw 'No visible KV STUDIO process.' }
+  $script:ProcessIdForVariables = $process.Id
+  if ($AllowBoundWindowWithoutForeground) {
+    Log 'skipped startup system-foreground requirement under explicit unique PID-bound mode'
+  } else {
+    Restore-KvForeground $process $projectNeedle 'set variables start'
+    Set-CapsLockState $true $process.MainWindowHandle "KV STUDIO*$projectNeedle*" 'set variables start'
+  }
+  Assert-NoDirectInputFast $process.Id 'before variable editing'
 
   $form = Ensure-VariableEditorOpen $process $projectNeedle
   Set-CapsLockState $false ([IntPtr]$form.Current.NativeWindowHandle) '*变量编辑*' 'variable editor opened'
@@ -1440,6 +1490,20 @@ try {
 
   $localReopenClipboardPath = ''
   $localReopenClipboardText = ''
+  $globalReopenClipboardPath = ''
+  $globalReopenClipboardText = ''
+  if ($AuditPersistence -and $globalRows.Count -gt 0 -and -not $SkipGlobal) {
+    $verifyForm = Ensure-VariableEditorOpen $process $projectNeedle
+    Set-CapsLockState $false ([IntPtr]$verifyForm.Current.NativeWindowHandle) '*变量编辑*' 'global reopen verification'
+    $verifyForm = Select-VariableTabByAid $verifyForm '_tabPageGlobal' 'global tab reopen verification'
+    $verifyForm = Get-VariableForm $process.Id
+    $verifyForm = Wait-VariableFormUiStable $verifyForm 'global variables after reopen tab select'
+    $globalReopenClipboardText = Copy-VariableGridText $verifyForm '_tabPageGlobal' 'global variables reopen verification'
+    $globalReopenClipboardPath = Join-Path $OutDir 'global_variables_reopen_clipboard.txt'
+    Set-Content -LiteralPath $globalReopenClipboardPath -Value $globalReopenClipboardText -Encoding UTF8
+    Assert-ExpectedVariableRowsInCopiedText $globalReopenClipboardText $globalRows 'global variables after close/reopen' $globalReopenClipboardPath
+    Save-Shot '05_after_global_reopen_verification.png'
+  }
   if ($AuditPersistence -and $localRows.Count -gt 0) {
     $verifyForm = Ensure-VariableEditorOpen $process $projectNeedle
     Set-CapsLockState $false ([IntPtr]$verifyForm.Current.NativeWindowHandle) '*变量编辑*' 'local reopen verification'
@@ -1453,7 +1517,7 @@ try {
       Set-Content -LiteralPath $localReopenClipboardPath -Value $localReopenClipboardText -Encoding UTF8
       Assert-ExpectedVariableRowsInCopiedText $localReopenClipboardText $localRows 'local variables after close/reopen' $localReopenClipboardPath
       Assert-NameColumnNotInCopiedText $localReopenClipboardText $script:ForbiddenLocalNames 'local variables after close/reopen' $localReopenClipboardPath
-      Save-Shot '05_after_local_reopen_verification.png'
+      Save-Shot '06_after_local_reopen_verification.png'
     }
     catch {
       $message = $_.Exception.Message
@@ -1502,6 +1566,9 @@ try {
     GlobalNames = $definedGlobalNames
     LocalNames = $definedLocalNames
     GlobalVariableFileScanOk = $globalFileScan.Ok
+    GlobalPasteSkipped = [bool]$SkipGlobal
+    GlobalReopenClipboardPath = $globalReopenClipboardPath
+    GlobalReopenClipboardContainsExpectedNames = if ($AuditPersistence -and $globalRows.Count -gt 0 -and -not $SkipGlobal) { $true } else { $null }
     GlobalPasteRoute = if ($globalRows.Count -gt 0) { if ($AppendGlobalVariables) { 'global tab -> Tab -> PgDn -> Ctrl+V' } else { 'global tab -> Tab -> Ctrl+V' } } else { 'skipped: no executable global variables' }
     LocalVariableValidationBasis = if ($AuditPersistence) { 'guarded close/reopen/copy verification from the KV STUDIO local-variable grid after UI stability evidence' } else { 'fast mode: local persistence is deferred to compile gate unless AuditPersistence is enabled' }
     LocalReopenClipboardPath = $localReopenClipboardPath

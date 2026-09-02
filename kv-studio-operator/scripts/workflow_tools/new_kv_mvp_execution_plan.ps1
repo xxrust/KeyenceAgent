@@ -290,8 +290,10 @@ try {
     if ($Mode -eq 'repair_existing_project') { Add-SwitchArg -List $setArgs -Name '-AppendGlobalVariables' -Enabled $true }
     if ($fbTypeNames.Count -gt 0) { Add-Arg -List $setArgs -Name '-AllowedCustomDataTypes' -Value ($fbTypeNames -join ',') }
     if ($globalVariablesPasted -or [int]$mergedGlobal.executable_global_variable_count -eq 0) { Add-SwitchArg -List $setArgs -Name '-SkipGlobal' -Enabled $true }
+    # A variable step is not successful until the saved grids have been
+    # closed, reopened, copied, and matched against the requested rows.
+    Add-SwitchArg -List $setArgs -Name '-AuditPersistence' -Enabled $true
     if ($AuditVariablePersistence) {
-      Add-SwitchArg -List $setArgs -Name '-AuditPersistence' -Enabled $true
       $forbiddenLocalNames = @()
       for ($j = 0; $j -lt $resolvedMnmFiles.Count; $j++) {
         if ($j -eq $i) { continue }
