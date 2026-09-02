@@ -907,7 +907,15 @@ function Focus-VariableGridArea($Form, [string]$PageAid, [string]$Label) {
   $before = Assert-VariableFormForeground $Form $focusStep -AllowSingleRecovery
   $grid = Find-DescByAid $Form '_grid'
   if ($grid) {
-    $grid.SetFocus()
+    try { $grid.SetFocus() } catch {
+      Log "grid SetFocus failed for $Label; using Alt+L then Shift+Tab fallback: $($_.Exception.Message)"
+      Write-StepCheckpoint "$focusStep Alt+L Shift+Tab" 'before' 'fallback focus route before Alt+L then Shift+Tab' $Form $before $null '' 'Variable form is foreground.' @() | Out-Null
+      $Form = Invoke-GuardedVariableKeyAction $Form "$focusStep Alt+L" '%l' 'Alt+L focuses variable filter field' 150
+      $Form = Invoke-GuardedVariableKeyAction $Form "$focusStep Shift+Tab" '+{TAB}' 'Shift+Tab moves from filter field to upper-left variable cell' 150
+      $after = Assert-VariableFormForeground $Form "$focusStep fallback postcondition" -AllowSingleRecovery
+      Write-StepCheckpoint "$focusStep Alt+L Shift+Tab" 'after' 'fallback focus route completed' $Form $before $after '' 'Upper-left variable cell reached from filter field.' @() | Out-Null
+      return
+    }
     $rect = $grid.Current.BoundingRectangle
     if ($rect.Width -lt 300 -or $rect.Height -lt 120) { throw "Variable grid _grid has invalid bounds for $Label." }
     $xOffset = if ($Label -like 'global*') { 110 } else { 70 }
@@ -921,7 +929,15 @@ function Focus-VariableGridArea($Form, [string]$PageAid, [string]$Label) {
   }
   $page = Find-VariablePagePane $Form $PageAid
   if (-not $page) { throw "Variable page $PageAid missing for $Label grid focus." }
-  $page.SetFocus()
+  try { $page.SetFocus() } catch {
+    Log "page SetFocus failed for $Label; using Alt+L then Shift+Tab fallback: $($_.Exception.Message)"
+    Write-StepCheckpoint "$focusStep Alt+L Shift+Tab" 'before' 'fallback focus route before Alt+L then Shift+Tab' $Form $before $null '' 'Variable form is foreground.' @() | Out-Null
+    $Form = Invoke-GuardedVariableKeyAction $Form "$focusStep Alt+L" '%l' 'Alt+L focuses variable filter field' 150
+    $Form = Invoke-GuardedVariableKeyAction $Form "$focusStep Shift+Tab" '+{TAB}' 'Shift+Tab moves from filter field to upper-left variable cell' 150
+    $after = Assert-VariableFormForeground $Form "$focusStep fallback postcondition" -AllowSingleRecovery
+    Write-StepCheckpoint "$focusStep Alt+L Shift+Tab" 'after' 'fallback focus route completed' $Form $before $after '' 'Upper-left variable cell reached from filter field.' @() | Out-Null
+    return
+  }
   $rect = $page.Current.BoundingRectangle
   if ($rect.Width -lt 300 -or $rect.Height -lt 180) { throw "Variable page $PageAid has invalid grid bounds for $Label." }
   $x = [int]($rect.X + 32)
