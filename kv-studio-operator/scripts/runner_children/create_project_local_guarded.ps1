@@ -461,27 +461,42 @@ try {
   Click-ById '1'
   Log 'submitted new project dialog'
 
-  $adminUser = Find-ElementByAutomationId '_ltxUserName' 12
-  if ($adminUser) {
-    Set-TextById '_ltxUserName' $adminCredential.User
-    Set-TextById '_ltxPassword' $adminCredential.Password
-    Set-TextById '_ltxPasswordConfirmation' $adminCredential.Password
-    Click-ById '_btnOK'
-    Log 'submitted admin dialog'
-  }
-
-  Start-Sleep -Seconds 2
-  if (-not (Dismiss-UnitConfigPromptNoByAltN 8)) {
-    Log 'unit configuration prompt not present'
-  }
-
   $projectPath = Join-Path (Join-Path $ProjectRoot $ProjectName) ($ProjectName + '.kpr')
+  $fastDeadline = (Get-Date).AddSeconds(8)
+  $fastPathReady = $false
+  do {
+    $projectProcess = Get-Process Kvs -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectName*" } |
+      Select-Object -First 1
+    if ((Test-Path -LiteralPath $projectPath) -and $projectProcess) {
+      $fastPathReady = $true
+      Log "project creation fast-path ready pid=$($projectProcess.Id) title=$($projectProcess.MainWindowTitle) path=$projectPath"
+      break
+    }
+    Start-Sleep -Milliseconds 200
+  } while ((Get-Date) -lt $fastDeadline)
+
+  if (-not $fastPathReady) {
+    $adminUser = Find-ElementByAutomationId '_ltxUserName' 12
+    if ($adminUser) {
+      Set-TextById '_ltxUserName' $adminCredential.User
+      Set-TextById '_ltxPassword' $adminCredential.Password
+      Set-TextById '_ltxPasswordConfirmation' $adminCredential.Password
+      Click-ById '_btnOK'
+      Log 'submitted admin dialog'
+    }
+    Start-Sleep -Seconds 2
+    if (-not (Dismiss-UnitConfigPromptNoByAltN 8)) { Log 'unit configuration prompt not present' }
+  }
+
   Start-Sleep -Seconds 2
   $process = Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
   if ($process -and $process.MainWindowHandle -ne 0) {
     [KvWin32]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
-    Assert-KvStudioForeground 'Ctrl+S'
-    Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'save created project Ctrl+S' -Keys '^s' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+S saves created project' -SleepMs 300
+    if (-not $fastPathReady) {
+      Assert-KvStudioForeground 'Ctrl+S'
+      Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'save created project Ctrl+S' -Keys '^s' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+S saves created project' -SleepMs 300
+    }
     if (-not (Wait-ProjectSaveSettled $projectPath $ProjectName 8)) {
       Start-Sleep -Seconds 2
     }
