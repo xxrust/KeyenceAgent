@@ -1057,7 +1057,7 @@ function Test-ClipboardOpenable {
   }
 }
 
-function Wait-ClipboardAvailable([string]$Label, [int]$Seconds = 8) {
+function Wait-ClipboardAvailable([string]$Label, [int]$Seconds = 4) {
   $deadline = (Get-Date).AddSeconds($Seconds)
   $stableSince = $null
   $observations = [System.Collections.Generic.List[object]]::new()
@@ -1101,7 +1101,7 @@ function Wait-ClipboardAvailable([string]$Label, [int]$Seconds = 8) {
   Fail-Guard 'KV_CLIPBOARD_NOT_AVAILABLE' "$Label clipboard availability" "System clipboard was not continuously openable before asking KV STUDIO to copy or paste." @($path)
 }
 
-function Get-ClipboardTextAfterCopy([uint32]$BeforeSequence, [int]$Seconds = 4) {
+function Get-ClipboardTextAfterCopy([uint32]$BeforeSequence, [int]$Seconds = 2) {
   $deadline = (Get-Date).AddSeconds($Seconds)
   do {
     Start-Sleep -Milliseconds 200
@@ -1149,7 +1149,7 @@ function Get-VariableFormUiSignature($Form) {
   }
 }
 
-function Wait-VariableFormUiStable($Form, [string]$Label, [int]$Seconds = 8) {
+function Wait-VariableFormUiStable($Form, [string]$Label, [int]$Seconds = 4) {
   $deadline = (Get-Date).AddSeconds($Seconds)
   $last = $null
   $stableSince = $null
@@ -1577,6 +1577,8 @@ try {
     LocalReopenClipboardExcludesForbiddenNames = if ($AuditPersistence -and $script:ForbiddenLocalNames.Count -gt 0) { $true } else { $null }
     LocalPasteRoute = if ($localRows.Count -gt 0) { "local tab -> $LocalProgramName -> verified local grid cell -> Ctrl+V" } else { 'skipped: no executable local variables' }
     ScreenshotAfterLocalPaste = if ($localRows.Count -gt 0) { (Join-Path $OutDir '02_after_local_paste.png') } else { '' }
+    AtomicActionTimingsPath = Join-Path $OutDir 'atomic_action_timings.json'
+    AtomicActionTimings = @(Get-KvUiGuardAtomicActionTimings)
     ProjectFileScan = $globalFileScan
   }
   $validation | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $OutDir 'variable_persistence_validation.json') -Encoding UTF8
@@ -1590,6 +1592,8 @@ try {
     GlobalVariableFileScanOk = $globalFileScan.Ok
     AuditPersistence = [bool]$AuditPersistence
     AuditProjectTextScan = [bool]$AuditProjectTextScan
+    AtomicActionTimingsPath = Join-Path $OutDir 'atomic_action_timings.json'
+    AtomicActionTimings = @(Get-KvUiGuardAtomicActionTimings)
   } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'set_variables_result.json') -Encoding UTF8
   Log 'done set variables'
 } catch {

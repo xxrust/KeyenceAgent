@@ -31,6 +31,8 @@ Add-Type -AssemblyName UIAutomationTypes
 $script:KvUiGuardOutDir = ''
 $script:KvUiGuardCheckpointDir = ''
 $script:KvUiGuardSeq = 0
+$script:KvUiGuardAtomicActionBudgetMs = 10000
+$script:KvUiGuardAtomicActions = [System.Collections.Generic.List[object]]::new()
 
 function Initialize-KvUiGuard {
   param(
@@ -44,6 +46,41 @@ function Initialize-KvUiGuard {
   if ([string]::IsNullOrWhiteSpace($safeCheckpointSubdir)) { $safeCheckpointSubdir = 'ui_cp' }
   $script:KvUiGuardCheckpointDir = Join-Path $script:KvUiGuardOutDir $safeCheckpointSubdir
   New-Item -ItemType Directory -Force -Path $script:KvUiGuardCheckpointDir | Out-Null
+  $script:KvUiGuardAtomicActions = [System.Collections.Generic.List[object]]::new()
+}
+
+function Complete-KvUiGuardAtomicAction {
+  param(
+    [Parameter(Mandatory=$true)][Diagnostics.Stopwatch]$Stopwatch,
+    [Parameter(Mandatory=$true)][string]$Step,
+    [Parameter(Mandatory=$true)][string]$Action,
+    [IntPtr]$TargetHwnd = [IntPtr]::Zero,
+    [string]$ExpectedTitleLike = ''
+  )
+  $elapsedMs = [int]$Stopwatch.ElapsedMilliseconds
+  $record = [pscustomobject]@{
+    step = $Step
+    action = $Action
+    elapsed_ms = $elapsedMs
+    budget_ms = $script:KvUiGuardAtomicActionBudgetMs
+    target_hwnd = $TargetHwnd.ToInt64()
+    expected_title_like = $ExpectedTitleLike
+    ok = ($elapsedMs -lt $script:KvUiGuardAtomicActionBudgetMs)
+  }
+  $script:KvUiGuardAtomicActions.Add($record)
+  if ($script:KvUiGuardOutDir) {
+    $timingPath = Join-Path $script:KvUiGuardOutDir 'atomic_action_timings.json'
+    @($script:KvUiGuardAtomicActions) | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $timingPath -Encoding UTF8
+  }
+  if (-not $record.ok) {
+    $evidence = Write-KvUiGuardCheckpoint -Step $Step -Status 'failed' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; atomic_budget_ms = $script:KvUiGuardAtomicActionBudgetMs } -ErrorCode 'KV_UI_ATOMIC_STEP_TIMEOUT' -Message "Atomic KV STUDIO UI action exceeded the $($script:KvUiGuardAtomicActionBudgetMs)ms budget: ${elapsedMs}ms."
+    Stop-KvUiGuard -ErrorCode 'KV_UI_ATOMIC_STEP_TIMEOUT' -Step $Step -Message "Atomic KV STUDIO UI action exceeded the 10-second budget: ${elapsedMs}ms." -Evidence @($evidence)
+  }
+  return $record
+}
+
+function Get-KvUiGuardAtomicActionTimings {
+  @($script:KvUiGuardAtomicActions)
 }
 
 function Get-KvForegroundSnapshot {
@@ -303,12 +340,14 @@ function Invoke-KvGuardedSendKeys {
     [string]$Action = 'SendKeys',
     [int]$SleepMs = 150
   )
+  $watch = [Diagnostics.Stopwatch]::StartNew()
   $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
   $beforePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; keys = $Keys } -Before $before -Message 'Precondition passed; target owns foreground.'
   [System.Windows.Forms.SendKeys]::SendWait($Keys)
   Start-Sleep -Milliseconds $SleepMs
   $after = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step "$Step postcondition" -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
   Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; keys = $Keys } -Before $before -After $after -Message 'Postcondition passed; target still owns foreground.' -Evidence @($beforePath) | Out-Null
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action $Action -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
 }
 
 function Invoke-KvGuardedSendKeysAllowTargetClose {
@@ -321,6 +360,7 @@ function Invoke-KvGuardedSendKeysAllowTargetClose {
     [string]$Action = 'SendKeys',
     [int]$SleepMs = 300
   )
+  $watch = [Diagnostics.Stopwatch]::StartNew()
   $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
   $beforePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; keys = $Keys; success_title_like = @($SuccessTitleLike) } -Before $before -Message 'Precondition passed; target owns foreground.'
   [System.Windows.Forms.SendKeys]::SendWait($Keys)
@@ -347,6 +387,7 @@ function Invoke-KvGuardedSendKeysAllowTargetClose {
   }
   if ($targetStillForeground -or $successForeground) {
     Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; keys = $Keys; success_title_like = @($SuccessTitleLike); target_still_window = $targetStillWindow } -Before $before -After $after -Message 'Postcondition passed; target remained foreground or closed into the expected successor foreground.' -Evidence @($beforePath) | Out-Null
+    Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action $Action -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
     return
   }
   $code = Get-KvUiGuardForegroundErrorCode $after $TargetHwnd
@@ -362,6 +403,7 @@ function Invoke-KvGuardedClipboardPaste {
     [string]$ExpectedTitleLike = '',
     [int]$SleepMs = 500
   )
+  $watch = [Diagnostics.Stopwatch]::StartNew()
   if ([string]::IsNullOrWhiteSpace($Text)) {
     $path = Write-KvUiGuardCheckpoint -Step $Step -Status 'failed' -Action 'clipboard paste' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike } -ErrorCode 'KV_EMPTY_PASTE_TEXT' -Message 'Paste text is empty; clipboard was not changed.'
     Stop-KvUiGuard -ErrorCode 'KV_EMPTY_PASTE_TEXT' -Step $Step -Message 'Paste text is empty; clipboard was not changed.' -Evidence @($path)
@@ -369,6 +411,7 @@ function Invoke-KvGuardedClipboardPaste {
   Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step "$Step clipboard precondition" -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery | Out-Null
   [System.Windows.Forms.Clipboard]::SetText($Text)
   Invoke-KvGuardedSendKeys -TargetHwnd $TargetHwnd -Step $Step -Keys '^v' -ExpectedTitleLike $ExpectedTitleLike -Action 'Ctrl+V guarded clipboard paste' -SleepMs $SleepMs
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'clipboard set plus Ctrl+V guarded paste' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
 }
 
 function Invoke-KvGuardedClipboardSetText {
@@ -378,9 +421,11 @@ function Invoke-KvGuardedClipboardSetText {
     [Parameter(Mandatory=$true)][string]$Text,
     [string]$ExpectedTitleLike = ''
   )
+  $watch = [Diagnostics.Stopwatch]::StartNew()
   Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step "$Step clipboard-set precondition" -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery | Out-Null
   [System.Windows.Forms.Clipboard]::SetText($Text)
   Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action 'clipboard set text' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; text_length = $Text.Length } -Message 'Clipboard text set under guarded target foreground.' | Out-Null
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'clipboard set text' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
 }
 
 function Invoke-KvGuardedMouseClick {
@@ -392,6 +437,7 @@ function Invoke-KvGuardedMouseClick {
     [string]$ExpectedTitleLike = '',
     [int]$SleepMs = 120
   )
+  $watch = [Diagnostics.Stopwatch]::StartNew()
   $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
   $beforePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Action 'mouse left click' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; x = $X; y = $Y } -Before $before -Message 'Precondition passed; target owns foreground.'
   [KvSharedUiGuardWin32]::SetCursorPos($X, $Y) | Out-Null
@@ -402,6 +448,7 @@ function Invoke-KvGuardedMouseClick {
   Start-Sleep -Milliseconds $SleepMs
   $after = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step "$Step postcondition" -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
   Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action 'mouse left click' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; x = $X; y = $Y } -Before $before -After $after -Message 'Postcondition passed; target still owns foreground.' -Evidence @($beforePath) | Out-Null
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'mouse left click' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
 }
 
 function Invoke-KvGuardedMouseRightClick {
@@ -413,6 +460,7 @@ function Invoke-KvGuardedMouseRightClick {
     [string]$ExpectedTitleLike = '',
     [int]$SleepMs = 180
   )
+  $watch = [Diagnostics.Stopwatch]::StartNew()
   $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
   $beforePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Action 'mouse right click' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; x = $X; y = $Y; popup_class = '#32768' } -Before $before -Message 'Precondition passed; target owns foreground.'
   [KvSharedUiGuardWin32]::SetCursorPos($X, $Y) | Out-Null
@@ -426,6 +474,7 @@ function Invoke-KvGuardedMouseRightClick {
   $popupForeground = ([string]$after.class_name -eq '#32768')
   if ($targetStillForeground -or $popupForeground) {
     Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action 'mouse right click' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; x = $X; y = $Y; popup_class = '#32768' } -Before $before -After $after -Message 'Postcondition passed; target remained foreground or context menu owns foreground.' -Evidence @($beforePath) | Out-Null
+    Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'mouse right click' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
     return
   }
   $code = Get-KvUiGuardForegroundErrorCode $after $TargetHwnd
@@ -441,6 +490,7 @@ function Invoke-KvGuardedVkTap {
     [string]$ExpectedTitleLike = '',
     [int]$SleepMs = 70
   )
+  $watch = [Diagnostics.Stopwatch]::StartNew()
   $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
   $beforePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Action 'virtual key tap' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk } -Before $before -Message 'Precondition passed; target owns foreground.'
   [KvSharedUiGuardWin32]::keybd_event($Vk, 0, 0, 0)
@@ -449,6 +499,7 @@ function Invoke-KvGuardedVkTap {
   Start-Sleep -Milliseconds $SleepMs
   $after = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step "$Step postcondition" -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
   Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action 'virtual key tap' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk } -Before $before -After $after -Message 'Postcondition passed; target still owns foreground.' -Evidence @($beforePath) | Out-Null
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'virtual key tap' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
 }
 
 function Invoke-KvGuardedVkTapCallerOracle {
@@ -460,6 +511,7 @@ function Invoke-KvGuardedVkTapCallerOracle {
     [string]$Action = 'virtual key tap with caller oracle',
     [int]$SleepMs = 700
   )
+  $watch = [Diagnostics.Stopwatch]::StartNew()
   $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
   $beforePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk; sleep_ms = $SleepMs } -Before $before -Message 'Precondition passed; target owns foreground before physical VK tap.'
   [KvSharedUiGuardWin32]::keybd_event($Vk, 0, 0, 0)
@@ -468,6 +520,7 @@ function Invoke-KvGuardedVkTapCallerOracle {
   Start-Sleep -Milliseconds $SleepMs
   $after = Get-KvForegroundSnapshot
   Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk; sleep_ms = $SleepMs } -Before $before -After $after -Message 'Physical VK sent; successor window is validated by the caller-specific oracle.' -Evidence @($beforePath) | Out-Null
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action $Action -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
 }
 
 function Invoke-KvGuardedCtrlChord {
@@ -480,6 +533,7 @@ function Invoke-KvGuardedCtrlChord {
     [int]$SleepMs = 250,
     [switch]$AllowModalAfter
   )
+  $watch = [Diagnostics.Stopwatch]::StartNew()
   $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
   $beforePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk; ctrl = $true } -Before $before -Message 'Precondition passed; target owns foreground.'
   [KvSharedUiGuardWin32]::keybd_event(0x11, 0, 0, 0)
@@ -493,10 +547,12 @@ function Invoke-KvGuardedCtrlChord {
   $after = Get-KvForegroundSnapshot
   if ($after.hwnd -eq $TargetHwnd.ToInt64() -and ((-not $ExpectedTitleLike) -or $after.title -like $ExpectedTitleLike)) {
     Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk; ctrl = $true } -Before $before -After $after -Message 'Postcondition passed; target still owns foreground.' -Evidence @($beforePath) | Out-Null
+    Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action $Action -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
     return
   }
   if ($AllowModalAfter -and [string]$after.class_name -eq '#32770' -and [string]$after.process_name -eq 'Kvs') {
     Write-KvUiGuardCheckpoint -Step $Step -Status 'after_modal' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk; ctrl = $true; modal_allowed_for_caller_evidence = $true } -Before $before -After $after -ErrorCode 'KV_MODAL_PRESENT' -Message 'Ctrl chord produced a KV modal; caller must capture modal evidence before any recovery.' -Evidence @($beforePath) | Out-Null
+    Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action $Action -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
     return
   }
   $code = Get-KvUiGuardForegroundErrorCode $after $TargetHwnd
@@ -512,6 +568,7 @@ function Invoke-KvGuardedAltVk {
     [string]$ExpectedTitleLike = '',
     [int]$SleepMs = 100
   )
+  $watch = [Diagnostics.Stopwatch]::StartNew()
   $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
   $beforePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Action 'Alt+virtual key' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk } -Before $before -Message 'Precondition passed; target owns foreground.'
   [KvSharedUiGuardWin32]::keybd_event(0x12, 0, 0, 0)
@@ -524,4 +581,5 @@ function Invoke-KvGuardedAltVk {
   Start-Sleep -Milliseconds $SleepMs
   $after = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step "$Step postcondition" -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
   Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action 'Alt+virtual key' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk } -Before $before -After $after -Message 'Postcondition passed; target still owns foreground.' -Evidence @($beforePath) | Out-Null
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'Alt+virtual key' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
 }

@@ -1129,7 +1129,7 @@ function SetInlineMnemonicReadFile([string]$path){
 }
 function SetOpenDialogFileByVerifiedDialogHandle([string]$path){
   $path=[IO.Path]::GetFullPath($path)
-  $deadline=(Get-Date).AddSeconds(20)
+  $deadline=(Get-Date).AddSeconds(8)
   do{
     $nativeDialog=GetStandardOpenDialogByWin32
     if(-not $nativeDialog){
@@ -1203,7 +1203,7 @@ function SetOpenDialogFile([string]$path){
 
   $root=[System.Windows.Automation.AutomationElement]::RootElement
   $dialogs=$null
-  $deadline=(Get-Date).AddSeconds(20)
+  $deadline=(Get-Date).AddSeconds(8)
   do{
     try{
       $windows=$root.FindAll(
@@ -1279,7 +1279,7 @@ function SetOpenDialogFile([string]$path){
 function SetOpenDialogFileByUia([string]$path){
   $path=[IO.Path]::GetFullPath($path)
   $root=[System.Windows.Automation.AutomationElement]::RootElement
-  $deadline=(Get-Date).AddSeconds(20)
+  $deadline=(Get-Date).AddSeconds(8)
   do{
     try{
       $windows=$root.FindAll(

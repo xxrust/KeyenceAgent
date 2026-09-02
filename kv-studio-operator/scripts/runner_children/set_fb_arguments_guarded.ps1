@@ -852,6 +852,8 @@ try {
     copyback_path = $visible.copy_path
     paste_attempts = @($attempts)
     argument_names = @($pastePayload.rows | ForEach-Object { [string]$_.argument_name })
+    atomic_action_timings_path = Join-Path $OutDir 'atomic_action_timings.json'
+    atomic_action_timings = @(Get-KvUiGuardAtomicActionTimings)
     route = 'project tree select FB -> guarded right click -> Z -> embedded FuncBlockParamVariableControl/_grid -> Alt+L filter focus -> Shift+Tab upper-left variable cell -> Ctrl+V -> copyback verify -> Ctrl+S'
   } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'set_fb_arguments_result.json') -Encoding UTF8
   '0' | Set-Content -LiteralPath (Join-Path $OutDir 'exit_code.txt') -Encoding ASCII
