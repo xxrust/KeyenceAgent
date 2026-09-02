@@ -15,6 +15,7 @@
   [switch]$AuditPersistence,
   [switch]$AuditProjectTextScan,
   [switch]$AuditScreenshots,
+  [switch]$AllowBoundWindowWithoutForeground,
 
   [string]$ForbiddenLocalNamesCsv = '',
   [ValidateSet('Full','NameType')]
@@ -101,6 +102,20 @@ function Get-VisibleKvsProcess {
     Where-Object { $_.MainWindowHandle -ne 0 } |
     Sort-Object StartTime -Descending |
     Select-Object -First 1
+}
+
+function Get-BoundKvsProcess([string]$ProjectNeedle) {
+  $visible = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })
+  if ($visible.Count -ne 1) {
+    Fail-Guard 'KV_VARIABLE_BOUND_WINDOW_AMBIGUOUS' 'bind KV STUDIO window' "AllowBoundWindowWithoutForeground requires exactly one visible Kvs window; found $($visible.Count)." @()
+  }
+  $candidate = $visible[0]
+  $candidate.Refresh()
+  if (-not $candidate.Responding -or $candidate.MainWindowHandle -eq 0 -or $candidate.MainWindowTitle -notlike 'KV STUDIO*' -or $candidate.MainWindowTitle -notlike "*$ProjectNeedle*") {
+    Fail-Guard 'KV_VARIABLE_BOUND_WINDOW_MISMATCH' 'bind KV STUDIO window' "The unique Kvs window is not a responsive match for project $ProjectNeedle. pid=$($candidate.Id) hwnd=$($candidate.MainWindowHandle) title=$($candidate.MainWindowTitle) responding=$($candidate.Responding)" @()
+  }
+  Log "bound unique Kvs window without startup foreground dependency pid=$($candidate.Id) hwnd=$($candidate.MainWindowHandle) title=$($candidate.MainWindowTitle)"
+  return $candidate
 }
 
 function Get-ForegroundTitle {
@@ -702,7 +717,31 @@ function Invoke-GuardedKvMainKeyAction([System.Diagnostics.Process]$Process, [st
 function Ensure-VariableEditorOpen([System.Diagnostics.Process]$Process, [string]$ProjectNeedle) {
   $form = Get-VariableForm $Process.Id
   if ($form) { return $form }
-  Restore-KvForeground $Process $ProjectNeedle 'open variable editor'
+  try {
+    Restore-KvForeground $Process $ProjectNeedle 'open variable editor'
+  } catch {
+    if (-not $AllowBoundWindowWithoutForeground) { throw }
+    Log "foreground restore failed before opening variable editor; trying bounded UIA menu route: $($_.Exception.Message)"
+    $helper = Join-Path (Split-Path -Parent $PSCommandPath) 'invoke_kv_variable_menu_helper.ps1'
+    $helperResult = Join-Path $OutDir 'variable_menu_helper_result.json'
+    $args = @('-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',$helper,'-ExpectedProcessId',([string]$Process.Id),'-ExpectedProjectNeedle',$ProjectNeedle,'-ResultPath',$helperResult)
+    $child = Start-Process -FilePath 'powershell.exe' -ArgumentList $args -PassThru -WindowStyle Hidden
+    if (-not $child.WaitForExit(10000)) {
+      Stop-Process -Id $child.Id -Force -ErrorAction SilentlyContinue
+      Fail-Guard 'KV_VARIABLE_FOREGROUND_REQUIRED' 'open variable editor' 'The PID-bound UIA View -> Variable helper exceeded 10 seconds; no global keyboard input was sent.' @($helperResult)
+    }
+    $payload = if (Test-Path -LiteralPath $helperResult) { Get-Content -LiteralPath $helperResult -Raw | ConvertFrom-Json } else { $null }
+    if (-not $payload -or -not $payload.ok) {
+      Fail-Guard 'KV_VARIABLE_FOREGROUND_REQUIRED' 'open variable editor' 'Foreground was unavailable and the PID-bound UIA View -> Variable route did not open the editor; no global keyboard input was sent.' @($helperResult)
+    }
+    Start-Sleep -Milliseconds 500
+    $form = Get-VariableForm $Process.Id
+    if (-not $form) {
+      Fail-Guard 'KV_VARIABLE_FOREGROUND_REQUIRED' 'open variable editor' 'The PID-bound UIA menu invocation completed but KvVariableForm was not found.' @($helperResult)
+    }
+    Log 'opened variable editor through PID-bound UIA View -> Variable route'
+    return $form
+  }
   Set-CapsLockState $true $Process.MainWindowHandle "KV STUDIO*$ProjectNeedle*" 'open variable editor accelerator'
   Send-AltLetter 0x56 $Process.MainWindowHandle "KV STUDIO*$ProjectNeedle*" 'open variable editor Alt+V'
   Log 'sent Alt+V'
@@ -1335,11 +1374,15 @@ try {
 
   $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
   $projectRoot = Split-Path -Parent $ProjectPath
-  $process = Get-VisibleKvsProcess
+  $process = if ($AllowBoundWindowWithoutForeground) { Get-BoundKvsProcess $projectNeedle } else { Get-VisibleKvsProcess }
   if (-not $process) { throw 'No visible KV STUDIO process.' }
   $script:ProcessIdForVariables = $process.Id
-  Restore-KvForeground $process $projectNeedle 'set variables start'
-  Set-CapsLockState $true $process.MainWindowHandle "KV STUDIO*$projectNeedle*" 'set variables start'
+  if ($AllowBoundWindowWithoutForeground) {
+    Log 'skipped startup system-foreground requirement under explicit unique PID-bound mode'
+  } else {
+    Restore-KvForeground $process $projectNeedle 'set variables start'
+    Set-CapsLockState $true $process.MainWindowHandle "KV STUDIO*$projectNeedle*" 'set variables start'
+  }
   Assert-NoDirectInputFast $process.Id 'before variable editing'
 
   $globalRows = @(Get-DefinedVariableRows $GlobalVariablesTsv 'global')
