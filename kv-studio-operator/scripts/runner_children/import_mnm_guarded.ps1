@@ -470,6 +470,10 @@ function WaitKvsMainWindowReady([int]$seconds){
       Select-Object -First 1
     if($process){
       $hwnd=[IntPtr]$process.MainWindowHandle
+      if($script:AllowBoundTargetWithoutForeground -and $process.Responding){
+        Log ('KV STUDIO main window accepted by bound mode: pid='+$process.Id+' hwnd='+$process.MainWindowHandle+' title='+$process.MainWindowTitle)
+        return $true
+      }
       for($try=1;$try -le 10;$try++){
         if([W]::IsIconic($hwnd)){
           [W]::ShowWindow($hwnd,9)|Out-Null
