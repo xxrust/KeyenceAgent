@@ -283,21 +283,17 @@ function Get-KvStudioMainProcess {
 
 function Invoke-NewProjectButtonByUia([System.Diagnostics.Process]$Process) {
   if (-not $Process -or $Process.MainWindowHandle -eq 0) { return $false }
-  try {
-    $root = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$Process.MainWindowHandle)
-    $condition = New-Object System.Windows.Automation.PropertyCondition(
-      [System.Windows.Automation.AutomationElement]::NameProperty, '新建项目(Ctrl+N)')
-    $button = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
-    if (-not $button) { return $false }
-    $props = [ordered]@{ name=$button.Current.Name; automation_id=$button.Current.AutomationId; class=$button.Current.ClassName; hwnd=$button.Current.NativeWindowHandle; process_id=$Process.Id }
-    $props | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutDir 'new_project_button_uia.json') -Encoding UTF8
-    $invoke = $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
-    $invoke.Invoke()
-    return $true
-  } catch {
-    [ordered]@{ error_code='KV_CREATE_PROJECT_UIA_INVOKE_UNAVAILABLE'; message=$_.Exception.Message; process_id=$Process.Id } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutDir 'new_project_button_uia_error.json') -Encoding UTF8
+  $helper = Join-Path (Split-Path -Parent $PSCommandPath) 'invoke_kv_new_project_button_helper.ps1'
+  $resultPath = Join-Path $OutDir 'new_project_button_uia.json'
+  $args = @('-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',$helper,'-MainWindowHandle',([string][long]$Process.MainWindowHandle),'-ExpectedProcessId',([string]$Process.Id),'-ResultPath',$resultPath)
+  $child = Start-Process -FilePath 'powershell.exe' -ArgumentList $args -PassThru -WindowStyle Hidden
+  if (-not $child.WaitForExit(10000)) {
+    Stop-Process -Id $child.Id -Force -ErrorAction SilentlyContinue
+    [ordered]@{ok=$false;error_code='KV_CREATE_PROJECT_UIA_INVOKE_TIMEOUT';message='PID-bound UIA helper exceeded 10 seconds.';process_id=$Process.Id;helper_pid=$child.Id} | ConvertTo-Json | Set-Content -LiteralPath $resultPath -Encoding UTF8
     return $false
   }
+  if (-not (Test-Path -LiteralPath $resultPath)) { return $false }
+  return [bool]((Get-Content -Raw -LiteralPath $resultPath | ConvertFrom-Json).ok)
 }
 
 function Get-KvStudioUiaWindow {
@@ -437,6 +433,9 @@ try {
     $process = Get-KvStudioMainProcess 1
   } while (($null -eq $process -or $process.MainWindowHandle -eq 0) -and (Get-Date) -lt $deadline)
   if (-not $process -or $process.MainWindowHandle -eq 0) { throw 'KV STUDIO main window not ready' }
+  if ($process.MainWindowTitle -match '\*\]\s*$') {
+    throw "KV_CREATE_PROJECT_EXISTING_UNSAVED_PROJECT title=$($process.MainWindowTitle) pid=$($process.Id)"
+  }
   Restore-KvStudioForeground $process 'Ctrl+N'
 
   Log 'invoke new project button by window-scoped UIA'
