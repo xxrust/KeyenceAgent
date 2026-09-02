@@ -24,6 +24,7 @@
 
 $ErrorActionPreference='Continue'
 $script:AllowBoundTargetWithoutForeground = $AllowBoundTargetWithoutForeground.IsPresent
+$script:BoundProjectNeedle = ''
 $out=$OutDir
 $project=$ProjectPath
 $kvs=$KvsExe
@@ -223,6 +224,8 @@ function AssertBoundTargetWindow([string]$action, [string]$projectNeedle=''){
   $targets=@(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and (!$projectNeedle -or $_.MainWindowTitle -like ('*'+$projectNeedle+'*')) })
   if($targets.Count -ne 1 -or -not $targets[0].Responding){ throw 'KV_IMPORT_FOREGROUND_REQUIRED: unique responding PID-bound target window unavailable for '+$action }
   $script:KvGuardTargetHwnd=[IntPtr]$targets[0].MainWindowHandle
+  $script:BoundProjectNeedle=$projectNeedle
+  Log ('BOUND_WINDOW_READY action='+$action+' pid='+$targets[0].Id+' hwnd='+$targets[0].MainWindowHandle+' title='+$targets[0].MainWindowTitle)
   return $targets[0]
 }
 function ClickPoint([int]$x, [int]$y, [string]$label){
@@ -955,8 +958,12 @@ function InvokeOrClickMenuItem($item, [string]$label){
   $rect=GetElementRectObject $item
   Log ('menu target '+$label+' name='+$item.Current.Name+' access='+$item.Current.AccessKey+' rect='+$rect.Left+','+$rect.Top+','+$rect.Width+','+$rect.Height+' patterns='+((GetElementPatternNames $item) -join ','))
   if($script:AllowBoundTargetWithoutForeground -and $label -eq 'mnemonic-list read'){
-    $target=Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -eq [int64]$script:KvGuardTargetHwnd } | Select-Object -First 1
-    if(-not $target){ throw 'KV_IMPORT_FOREGROUND_REQUIRED: PID-bound target missing before MNM read invoke' }
+    $needle=$script:BoundProjectNeedle
+    $targets=@(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.Responding -and $_.MainWindowTitle -like 'KV STUDIO*' -and (!$needle -or $_.MainWindowTitle -like ('*'+$needle+'*')) })
+    if($targets.Count -ne 1){ throw 'KV_IMPORT_FOREGROUND_REQUIRED: unique current PID-bound target missing before MNM read invoke' }
+    $target=$targets[0]
+    $script:KvGuardTargetHwnd=[IntPtr]$target.MainWindowHandle
+    Log ('rebound target before MNM read invoke pid='+$target.Id+' hwnd='+$target.MainWindowHandle+' title='+$target.MainWindowTitle)
     $helper=Join-Path (Split-Path -Parent $PSCommandPath) 'invoke_kv_mnm_read_menu_helper.ps1'
     $helperResult=Join-Path $out 'mnm_read_menu_helper_result.json'
     $args=@('-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',$helper,'-ExpectedProcessId',([string]$target.Id),'-ResultPath',$helperResult)
