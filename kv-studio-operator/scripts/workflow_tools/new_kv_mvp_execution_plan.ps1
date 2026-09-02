@@ -231,7 +231,9 @@ try {
     Add-Arg -List $createArgs -Name '-OutDir' -Value (Join-Path $artifactRoot 'create_project')
     Add-Arg -List $createArgs -Name '-ChecklistPath' -Value $ChecklistPath
     Add-Arg -List $createArgs -Name '-TimeoutSeconds' -Value '120'
-    Add-SwitchArg -List $createArgs -Name '-RestartKvs' -Enabled $true
+    # Keep an already visible, PID-bound KV STUDIO instance when possible.
+    # Restarting here can put Kvs into its standby shell and lose foreground focus.
+    Add-SwitchArg -List $createArgs -Name '-RestartKvs' -Enabled $false
     Add-Arg -List $createArgs -Name '-KvsExe' -Value $KvsExe
     Add-Arg -List $createArgs -Name '-AdminUser' -Value $AdminUser
     Add-Arg -List $createArgs -Name '-AdminPassword' -Value $AdminPassword
