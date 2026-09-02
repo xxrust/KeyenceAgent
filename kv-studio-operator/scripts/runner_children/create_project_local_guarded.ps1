@@ -107,6 +107,7 @@ if (-not (Test-Path -LiteralPath $KvsExe)) { throw "KvsExe not found: $KvsExe" }
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+Add-Type -AssemblyName Microsoft.VisualBasic
 $sharedUiGuard = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'guards\kv_ui_guard.ps1'
 if (-not (Test-Path -LiteralPath $sharedUiGuard)) { throw "Shared KV UI guard script not found: $sharedUiGuard" }
 . $sharedUiGuard
@@ -280,6 +281,33 @@ function Get-KvStudioMainProcess {
   return $null
 }
 
+function Get-KvStudioUiaWindow {
+  # MainWindowHandle can remain zero while Kvs is restoring its standby shell.
+  # UIA still exposes the real top-level window; bind it back to its owning PID.
+  $condition = New-Object System.Windows.Automation.PropertyCondition(
+    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+    [System.Windows.Automation.ControlType]::Window)
+  try {
+    $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+      [System.Windows.Automation.TreeScope]::Children, $condition)
+  } catch {
+    Log ('UIA top-level enumeration unavailable: ' + $_.Exception.Message)
+    return $null
+  }
+  for ($i = 0; $i -lt $windows.Count; $i++) {
+    $window = $windows.Item($i)
+    $title = [string]$window.Current.Name
+    if ($title -notlike 'KV STUDIO*') { continue }
+    $hwnd = [IntPtr]$window.Current.NativeWindowHandle
+    if ($hwnd -eq [IntPtr]::Zero) { continue }
+    $ownerPid = [uint32]0
+    [void][KvWin32]::GetWindowThreadProcessId($hwnd, [ref]$ownerPid)
+    $process = Get-Process -Id ([int]$ownerPid) -ErrorAction SilentlyContinue
+    if ($process) { return [pscustomobject]@{ Process = $process; Hwnd = $hwnd; Title = $title } }
+  }
+  return $null
+}
+
 function Force-KvStudioForeground {
   param([IntPtr]$Hwnd)
   if ($Hwnd -eq [IntPtr]::Zero) { return $false }
@@ -331,11 +359,14 @@ function Restore-KvStudioForeground {
   for ($try = 1; $try -le 20; $try++) {
     $latest = Get-KvStudioMainProcess 1
     if ($latest) { $Process = $latest }
-    [void](Force-KvStudioForeground ([IntPtr]$Process.MainWindowHandle))
+    $uia = Get-KvStudioUiaWindow
+    $targetHwnd = if ($uia) { [IntPtr]$uia.Hwnd } elseif ($Process) { [IntPtr]$Process.MainWindowHandle } else { [IntPtr]::Zero }
+    if ($Process -and $Process.Id) { try { [Microsoft.VisualBasic.Interaction]::AppActivate([int]$Process.Id) | Out-Null } catch {} }
+    [void](Force-KvStudioForeground $targetHwnd)
     Start-Sleep -Milliseconds 250
     $fg = Get-ForegroundTitle
     Log ("foreground restore ${Action}: try=$try hwnd=$($fg.Hwnd) title=$($fg.Title)")
-    if ($fg.Title -like 'KV STUDIO*') {
+    if ($fg.Title -like 'KV STUDIO*' -or ($uia -and $uia.Title -like 'KV STUDIO*')) {
       return
     }
   }
