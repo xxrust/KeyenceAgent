@@ -959,7 +959,7 @@ function InvokeOrClickMenuItem($item, [string]$label){
   Log ('menu target '+$label+' name='+$item.Current.Name+' access='+$item.Current.AccessKey+' rect='+$rect.Left+','+$rect.Top+','+$rect.Width+','+$rect.Height+' patterns='+((GetElementPatternNames $item) -join ','))
   if($script:AllowBoundTargetWithoutForeground -and $label -eq 'mnemonic-list read'){
     $needle=$script:BoundProjectNeedle
-    $targets=@(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.Responding -and $_.MainWindowTitle -like 'KV STUDIO*' -and (!$needle -or $_.MainWindowTitle -like ('*'+$needle+'*')) })
+    $targets=@(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.Responding -and $_.MainWindowTitle -like 'KV STUDIO*' -and ([string]::IsNullOrWhiteSpace($needle) -or $_.MainWindowTitle -like ('*'+$needle+'*')) })
     if($targets.Count -ne 1){ throw 'KV_IMPORT_FOREGROUND_REQUIRED: unique current PID-bound target missing before MNM read invoke' }
     $target=$targets[0]
     $script:KvGuardTargetHwnd=[IntPtr]$target.MainWindowHandle
