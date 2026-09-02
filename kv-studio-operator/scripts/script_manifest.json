@@ -134,6 +134,12 @@
         "ui_guard_required": true
       },
       {
+        "path": "runner_children/invoke_kv_mnm_read_menu_helper.ps1",
+        "status": "approved",
+        "customer_callable": false,
+        "ui_guard_required": true
+      },
+      {
         "path": "runner_children/import_mnm_guarded.ps1",
         "status": "approved",
         "customer_callable": false,

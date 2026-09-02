@@ -954,6 +954,23 @@ function InvokeOrClickMenuItem($item, [string]$label){
   if(-not $item){ return $false }
   $rect=GetElementRectObject $item
   Log ('menu target '+$label+' name='+$item.Current.Name+' access='+$item.Current.AccessKey+' rect='+$rect.Left+','+$rect.Top+','+$rect.Width+','+$rect.Height+' patterns='+((GetElementPatternNames $item) -join ','))
+  if($script:AllowBoundTargetWithoutForeground -and $label -eq 'mnemonic-list read'){
+    $target=Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -eq [int64]$script:KvGuardTargetHwnd } | Select-Object -First 1
+    if(-not $target){ throw 'KV_IMPORT_FOREGROUND_REQUIRED: PID-bound target missing before MNM read invoke' }
+    $helper=Join-Path (Split-Path -Parent $PSCommandPath) 'invoke_kv_mnm_read_menu_helper.ps1'
+    $helperResult=Join-Path $out 'mnm_read_menu_helper_result.json'
+    $args=@('-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',$helper,'-ExpectedProcessId',([string]$target.Id),'-ResultPath',$helperResult)
+    $child=Start-Process powershell.exe -ArgumentList $args -PassThru -WindowStyle Hidden
+    if(-not $child.WaitForExit(12000)){
+      Stop-Process -Id $child.Id -Force -ErrorAction SilentlyContinue
+      [ordered]@{ok=$false;error_code='KV_MNM_READ_MENU_INVOKE_TIMEOUT';helper_pid=$child.Id;target_pid=$target.Id}|ConvertTo-Json|Set-Content -LiteralPath $helperResult -Encoding UTF8
+      throw 'KV_MNM_READ_MENU_INVOKE_TIMEOUT: bound helper exceeded 12 seconds'
+    }
+    $helperPayload=if(Test-Path -LiteralPath $helperResult){Get-Content -Raw -LiteralPath $helperResult|ConvertFrom-Json}else{$null}
+    if(-not $helperPayload -or -not $helperPayload.ok){ throw 'KV_MNM_READ_MENU_INVOKE_UNAVAILABLE: bound helper did not invoke verified menu item' }
+    Log ('invoked '+$label+' by bounded helper pid='+$child.Id)
+    return $true
+  }
   try{
     $invokePattern=$item.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
     $invokePattern.Invoke()
