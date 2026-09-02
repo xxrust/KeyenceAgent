@@ -338,16 +338,18 @@ try {
   }
 
   if ($AuditCompileWait) {
-    $deadline = (Get-Date).AddSeconds($WaitSeconds)
-    do {
-      Start-Sleep -Milliseconds 500
-      if (Dismiss-ConvertFailureIfPresent $process.Id) { break }
-      $result = Find-ResultArea $process.Id
-      if ($result) {
-        $name = [string]$result.Current.Name
-        if ($name -like '*杞崲缁撴灉*' -or $name -like '*Convert*') { break }
-      }
-    } while ((Get-Date) -lt $deadline)
+    # Wait-VisibleResultTree above is the compile-completion oracle.  A deep
+    # RootElement UIA search is diagnostic only; repeating it until
+    # WaitSeconds made an already-complete compile spend tens of seconds in
+    # post-processing.  Keep one bounded diagnostic lookup for evidence.
+    Start-Sleep -Milliseconds 500
+    Dismiss-ConvertFailureIfPresent $process.Id | Out-Null
+    $auditResultArea = Find-ResultArea $process.Id
+    if ($auditResultArea) {
+      Log 'audit result-area lookup found outputTreeControl1 after result-tree completion'
+    } else {
+      Log 'audit result-area lookup did not find outputTreeControl1; visible result tree remains the compile completion oracle'
+    }
   } else {
     Start-Sleep -Milliseconds 900
     Log 'fast compile mode: skipped UIA result-area wait; copy_convert_result step owns compile-result oracle'
@@ -357,7 +359,8 @@ try {
   $resultArea = $null
   if ($AuditCompileWait) {
     Dismiss-ConvertFailureIfPresent $process.Id | Out-Null
-    $resultArea = Find-ResultArea $process.Id
+    # Reuse the one diagnostic lookup above; do not rescan the desktop.
+    $resultArea = $auditResultArea
     if ($resultArea) {
       Log 'outputTreeControl1 result area found; text extraction deferred to copy_convert_result_from_tree_handle.ps1'
     } else {
