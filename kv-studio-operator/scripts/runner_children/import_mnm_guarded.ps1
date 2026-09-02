@@ -854,8 +854,12 @@ function TestHasPatternName($element, [string]$patternText){
   return $false
 }
 function OpenFileMenuByUia(){
-  Invoke-KvGuardedSendKeys -TargetHwnd $script:KvGuardTargetHwnd -Step 'close transient menu before UIA file menu' -Keys '{ESC}' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Esc closes transient menu before UIA file-menu route' -SleepMs 200
-  Start-Sleep -Milliseconds 200
+  if(-not $script:AllowBoundTargetWithoutForeground){
+    Invoke-KvGuardedSendKeys -TargetHwnd $script:KvGuardTargetHwnd -Step 'close transient menu before UIA file menu' -Keys '{ESC}' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Esc closes transient menu before UIA file-menu route' -SleepMs 200
+    Start-Sleep -Milliseconds 200
+  } else {
+    Log 'bound mode: skipped global Esc before UIA File menu'
+  }
   $items=@(GetVisibleMenuItems)
   $topMenuItems=@()
   foreach($item in $items){
@@ -939,6 +943,9 @@ function ExpandOrClickMenuItem($item, [string]$label){
     return $true
   }catch{
     Log ('Invoke unavailable for '+$label+': '+$_.Exception.Message)
+  }
+  if($script:AllowBoundTargetWithoutForeground){
+    throw 'KV_IMPORT_FOREGROUND_REQUIRED: bound UIA menu item lacks ExpandCollapse/Invoke pattern for '+$label
   }
   ClickAutomationElementCenter $item $label
   return $true
