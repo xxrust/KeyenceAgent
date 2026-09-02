@@ -994,7 +994,9 @@ function InvokeMnemonicImportMenu(){
   Log 'sent Alt+F,R,R by shared UI guard'
   if(-not (WaitForStandardOpenDialog 3000)){
     SaveVisibleTopWindowSnapshot 'top_windows_after_sendkeys_alt_f_r_r_no_open_dialog.json'
-    throw 'Alt+F,R,R via SendKeys did not expose a verified standard MNM file-open dialog; refusing inline editor path'
+    Log 'Alt+F,R,R did not open MNM dialog; trying PID-bound UIA File/MNM menu route'
+    if(InvokeMnemonicImportMenuByUia){ return }
+    throw 'KV_MNM_IMPORT_MENU_UNRESOLVED: neither guarded Alt+F,R,R nor verified UIA File/MNM menu route exposed a standard MNM file-open dialog'
   }
   Log 'ROUTE_ALTFRR_MNM_READ_FILE_DIALOG invoked mnemonic list read/import through SendKeys Alt+F,R,R'
 }
