@@ -281,6 +281,25 @@ function Get-KvStudioMainProcess {
   return $null
 }
 
+function Invoke-NewProjectButtonByUia([System.Diagnostics.Process]$Process) {
+  if (-not $Process -or $Process.MainWindowHandle -eq 0) { return $false }
+  try {
+    $root = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$Process.MainWindowHandle)
+    $condition = New-Object System.Windows.Automation.PropertyCondition(
+      [System.Windows.Automation.AutomationElement]::NameProperty, '新建项目(Ctrl+N)')
+    $button = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+    if (-not $button) { return $false }
+    $props = [ordered]@{ name=$button.Current.Name; automation_id=$button.Current.AutomationId; class=$button.Current.ClassName; hwnd=$button.Current.NativeWindowHandle; process_id=$Process.Id }
+    $props | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutDir 'new_project_button_uia.json') -Encoding UTF8
+    $invoke = $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
+    $invoke.Invoke()
+    return $true
+  } catch {
+    [ordered]@{ error_code='KV_CREATE_PROJECT_UIA_INVOKE_UNAVAILABLE'; message=$_.Exception.Message; process_id=$Process.Id } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutDir 'new_project_button_uia_error.json') -Encoding UTF8
+    return $false
+  }
+}
+
 function Get-KvStudioUiaWindow {
   # MainWindowHandle can remain zero while Kvs is restoring its standby shell.
   # UIA still exposes the real top-level window; bind it back to its owning PID.
@@ -420,9 +439,13 @@ try {
   if (-not $process -or $process.MainWindowHandle -eq 0) { throw 'KV STUDIO main window not ready' }
   Restore-KvStudioForeground $process 'Ctrl+N'
 
-  Log 'send Ctrl+N'
-  Assert-KvStudioForeground 'Ctrl+N'
-  Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'create project Ctrl+N' -Keys '^n' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+N opens new project dialog' -SleepMs 200
+  Log 'invoke new project button by window-scoped UIA'
+  $uiaInvoked = Invoke-NewProjectButtonByUia $process
+  if (-not $uiaInvoked) {
+    Log 'UIA invoke unavailable; fallback requires verified foreground'
+    Assert-KvStudioForeground 'Ctrl+N'
+    Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'create project Ctrl+N' -Keys '^n' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+N opens new project dialog' -SleepMs 200
+  }
   $newProjectDialog = Find-NewProjectDialog 45
   if (-not $newProjectDialog) {
     Save-Uia 'fail_no_new_project_dialog.json'
