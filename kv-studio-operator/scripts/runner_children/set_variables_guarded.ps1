@@ -761,7 +761,7 @@ function Get-KvsModalEvidence($Window, [string]$Stage) {
 }
 
 function Get-KvsModalErrorCode([string]$Text) {
-  if ($Text -like '*粘贴数据中存在错误*' -or $Text -like '*已跳过部分数据粘贴*') {
+  if ($Text -like '*粘贴数据中存在错误*' -or $Text -like '*粘贴数据中存在无效数据*' -or $Text -like '*已跳过部分数据粘贴*') {
     return 'KV_VARIABLE_PASTE_DATA_ERROR'
   }
   if ($Text -like '*变量名被更改*' -or $Text -like '*要覆盖吗*' -or $Text -like '*粘贴目标*复制源*') {
@@ -787,11 +787,6 @@ function Convert-GlobalRows([string]$Path) {
   $text = [IO.File]::ReadAllText($Path, [Text.Encoding]::Default)
   $rows = $text | ConvertFrom-Csv -Delimiter "`t"
   $lines = foreach ($row in (Get-KvExecutableVariableRows -Rows @($rows) -Scope global)) {
-    @(
-      $row.name
-      $row.data_type
-    ) -join "`t"
-    continue
     @(
       $row.name
       $row.data_type
