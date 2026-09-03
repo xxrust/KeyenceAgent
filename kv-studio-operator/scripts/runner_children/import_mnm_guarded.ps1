@@ -343,13 +343,13 @@ function GetStandardOpenDialogByWin32(){
 function TestOpenDialogByNativeHwnd([int64]$nativeHwnd){
   if($nativeHwnd -eq 0){ return $false }
   try{
-    $root=[System.Windows.Automation.AutomationElement]::RootElement
-    $dialog=$root.FindFirst(
-      [System.Windows.Automation.TreeScope]::Descendants,
-      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NativeWindowHandleProperty,[int]$nativeHwnd))
-    )
+    # Resolve the dialog directly from its native handle.  RootElement
+    # descendant lookup is unreliable for common-dialog providers during the
+    # first few milliseconds after the menu command (it may return no element
+    # or a proxy with an empty ClassName), even though the dialog is visible.
+    $dialog=[System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$nativeHwnd)
     if(-not $dialog){ return $false }
-    if($dialog.Current.ClassName -ne '#32770'){ return $false }
+    if($dialog.Current.ClassName -and $dialog.Current.ClassName -ne '#32770'){ return $false }
     $openButton=$dialog.FindFirst(
       [System.Windows.Automation.TreeScope]::Descendants,
       (New-Object System.Windows.Automation.AndCondition(
