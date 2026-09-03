@@ -1296,9 +1296,13 @@ function Get-CopiedVariableRows([string]$Text) {
   foreach ($line in @($Text -split "\r?\n")) {
     if ([string]::IsNullOrWhiteSpace($line)) { continue }
     $columns = @($line -split "`t", -1)
+    # Global-variable copyback includes the storage group as column 1:
+    # (Default) <TAB> Name <TAB> Type ... . Local copyback begins at Name.
+    # Normalize both table layouts before comparing persistence evidence.
+    $offset = if ($columns.Count -ge 3 -and [string]$columns[0] -match '^\(.*\)$') { 1 } else { 0 }
     $rows.Add([pscustomobject]@{
-      name = if ($columns.Count -gt 0) { [string]$columns[0] } else { '' }
-      data_type = if ($columns.Count -gt 1) { [string]$columns[1] } else { '' }
+      name = if ($columns.Count -gt $offset) { [string]$columns[$offset] } else { '' }
+      data_type = if ($columns.Count -gt ($offset + 1)) { [string]$columns[$offset + 1] } else { '' }
       columns = $columns
       raw = $line
     })
