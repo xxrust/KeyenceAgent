@@ -10,6 +10,8 @@ customer_workflow:
     - scripts\workflows\run_kv_mvp_repair_existing_project.ps1
     - scripts\workflows\export_mnm_project_copy_default_folder.ps1
     - scripts\workflows\configure_kv_expansion_units.ps1
+    - scripts\workflows\set_kv_variables.ps1
+    - scripts\workflows\set_kv_fb_arguments.ps1
 
 regression_harness:
   customer_callable: true
@@ -37,11 +39,22 @@ internal_runner_child:
     - scripts\runner_children\create_project_local_guarded.ps1
     - scripts\runner_children\export_mnm_browse_default_folder_guarded.ps1
     - scripts\runner_children\configure_expansion_units_guarded.ps1
+    - scripts\runner_children\set_fb_arguments_guarded.ps1
 
 pending_runner_child:
   customer_callable: false
-  entries:
-    - scripts\runner_children\set_fb_arguments_guarded.ps1
+  entries: []
+
+customer_api_contract:
+  ui_payload_boundary:
+    - set_kv_variables(project_path, global_variables_tsv, local_variables_tsv, local_program_name)
+    - set_kv_fb_arguments(project_path, fb_module_name, arguments_tsv)
+    - configure_kv_expansion_units(project_path, models)
+  guarantees:
+    - agent supplies only named project targets and structured payload paths
+    - workflow owns focus, menu, grid, clipboard, modal, persistence, and timing operations
+    - variables use close_reopen_copyback verification on every successful public call
+    - FB arguments use copyback verification on every successful public call
 
 project_configuration:
   plc_units:

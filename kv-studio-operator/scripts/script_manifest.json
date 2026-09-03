@@ -111,6 +111,24 @@
           "configure_plc_expansion_units",
           "verify_plc_expansion_units_persistence"
         ]
+      },
+      {
+        "path": "workflows/set_kv_variables.ps1",
+        "status": "published",
+        "customer_callable": true,
+        "capabilities": [
+          "set_global_and_local_variables",
+          "verify_variable_persistence"
+        ]
+      },
+      {
+        "path": "workflows/set_kv_fb_arguments.ps1",
+        "status": "published",
+        "customer_callable": true,
+        "capabilities": [
+          "set_fb_arguments",
+          "verify_fb_argument_copyback"
+        ]
       }
     ],
     "regression_harness": [

@@ -269,7 +269,7 @@ try {
     if ([int]$entry.module_type -ne 2) { continue }
     $safeModule = ($entry.module_name -replace '[^A-Za-z0-9_.-]+', '_')
     $fbOutDir = Join-Path $fbArgumentRoot ('module_{0:D2}_{1}' -f ($i + 1), $safeModule)
-    $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })set_fb_arguments_$($entry.module_name)" 'set_fb_arguments_guarded.ps1' @('runner_child_pending') @('-ProjectPath',$projectPathForRun,'-FbModuleName',$entry.module_name,'-ArgumentsTsv',$entry.arguments_tsv,'-ChecklistPath',$ChecklistPath,'-OutDir',$fbOutDir) $fbOutDir 'runner_child'))
+    $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })set_fb_arguments_$($entry.module_name)" 'set_fb_arguments_guarded.ps1' @('runner_child_approved') @('-ProjectPath',$projectPathForRun,'-FbModuleName',$entry.module_name,'-ArgumentsTsv',$entry.arguments_tsv,'-ChecklistPath',$ChecklistPath,'-OutDir',$fbOutDir) $fbOutDir 'runner_child'))
   }
 
   $setVariablesRoot = Join-Path $artifactRoot 'set_variables'
