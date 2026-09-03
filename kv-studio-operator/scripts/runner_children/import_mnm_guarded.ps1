@@ -85,6 +85,7 @@ public class W{
 [DllImport("user32.dll")] public static extern short GetKeyState(int nVirtKey);
 [DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
 [DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+[DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr hDlg, int nIDDlgItem);
 [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
 [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
 public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
@@ -343,6 +344,16 @@ function GetStandardOpenDialogByWin32(){
 function TestOpenDialogByNativeHwnd([int64]$nativeHwnd){
   if($nativeHwnd -eq 0){ return $false }
   try{
+    # Native control IDs are the stable identity for a Windows common open
+    # dialog.  Prefer them over UIA while the dialog is being created: UIA
+    # can expose descendants for diagnostics before it exposes the parent
+    # window through a RootElement query.
+    $nativeDialog=[IntPtr]$nativeHwnd
+    $nativeOpen=[W]::GetDlgItem($nativeDialog,1)
+    $nativeFileName=[W]::GetDlgItem($nativeDialog,1148)
+    if($nativeOpen -ne [IntPtr]::Zero -and $nativeFileName -ne [IntPtr]::Zero){
+      return $true
+    }
     # Resolve the dialog directly from its native handle.  RootElement
     # descendant lookup is unreliable for common-dialog providers during the
     # first few milliseconds after the menu command (it may return no element
