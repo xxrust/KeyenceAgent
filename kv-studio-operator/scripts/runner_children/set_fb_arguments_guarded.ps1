@@ -127,6 +127,14 @@ function FindProjectModuleTreeItem([int]$ProcessIdValue, [string]$ModuleName) {
   return $null
 }
 
+function Read-KvDelimitedText([string]$Path) {
+  $bytes = [IO.File]::ReadAllBytes($Path)
+  if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) { return [Text.Encoding]::Unicode.GetString($bytes) }
+  if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { return [Text.Encoding]::UTF8.GetString($bytes) }
+  try { return ([Text.UTF8Encoding]::new($false, $true)).GetString($bytes) }
+  catch { return [Text.Encoding]::Default.GetString($bytes) }
+}
+
 function Convert-UiaPointToPhysicalScreen([int]$ProcessIdValue, [double]$X, [double]$Y) {
   $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
   $root = [System.Windows.Automation.AutomationElement]::RootElement
@@ -499,7 +507,7 @@ function Assert-FbArgumentFormForeground($Form, [string]$Step) {
 }
 
 function Convert-FbArgumentRowsToPasteText([string]$Path, [string]$ExpectedOwner) {
-  $text = [IO.File]::ReadAllText($Path, [Text.Encoding]::Default)
+  $text = Read-KvDelimitedText $Path
   $rows = @($text | ConvertFrom-Csv -Delimiter "`t" | Where-Object { $_.status -ne 'display_name' -and $_.argument_name })
   if ($rows.Count -eq 0) { Fail-Step 'KV_FB_ARGUMENTS_EMPTY' 'preflight FB arguments' "No executable FB argument rows in $Path" @($Path) }
   $errors = [System.Collections.Generic.List[object]]::new()

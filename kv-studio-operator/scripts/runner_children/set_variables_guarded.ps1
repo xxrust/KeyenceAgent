@@ -104,6 +104,24 @@ function Get-VisibleKvsProcess {
     Select-Object -First 1
 }
 
+function Read-KvDelimitedText([string]$Path) {
+  $bytes = [IO.File]::ReadAllBytes($Path)
+  if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+    return [Text.Encoding]::Unicode.GetString($bytes)
+  }
+  if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+    return [Text.Encoding]::UTF8.GetString($bytes)
+  }
+  # Accept UTF-8 without BOM (the common cross-platform TSV form), but fall
+  # back to the system ANSI code page for legacy KEYENCE exports.
+  try {
+    $strictUtf8 = [Text.UTF8Encoding]::new($false, $true)
+    return $strictUtf8.GetString($bytes)
+  } catch {
+    return [Text.Encoding]::Default.GetString($bytes)
+  }
+}
+
 function Get-BoundKvsProcess([string]$ProjectNeedle) {
   $visible = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })
   if ($visible.Count -ne 1) {
@@ -823,7 +841,7 @@ function Assert-NoKvsModalFast([int]$ProcessIdValue, [string]$Stage) {
 }
 
 function Convert-GlobalRows([string]$Path) {
-  $text = [IO.File]::ReadAllText($Path, [Text.Encoding]::Default)
+  $text = Read-KvDelimitedText $Path
   $rows = $text | ConvertFrom-Csv -Delimiter "`t"
   $lines = foreach ($row in (Get-KvExecutableVariableRows -Rows @($rows) -Scope global)) {
     @(
@@ -918,7 +936,7 @@ function Assert-KvVariableDefinitionsBeforePaste([object[]]$Rows, [string]$Scope
 }
 
 function Convert-LocalRows([string]$Path) {
-  $text = [IO.File]::ReadAllText($Path, [Text.Encoding]::Default)
+  $text = Read-KvDelimitedText $Path
   $rows = $text | ConvertFrom-Csv -Delimiter "`t"
   $lines = foreach ($row in (Get-KvExecutableVariableRows -Rows @($rows) -Scope local)) {
     if ($LocalPasteFormat -eq 'NameType') {
