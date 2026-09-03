@@ -1037,7 +1037,12 @@ function InvokeMnemonicImportMenuByUia(){
     Log 'UIA mnemonic import route failed: mnemonic read item was not invoked'
     return $false
   }
-  if(-not (WaitForStandardOpenDialog 2500)){
+  # UIA menu expansion/invocation can take several seconds on a freshly
+  # created project while KV STUDIO finishes binding its editor commands.
+  # Keep this as a bounded post-command wait; the command itself remains a
+  # single guarded UI action and the standard-dialog identity is still
+  # required before any file path is supplied.
+  if(-not (WaitForStandardOpenDialog 8000)){
     SaveVisibleTopWindowSnapshot 'top_windows_uia_mnemonic_read_no_open_dialog.json'
     Log 'UIA mnemonic import route failed: standard open dialog was not detected after menu invoke'
     return $false
@@ -1055,7 +1060,7 @@ function InvokeMnemonicImportMenu(){
   SetCapsLockState $true
   Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $script:KvGuardTargetHwnd -Step 'MNM import Alt+F,R,R' -Keys '%frr' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -SuccessTitleLike @('打开','KV STUDIO*') -Action 'Alt+F,R,R opens MNM read dialog' -SleepMs 300
   Log 'sent Alt+F,R,R by shared UI guard'
-  if(-not (WaitForStandardOpenDialog 3000)){
+  if(-not (WaitForStandardOpenDialog 8000)){
     SaveVisibleTopWindowSnapshot 'top_windows_after_sendkeys_alt_f_r_r_no_open_dialog.json'
     Log 'Alt+F,R,R did not open MNM dialog; trying PID-bound UIA File/MNM menu route'
     if(InvokeMnemonicImportMenuByUia){ return }
