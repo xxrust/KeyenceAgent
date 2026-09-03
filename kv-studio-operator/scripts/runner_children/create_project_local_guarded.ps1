@@ -281,6 +281,43 @@ function Get-KvStudioMainProcess {
   return $null
 }
 
+function Find-ElementByAutomationIdNow([string]$AutomationId) {
+  $condition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, $AutomationId)
+  return [System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+}
+
+function Resolve-InitialAdminDialog([pscustomobject]$Credential, [int]$WaitSeconds = 25) {
+  # KV STUDIO creates the project file before its first-run administrator
+  # dialog is necessarily materialized.  Treat that dialog as part of project
+  # initialization, rather than assuming that an existing .kpr proves the UI
+  # is ready for the next workflow step.
+  $deadline = (Get-Date).AddSeconds($WaitSeconds)
+  do {
+    $adminUser = Find-ElementByAutomationIdNow '_ltxUserName'
+    if ($adminUser) {
+      Set-TextById '_ltxUserName' $Credential.User
+      Set-TextById '_ltxPassword' $Credential.Password
+      Set-TextById '_ltxPasswordConfirmation' $Credential.Password
+      Click-ById '_btnOK'
+      Log 'submitted admin dialog'
+
+      $dismissDeadline = (Get-Date).AddSeconds(5)
+      do {
+        if (-not (Find-ElementByAutomationIdNow '_ltxUserName')) {
+          Log 'administrator dialog dismissed'
+          return $true
+        }
+        Start-Sleep -Milliseconds 200
+      } while ((Get-Date) -lt $dismissDeadline)
+      Save-Uia 'fail_admin_dialog_still_visible.json'
+      throw 'KV_CREATE_ADMIN_DIALOG_NOT_DISMISSED'
+    }
+    Start-Sleep -Milliseconds 250
+  } while ((Get-Date) -lt $deadline)
+  Log "administrator dialog not presented during $WaitSeconds-second initialization window"
+  return $false
+}
+
 function Invoke-NewProjectButtonByUia([System.Diagnostics.Process]$Process) {
   if (-not $Process -or $Process.MainWindowHandle -eq 0) { return $false }
   $helper = Join-Path (Split-Path -Parent $PSCommandPath) 'invoke_kv_new_project_button_helper.ps1'
@@ -480,21 +517,7 @@ try {
   # dialog, independent of the fast-path result; otherwise subsequent menu
   # operations are sent to a blocked window and fail with misleading routing
   # errors.
-  $adminUser = Find-ElementByAutomationId '_ltxUserName' 3
-  if ($adminUser) {
-    Set-TextById '_ltxUserName' $adminCredential.User
-    Set-TextById '_ltxPassword' $adminCredential.Password
-    Set-TextById '_ltxPasswordConfirmation' $adminCredential.Password
-    Click-ById '_btnOK'
-    Log 'submitted admin dialog'
-    # Do not continue while the modal dialog remains.  A lingering dialog
-    # means credentials were rejected or the UI is in an unknown state.
-    $adminStillVisible = Find-ElementByAutomationId '_ltxUserName' 5
-    if ($adminStillVisible) {
-      Save-Uia 'fail_admin_dialog_still_visible.json'
-      throw 'KV_CREATE_ADMIN_DIALOG_NOT_DISMISSED'
-    }
-  }
+  $adminHandled = Resolve-InitialAdminDialog -Credential $adminCredential -WaitSeconds 25
 
   if (-not $fastPathReady) {
     Start-Sleep -Seconds 2
