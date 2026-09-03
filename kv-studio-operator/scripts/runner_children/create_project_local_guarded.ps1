@@ -475,15 +475,28 @@ try {
     Start-Sleep -Milliseconds 200
   } while ((Get-Date) -lt $fastDeadline)
 
-  if (-not $fastPathReady) {
-    $adminUser = Find-ElementByAutomationId '_ltxUserName' 12
-    if ($adminUser) {
-      Set-TextById '_ltxUserName' $adminCredential.User
-      Set-TextById '_ltxPassword' $adminCredential.Password
-      Set-TextById '_ltxPasswordConfirmation' $adminCredential.Password
-      Click-ById '_btnOK'
-      Log 'submitted admin dialog'
+  # A newly-created project can have its .kpr and main window ready while the
+  # first-run administrator dialog is still modal.  Always probe for this
+  # dialog, independent of the fast-path result; otherwise subsequent menu
+  # operations are sent to a blocked window and fail with misleading routing
+  # errors.
+  $adminUser = Find-ElementByAutomationId '_ltxUserName' 3
+  if ($adminUser) {
+    Set-TextById '_ltxUserName' $adminCredential.User
+    Set-TextById '_ltxPassword' $adminCredential.Password
+    Set-TextById '_ltxPasswordConfirmation' $adminCredential.Password
+    Click-ById '_btnOK'
+    Log 'submitted admin dialog'
+    # Do not continue while the modal dialog remains.  A lingering dialog
+    # means credentials were rejected or the UI is in an unknown state.
+    $adminStillVisible = Find-ElementByAutomationId '_ltxUserName' 5
+    if ($adminStillVisible) {
+      Save-Uia 'fail_admin_dialog_still_visible.json'
+      throw 'KV_CREATE_ADMIN_DIALOG_NOT_DISMISSED'
     }
+  }
+
+  if (-not $fastPathReady) {
     Start-Sleep -Seconds 2
     if (-not (Dismiss-UnitConfigPromptNoByAltN 8)) { Log 'unit configuration prompt not present' }
   }
