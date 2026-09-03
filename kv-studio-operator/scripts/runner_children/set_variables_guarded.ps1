@@ -312,6 +312,16 @@ function Set-CapsLockState([bool]$Enabled, [IntPtr]$TargetHwnd, [string]$Expecte
 
 function Restore-KvForeground([System.Diagnostics.Process]$Process, [string]$ProjectNeedle, [string]$Action) {
   for ($i = 1; $i -le 10; $i++) {
+    # KV STUDIO may recreate its top-level window when an MNM/common dialog
+    # closes. Refresh the Process object so MainWindowHandle is not a stale
+    # handle from before the import step.
+    try { $Process.Refresh() } catch {}
+    if ($Process.MainWindowHandle -eq [IntPtr]::Zero) {
+      $replacement = Get-Process Kvs -ErrorAction SilentlyContinue |
+        Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like "*$ProjectNeedle*" } |
+        Select-Object -First 1
+      if ($replacement) { $Process = $replacement }
+    }
     # Reuse the shared guard's thread-input foreground handoff. A bare
     # SetForegroundWindow can be denied after the MNM common dialog closes,
     # leaving the process window valid but no longer foreground.
