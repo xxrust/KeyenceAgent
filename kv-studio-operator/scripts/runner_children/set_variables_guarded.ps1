@@ -1024,7 +1024,14 @@ function Focus-VariableGridArea($Form, [string]$PageAid, [string]$Label) {
   # fallback when the filter control is not exposed.
   try {
     $Form = Invoke-GuardedVariableKeyAction $Form "$focusStep Alt+L" '%l' 'Alt+L focuses variable filter field' 150
-    $Form = Invoke-GuardedVariableKeyAction $Form "$focusStep Shift+Tab" '+{TAB}' 'Shift+Tab moves from filter field to upper-left variable cell' 150
+    $Form = Invoke-GuardedVariableKeyAction $Form "$focusStep Shift+Tab" '+{TAB}' 'Shift+Tab moves from filter field toward the upper-left variable cell' 150
+    # In the global table KV STUDIO exposes the filter button group between
+    # the filter combo and the grid. One additional guarded Shift+Tab is
+    # required when that intermediate control owns focus.
+    $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+    if ($focused -and [string]$focused.Current.AutomationId -eq '_buttonGroupFilter') {
+      $Form = Invoke-GuardedVariableKeyAction $Form "$focusStep Shift+Tab grid" '+{TAB}' 'Shift+Tab moves from filter button group to upper-left variable cell' 150
+    }
     $after = Assert-VariableFormForeground $Form "$focusStep semantic focus postcondition" -AllowSingleRecovery
     Write-StepCheckpoint $focusStep 'after' 'Alt+L then Shift+Tab semantic variable-cell focus' $Form $before $after '' 'Native KV focus chain reached upper-left variable cell.' @() | Out-Null
     return
