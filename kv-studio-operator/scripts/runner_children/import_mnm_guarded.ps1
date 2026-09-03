@@ -1153,48 +1153,33 @@ function SetOpenDialogFileByVerifiedDialogHandle([string]$path){
       continue
     }
     try{
-      # Common-dialog UIA providers can lag behind Win32 enumeration. Resolve
-      # the already-verified native handle directly so its controls are
-      # available in the same polling iteration.
-      $dialog=[System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$nativeDialog.Hwnd)
-      if(-not $dialog){
-        Log ('verified open dialog hwnd not found in UIA tree hwnd='+$nativeDialog.Hwnd)
-        Start-Sleep -Milliseconds 200
-        continue
+      # The dialog was validated from its native HWND and the mandatory
+      # controls (Open=1 and File name=1148).  Some Common Dialog providers
+      # do not expose those descendants reliably through UIA, so use the
+      # guarded foreground input path only after this native proof.  This is
+      # not a generic keyboard fallback: its target is the verified dialog
+      # handle and every input atom is checked by kv_ui_guard.
+      $dialogHwnd=[IntPtr]$nativeDialog.Hwnd
+      [W]::SetForegroundWindow($dialogHwnd) | Out-Null
+      Start-Sleep -Milliseconds 100
+      $fg=GetForegroundTitle
+      if([int64]$fg.Hwnd -ne [int64]$nativeDialog.Hwnd){
+        throw ('Verified open dialog did not become foreground. Foreground='+$fg.Title)
       }
-      $openButton=$dialog.FindFirst(
-        [System.Windows.Automation.TreeScope]::Descendants,
-        (New-Object System.Windows.Automation.AndCondition(
-          (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty,'1')),
-          (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Button))
-        ))
-      )
-      $fileNameEdit=$dialog.FindFirst(
-        [System.Windows.Automation.TreeScope]::Descendants,
-        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty,'1148'))
-      )
-      if(-not $openButton -or -not $fileNameEdit){
-        Log ('verified open dialog missing filename edit or open button hwnd='+$nativeDialog.Hwnd)
-        Start-Sleep -Milliseconds 200
-        continue
-      }
-      $valuePattern=$fileNameEdit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
-      $valuePattern.SetValue($path)
-      Log ('set verified open dialog filename by ValuePattern hwnd='+$nativeDialog.Hwnd)
-      Start-Sleep -Milliseconds 200
-      $invokePattern=$openButton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
-      $invokePattern.Invoke()
-      Log ('invoked verified open dialog Open button by InvokePattern hwnd='+$nativeDialog.Hwnd)
+      Invoke-KvGuardedSendKeys -TargetHwnd $dialogHwnd -Step 'verified open dialog filename Alt+N' -Keys '%n' -ExpectedTitleLike '*' -Action 'Alt+N focuses filename in native-verified dialog' -SleepMs 100
+      Invoke-KvGuardedSendKeys -TargetHwnd $dialogHwnd -Step 'verified open dialog filename Ctrl+A' -Keys '^a' -ExpectedTitleLike '*' -Action 'Ctrl+A selects native-verified filename' -SleepMs 80
+      Invoke-KvGuardedClipboardPaste -TargetHwnd $dialogHwnd -Step 'verified open dialog filename Ctrl+V' -Text $path -ExpectedTitleLike '*' -SleepMs 150
+      Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $dialogHwnd -Step 'verified open dialog submit Enter' -Keys '{ENTER}' -ExpectedTitleLike '*' -SuccessTitleLike @('选择程序种类','KV STUDIO*') -Action 'Enter submits native-verified MNM dialog' -SleepMs 500
       $closedDeadline=(Get-Date).AddSeconds(4)
       do{
         Start-Sleep -Milliseconds 100
         if(-not (GetStandardOpenDialogByWin32)){
-          Log 'verified standard open dialog closed after ValuePattern/Open invoke'
+          Log 'verified standard open dialog closed after guarded filename submission'
           return $true
         }
       }while((Get-Date) -lt $closedDeadline)
-      SaveVisibleTopWindowSnapshot 'top_windows_open_dialog_not_closed_after_valuepattern_open.json'
-      throw 'Open dialog did not close after ValuePattern/Open invoke; refusing to assume MNM file was accepted'
+      throw 'Verified open dialog did not close after guarded filename submission'
+
     }catch{
       Log ('verified open dialog ValuePattern path failed: '+$_.Exception.Message)
       Start-Sleep -Milliseconds 300
