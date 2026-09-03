@@ -312,12 +312,10 @@ function Set-CapsLockState([bool]$Enabled, [IntPtr]$TargetHwnd, [string]$Expecte
 
 function Restore-KvForeground([System.Diagnostics.Process]$Process, [string]$ProjectNeedle, [string]$Action) {
   for ($i = 1; $i -le 10; $i++) {
-    if ([KvSetVarWin32]::IsIconic($Process.MainWindowHandle)) {
-      # Restore a minimized window without changing the user's normal/maximized size.
-      [KvSetVarWin32]::ShowWindow($Process.MainWindowHandle, 9) | Out-Null
-    }
-    [KvSetVarWin32]::SetForegroundWindow($Process.MainWindowHandle) | Out-Null
-    Start-Sleep -Milliseconds 100
+    # Reuse the shared guard's thread-input foreground handoff. A bare
+    # SetForegroundWindow can be denied after the MNM common dialog closes,
+    # leaving the process window valid but no longer foreground.
+    Invoke-KvUiGuardForceForeground -TargetHwnd $Process.MainWindowHandle | Out-Null
     $fg = Get-ForegroundTitle
     Log "foreground ${Action}: try=$i title=$($fg.Title)"
     if ($fg.Title -like 'KV STUDIO*' -and $fg.Title -like "*$ProjectNeedle*" -and -not [KvSetVarWin32]::IsIconic($Process.MainWindowHandle)) {
