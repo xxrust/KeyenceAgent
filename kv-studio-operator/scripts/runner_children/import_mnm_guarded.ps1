@@ -1153,11 +1153,10 @@ function SetOpenDialogFileByVerifiedDialogHandle([string]$path){
       continue
     }
     try{
-      $root=[System.Windows.Automation.AutomationElement]::RootElement
-      $dialog=$root.FindFirst(
-        [System.Windows.Automation.TreeScope]::Descendants,
-        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NativeWindowHandleProperty,[int]$nativeDialog.Hwnd))
-      )
+      # Common-dialog UIA providers can lag behind Win32 enumeration. Resolve
+      # the already-verified native handle directly so its controls are
+      # available in the same polling iteration.
+      $dialog=[System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$nativeDialog.Hwnd)
       if(-not $dialog){
         Log ('verified open dialog hwnd not found in UIA tree hwnd='+$nativeDialog.Hwnd)
         Start-Sleep -Milliseconds 200
