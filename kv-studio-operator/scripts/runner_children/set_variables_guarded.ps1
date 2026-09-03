@@ -1015,6 +1015,22 @@ function Escape-SendKeysText([string]$Text) {
 function Focus-VariableGridArea($Form, [string]$PageAid, [string]$Label) {
   $focusStep = "$Label grid focus"
   $before = Assert-VariableFormForeground $Form $focusStep -AllowSingleRecovery
+  # The native KV focus chain is the stable route for an empty or newly
+  # imported table: Alt+L owns the variable filter, then Shift+Tab moves to
+  # the upper-left name cell.  A UIA SetFocus/click on _grid can leave focus
+  # on a pane (or open an inline editor), which makes a valid NameType payload
+  # appear as invalid paste data.  Try the semantic focus route first for all
+  # variable pages; retain the verified grid route only as a diagnostic
+  # fallback when the filter control is not exposed.
+  try {
+    $Form = Invoke-GuardedVariableKeyAction $Form "$focusStep Alt+L" '%l' 'Alt+L focuses variable filter field' 150
+    $Form = Invoke-GuardedVariableKeyAction $Form "$focusStep Shift+Tab" '+{TAB}' 'Shift+Tab moves from filter field to upper-left variable cell' 150
+    $after = Assert-VariableFormForeground $Form "$focusStep semantic focus postcondition" -AllowSingleRecovery
+    Write-StepCheckpoint $focusStep 'after' 'Alt+L then Shift+Tab semantic variable-cell focus' $Form $before $after '' 'Native KV focus chain reached upper-left variable cell.' @() | Out-Null
+    return
+  } catch {
+    Log "semantic Alt+L/Shift+Tab focus route unavailable for $Label; using verified grid route: $($_.Exception.Message)"
+  }
   $grid = Find-DescByAid $Form '_grid'
   if ($grid) {
     try { $grid.SetFocus() } catch {
