@@ -1,6 +1,8 @@
 param(
   [Parameter(Mandatory=$true)]
   [string]$ProjectName,
+  [string]$ProjectPath = '',
+  [string]$DeviceModel = '',
   [string[]]$DevicePath = @('KEYENCE CORPORATION','Servo Drives','SV3'),
   [string]$EsiPath = '',
   [string]$BatchAxisRegistration = 'No',
@@ -24,13 +26,19 @@ using System.Text;
 using System.Runtime.InteropServices;
 public class KvEtherCatWin32 {
   public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+  public delegate bool EnumChildProc(IntPtr hWnd, IntPtr lParam);
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
   [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+  [DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr hWndParent, EnumChildProc lpEnumFunc, IntPtr lParam);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr hDlg, int nIDDlgItem);
   [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);
+  [DllImport("user32.dll")] public static extern void mouse_event(int flags, int dx, int dy, int data, int extraInfo);
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
@@ -81,11 +89,12 @@ function Save-Screenshot {
 }
 
 function Get-KvsProcess {
-  $matches = @(Get-Process Kvs -ErrorAction SilentlyContinue |
-    Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectName*" })
+  $matches = @(Get-VisibleTopWindows | Where-Object {
+    $_.process_name -eq 'Kvs' -and $_.title -like 'KV STUDIO*' -and $_.title -like "*$ProjectName*"
+  })
   if ($matches.Count -eq 0) { throw "KV_ETHERCAT_PROJECT_NOT_OPEN: KV STUDIO process with project '$ProjectName' was not found." }
   if ($matches.Count -gt 1) { throw "KV_ETHERCAT_PROJECT_WINDOW_AMBIGUOUS: found $($matches.Count) windows matching '$ProjectName'." }
-  $matches[0]
+  [pscustomobject]@{Id=[int]$matches[0].process_id;MainWindowHandle=[IntPtr]$matches[0].hwnd;MainWindowTitle=[string]$matches[0].title}
 }
 
 function Get-VisibleTopWindows {
@@ -367,6 +376,185 @@ function Find-DeviceTreeItem {
   }
 }
 
+function Send-DoubleClickToElement {
+  param([Windows.Automation.AutomationElement]$Element)
+  $scroll=$null
+  if($Element.TryGetCurrentPattern([Windows.Automation.ScrollItemPattern]::Pattern,[ref]$scroll)){try{$scroll.ScrollIntoView()}catch{}}
+  $select=$null
+  if($Element.TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern,[ref]$select)){try{$select.Select()}catch{}}
+  $Element.SetFocus()
+  $rect=$Element.Current.BoundingRectangle
+  if($rect.Width -le 0 -or $rect.Height -le 0){throw 'KV_ETHERCAT_DEVICE_ITEM_OFFSCREEN: filtered device item has no clickable UIA bounds.'}
+  $x=[int]($rect.Left+($rect.Width/2));$y=[int]($rect.Top+($rect.Height/2))
+  [void][KvEtherCatWin32]::SetCursorPos($x,$y)
+  Start-Sleep -Milliseconds 40
+  foreach($n in 1..2){[KvEtherCatWin32]::mouse_event(0x0002,0,0,0,0);Start-Sleep -Milliseconds 30;[KvEtherCatWin32]::mouse_event(0x0004,0,0,0,0);Start-Sleep -Milliseconds 80}
+  [pscustomobject]@{x=$x;y=$y;rect=(Get-ElementRectData $Element)}
+}
+
+function Write-AtomicTiming {
+  param([string]$Step,[Diagnostics.Stopwatch]$Stopwatch,[hashtable]$Data=@{})
+  $elapsed = [int]$Stopwatch.ElapsedMilliseconds
+  $payload = @{step=$Step;elapsed_ms=$elapsed;budget_ms=10000;ok=($elapsed -lt 10000)}
+  foreach($key in $Data.Keys){$payload[$key]=$Data[$key]}
+  Log-Event 'atomic_action' $payload
+  if($elapsed -ge 10000){throw "KV_ETHERCAT_ATOMIC_STEP_TIMEOUT: $Step took ${elapsed}ms."}
+}
+
+function Get-ElementRectData {
+  param([Windows.Automation.AutomationElement]$Element)
+  $rect=$Element.Current.BoundingRectangle
+  [pscustomobject]@{left=[double]$rect.Left;top=[double]$rect.Top;width=[double]$rect.Width;height=[double]$rect.Height;right=[double]$rect.Right;bottom=[double]$rect.Bottom}
+}
+
+function Get-NetworkStructureSnapshot {
+  param([Windows.Automation.AutomationElement]$WindowElement)
+  $windowRect=Get-ElementRectData $WindowElement
+  $mid=$windowRect.left+($windowRect.width*0.43)
+  $all=$WindowElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+  $rows=@()
+  for($i=0;$i -lt $all.Count;$i++){
+    $e=$all.Item($i)
+    try{
+      $name=[string]$e.Current.Name
+      $rect=Get-ElementRectData $e
+      if(-not $name -or $rect.width -le 0 -or $rect.height -le 0){continue}
+      if($rect.left -lt $windowRect.left -or $rect.left -ge $mid){continue}
+      if($rect.top -lt ($windowRect.top+70) -or $rect.bottom -gt ($windowRect.bottom-45)){continue}
+      $type=[string]$e.Current.ControlType.ProgrammaticName
+      if($type -notin @('ControlType.TreeItem','ControlType.ListItem','ControlType.DataItem','ControlType.Text','ControlType.Image')){continue}
+      $rows += [pscustomobject]@{name=$name;control_type=$type;automation_id=[string]$e.Current.AutomationId;rect=$rect}
+    }catch{}
+  }
+  $wrapper=Find-Descendant -Root $WindowElement -Predicate {
+    param($e)
+    try{$e.Current.AutomationId -eq '_projectTree'}catch{$false}
+  }
+  if(-not $wrapper){throw 'KV_ETHERCAT_PROJECT_TREE_WRAPPER_NOT_FOUND: AutomationId _projectTree was not found.'}
+  $wrapperRect=Get-ElementRectData $wrapper
+  $treeCandidates=New-Object System.Collections.ArrayList
+  $callback=[KvEtherCatWin32+EnumChildProc]{
+    param([IntPtr]$handle,[IntPtr]$lParam)
+    try{
+      $classBuilder=[Text.StringBuilder]::new(256)
+      [void][KvEtherCatWin32]::GetClassName($handle,$classBuilder,$classBuilder.Capacity)
+      $className=$classBuilder.ToString()
+      if($className -notlike '*SysTreeView32*'){return $true}
+      $nativeRect=New-Object KvEtherCatWin32+RECT
+      if(-not [KvEtherCatWin32]::GetWindowRect($handle,[ref]$nativeRect)){return $true}
+      $overlapLeft=[Math]::Max($wrapperRect.left,[double]$nativeRect.Left)
+      $overlapTop=[Math]::Max($wrapperRect.top,[double]$nativeRect.Top)
+      $overlapRight=[Math]::Min($wrapperRect.right,[double]$nativeRect.Right)
+      $overlapBottom=[Math]::Min($wrapperRect.bottom,[double]$nativeRect.Bottom)
+      if($overlapRight -gt $overlapLeft -and $overlapBottom -gt $overlapTop){
+        [void]$treeCandidates.Add([pscustomobject]@{hwnd=$handle.ToInt64();class_name=$className;rect=[pscustomobject]@{left=$nativeRect.Left;top=$nativeRect.Top;right=$nativeRect.Right;bottom=$nativeRect.Bottom}})
+      }
+    }catch{}
+    return $true
+  }
+  [void][KvEtherCatWin32]::EnumChildWindows([IntPtr]$WindowElement.Current.NativeWindowHandle,$callback,[IntPtr]::Zero)
+  if($treeCandidates.Count -eq 0){
+    return [pscustomobject]@{captured_at=(Get-Date).ToString('o');window_rect=$windowRect;left_boundary=$mid;project_tree_wrapper_rect=$wrapperRect;native_tree=$null;native_tree_count=0;tree_materialized=$false;rows=@($rows);names=@($rows|ForEach-Object{$_.name})}
+  }
+  if($treeCandidates.Count -gt 1){throw "KV_ETHERCAT_PROJECT_NATIVE_TREE_AMBIGUOUS: $($treeCandidates.Count) SysTreeView32 controls overlap the _projectTree wrapper."}
+  $nativeTree=$treeCandidates[0]
+  $nativeCount=[KvEtherCatWin32]::SendMessage([IntPtr]$nativeTree.hwnd,0x1105,[IntPtr]::Zero,[IntPtr]::Zero).ToInt64()
+  [pscustomobject]@{captured_at=(Get-Date).ToString('o');window_rect=$windowRect;left_boundary=$mid;project_tree_wrapper_rect=$wrapperRect;native_tree=$nativeTree;native_tree_count=$nativeCount;tree_materialized=$true;rows=@($rows);names=@($rows|ForEach-Object{$_.name})}
+}
+
+function Find-DeviceModelFilter {
+  param([Windows.Automation.AutomationElement]$WindowElement)
+  $windowRect=Get-ElementRectData $WindowElement
+  $mid=$windowRect.left+($windowRect.width*0.43)
+  $all=$WindowElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+  $candidates=@()
+  for($i=0;$i -lt $all.Count;$i++){
+    $e=$all.Item($i)
+    try{
+      if($e.Current.ControlType.ProgrammaticName -ne 'ControlType.Edit' -or -not $e.Current.IsEnabled -or $e.Current.IsOffscreen){continue}
+      $rect=Get-ElementRectData $e
+      if($rect.left -lt $mid -or $rect.width -lt 80 -or $rect.height -lt 15){continue}
+      $pattern=$null
+      if(-not $e.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern,[ref]$pattern) -or $pattern.Current.IsReadOnly){continue}
+      $candidates += [pscustomobject]@{element=$e;name=[string]$e.Current.Name;automation_id=[string]$e.Current.AutomationId;rect=$rect;pattern=$pattern}
+    }catch{}
+  }
+  if($candidates.Count -eq 0){throw 'KV_ETHERCAT_MODEL_FILTER_NOT_FOUND: no enabled writable Edit control was found in the device-list region.'}
+  if($candidates.Count -gt 1){
+    $evidence=New-EvidencePath 'ambiguous_model_filters'
+    Write-JsonFile $evidence @($candidates|ForEach-Object{[pscustomobject]@{name=$_.name;automation_id=$_.automation_id;rect=$_.rect}})
+    throw "KV_ETHERCAT_MODEL_FILTER_AMBIGUOUS: found $($candidates.Count) writable Edit controls in the device-list region. evidence=$evidence"
+  }
+  $candidates[0]
+}
+
+function Test-DeviceModelNameMatch {
+  param([string]$Candidate,[string]$Model)
+  if([string]::IsNullOrWhiteSpace($Candidate)){return $false}
+  if([string]::Equals($Candidate.Trim(),$Model.Trim(),[StringComparison]::OrdinalIgnoreCase)){return $true}
+  $escaped=[Regex]::Escape($Model.Trim())
+  return ($Candidate -match "(?i)(^|[^A-Z0-9])$escaped([^A-Z0-9]|$)")
+}
+
+function Select-EtherCatDeviceByModel {
+  param([string]$Model)
+  $windowRow=Get-EtherCatWindowRow
+  $windowElement=Get-ElementFromHwnd -Hwnd $windowRow.hwnd
+  Set-ForegroundWindowByHwnd -Hwnd $windowRow.hwnd
+  $networkBefore=Get-NetworkStructureSnapshot $windowElement
+  $beforePath=New-EvidencePath 'network_structure_before'
+  Write-JsonFile $beforePath $networkBefore
+
+  $filterWatch=[Diagnostics.Stopwatch]::StartNew()
+  $filter=Find-DeviceModelFilter $windowElement
+  $filter.pattern.SetValue($Model)
+  $deadline=(Get-Date).AddSeconds(5)
+  $matches=@()
+  do{
+    Start-Sleep -Milliseconds 150
+    $all=$windowElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+    $matches=@()
+    for($i=0;$i -lt $all.Count;$i++){
+      $e=$all.Item($i)
+      try{
+        if($e.Current.ControlType.ProgrammaticName -ne 'ControlType.TreeItem' -or $e.Current.IsOffscreen){continue}
+        if(Test-DeviceModelNameMatch ([string]$e.Current.Name) $Model){$matches += $e}
+      }catch{}
+    }
+    if($matches.Count -gt 0){break}
+  }while((Get-Date) -lt $deadline)
+  $filterWatch.Stop()
+  Write-AtomicTiming 'filter EtherCAT catalog by device model' $filterWatch @{device_model=$Model;filter_automation_id=$filter.automation_id;match_count=$matches.Count}
+  if($matches.Count -eq 0){throw "KV_ETHERCAT_DEVICE_MODEL_NOT_FOUND: no visible device matched '$Model' after filtering."}
+  if($matches.Count -gt 1){
+    $names=@($matches|ForEach-Object{$_.Current.Name})
+    $evidence=New-EvidencePath 'ambiguous_filtered_devices'
+    Write-JsonFile $evidence ([pscustomobject]@{device_model=$Model;matches=$names})
+    throw "KV_ETHERCAT_DEVICE_MODEL_AMBIGUOUS: '$Model' matched $($matches.Count) visible devices. evidence=$evidence"
+  }
+
+  $leaf=$matches[0]
+  $selectedName=[string]$leaf.Current.Name
+  $selectedRect=Get-ElementRectData $leaf
+  $insertWatch=[Diagnostics.Stopwatch]::StartNew()
+  $activation=Send-DoubleClickToElement -Element $leaf
+  $networkAfter=$null
+  $added=@()
+  $deadline=(Get-Date).AddSeconds(5)
+  do{
+    $networkAfter=Get-NetworkStructureSnapshot $windowElement
+    $beforeNames=@($networkBefore.names)
+    $added=@($networkAfter.names|Where-Object{$beforeNames -notcontains $_})
+    if([int64]$networkAfter.native_tree_count -gt [int64]$networkBefore.native_tree_count){break}
+    Start-Sleep -Milliseconds 150
+  }while((Get-Date) -lt $deadline)
+  $insertWatch.Stop()
+  $afterPath=New-EvidencePath 'network_structure_after'
+  Write-JsonFile $afterPath $networkAfter
+  Write-AtomicTiming 'insert filtered EtherCAT device and observe network tree' $insertWatch @{device_model=$Model;selected_name=$selectedName;activation='UIA-bounded double click';activation_point=$activation;added_names=$added}
+  [pscustomobject]@{window=$windowRow;selection_mode='device_model_filter';device_model=$Model;filter=[pscustomobject]@{name=$filter.name;automation_id=$filter.automation_id;rect=$filter.rect};selected_leaf=$selectedName;selected_rect=$selectedRect;network_before=$beforePath;network_after=$afterPath;network_count_before=$networkBefore.native_tree_count;network_count_after=$networkAfter.native_tree_count;added_network_names=$added;verification_status='pending_commit_and_project_tree_readback'}
+}
+
 function Select-EtherCatDeviceByPath {
   $windowRow = Get-EtherCatWindowRow
   $windowElement = Get-ElementFromHwnd -Hwnd $windowRow.hwnd
@@ -475,8 +663,34 @@ function Save-Project {
   (Get-KvsProcess).MainWindowTitle
 }
 
+function Assert-EtherCatModelPersisted {
+  param([string]$Model)
+  $process=Get-KvsProcess
+  $title=[string]$process.MainWindowTitle
+  $resolvedProjectPath=$ProjectPath
+  if(-not $resolvedProjectPath){
+    $commandLine=[string](Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)" -ErrorAction SilentlyContinue).CommandLine
+    $match=[regex]::Match($commandLine,'(?i)"([^"\r\n]+\.kpr)"')
+    if($match.Success){$resolvedProjectPath=$match.Groups[1].Value}
+  }
+  if(-not $resolvedProjectPath -or -not(Test-Path -LiteralPath $resolvedProjectPath -PathType Leaf)){throw "KV_ETHERCAT_PROJECT_PATH_UNRESOLVED: pass -ProjectPath or launch Kvs with the project path in its command line."}
+  $resolvedProjectPath=[IO.Path]::GetFullPath($resolvedProjectPath)
+  $treePath=Join-Path (Split-Path -Parent $resolvedProjectPath) 'WsTreeEnv.xml'
+  $deadline=(Get-Date).AddSeconds(8)
+  do{
+    if(Test-Path -LiteralPath $treePath){
+      $text=Get-Content -Raw -LiteralPath $treePath -ErrorAction SilentlyContinue
+      if($text -match ('(?m)<value\.first>\[\d+\]\s*(?::\s*)?'+[regex]::Escape($Model)+'(?:\s|<)')){
+        return [pscustomobject]@{ok=$true;project_path=$resolvedProjectPath;tree_path=$treePath;model=$Model;title=$title}
+      }
+    }
+    Start-Sleep -Milliseconds 150
+  }while((Get-Date)-lt$deadline)
+  throw "KV_ETHERCAT_PERSISTENCE_FAILED: '$Model' was not found as an EtherCAT node in $treePath after save."
+}
+
 try {
-  Log-Event 'workflow_started' @{project_name=$ProjectName;device_path=@($DevicePath);inspect_only=[bool]$InspectOnly;keep_window_open=[bool]$KeepWindowOpen}
+  Log-Event 'workflow_started' @{project_name=$ProjectName;device_model=$DeviceModel;device_path=@($DevicePath);inspect_only=[bool]$InspectOnly;keep_window_open=[bool]$KeepWindowOpen}
   $normalizedDevicePath = @()
   foreach ($item in @($DevicePath)) {
     foreach ($part in ([string]$item -split ',')) {
@@ -509,22 +723,25 @@ try {
     }
     Log-Event 'inspection_succeeded' @{step='inspect EtherCAT setting';tree_item_count=@($inspection.tree_items).Count;named_item_count=$inspection.named_item_count}
   } else {
-    $device = Select-EtherCatDeviceByPath
+    $device = if($DeviceModel){Select-EtherCatDeviceByModel -Model $DeviceModel}else{Select-EtherCatDeviceByPath}
     Log-Event 'step_succeeded' @{step='insert EtherCAT device';selected_leaf=$device.selected_leaf}
   }
   $mainOk = $null
   $dialogs = @()
   $savedTitle = ''
+  $persistence = $null
   if (-not $KeepWindowOpen -and -not $InspectOnly) {
     $mainOk = Invoke-EtherCatMainOk
     $dialogs = @(Handle-PostOkDialogs)
     $savedTitle = Save-Project
+    if($DeviceModel){$persistence=Assert-EtherCatModelPersisted -Model $DeviceModel;Log-Event 'persistence_verified' @{step='EtherCAT model readback';model=$DeviceModel;tree_path=$persistence.tree_path}}
   }
   $afterWindows = @(Get-KvRelevantWindows)
   $result = [pscustomobject]@{
     ok = $true
     project_name = $ProjectName
-    route = 'unit_configuration_ethercat_manual_device_tree_enter'
+    route = if($DeviceModel){'unit_configuration_ethercat_model_filter_enter'}else{'unit_configuration_ethercat_manual_device_tree_enter'}
+    device_model = $DeviceModel
     device_path = $DevicePath
     esi_path = $EsiPath
     batch_axis_registration = $BatchAxisRegistration
@@ -536,6 +753,7 @@ try {
     main_ok = $mainOk
     post_ok_dialogs = $dialogs
     saved_title = $savedTitle
+    persistence = $persistence
     after_windows = $afterWindows
     remaining_ethercat_windows = @($afterWindows | Where-Object { $_.title -like '*EtherCAT*' -and $_.title -notlike 'KV STUDIO*' })
     remaining_dialogs = @($afterWindows | Where-Object { $_.class_name -eq '#32770' })

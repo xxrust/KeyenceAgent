@@ -214,8 +214,8 @@ try {
   if ($cpuNode) {
     $ecRoot = @($treeNodes | Where-Object { $_.parent_id -eq $cpuNode.id -and $_.text -eq 'EtherCAT' } | Select-Object -First 1)
     if ($ecRoot) {
-      $ecNodes = @($treeNodes | Where-Object { $_.parent_id -eq $ecRoot.id -and $_.text -match '^\[(\d+)\]\s*:\s*(.+)$' } | ForEach-Object {
-        $m = [regex]::Match($_.text, '^\[(\d+)\]\s*:\s*(.+)$')
+      $ecNodes = @($treeNodes | Where-Object { $_.parent_id -eq $ecRoot.id -and $_.text -match '^\[(\d+)\]\s*(?::\s*)?(.+)$' } | ForEach-Object {
+        $m = [regex]::Match($_.text, '^\[(\d+)\]\s*(?::\s*)?(.+)$')
         [ordered]@{
           node = [int]$m.Groups[1].Value
           device_name = $m.Groups[2].Value.Trim()
