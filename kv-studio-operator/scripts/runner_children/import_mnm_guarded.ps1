@@ -41,6 +41,11 @@ function Log($m){
   $line = (Get-Date -Format s) + ' ' + $m + [Environment]::NewLine
   [IO.File]::AppendAllText((Join-Path $out 'run.log'), $line, [Text.Encoding]::UTF8)
 }
+function LogContract([string]$Type, [hashtable]$Data = @{}) {
+  $entry = [ordered]@{ timestamp=(Get-Date).ToString('o'); type=$Type }
+  foreach($key in $Data.Keys){ $entry[$key]=$Data[$key] }
+  [IO.File]::AppendAllText((Join-Path $out 'run.log'), (($entry | ConvertTo-Json -Compress -Depth 8)+[Environment]::NewLine), [Text.Encoding]::UTF8)
+}
 
 function ConvertTo-BoolValue([object]$Value, [bool]$Default) {
   if ($null -eq $Value) { return $Default }
@@ -1047,6 +1052,35 @@ function InvokeMnemonicImportMenuByUia(){
     SaveVisibleTopWindowSnapshot 'top_windows_uia_mnemonic_read_not_invoked.json'
     Log 'UIA mnemonic import route failed: mnemonic read item was not invoked'
     return $false
+  }
+  # A freshly-created project can acknowledge InvokePattern while its command
+  # router is still transferring ownership from the popup menu to the common
+  # file dialog.  If the popup is still present and no dialog appeared, safely
+  # reacquire the live menu element and retry once.  This is element/state
+  # based (never coordinate based) and avoids duplicate invocation when the
+  # first command already dismissed the menu.
+  if(-not (WaitForStandardOpenDialog 2500)){
+    $popupAfterFirstInvoke = @(GetVisiblePopupMenuWindows)
+    if($popupAfterFirstInvoke.Count -gt 0){
+      Log ('mnm read command handoff pending; popup menu still visible count='+$popupAfterFirstInvoke.Count+'; reacquiring live UIA read item for one retry')
+      LogContract 'mnm_command_handoff_retry' @{ reason='popup_menu_still_visible_without_standard_dialog'; popup_count=$popupAfterFirstInvoke.Count; retry_limit=1 }
+      $liveParent = FindMnemonicListMenuItem
+      $liveRead = FindMnemonicReadMenuItem $liveParent
+      if($liveRead){
+        if(-not (InvokeOrClickMenuItem $liveRead 'mnemonic-list read retry')){
+          SaveVisibleTopWindowSnapshot 'top_windows_uia_mnemonic_read_retry_not_invoked.json'
+          Log 'UIA mnemonic import retry failed: live mnemonic read item was not invoked'
+          return $false
+        }
+        Log 'invoked mnemonic-list read retry by reacquired UIA element'
+        LogContract 'mnm_command_handoff_retry_invoked' @{ retry=1 }
+      } else {
+        SaveVisibleTopWindowSnapshot 'top_windows_uia_mnemonic_read_retry_not_found.json'
+        Log 'UIA mnemonic import retry skipped: live mnemonic read item not found'
+      }
+    } else {
+      Log 'mnm read command handoff ended popup menu; no retry issued before dialog wait'
+    }
   }
   # UIA menu expansion/invocation can take several seconds on a freshly
   # created project while KV STUDIO finishes binding its editor commands.
