@@ -5,6 +5,7 @@ param(
   [string]$EsiPath = '',
   [string]$BatchAxisRegistration = 'No',
   [string]$OutDir = '',
+  [switch]$InspectOnly,
   [switch]$KeepWindowOpen
 )
 
@@ -13,6 +14,7 @@ if ([string]::IsNullOrWhiteSpace($OutDir)) {
   $OutDir = Join-Path (Join-Path ([IO.Path]::GetTempPath()) 'kv-studio-operator') 'kv_network_config_runs'
 }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+$RunLogPath = Join-Path $OutDir 'run.log'
 Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes,System.Windows.Forms,System.Drawing
 
 if (-not ('KvEtherCatWin32' -as [type])) {
@@ -38,7 +40,6 @@ public class KvEtherCatWin32 {
 
 $BM_CLICK = 0x00F5
 $NameUnitConfiguration = -join ([char[]](0x5355,0x5143,0x914D,0x7F6E))
-$NameCpuUnit = '[0]  KV-X310'
 $NameManual = -join ([char[]](0x624B,0x52A8))
 $NameCancel = -join ([char[]](0x53D6,0x6D88))
 $NameConfirm = -join ([char[]](0x786E,0x5B9A))
@@ -59,6 +60,13 @@ function Write-JsonFile {
   $Value | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $Path -Encoding UTF8
 }
 
+function Log-Event {
+  param([string]$Type,[hashtable]$Data=@{})
+  $entry=[ordered]@{timestamp=(Get-Date).ToString('o');type=$Type}
+  foreach($key in $Data.Keys){$entry[$key]=$Data[$key]}
+  [IO.File]::AppendAllText($RunLogPath,(($entry|ConvertTo-Json -Compress -Depth 12)+[Environment]::NewLine),[Text.Encoding]::UTF8)
+}
+
 function Save-Screenshot {
   param([string]$Name)
   $path = Join-Path $OutDir $Name
@@ -73,11 +81,11 @@ function Save-Screenshot {
 }
 
 function Get-KvsProcess {
-  $process = Get-Process Kvs -ErrorAction SilentlyContinue |
-    Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectName*" } |
-    Select-Object -First 1
-  if (-not $process) { throw "KV STUDIO process with project '$ProjectName' was not found." }
-  $process
+  $matches = @(Get-Process Kvs -ErrorAction SilentlyContinue |
+    Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectName*" })
+  if ($matches.Count -eq 0) { throw "KV_ETHERCAT_PROJECT_NOT_OPEN: KV STUDIO process with project '$ProjectName' was not found." }
+  if ($matches.Count -gt 1) { throw "KV_ETHERCAT_PROJECT_WINDOW_AMBIGUOUS: found $($matches.Count) windows matching '$ProjectName'." }
+  $matches[0]
 }
 
 function Get-VisibleTopWindows {
@@ -220,10 +228,16 @@ function Expand-TreeItem {
 function Ensure-UnitTreeExpanded {
   $unit = Find-TreeItemInMain -Exact $NameUnitConfiguration
   $unitState = Expand-TreeItem -Item $unit -Label 'unit configuration'
-  $cpu = Find-TreeItemInMain -Exact $NameCpuUnit
-  if (-not $cpu) { $cpu = Find-TreeItemInMain -Contains 'KV-X310' }
+  $window = Get-MainWindowElement
+  $cpu = Find-Descendant -Root $window -Predicate {
+    param($e)
+    try {
+      $e.Current.ControlType.ProgrammaticName -eq 'ControlType.TreeItem' -and
+        $e.Current.Name -match '^\[0\]\s+KV-[A-Z0-9*]+'
+    } catch { $false }
+  }
   $cpuState = Expand-TreeItem -Item $cpu -Label 'CPU unit'
-  [pscustomobject]@{ unit_state = $unitState; cpu_state = $cpuState }
+  [pscustomobject]@{ unit_state = $unitState; cpu_state = $cpuState; cpu_name = $cpu.Current.Name }
 }
 
 function Set-ForegroundWindowByHwnd {
@@ -462,6 +476,7 @@ function Save-Project {
 }
 
 try {
+  Log-Event 'workflow_started' @{project_name=$ProjectName;device_path=@($DevicePath);inspect_only=[bool]$InspectOnly;keep_window_open=[bool]$KeepWindowOpen}
   $normalizedDevicePath = @()
   foreach ($item in @($DevicePath)) {
     foreach ($part in ([string]$item -split ',')) {
@@ -476,13 +491,31 @@ try {
   }
   if ($BatchAxisRegistration -notin @('Yes','No')) { throw "BatchAxisRegistration must be Yes or No." }
   $beforeWindows = @(Get-KvRelevantWindows)
+  Log-Event 'precondition_passed' @{step='resolve unique project window';windows=@($beforeWindows)}
   $open = Open-EtherCatSetting
+  Log-Event 'step_succeeded' @{step='open EtherCAT setting';open=$open}
   $esiRegistration = $null
-  $device = Select-EtherCatDeviceByPath
+  $device = $null
+  $inspection = $null
+  if ($InspectOnly) {
+    $windowRow = Get-EtherCatWindowRow
+    $windowElement = Get-ElementFromHwnd -Hwnd $windowRow.hwnd
+    $rows = @(Get-ElementRows -Root $windowElement -Limit 2000)
+    $inspection = [pscustomobject]@{
+      window = $windowRow
+      tree_items = @($rows | Where-Object {$_.control_type -eq 'ControlType.TreeItem'})
+      named_item_count = @($rows | Where-Object {$_.name}).Count
+      screenshot = Save-Screenshot 'inspect_ethercat_setting.png'
+    }
+    Log-Event 'inspection_succeeded' @{step='inspect EtherCAT setting';tree_item_count=@($inspection.tree_items).Count;named_item_count=$inspection.named_item_count}
+  } else {
+    $device = Select-EtherCatDeviceByPath
+    Log-Event 'step_succeeded' @{step='insert EtherCAT device';selected_leaf=$device.selected_leaf}
+  }
   $mainOk = $null
   $dialogs = @()
   $savedTitle = ''
-  if (-not $KeepWindowOpen) {
+  if (-not $KeepWindowOpen -and -not $InspectOnly) {
     $mainOk = Invoke-EtherCatMainOk
     $dialogs = @(Handle-PostOkDialogs)
     $savedTitle = Save-Project
@@ -499,6 +532,7 @@ try {
     open = $open
     esi_registration = $esiRegistration
     device = $device
+    inspection = $inspection
     main_ok = $mainOk
     post_ok_dialogs = $dialogs
     saved_title = $savedTitle
@@ -511,6 +545,7 @@ try {
   }
   $path = New-EvidencePath 'configure_kv_ethercat_device'
   Write-JsonFile -Path $path -Value $result
+  Log-Event 'workflow_succeeded' @{result_path=$path;inspect_only=[bool]$InspectOnly;remaining_ethercat_windows=@($result.remaining_ethercat_windows).Count;remaining_dialogs=@($result.remaining_dialogs).Count}
   $result | Add-Member -NotePropertyName result_path -NotePropertyValue $path
   $result | ConvertTo-Json -Depth 16
   if (-not $result.ok) { exit 62 }
@@ -524,6 +559,8 @@ try {
     windows = @(try { Get-KvRelevantWindows } catch { @() })
   }
   Write-JsonFile -Path $path -Value $failure
+  $code=if($_.Exception.Message -match '^(KV_[A-Z0-9_]+)'){$Matches[1]}else{'KV_ETHERCAT_CONFIGURATION_FAILED'}
+  Log-Event 'workflow_failed' @{error_code=$code;message=$_.Exception.Message;result_path=$path}
   $failure | ConvertTo-Json -Depth 10
   exit 1
 }
