@@ -30,6 +30,7 @@ Add-Type -AssemblyName UIAutomationTypes
 
 $script:KvUiGuardOutDir = ''
 $script:KvUiGuardCheckpointDir = ''
+$script:KvUiGuardRunLogPath = ''
 $script:KvUiGuardSeq = 0
 $script:KvUiGuardAtomicActionBudgetMs = 10000
 $script:KvUiGuardAtomicActions = [System.Collections.Generic.List[object]]::new()
@@ -46,7 +47,23 @@ function Initialize-KvUiGuard {
   if ([string]::IsNullOrWhiteSpace($safeCheckpointSubdir)) { $safeCheckpointSubdir = 'ui_cp' }
   $script:KvUiGuardCheckpointDir = Join-Path $script:KvUiGuardOutDir $safeCheckpointSubdir
   New-Item -ItemType Directory -Force -Path $script:KvUiGuardCheckpointDir | Out-Null
+  $script:KvUiGuardRunLogPath = Join-Path $script:KvUiGuardOutDir 'run.log'
+  # One append-only log is the contract for a workflow run.  Keep JSON lines so
+  # callers can stream/parse entries while retaining human-readable fields.
+  $header = [ordered]@{ timestamp = (Get-Date).ToString('o'); type = 'guard_initialized'; out_dir = $script:KvUiGuardOutDir }
+  [IO.File]::AppendAllText($script:KvUiGuardRunLogPath, (($header | ConvertTo-Json -Compress) + [Environment]::NewLine), [Text.Encoding]::UTF8)
   $script:KvUiGuardAtomicActions = [System.Collections.Generic.List[object]]::new()
+}
+
+function Write-KvUiGuardRunLog {
+  param(
+    [Parameter(Mandatory=$true)][string]$Event,
+    [hashtable]$Data = @{}
+  )
+  if (-not $script:KvUiGuardRunLogPath) { return }
+  $entry = [ordered]@{ timestamp = (Get-Date).ToString('o'); type = $Event }
+  foreach ($key in $Data.Keys) { $entry[$key] = $Data[$key] }
+  [IO.File]::AppendAllText($script:KvUiGuardRunLogPath, (($entry | ConvertTo-Json -Compress -Depth 12) + [Environment]::NewLine), [Text.Encoding]::UTF8)
 }
 
 function Complete-KvUiGuardAtomicAction {
@@ -68,6 +85,9 @@ function Complete-KvUiGuardAtomicAction {
     ok = ($elapsedMs -lt $script:KvUiGuardAtomicActionBudgetMs)
   }
   $script:KvUiGuardAtomicActions.Add($record)
+  if ($script:KvUiGuardRunLogPath) {
+    Write-KvUiGuardRunLog -Event 'atomic_action' -Data @{ step = $Step; action = $Action; target_hwnd = $TargetHwnd.ToInt64(); elapsed_ms = $elapsedMs; budget_ms = $script:KvUiGuardAtomicActionBudgetMs; ok = $record.ok; expected_title_like = $ExpectedTitleLike }
+  }
   if ($script:KvUiGuardOutDir) {
     $timingPath = Join-Path $script:KvUiGuardOutDir 'atomic_action_timings.json'
     @($script:KvUiGuardAtomicActions) | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $timingPath -Encoding UTF8

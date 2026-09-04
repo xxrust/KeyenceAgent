@@ -12,6 +12,10 @@ Add-Type -AssemblyName System.Windows.Forms
 if ([string]::IsNullOrWhiteSpace($OutDir)) { $OutDir = Join-Path ([IO.Path]::GetTempPath()) ('kv_expansion_' + (Get-Date -Format 'yyyyMMdd_HHmmss')) }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 Initialize-KvUiGuard -OutDir $OutDir -CheckpointSubdir 'ui_guard'
+function Log([string]$Event,[hashtable]$Data=@{}) {
+  Write-KvUiGuardRunLog -Event $Event -Data $Data
+}
+Log 'workflow_started' @{ project_path = [IO.Path]::GetFullPath($ProjectPath); models = @($Models); per_module_budget_seconds = $PerModuleBudgetSeconds }
 
 if (-not ('KvExpansionGuardedWin32' -as [type])) {
 Add-Type @'
@@ -96,6 +100,7 @@ function Wait-VisibleChild([IntPtr]$Editor,[string]$Class,[int]$Id,[int]$Ms=2000
   $deadline=(Get-Date).AddMilliseconds($Ms);do{$h=Get-Child $Editor $Class $Id -VisibleOnly;if($h -ne [IntPtr]::Zero){return $h};Start-Sleep -Milliseconds 50}while((Get-Date)-lt$deadline);return [IntPtr]::Zero
 }
 function Open-UnitEditor([System.Diagnostics.Process]$Process) {
+  Log 'step_started' @{ step = 'open unit editor'; process_id = $Process.Id; main_hwnd = $Process.MainWindowHandle.ToInt64() }
   $existing=Find-UnitEditor $Process.Id;if($existing -ne [IntPtr]::Zero){return $existing}
   $main=[Windows.Automation.AutomationElement]::FromHandle([IntPtr]$Process.MainWindowHandle)
   $items=$main.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::TreeItem)))
@@ -104,7 +109,7 @@ function Open-UnitEditor([System.Diagnostics.Process]$Process) {
   if(-not(Invoke-KvUiGuardForceForeground -TargetHwnd ([IntPtr]$Process.MainWindowHandle))){throw 'KV_MAIN_FOREGROUND_RESTORE_FAILED'}
   $sel=$null;if($cpu.TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern,[ref]$sel)){$sel.Select()};$cpu.SetFocus()
   Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd ([IntPtr]$Process.MainWindowHandle) -Step 'open unit editor from CPU tree item' -Keys '{ENTER}' -ExpectedTitleLike 'KV STUDIO*' -SuccessTitleLike @('*'+$UnitEditorNeedle+'*') -Action 'open unit editor' -SleepMs 650
-  $deadline=(Get-Date).AddSeconds(5);do{$e=Find-UnitEditor $Process.Id;if($e-ne[IntPtr]::Zero){return $e};Start-Sleep -Milliseconds 60}while((Get-Date)-lt$deadline);throw 'KV_UNIT_EDITOR_OPEN_TIMEOUT'
+  $deadline=(Get-Date).AddSeconds(5);do{$e=Find-UnitEditor $Process.Id;if($e-ne[IntPtr]::Zero){Log 'step_succeeded' @{ step='open unit editor'; editor_hwnd=$e.ToInt64() }; return $e};Start-Sleep -Milliseconds 60}while((Get-Date)-lt$deadline);Log 'step_failed' @{ step='open unit editor'; error_code='KV_UNIT_EDITOR_OPEN_TIMEOUT' }; throw 'KV_UNIT_EDITOR_OPEN_TIMEOUT'
 }
 function Set-FlatCatalog([IntPtr]$Editor) {
   # If the selectable catalog is already active, preserve that state; this is
@@ -159,8 +164,10 @@ function Add-One([IntPtr]$Editor,[string]$Model) {
 
 try {
   Normalize-Models
+  Log 'step_succeeded' @{ step='normalize models'; models=@($Models) }
   if(-not(Test-Path -LiteralPath $ProjectPath -PathType Leaf)){throw "KV_PROJECT_MISSING:$ProjectPath"}
   $process=Get-KvsMain
+  Log 'precondition_passed' @{ step='resolve project window'; process_id=$process.Id; main_hwnd=$process.MainWindowHandle.ToInt64(); title=$process.MainWindowTitle }
   $beforeLength=(Get-Item -LiteralPath $unitSetPath).Length
   $actions=@();$missing=@()
   foreach($model in $Models){
@@ -168,6 +175,7 @@ try {
     else{$missing += $model}
   }
   if($missing.Count -gt 0){
+    Log 'step_started' @{ step='configure requested modules'; missing=@($missing) }
     $editor=Open-UnitEditor $process
     foreach($model in $missing){$actions += Add-One $editor $model}
   }
@@ -175,7 +183,7 @@ try {
   if($missing.Count -eq 0){
     $persisted=@($Models|ForEach-Object {$_+'*'})
     $result=[ordered]@{ok=$true;project_path=[IO.Path]::GetFullPath($ProjectPath);models=$Models;actions=$actions;unitset_path=$unitSetPath;unitset_length_before=$beforeLength;unitset_length_after=$beforeLength;persisted_models=$persisted;clean_end_state=(Get-KvForegroundSnapshot)}
-    Write-Result $result; $result | ConvertTo-Json -Depth 12; return
+    Write-Result $result; Log 'workflow_succeeded' @{ project_path=[IO.Path]::GetFullPath($ProjectPath); models=@($Models); persisted_models=@($persisted) }; $result | ConvertTo-Json -Depth 12; return
   }
   $ok=Get-Child $editor 'Button' 23017
   if($ok-eq[IntPtr]::Zero){throw 'KV_UNIT_EDITOR_OK_BUTTON_NOT_FOUND'}
@@ -196,4 +204,5 @@ try {
   Invoke-KvGuardedSendKeys -TargetHwnd ([IntPtr]$process.MainWindowHandle) -Step 'save project after unit configuration' -Keys '^s' -ExpectedTitleLike 'KV STUDIO*' -Action 'save committed unit layout' -SleepMs 500
   $result=[ordered]@{ok=$true;project_path=[IO.Path]::GetFullPath($ProjectPath);models=$Models;actions=$actions;unitset_path=$unitSetPath;unitset_length_before=$beforeLength;unitset_length_after=(Get-Item $unitSetPath).Length;persisted_models=$persisted;clean_end_state=(Get-KvForegroundSnapshot)}
   Write-Result $result; $result | ConvertTo-Json -Depth 12
-} catch { $failure=[ordered]@{ok=$false;error_code=if($_.Exception.Message -match '^KV_[A-Z0-9_:-]+'){($_.Exception.Message -split ':')[0]}else{'KV_EXPANSION_UNIT_CONFIGURATION_FAILED'};message=$_.Exception.Message;project_path=$ProjectPath;evidence_dir=$OutDir;foreground=(Get-KvForegroundSnapshot)}; $failure|ConvertTo-Json -Depth 10|Set-Content (Join-Path $OutDir 'failure.json') -Encoding UTF8; throw }
+  Log 'workflow_succeeded' @{ project_path=[IO.Path]::GetFullPath($ProjectPath); models=@($Models); persisted_models=@($persisted) }
+} catch { $code=if($_.Exception.Message -match '^KV_[A-Z0-9_:-]+'){($_.Exception.Message -split ':')[0]}else{'KV_EXPANSION_UNIT_CONFIGURATION_FAILED'}; Log 'workflow_failed' @{ error_code=$code; message=$_.Exception.Message; foreground=(Get-KvForegroundSnapshot) }; $failure=[ordered]@{ok=$false;error_code=$code;message=$_.Exception.Message;project_path=$ProjectPath;evidence_dir=$OutDir;foreground=(Get-KvForegroundSnapshot)}; $failure|ConvertTo-Json -Depth 10|Set-Content (Join-Path $OutDir 'failure.json') -Encoding UTF8; throw }

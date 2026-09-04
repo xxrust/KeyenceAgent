@@ -30,6 +30,12 @@ quick_start:
     project_configuration: manifest.classes.customer_workflow requires matching capability
 ```
 
+## 运行日志与状态交接契约
+
+每次 `customer_workflow` 必须在接管 KV STUDIO 前创建同次运行的 `run.log`（JSONL）。日志是该运行的唯一审计入口，必须记录：workflow 开始/结束、每个阶段开始/结束/失败、目标窗口句柄与标题、耗时、预算、结果或稳定错误码。所有 guard 原子动作（键盘、鼠标、剪贴板、虚拟键等）也必须即时追加到同一个 `run.log`，不得只写独立的 timing JSON；独立 JSON 仅作为兼容副本。
+
+UI workflow 启动前必须完成并记录前置检查：项目文件存在、目标项目窗口唯一、窗口可前台接收输入、无残留模态框/待机界面、目标状态与 workflow 第一步匹配。前置检查失败时不得发送任何 UI 输入，应输出 `failure.json` 和 `run.log` 后停止。每个原子动作预算为 10 秒（`elapsed_ms < 10000`）；超时必须记录 `KV_UI_ATOMIC_STEP_TIMEOUT` 并停止。只有在统一日志写入成功且结果/失败证据齐全后，agent 才可汇报本次运行。
+
 `runner_children`、`guards`、`probes` 是 workflow 内部实现或研发工具。客户态失败诊断读取同次 result/evidence；研发态操作需要用户明确授权。references 只提供状态、schema 和失败归因；执行入口仍由 manifest 决定。
 
 ## 术语
