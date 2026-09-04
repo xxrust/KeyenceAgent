@@ -10,6 +10,15 @@ $ErrorActionPreference = 'Stop'
 function Read-TextFile {
   param([string]$FilePath)
   $bytes = [IO.File]::ReadAllBytes($FilePath)
+  if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+    return [Text.Encoding]::Unicode.GetString($bytes, 2, $bytes.Length - 2)
+  }
+  if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
+    return [Text.Encoding]::BigEndianUnicode.GetString($bytes, 2, $bytes.Length - 2)
+  }
+  if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+    return [Text.Encoding]::UTF8.GetString($bytes, 3, $bytes.Length - 3)
+  }
   foreach ($encoding in @(
       [Text.UTF8Encoding]::new($false, $true),
       [Text.Encoding]::GetEncoding(936),
