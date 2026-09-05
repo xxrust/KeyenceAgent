@@ -5,8 +5,8 @@ param(
   [Parameter(Mandatory=$true)]
   [string]$FbModuleName,
 
-  [Parameter(Mandatory=$true)]
-  [string]$ArgumentsTsv,
+  [string]$ArgumentsTsv = '',
+  [switch]$SnapshotOnly,
 
   [string]$ChecklistPath = '',
 
@@ -41,8 +41,9 @@ Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 
 function Log([string]$Message) {
-  $line = (Get-Date -Format s) + ' ' + $Message + [Environment]::NewLine
-  [IO.File]::AppendAllText((Join-Path $OutDir 'run.log'), $line, [Text.Encoding]::UTF8)
+  $path=if($env:KV_WORKFLOW_RUN_LOG){$env:KV_WORKFLOW_RUN_LOG}else{Join-Path $OutDir 'run.log'}
+  $line=([ordered]@{timestamp=(Get-Date).ToString('o');type='fb_step';message=$Message}|ConvertTo-Json -Compress)+[Environment]::NewLine
+  [IO.File]::AppendAllText($path,$line,[Text.Encoding]::UTF8)
 }
 
 function New-Utf16Text([int[]]$CodePoints) {
@@ -136,24 +137,9 @@ function Read-KvDelimitedText([string]$Path) {
 }
 
 function Convert-UiaPointToPhysicalScreen([int]$ProcessIdValue, [double]$X, [double]$Y) {
-  $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-  $root = [System.Windows.Automation.AutomationElement]::RootElement
-  $window = $root.FindFirst(
-    [System.Windows.Automation.TreeScope]::Descendants,
-    (New-Object System.Windows.Automation.AndCondition(
-      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $ProcessIdValue)),
-      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Window))
-    ))
-  )
-  if (-not $window) { return [pscustomobject]@{ x = [int]$X; y = [int]$Y; scale = 1.0 } }
-  $rect = $window.Current.BoundingRectangle
-  $scaleX = if ($rect.Width -gt $screen.Width -and $rect.Width -gt 0) { [double]$screen.Width / [double]$rect.Width } else { 1.0 }
-  $scaleY = if ($rect.Height -gt $screen.Height -and $rect.Height -gt 0) { [double]$screen.Height / [double]$rect.Height } else { 1.0 }
-  [pscustomobject]@{
-    x = [int][math]::Round($X * $scaleX)
-    y = [int][math]::Round($Y * $scaleY)
-    scale = [math]::Min($scaleX, $scaleY)
-  }
+  # UIA coordinates are physical, including maximized invisible frame borders.
+  # Scaling by screen/frame dimensions can hit the preceding project-tree row.
+  return [pscustomobject]@{x=[int][math]::Round($X);y=[int][math]::Round($Y);scale=1.0}
 }
 
 function Bring-ProjectTreeItemIntoView($Item, [int]$ProcessIdValue) {
@@ -733,13 +719,15 @@ function Invoke-FbArgumentPasteAttempt($Form, [IntPtr]$MainHwnd, [string]$Projec
 try {
   Log 'start set FB arguments'
   $ProjectPath = [IO.Path]::GetFullPath($ProjectPath)
-  $ArgumentsTsv = [IO.Path]::GetFullPath($ArgumentsTsv)
+  if (-not $SnapshotOnly) { $ArgumentsTsv = [IO.Path]::GetFullPath($ArgumentsTsv) }
   if (-not (Test-Path -LiteralPath $ProjectPath -PathType Leaf)) { throw "ProjectPath not found: $ProjectPath" }
-  if (-not (Test-Path -LiteralPath $ArgumentsTsv -PathType Leaf)) { throw "ArgumentsTsv not found: $ArgumentsTsv" }
+  if (-not $SnapshotOnly -and -not (Test-Path -LiteralPath $ArgumentsTsv -PathType Leaf)) { throw "ArgumentsTsv not found: $ArgumentsTsv" }
   $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
+  if (-not $SnapshotOnly) {
   $pastePayload = Convert-FbArgumentRowsToPasteText $ArgumentsTsv $FbModuleName
   $pastePath = Join-Path $OutDir 'fb_arguments_paste.tsv'
   [IO.File]::WriteAllText($pastePath, $pastePayload.text, [Text.Encoding]::Default)
+  }
 
   $process = Get-VisibleKvsProcess $projectNeedle 10
   if (-not $process) { Fail-Step 'KV_PROJECT_PROCESS_NOT_FOUND' 'find target KV STUDIO project' "No visible KV STUDIO process matched project needle '$projectNeedle'. Refusing to operate another project window." @() }
@@ -810,6 +798,14 @@ try {
   }
   $formDumpPath = ''
   Assert-FbArgumentSurfaceTarget $form $process.Id ([IntPtr]$process.MainWindowHandle) $FbModuleName
+  if ($SnapshotOnly) {
+    Focus-FbArgumentGrid $form $process.MainWindowHandle $projectNeedle 'FB snapshot grid' -InitialSurfaceFocus
+    $copied = Test-FbArgumentPasteVisible $process.MainWindowHandle $projectNeedle @() $FbModuleName 'snapshot'
+    $raw = Get-Content -LiteralPath $copied.copy_path -Raw -Encoding UTF8
+    if ([string]::IsNullOrWhiteSpace($raw)) { throw 'KV_FB_SNAPSHOT_EMPTY_UNPROVEN' }
+    [pscustomobject]@{ok=$true;read_only=$true;project_path=$ProjectPath;module_name=$FbModuleName;raw_path=$copied.copy_path;all_columns_preserved=$true;unfiltered_completeness_verified=$false} | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $OutDir 'fb_snapshot_result.json') -Encoding UTF8
+    return
+  }
   # The surface is already stable after Wait-FbArgumentSurface; avoid an
   # additional fixed delay before the fast row-write path.
 

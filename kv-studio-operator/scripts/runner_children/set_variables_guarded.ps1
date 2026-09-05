@@ -2,11 +2,11 @@
   [Parameter(Mandatory=$true)]
   [string]$ProjectPath,
 
-  [Parameter(Mandatory=$true)]
-  [string]$GlobalVariablesTsv,
+  [string]$GlobalVariablesTsv = '',
 
-  [Parameter(Mandatory=$true)]
-  [string]$LocalVariablesTsv,
+  [string]$LocalVariablesTsv = '',
+  [switch]$SnapshotOnly,
+  [string[]]$SnapshotModules = @(),
 
   [string]$LocalProgramName = '',
 
@@ -94,8 +94,9 @@ public class KvSetVarWin32 {
 "@
 
 function Log([string]$Message) {
-  $line = (Get-Date -Format s) + ' ' + $Message + [Environment]::NewLine
-  [IO.File]::AppendAllText((Join-Path $OutDir 'run.log'), $line, [Text.Encoding]::UTF8)
+  $path = if($env:KV_WORKFLOW_RUN_LOG){$env:KV_WORKFLOW_RUN_LOG}else{Join-Path $OutDir 'run.log'}
+  $line = ([ordered]@{timestamp=(Get-Date).ToString('o');type='variable_step';message=$Message}|ConvertTo-Json -Compress)+[Environment]::NewLine
+  [IO.File]::AppendAllText($path, $line, [Text.Encoding]::UTF8)
 }
 
 function Get-VisibleKvsProcess {
@@ -1264,6 +1265,22 @@ function Copy-VariableGridText($Form, [string]$PageAid, [string]$Label) {
   return $text
 }
 
+function Clear-SnapshotFilters($Form) {
+  $nameFilter=Find-DescByAid $Form '_nameFilterComboBox'
+  $usageFilter=Find-DescByAid $Form '_usageFilterComboBox'
+  if(-not $nameFilter -or -not $usageFilter){throw 'KV_SNAPSHOT_FILTER_CONTROL_MISSING'}
+  $nameFilter.SetFocus()
+  $Form=Invoke-GuardedVariableKeyAction $Form 'clear snapshot name filter' '^a{BACKSPACE}{ENTER}' 'Clear the name filter before complete snapshot' 100
+  $usageFilter.SetFocus()
+  $Form=Invoke-GuardedVariableKeyAction $Form 'select all snapshot usage filter' '{HOME}{ENTER}' 'Select all usage categories before snapshot' 100
+  $actualName=Get-LocalProgramComboValue (Find-DescByAid $Form '_nameFilterComboBox')
+  $actualUsage=Get-LocalProgramComboValue (Find-DescByAid $Form '_usageFilterComboBox')
+  $all=-join [char[]](0x5168,0x90E8)
+  if($actualName -or $actualUsage -ne $all){throw "KV_SNAPSHOT_FILTER_NOT_CLEARED name=$actualName usage=$actualUsage"}
+  Log 'snapshot name filter empty; usage filter all'
+  return $Form
+}
+
 function Copy-LocalVariableGridTextByTabRoute($Form, [string]$ProgramName, [string]$Label, [switch]$AllowEmpty) {
   if (-not (Test-VariablePageSelected $Form '_tabPageLocal')) {
     throw "Local variable page is not selected before copy audit for $Label."
@@ -1473,6 +1490,36 @@ try {
   Log 'start set variables'
   Log "ProjectPath=$ProjectPath"
   if (-not (Test-Path -LiteralPath $ProjectPath)) { throw "ProjectPath not found: $ProjectPath" }
+  if ($SnapshotOnly) {
+    $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
+    $process = Get-BoundKvsProcess $projectNeedle
+    if (-not $process) { throw 'KV_PROJECT_PROCESS_NOT_FOUND' }
+    $script:ProcessIdForVariables = $process.Id
+    Assert-NoDirectInputFast $process.Id 'before variable snapshot'
+    $form = Ensure-VariableEditorOpen $process $projectNeedle
+    $snapshots = @()
+    if (-not $SkipGlobal) {
+      $form = Select-VariableTabByAid $form '_tabPageGlobal' 'global snapshot'
+      $form = Clear-SnapshotFilters $form
+      $text = Copy-VariableGridText $form '_tabPageGlobal' 'global snapshot'
+      $path = Join-Path $OutDir 'global_variables_raw.tsv'
+      [IO.File]::WriteAllText($path,$text,[Text.Encoding]::UTF8)
+      $snapshots += @{scope='global';owner_program='';raw_path=$path;row_count=@($text -split '\r?\n' | Where-Object {$_}).Count}
+    }
+    $moduleNames = if($SnapshotModules.Count){$SnapshotModules}else{@($LocalProgramName | Where-Object {$_})}
+    foreach ($snapshotModule in $moduleNames) {
+      $form = Select-VariableTabByAid $form '_tabPageLocal' 'local snapshot'
+      $form = Clear-SnapshotFilters $form
+      $text = Copy-LocalVariableGridTextByTabRoute $form $snapshotModule "local snapshot $snapshotModule"
+      if($snapshotModule.IndexOfAny([IO.Path]::GetInvalidFileNameChars()) -ge 0){throw 'KV_SNAPSHOT_INVALID_MODULE_FILE_NAME'}
+      $path = Join-Path $OutDir ('local_'+$snapshotModule+'_raw.tsv')
+      [IO.File]::WriteAllText($path,$text,[Text.Encoding]::UTF8)
+      $snapshots += @{scope='local';owner_program=$snapshotModule;raw_path=$path;row_count=@($text -split '\r?\n' | Where-Object {$_}).Count}
+    }
+    if (-not $KeepVariableEditorOpen) { Close-VariableEditor $process.Id }
+    [pscustomobject]@{ok=$true;read_only=$true;project_path=$ProjectPath;snapshots=$snapshots;all_columns_preserved=$true;unfiltered_completeness_verified=$false} | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $OutDir 'variable_snapshot_result.json') -Encoding UTF8
+    return
+  }
   if (-not (Test-Path -LiteralPath $GlobalVariablesTsv)) { throw "GlobalVariablesTsv not found: $GlobalVariablesTsv" }
   if (-not (Test-Path -LiteralPath $LocalVariablesTsv)) { throw "LocalVariablesTsv not found: $LocalVariablesTsv" }
 
