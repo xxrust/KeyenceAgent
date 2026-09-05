@@ -40,6 +40,7 @@ public class KvTreeHandleWin32 {
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern uint GetClipboardSequenceNumber();
   public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
   public static List<IntPtr> EnumChildren(IntPtr parent) {
     List<IntPtr> result = new List<IntPtr>();
@@ -155,6 +156,38 @@ function Get-ConversionResultDialogText {
     if ($text) { $lines.Add($text) }
   }
   @($lines | Select-Object -Unique)
+}
+
+function Copy-ResultTreeThroughMenu {
+  param($Candidate, $Process)
+  $watch = [Diagnostics.Stopwatch]::StartNew()
+  $beforeSequence = [KvTreeHandleWin32]::GetClipboardSequenceNumber()
+  Invoke-KvGuardedMouseRightClick -TargetHwnd $Process.MainWindowHandle -Step 'open conversion result copy menu' -X ([int]$Candidate.left+80) -Y ([int]$Candidate.top+12) -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*"
+  $copyName = (-join [char[]](0x590D,0x5236)) + '(C)'
+  $copyItems = @()
+  $windows = [Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children,[Windows.Automation.Condition]::TrueCondition)
+  foreach ($window in $windows) {
+    if ($window.Current.ProcessId -ne $Process.Id) { continue }
+    # WinForms may expose the popup beneath the main window or at desktop level.
+    $matches = $window.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::NameProperty,$copyName)))
+    $copyItems += @($matches | Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::MenuItem -and -not $_.Current.IsOffscreen})
+  }
+  if ($copyItems.Count -ne 1) { throw 'KV_COMPILE_COPY_MENU_AMBIGUOUS: Expected one result popup Copy command.' }
+  if (-not $copyItems[0].Current.IsEnabled) { throw 'KV_COMPILE_COPY_MENU_DISABLED' }
+  $pattern = $copyItems[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)
+  $pattern.Invoke()
+  do {
+    if ([KvTreeHandleWin32]::GetClipboardSequenceNumber() -ne $beforeSequence) { break }
+    Start-Sleep -Milliseconds 50
+  } while ($watch.ElapsedMilliseconds -lt 3000)
+  Assert-KvUiForegroundHwnd -ExpectedHwnd $Process.MainWindowHandle -Step 'conversion copy menu returned to project' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" | Out-Null
+  if ([KvTreeHandleWin32]::GetClipboardSequenceNumber() -eq $beforeSequence) { throw 'KV_COMPILE_CLIPBOARD_NOT_UPDATED' }
+  $copied = [Windows.Forms.Clipboard]::GetText()
+  $header = (-join [char[]](0x8F6C,0x6362,0x7ED3,0x679C)) + ' (OK|NG)'
+  if ($copied -notmatch ('^'+$header)) { throw 'KV_COMPILE_CLIPBOARD_INVALID: Missing result header.' }
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step 'copy full conversion result through menu' -Action 'scoped Copy menu plus fresh clipboard result' -TargetHwnd $Process.MainWindowHandle -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" | Out-Null
+  Log "result_menu_copy_ms=$($watch.ElapsedMilliseconds) characters=$($copied.Length) clipboard_sequence_changed=true"
+  return $copied
 }
 
 $conversionFailed = $false
@@ -280,6 +313,11 @@ try {
       if ($name) { $lines.Add($name) }
     }
     $route = 'win32_child_hwnd_to_uia_treeitem_to_file_clipboard_optional'
+    if ($lines.Count -eq 0) {
+      $copied = Copy-ResultTreeThroughMenu -Candidate $candidate -Process $process
+      foreach ($line in ($copied -split '\r?\n')) { if ($line) { $lines.Add($line) } }
+      $route = 'scoped_result_tree_context_menu_copy_with_fresh_clipboard'
+    }
   }
   if ($lookupWatch.ElapsedMilliseconds -gt $MaxLookupMs) {
     throw "Result handle lookup exceeded ${MaxLookupMs}ms: $($lookupWatch.ElapsedMilliseconds)ms"

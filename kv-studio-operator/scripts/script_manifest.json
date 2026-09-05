@@ -188,7 +188,7 @@
         "path": "runner_children/copy_convert_result_from_tree_handle.ps1",
         "status": "approved",
         "customer_callable": false,
-        "ui_guard_required": false
+        "ui_guard_required": true
       },
       {
         "path": "runner_children/export_mnm_browse_default_folder_guarded.ps1",

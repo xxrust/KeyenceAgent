@@ -62,8 +62,9 @@ public class KvCompileBoundedWin32 {
 
 function Log {
   param([string]$Message)
-  $line = (Get-Date -Format s) + ' ' + $Message + [Environment]::NewLine
-  [IO.File]::AppendAllText((Join-Path $OutDir 'run.log'), $line, [Text.Encoding]::UTF8)
+  $path = if($env:KV_WORKFLOW_RUN_LOG){$env:KV_WORKFLOW_RUN_LOG}else{Join-Path $OutDir 'run.log'}
+  $line = ([ordered]@{timestamp=(Get-Date).ToString('o');type='compile_step';message=$Message}|ConvertTo-Json -Compress)+[Environment]::NewLine
+  [IO.File]::AppendAllText($path, $line, [Text.Encoding]::UTF8)
 }
 
 function Get-ForegroundTitle {
@@ -144,11 +145,22 @@ function Invoke-CompileAction {
     [string]$AttemptName
   )
   if ($ConvertAction -eq 'CtrlF9') {
-    Invoke-KvGuardedCtrlChord -TargetHwnd $TargetHwnd -Step "compile convert Ctrl+F9 $AttemptName" -Vk 0x78 -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action "Ctrl+F9 compile/convert $AttemptName" -SleepMs 300
+    Invoke-KvGuardedCtrlChord -TargetHwnd $TargetHwnd -Step "compile convert Ctrl+F9 $AttemptName" -Vk 0x78 -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action "Ctrl+F9 compile/convert $AttemptName" -SleepMs 300 -AllowModalAfter
     Log "sent Ctrl+F9 $AttemptName"
   } else {
-    Invoke-KvGuardedCtrlChord -TargetHwnd $TargetHwnd -Step "compile convert Ctrl+F2 $AttemptName" -Vk 0x71 -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action "Ctrl+F2 compile/convert $AttemptName" -SleepMs 300
+    Invoke-KvGuardedCtrlChord -TargetHwnd $TargetHwnd -Step "compile convert Ctrl+F2 $AttemptName" -Vk 0x71 -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action "Ctrl+F2 compile/convert $AttemptName" -SleepMs 300 -AllowModalAfter
     Log "sent Ctrl+F2 $AttemptName"
+  }
+  $foreground = [Windows.Automation.AutomationElement]::FromHandle([KvCompileBoundedWin32]::GetForegroundWindow())
+  if ($foreground.Current.NativeWindowHandle -ne $TargetHwnd.ToInt64()) {
+    $target = [Windows.Automation.AutomationElement]::FromHandle($TargetHwnd)
+    $flat = Get-WindowTextFlat $foreground
+    $failed = -join [char[]](0x8F6C,0x6362,0x5931,0x8D25,0x3002)
+    $succeeded = -join [char[]](0x8F6C,0x6362,0x6210,0x529F,0x3002)
+    if ($foreground.Current.ProcessId -ne $target.Current.ProcessId -or $foreground.Current.ClassName -ne '#32770' -or (-not $flat.Contains($failed) -and -not $flat.Contains($succeeded))) {
+      throw "KV_COMPILE_UNEXPECTED_MODAL: $flat"
+    }
+    Log "proven conversion result modal deferred to collector: $flat"
   }
 }
 
