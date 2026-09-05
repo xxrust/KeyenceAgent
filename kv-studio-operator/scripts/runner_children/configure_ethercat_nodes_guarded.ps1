@@ -718,12 +718,38 @@ function Set-SelectedEtherCatNodeAddress {
   }
   if($addressEditors.Count -gt 1){throw "KV_ETHERCAT_NODE_ADDRESS_EDITOR_AMBIGUOUS: found $($addressEditors.Count) writable node-address editors in the selected device property tab."}
   $editor=$addressEditors[0]
-  $editor.pattern.SetValue([string]$RequestedNodeAddress)
-  Start-Sleep -Milliseconds 180
-  $actual=[string]$editor.pattern.Current.Value
+  # PropertyGrid's UIA SetValue changes the transient textbox, but does not
+  # mark its underlying GridEntry dirty. Even Enter can restore the old value.
+  # Focus first, then deliver real editing input and commit the GridEntry.
+  $editor.element.SetFocus()
+  Invoke-KvGuardedMouseClick -TargetHwnd ([IntPtr]$windowRow.hwnd) -Step 'focus EtherCAT node address value cell' -X ([int]($editor.rect.left+$editor.rect.width/2)) -Y ([int]($editor.rect.top+$editor.rect.height/2)) -ExpectedTitleLike '*EtherCAT*' -SleepMs 80
+  Start-Sleep -Milliseconds 100
+  $focused=[Windows.Automation.AutomationElement]::FocusedElement
+  $focusRect=if($focused){Get-ElementRectData $focused}else{$null}
+  Log-Event 'node_address_focus' @{name=[string]$focused.Current.Name;class_name=[string]$focused.Current.ClassName;control_type=[string]$focused.Current.ControlType.ProgrammaticName;rect=$focusRect;expected_rect=$editor.rect}
+  if(-not $focused -or $focused.Current.ProcessId -ne $windowElement.Current.ProcessId -or
+      $focused.Current.ControlType.ProgrammaticName -ne 'ControlType.Edit' -or
+      [Math]::Abs($focusRect.left-$editor.rect.left) -gt 3 -or [Math]::Abs($focusRect.top-$editor.rect.top) -gt 3){
+    throw 'KV_ETHERCAT_NODE_ADDRESS_FOCUS_FAILED: node address editor did not receive focus.'
+  }
+  Invoke-KvGuardedSendKeys -TargetHwnd ([IntPtr]$windowRow.hwnd) -Step 'edit and commit EtherCAT node address' -Keys ('^a'+[string]$RequestedNodeAddress+'{ENTER}{TAB}') -ExpectedTitleLike '*EtherCAT*' -Action 'Real editing input marks the PropertyGrid value dirty; Enter commits it' -SleepMs 150
+  # Rebuild the property surface before readback. Reading the same textbox
+  # immediately after editing is not proof that the device accepted the value.
+  $catalogTab=Find-SelectableByAutomationId -Root $windowElement -AutomationId '_tabEsiTree'
+  if(-not $catalogTab){throw 'KV_ETHERCAT_DEVICE_CATALOG_TAB_NOT_SELECTABLE: cannot refresh node property readback.'}
+  $catalogTab.pattern.Select()
+  $propertyTab=Find-SelectableByAutomationId -Root $windowElement -AutomationId '_tabProperty'
+  $propertyTab.pattern.Select()
+  $freshEditor=Find-Descendant -Root $windowElement -Predicate {
+    param($e)
+    $e.Current.ControlType.ProgrammaticName -eq 'ControlType.Edit' -and $e.Current.Name -eq $NameNodeAddress -and $e.Current.IsEnabled -and -not $e.Current.IsOffscreen
+  }
+  if(-not $freshEditor){throw 'KV_ETHERCAT_NODE_ADDRESS_EDITOR_NOT_FOUND: no address editor after property refresh.'}
+  $freshPattern=$freshEditor.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern)
+  $actual=[string]$freshPattern.Current.Value
   Write-AtomicTiming 'set selected EtherCAT node address' $watch @{requested_node_address=$RequestedNodeAddress;actual_node_address=$actual;editor_rect=$editor.rect;property_tab_automation_id=$propertyTab.element.Current.AutomationId}
   if($actual -ne [string]$RequestedNodeAddress){throw "KV_ETHERCAT_NODE_ADDRESS_WRITE_FAILED: requested node address '$RequestedNodeAddress' but editor readback was '$actual'."}
-  [pscustomobject]@{requested_node_address=$RequestedNodeAddress;actual_node_address=$actual;property_tab_automation_id=$propertyTab.element.Current.AutomationId;editor_rect=$editor.rect}
+  [pscustomobject]@{requested_node_address=$RequestedNodeAddress;actual_node_address=$actual;commit_method='focused_keyboard_enter';readback='property_surface_reopened';property_tab_automation_id=$propertyTab.element.Current.AutomationId;editor_rect=$editor.rect}
 }
 
 function Select-EtherCatDeviceByPath {
