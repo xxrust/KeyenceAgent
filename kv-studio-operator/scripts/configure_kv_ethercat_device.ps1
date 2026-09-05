@@ -530,11 +530,20 @@ function Select-EtherCatDeviceByModel {
   $filterWatch=[Diagnostics.Stopwatch]::StartNew()
   $filter=Find-DeviceModelFilter $windowElement
   $filter.pattern.SetValue($Model)
+  # Filtering rebuilds the owner-data tree; the previous AutomationElement can become stale.
+  Start-Sleep -Milliseconds 120
+  $windowRow=Get-EtherCatWindowRow
+  $windowElement=Get-ElementFromHwnd -Hwnd $windowRow.hwnd
   $deadline=(Get-Date).AddSeconds(5)
   $matches=@()
   do{
     Start-Sleep -Milliseconds 150
-    $all=$windowElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+    try { $all=$windowElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition) }
+    catch [Windows.Automation.ElementNotAvailableException] {
+      $windowRow=Get-EtherCatWindowRow
+      $windowElement=Get-ElementFromHwnd -Hwnd $windowRow.hwnd
+      $all=$windowElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+    }
     $matches=@()
     for($i=0;$i -lt $all.Count;$i++){
       $e=$all.Item($i)
@@ -545,8 +554,42 @@ function Select-EtherCatDeviceByModel {
     }
     if($matches.Count -gt 0){break}
   }while((Get-Date) -lt $deadline)
+  $expandedCatalog=$false
+  if($matches.Count -eq 0){
+    $expandWatch=[Diagnostics.Stopwatch]::StartNew()
+    $windowElement=Get-ElementFromHwnd -Hwnd $windowRow.hwnd
+    $expandButton=Find-Descendant -Root $windowElement -Predicate {
+      param($e)
+      try { $e.Current.AutomationId -eq '_expandAllButton' -and $e.Current.IsEnabled } catch { $false }
+    }
+    if($expandButton){
+      $invoke=$null
+      if($expandButton.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$invoke)){$invoke.Invoke();$expandedCatalog=$true}
+      Start-Sleep -Milliseconds 300
+    }
+    $deadline=(Get-Date).AddSeconds(4)
+    do{
+      try { $all=$windowElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition) }
+      catch [Windows.Automation.ElementNotAvailableException] {
+        $windowRow=Get-EtherCatWindowRow
+        $windowElement=Get-ElementFromHwnd -Hwnd $windowRow.hwnd
+        $all=$windowElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+      }
+      $matches=@()
+      for($i=0;$i -lt $all.Count;$i++){
+        $e=$all.Item($i)
+        try{
+          if($e.Current.ControlType.ProgrammaticName -eq 'ControlType.TreeItem' -and -not $e.Current.IsOffscreen -and (Test-DeviceModelNameMatch ([string]$e.Current.Name) $Model)){$matches += $e}
+        }catch{}
+      }
+      if($matches.Count -gt 0){break}
+      Start-Sleep -Milliseconds 150
+    }while((Get-Date) -lt $deadline)
+    $expandWatch.Stop()
+    Write-AtomicTiming 'expand EtherCAT catalog after model filter miss' $expandWatch @{device_model=$Model;expanded_catalog=$expandedCatalog;match_count_after_expand=$matches.Count}
+  }
   $filterWatch.Stop()
-  Write-AtomicTiming 'filter EtherCAT catalog by device model' $filterWatch @{device_model=$Model;filter_automation_id=$filter.automation_id;match_count=$matches.Count}
+  Write-AtomicTiming 'filter EtherCAT catalog by device model' $filterWatch @{device_model=$Model;filter_automation_id=$filter.automation_id;match_count=$matches.Count;expanded_catalog=$expandedCatalog}
   if($matches.Count -eq 0){throw "KV_ETHERCAT_DEVICE_MODEL_NOT_FOUND: no visible device matched '$Model' after filtering."}
   if($matches.Count -gt 1){
     $names=@($matches|ForEach-Object{$_.Current.Name})
