@@ -50,6 +50,8 @@ configuration_script_status:
           catalog_model: exact_or_unique_catalog_search_text
     required_success_evidence: [node-address editor readback, exact node/model WsTreeEnv.xml readback, clean main-window end state]
     per_node_budget_seconds: 10
+    idempotency: saved mappings with the same address and model are reported as already_persisted and are not inserted again; an occupied address with a different model fails with KV_ETHERCAT_NODE_ADDRESS_CONFLICT
+    preconditions: ProjectPath must exist, KV STUDIO must show the matching saved project with no modal/configuration window, and the EtherCAT subtree snapshot must be available
   ethernet_ip:
     evidence_source: references\capability-status.md
     customer_mode: requires_manifest_customer_workflow

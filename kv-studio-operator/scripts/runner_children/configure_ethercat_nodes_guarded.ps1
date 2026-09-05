@@ -819,15 +819,27 @@ function Invoke-DialogButton {
 
 function Handle-PostOkDialogs {
   $handled = @()
-  $deadline = (Get-Date).AddSeconds(10)
+  $watch = [Diagnostics.Stopwatch]::StartNew()
+  $deadline = (Get-Date).AddSeconds(9)
+  $readySince = $null
   do {
     $dialogRow = @(Get-KvRelevantWindows | Where-Object { $_.class_name -eq '#32770' -and $_.title -eq 'KV STUDIO' } | Select-Object -First 1)
     if ($dialogRow.Count -eq 0) {
+      $main = Get-KvsProcess
+      $ready = (Get-ElementFromHwnd -Hwnd $main.MainWindowHandle).Current.IsEnabled
+      if ($ready) {
+        if ($null -eq $readySince) { $readySince = Get-Date }
+        if (((Get-Date) - $readySince).TotalMilliseconds -ge 300) {
+          Write-AtomicTiming 'wait for EtherCAT commit dialogs and main readiness' $watch @{handled_count=$handled.Count}
+          return $handled
+        }
+      } else { $readySince = $null }
       Start-Sleep -Milliseconds 200
       if ((Get-Date) -gt $deadline) { break }
       continue
     }
     $dialog = Get-ElementFromHwnd -Hwnd $dialogRow[0].hwnd
+    $readySince = $null
     $text = Get-DialogText -Dialog $dialog
     $button = $null
     if ($text -like '*Universal Library*' -or $text -like '*KEYENCE_SV3*') {
@@ -849,7 +861,7 @@ function Handle-PostOkDialogs {
     }
     Start-Sleep -Milliseconds 1200
   } while ((Get-Date) -lt $deadline)
-  $handled
+  throw 'KV_ETHERCAT_COMMIT_NOT_READY: main window did not become ready within 9 seconds.'
 }
 
 function Save-Project {
@@ -925,12 +937,13 @@ function Get-BatchNodeRequests {
   $resolved=[IO.Path]::GetFullPath($NodesConfigPath)
   if(-not(Test-Path -LiteralPath $resolved -PathType Leaf)){throw "KV_ETHERCAT_NODES_CONFIG_NOT_FOUND: $resolved"}
   $config=Get-Content -LiteralPath $resolved -Raw -Encoding UTF8|ConvertFrom-Json
-  if([int]$config.schema_version -ne 1){throw 'KV_ETHERCAT_NODES_CONFIG_SCHEMA_UNSUPPORTED: schema_version must be 1.'}
+  if($config.schema_version -isnot [int] -or $config.schema_version -ne 1){throw 'KV_ETHERCAT_NODES_CONFIG_SCHEMA_UNSUPPORTED: schema_version must be the JSON integer 1.'}
   $requests=@($config.nodes)
   if($requests.Count -eq 0){throw 'KV_ETHERCAT_NODES_CONFIG_EMPTY: nodes must contain at least one item.'}
   $normalized=@()
   foreach($request in $requests){
-    $address=[int]$request.node_address
+    if ($request.node_address -isnot [int] -and $request.node_address -isnot [long]) { throw 'KV_ETHERCAT_NODE_ADDRESS_INVALID: node_address must be a JSON integer.' }
+    $address=[long]$request.node_address
     $model=[string]$request.catalog_model
     if($address -lt 1 -or $address -gt 65535){throw "KV_ETHERCAT_NODE_ADDRESS_INVALID: '$address' is outside 1..65535."}
     if([string]::IsNullOrWhiteSpace($model)){throw "KV_ETHERCAT_CATALOG_MODEL_REQUIRED: node '$address' has no catalog_model."}
@@ -945,19 +958,85 @@ function Get-BatchNodeRequests {
 
 function Assert-EtherCatMappingsPersisted {
   param([object[]]$Requests)
-  $verified=@()
-  foreach($request in $Requests){
-    $verified += Assert-EtherCatModelPersisted -Model $request.catalog_model -ExpectedNodeAddress $request.node_address
-  }
-  $verified
+  $watch = [Diagnostics.Stopwatch]::StartNew()
+  do {
+    $actual = @(Get-PersistedEtherCatMappings)
+    $verified = @()
+    foreach ($request in $Requests) {
+      $matches = @($actual | Where-Object { $_.node_address -eq $request.node_address })
+      $expectedModel = if ($request.resolved_model) { $request.resolved_model } else { $request.catalog_model }
+      if ($matches.Count -eq 1 -and $matches[0].catalog_model -eq $expectedModel) {
+        $verified += [pscustomobject]@{ok=$true;project_path=$ProjectPath;tree_path=$matches[0].source;model=$matches[0].catalog_model;node_address=$request.node_address}
+      }
+    }
+    if ($verified.Count -eq $Requests.Count) {
+      Write-AtomicTiming 'verify persisted EtherCAT batch mappings' $watch @{mapping_count=$verified.Count}
+      return $verified
+    }
+    Start-Sleep -Milliseconds 150
+  } while ($watch.ElapsedMilliseconds -lt 8000)
+  throw "KV_ETHERCAT_PERSISTENCE_FAILED: verified $($verified.Count)/$($Requests.Count) exact EtherCAT mappings after save."
 }
 
+function Get-PersistedEtherCatMappings {
+  # Read the last saved project state before opening the editor.  This makes
+  # the public batch API idempotent and prevents a retry from inserting a
+  # second copy of an already configured node.
+  if ([string]::IsNullOrWhiteSpace($ProjectPath) -or -not (Test-Path -LiteralPath $ProjectPath -PathType Leaf)) {
+    return @()
+  }
+  $treePath = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($ProjectPath))) 'WsTreeEnv.xml'
+  if (-not (Test-Path -LiteralPath $treePath -PathType Leaf)) { throw "KV_ETHERCAT_SNAPSHOT_MISSING: save the project to create $treePath before running the batch API." }
+  $document = New-Object System.Xml.XmlDocument
+  $document.XmlResolver = $null
+  $document.Load($treePath)
+  if ($document.SelectNodes('//Child[value.first="EtherCAT"]').Count -ne 1) { throw 'KV_ETHERCAT_SNAPSHOT_INVALID: expected exactly one EtherCAT subtree.' }
+  $rows = @()
+  foreach ($label in $document.SelectNodes('//Child[value.first="EtherCAT"]/value.second/Child/value.first')) {
+    $match = [regex]::Match($label.InnerText, '^\[(?<address>\d+)\]\s*(?::\s*)?(?<model>.+)$')
+    if (-not $match.Success) { continue }
+    $rows += [pscustomobject]@{ node_address = [int]$match.Groups['address'].Value; catalog_model = $match.Groups['model'].Value.Trim(); source = $treePath }
+  }
+  $rows
+}
+
+function Resolve-BatchNodeRequests {
+  param([object[]]$Requests)
+  $existing = @(Get-PersistedEtherCatMappings)
+  $pending = @(); $skipped = @()
+  foreach ($request in $Requests) {
+    $sameAddress = @($existing | Where-Object { $_.node_address -eq $request.node_address })
+    if ($sameAddress.Count -gt 0) {
+      if ($sameAddress.Count -ne 1 -or [string]$sameAddress[0].catalog_model -ne [string]$request.catalog_model) {
+        throw "KV_ETHERCAT_NODE_ADDRESS_CONFLICT: node address '$($request.node_address)' already contains '$($sameAddress[0].catalog_model)', requested '$($request.catalog_model)'."
+      }
+      $skipped += [pscustomobject]@{ node_address = $request.node_address; catalog_model = $request.catalog_model; action = 'already_persisted' }
+    } else {
+      $pending += $request
+    }
+  }
+  [pscustomobject]@{ existing = $existing; pending = @($pending); skipped = @($skipped) }
+}
+
+$uiStarted = $false
 try {
+  Log-Event 'workflow_started' @{project_name=$ProjectName;nodes_config_path=$NodesConfigPath}
   $batchRequests=@(Get-BatchNodeRequests)
   $isBatch=$batchRequests.Count -gt 0
   if($isBatch -and [string]::IsNullOrWhiteSpace($ProjectPath)){throw 'KV_ETHERCAT_PROJECT_PATH_REQUIRED: batch configuration requires ProjectPath.'}
   if($isBatch -and ($DeviceModel -or $NodeAddress -gt 0)){throw 'KV_ETHERCAT_ARGUMENT_CONFLICT: NodesConfigPath cannot be combined with DeviceModel or NodeAddress.'}
-  Log-Event 'workflow_started' @{project_name=$ProjectName;device_model=$DeviceModel;node_address=$NodeAddress;nodes_config_path=$NodesConfigPath;batch_count=$batchRequests.Count;device_path=@($DevicePath);inspect_only=[bool]$InspectOnly;keep_window_open=[bool]$KeepWindowOpen}
+  Log-Event 'request_validated' @{project_name=$ProjectName;device_model=$DeviceModel;node_address=$NodeAddress;nodes_config_path=$NodesConfigPath;batch_count=$batchRequests.Count;device_path=@($DevicePath);inspect_only=[bool]$InspectOnly;keep_window_open=[bool]$KeepWindowOpen}
+  $batchPlan = $null
+  if ($isBatch) {
+    if (-not (Test-Path -LiteralPath $ProjectPath -PathType Leaf)) { throw 'KV_ETHERCAT_PROJECT_PATH_UNRESOLVED: project file does not exist.' }
+    $process = Get-KvsProcess
+    if ($process.MainWindowTitle.Contains('*')) { throw 'KV_ETHERCAT_PROJECT_UNSAVED: save the project before batch configuration.' }
+    $mainElement = Get-ElementFromHwnd -Hwnd $process.MainWindowHandle
+    $blocking = @(Get-KvRelevantWindows | Where-Object { $_.hwnd -ne $process.MainWindowHandle.ToInt64() })
+    if (-not $mainElement.Current.IsEnabled -or $blocking.Count) { throw 'KV_ETHERCAT_PRECONDITION_FAILED: close existing configuration windows and modal dialogs first.' }
+    $batchPlan = Resolve-BatchNodeRequests -Requests $batchRequests
+    Log-Event 'batch_preflight' @{requested_count=$batchRequests.Count;pending_count=@($batchPlan.pending).Count;skipped_count=@($batchPlan.skipped).Count;skipped=@($batchPlan.skipped)}
+  }
   $normalizedDevicePath = @()
   foreach ($item in @($DevicePath)) {
     foreach ($part in ([string]$item -split ',')) {
@@ -973,8 +1052,14 @@ try {
   if ($BatchAxisRegistration -notin @('Yes','No')) { throw "BatchAxisRegistration must be Yes or No." }
   $beforeWindows = @(Get-KvRelevantWindows)
   Log-Event 'precondition_passed' @{step='resolve unique project window';windows=@($beforeWindows)}
-  $open = Open-EtherCatSettingStable
-  Log-Event 'step_succeeded' @{step='open EtherCAT setting';open=$open}
+  $open = $null
+  if (-not ($isBatch -and @($batchPlan.pending).Count -eq 0)) {
+    $uiStarted = $true
+    $open = Open-EtherCatSettingStable
+    Log-Event 'step_succeeded' @{step='open EtherCAT setting';open=$open}
+  } else {
+    Log-Event 'step_skipped' @{step='open EtherCAT setting';reason='all requested mappings already persisted'}
+  }
   $esiRegistration = $null
   $device = $null
   $devices = @()
@@ -993,15 +1078,16 @@ try {
     }
     Log-Event 'inspection_succeeded' @{step='inspect EtherCAT setting';tree_item_count=@($inspection.tree_items).Count;named_item_count=$inspection.named_item_count}
   } elseif($isBatch) {
-    foreach($request in $batchRequests){
+    foreach($request in @($batchPlan.pending)){
       $nodeWatch=[Diagnostics.Stopwatch]::StartNew()
       $deviceResult=Select-EtherCatDeviceByModel -Model $request.catalog_model
+      $request | Add-Member -NotePropertyName resolved_model -NotePropertyValue ($deviceResult.selected_leaf -replace '\s+\(0x[0-9a-fA-F]+\)$','') -Force
       Log-Event 'step_succeeded' @{step='insert EtherCAT device';selected_leaf=$deviceResult.selected_leaf;catalog_model=$request.catalog_model;node_address=$request.node_address}
       $addressResult=Set-SelectedEtherCatNodeAddress -RequestedNodeAddress $request.node_address
       $nodeWatch.Stop()
       Write-AtomicTiming 'configure one EtherCAT node' $nodeWatch @{catalog_model=$request.catalog_model;node_address=$request.node_address;selected_leaf=$deviceResult.selected_leaf;actual_node_address=$addressResult.actual_node_address}
       Log-Event 'step_succeeded' @{step='set selected EtherCAT node address';catalog_model=$request.catalog_model;requested_node_address=$request.node_address;actual_node_address=$addressResult.actual_node_address}
-      $devices += $deviceResult
+    $devices += $deviceResult
       $nodeAddressWrites += $addressResult
     }
   } else {
@@ -1018,12 +1104,18 @@ try {
   $dialogs = @()
   $savedTitle = ''
   $persistence = $null
+  $preserved = @()
   if (-not $KeepWindowOpen -and -not $InspectOnly) {
-    $mainOk = Invoke-EtherCatMainOk
-    $dialogs = @(Handle-PostOkDialogs)
-    $savedTitle = Save-Project
+    if (-not ($isBatch -and @($batchPlan.pending).Count -eq 0)) {
+      $mainOk = Invoke-EtherCatMainOk
+      $dialogs = @(Handle-PostOkDialogs)
+      $savedTitle = Save-Project
+    } else {
+      $savedTitle = (Get-KvsProcess).MainWindowTitle
+    }
     if($isBatch){
       $persistence=@(Assert-EtherCatMappingsPersisted -Requests $batchRequests)
+      $preserved=@(Assert-EtherCatMappingsPersisted -Requests @($batchPlan.existing))
       Log-Event 'persistence_verified' @{step='EtherCAT batch mapping readback';mapping_count=$persistence.Count;nodes=@($batchRequests)}
     }elseif($DeviceModel){$persistence=Assert-EtherCatModelPersisted -Model $DeviceModel -ExpectedNodeAddress $NodeAddress;Log-Event 'persistence_verified' @{step='EtherCAT model readback';model=$DeviceModel;node_address=$NodeAddress;tree_path=$persistence.tree_path}}
   }
@@ -1046,11 +1138,13 @@ try {
     devices = $devices
     node_address_write = $nodeAddressWrite
     node_address_writes = $nodeAddressWrites
+    batch_preflight = $batchPlan
     inspection = $inspection
     main_ok = $mainOk
     post_ok_dialogs = $dialogs
     saved_title = $savedTitle
     persistence = $persistence
+    preserved_existing_mappings = $preserved
     after_windows = $afterWindows
     remaining_ethercat_windows = @($afterWindows | Where-Object { $_.title -like '*EtherCAT*' -and $_.title -notlike 'KV STUDIO*' })
     remaining_dialogs = @($afterWindows | Where-Object { $_.class_name -eq '#32770' })
@@ -1060,14 +1154,18 @@ try {
   }
   $path = New-EvidencePath 'configure_kv_ethercat_nodes'
   Write-JsonFile -Path $path -Value $result
-  Log-Event 'workflow_succeeded' @{result_path=$path;inspect_only=[bool]$InspectOnly;remaining_ethercat_windows=@($result.remaining_ethercat_windows).Count;remaining_dialogs=@($result.remaining_dialogs).Count}
+  Write-JsonFile -Path (Join-Path $OutDir 'result.json') -Value $result
+  $endEvent = if ($result.ok) { 'workflow_succeeded' } else { 'workflow_failed' }
+  Log-Event $endEvent @{result_path=$path;inspect_only=[bool]$InspectOnly;remaining_ethercat_windows=@($result.remaining_ethercat_windows).Count;remaining_dialogs=@($result.remaining_dialogs).Count}
   $result | Add-Member -NotePropertyName result_path -NotePropertyValue $path
   $result | ConvertTo-Json -Depth 16
   if (-not $result.ok) { exit 62 }
 } catch {
   $originalError=$_
   $cleanup=$null
-  try{$cleanup=Restore-EtherCatCleanEndState}catch{$cleanup=[pscustomobject]@{ok=$false;message=$_.Exception.Message}}
+  if ($uiStarted) {
+    try{$cleanup=Restore-EtherCatCleanEndState}catch{$cleanup=[pscustomobject]@{ok=$false;message=$_.Exception.Message}}
+  } else { $cleanup=[pscustomobject]@{ok=$null;ui_untouched=$true} }
   $path = New-EvidencePath 'configure_kv_ethercat_nodes_failed'
   $code=if($originalError.Exception.Message -match '^(KV_[A-Z0-9_]+)'){$Matches[1]}else{'KV_ETHERCAT_CONFIGURATION_FAILED'}
   $failure = [pscustomobject]@{
@@ -1082,6 +1180,8 @@ try {
     windows = @(try { Get-KvRelevantWindows } catch { @() })
   }
   Write-JsonFile -Path $path -Value $failure
+  Write-JsonFile -Path (Join-Path $OutDir 'failure.json') -Value $failure
+  Write-JsonFile -Path (Join-Path $OutDir 'result.json') -Value $failure
   Log-Event 'workflow_failed' @{error_code=$code;message=$originalError.Exception.Message;result_path=$path;clean_end_state_ok=[bool]$cleanup.ok}
   $failure | ConvertTo-Json -Depth 10
   exit 1

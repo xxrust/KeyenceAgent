@@ -174,6 +174,7 @@ ethercat_customer_api:
   execution: one EtherCAT editor session, batch insert, one save, exact node/model readback
   supported_boundary: any catalog_model that uniquely matches an item already present in the current KV STUDIO EtherCAT catalog
   stable_failures: [KV_ETHERCAT_DEVICE_MODEL_NOT_FOUND, KV_ETHERCAT_DEVICE_MODEL_AMBIGUOUS, KV_ETHERCAT_NODE_ADDRESS_DUPLICATE]
+  retry_policy: saved same-address/same-model requests are idempotently skipped; different-model address collisions fail before UI input with KV_ETHERCAT_NODE_ADDRESS_CONFLICT
 ```
 
 PLC 扩展单元、单元首地址、EtherCAT、EtherNet/IP 等配置能力以 manifest 中的客户态 workflow 为准。manifest 没有对应客户态 workflow 时，客户态结果为 `ROUTE_RESEARCH_REQUIRED`；能力状态见 `references\capability-status.md`。
