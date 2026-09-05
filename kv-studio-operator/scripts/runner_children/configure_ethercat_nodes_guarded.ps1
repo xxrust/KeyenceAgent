@@ -5,6 +5,7 @@ param(
   [string]$DeviceModel = '',
   [ValidateRange(0, 65535)]
   [int]$NodeAddress = 0,
+  [string]$NodesConfigPath = '',
   [string[]]$DevicePath = @('KEYENCE CORPORATION','Servo Drives','SV3'),
   [string]$EsiPath = '',
   [string]$BatchAxisRegistration = 'No',
@@ -20,6 +21,10 @@ if ([string]::IsNullOrWhiteSpace($OutDir)) {
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $RunLogPath = Join-Path $OutDir 'run.log'
 Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes,System.Windows.Forms,System.Drawing
+$sharedUiGuard=Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'guards\kv_ui_guard.ps1'
+if(-not(Test-Path -LiteralPath $sharedUiGuard -PathType Leaf)){throw "KV_UI_GUARD_MISSING: $sharedUiGuard"}
+. $sharedUiGuard
+Initialize-KvUiGuard -OutDir $OutDir
 
 if (-not ('KvEtherCatWin32' -as [type])) {
   Add-Type @"
@@ -38,8 +43,6 @@ public class KvEtherCatWin32 {
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr hDlg, int nIDDlgItem);
   [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
-  [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);
-  [DllImport("user32.dll")] public static extern void mouse_event(int flags, int dx, int dy, int data, int extraInfo);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
@@ -148,6 +151,21 @@ function Get-ElementFromHwnd {
   $element = [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$Hwnd)
   if (-not $element) { throw "AutomationElement.FromHandle failed for $Hwnd." }
   $element
+}
+
+function Get-StableElementFromHwnd {
+  param([long]$Hwnd,[int]$TimeoutMs=1500)
+  $deadline=(Get-Date).AddMilliseconds($TimeoutMs)
+  do{
+    try{
+      $element=Get-ElementFromHwnd -Hwnd $Hwnd
+      [void]$element.FindAll([Windows.Automation.TreeScope]::Children,[Windows.Automation.Condition]::TrueCondition)
+      return $element
+    }catch [Windows.Automation.ElementNotAvailableException]{}
+    catch [System.Management.Automation.MethodInvocationException]{}
+    Start-Sleep -Milliseconds 80
+  }while((Get-Date)-lt$deadline)
+  throw "KV_ETHERCAT_WINDOW_NOT_STABLE: UI Automation tree for window $Hwnd did not stabilize within ${TimeoutMs}ms."
 }
 
 function Get-MainWindowElement {
@@ -273,8 +291,7 @@ function Send-EnterToElement {
   }
   $Element.SetFocus()
   Start-Sleep -Milliseconds 150
-  [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
-  Start-Sleep -Milliseconds 900
+  Invoke-KvGuardedSendKeys -TargetHwnd ([IntPtr](Get-KvsProcess).MainWindowHandle) -Step "open project tree item $($Element.Current.Name)" -Keys '{ENTER}' -ExpectedTitleLike 'KV STUDIO*' -Action 'Enter opens selected project tree item' -SleepMs 900
 }
 
 function Wait-WindowTitleLike {
@@ -334,7 +351,14 @@ function Open-EtherCatSetting {
   if ($existing -and $existing.title -like '*EtherCAT*') {
     return [pscustomobject]@{ reused_existing = $true; opened_window = $existing }
   }
-  $treeState = Ensure-UnitTreeExpanded
+  $treeState = $null
+  $treeDeadline=(Get-Date).AddSeconds(4)
+  do{
+    try { $treeState = Ensure-UnitTreeExpanded; break }
+    catch [Windows.Automation.ElementNotAvailableException] { Start-Sleep -Milliseconds 120 }
+    catch [System.Management.Automation.MethodInvocationException] { Start-Sleep -Milliseconds 120 }
+  }while((Get-Date)-lt$treeDeadline)
+  if(-not $treeState){throw 'KV_ETHERCAT_PROJECT_TREE_NOT_STABLE: project tree UIA did not stabilize while opening EtherCAT settings.'}
   $node = Find-TreeItemInMain -Exact 'EtherCAT'
   if (-not $node) { $node = Find-TreeItemInMain -Contains 'EtherCAT' }
   if (-not $node) { throw 'EtherCAT node was not found under unit configuration.' }
@@ -343,7 +367,7 @@ function Open-EtherCatSetting {
   Send-EnterToElement -Element $node
   $prompt = Wait-WindowTitleLike -TitleParts @($NameEtherCat) -TimeoutMs 6000
   if (-not $prompt) { throw 'EtherCAT prompt/setting window did not appear.' }
-  $promptElement = Get-ElementFromHwnd -Hwnd $prompt.hwnd
+  $promptElement = Get-StableElementFromHwnd -Hwnd $prompt.hwnd
   $manual = Invoke-ButtonByNamePart -Root $promptElement -NamePart $NameManual -OwnerHwnd $prompt.hwnd
   Start-Sleep -Milliseconds 1200
   $setting = Wait-WindowTitleLike -TitleParts @($NameEtherCat) -TimeoutMs 4000
@@ -379,6 +403,26 @@ function Find-DeviceTreeItem {
   }
 }
 
+function Open-EtherCatSettingStable {
+  $deadline=(Get-Date).AddSeconds(5)
+  $lastError=$null
+  do{
+    try{return Open-EtherCatSetting}
+    catch{
+      $lastError=$_
+      $existing=Wait-WindowTitleLike -TitleParts @($NameEtherCat) -TimeoutMs 250
+      if($existing -and $existing.title -like '*EtherCAT*' -and $existing.title -notlike 'KV STUDIO*'){
+        try{
+          [void](Get-StableElementFromHwnd -Hwnd $existing.hwnd -TimeoutMs 800)
+          return [pscustomobject]@{reused_existing=$true;opened_window=$existing;recovered_after_transient_open_error=$lastError.Exception.Message}
+        }catch{}
+      }
+      Start-Sleep -Milliseconds 120
+    }
+  }while((Get-Date)-lt$deadline)
+  throw "KV_ETHERCAT_OPEN_FAILED: EtherCAT settings did not stabilize. last_error=$($lastError.Exception.Message)"
+}
+
 function Find-SelectableByAutomationId {
   param([Windows.Automation.AutomationElement]$Root,[string]$AutomationId)
   $condition=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::AutomationIdProperty,$AutomationId)
@@ -404,9 +448,9 @@ function Send-DoubleClickToElement {
   $rect=$Element.Current.BoundingRectangle
   if($rect.Width -le 0 -or $rect.Height -le 0){throw 'KV_ETHERCAT_DEVICE_ITEM_OFFSCREEN: filtered device item has no clickable UIA bounds.'}
   $x=[int]($rect.Left+($rect.Width/2));$y=[int]($rect.Top+($rect.Height/2))
-  [void][KvEtherCatWin32]::SetCursorPos($x,$y)
-  Start-Sleep -Milliseconds 40
-  foreach($n in 1..2){[KvEtherCatWin32]::mouse_event(0x0002,0,0,0,0);Start-Sleep -Milliseconds 30;[KvEtherCatWin32]::mouse_event(0x0004,0,0,0,0);Start-Sleep -Milliseconds 80}
+  $owner=[IntPtr](Get-EtherCatWindowRow).hwnd
+  Invoke-KvGuardedMouseClick -TargetHwnd $owner -Step 'activate filtered EtherCAT device click 1' -X $x -Y $y -ExpectedTitleLike '*EtherCAT*' -SleepMs 40
+  Invoke-KvGuardedMouseClick -TargetHwnd $owner -Step 'activate filtered EtherCAT device click 2' -X $x -Y $y -ExpectedTitleLike '*EtherCAT*' -SleepMs 80
   [pscustomobject]@{x=$x;y=$y;rect=(Get-ElementRectData $Element)}
 }
 
@@ -523,7 +567,7 @@ function Select-EtherCatDeviceByModel {
   if(-not $catalogTab){throw 'KV_ETHERCAT_DEVICE_CATALOG_TAB_NOT_SELECTABLE: no enabled _tabEsiTree instance exposes SelectionItemPattern.'}
   $catalogTab.pattern.Select()
   Start-Sleep -Milliseconds 180
-  $networkBefore=Get-NetworkStructureSnapshot $windowElement
+  try{$networkBefore=Get-NetworkStructureSnapshot $windowElement}catch{$networkBefore=[pscustomobject]@{native_tree_count=0;names=@();tree_materialized=$false;diagnostic_error=$_.Exception.Message}}
   $beforePath=New-EvidencePath 'network_structure_before'
   Write-JsonFile $beforePath $networkBefore
 
@@ -534,15 +578,17 @@ function Select-EtherCatDeviceByModel {
   Start-Sleep -Milliseconds 120
   $windowRow=Get-EtherCatWindowRow
   $windowElement=Get-ElementFromHwnd -Hwnd $windowRow.hwnd
-  $deadline=(Get-Date).AddSeconds(5)
+  $deadline=(Get-Date).AddMilliseconds(1500)
   $matches=@()
   do{
     Start-Sleep -Milliseconds 150
     try { $all=$windowElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition) }
-    catch [Windows.Automation.ElementNotAvailableException] {
+    catch {
+      if($_.Exception.InnerException -isnot [Windows.Automation.ElementNotAvailableException] -and $_.Exception -isnot [Windows.Automation.ElementNotAvailableException]){throw}
       $windowRow=Get-EtherCatWindowRow
       $windowElement=Get-ElementFromHwnd -Hwnd $windowRow.hwnd
-      $all=$windowElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+      Start-Sleep -Milliseconds 80
+      continue
     }
     $matches=@()
     for($i=0;$i -lt $all.Count;$i++){
@@ -567,13 +613,15 @@ function Select-EtherCatDeviceByModel {
       if($expandButton.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$invoke)){$invoke.Invoke();$expandedCatalog=$true}
       Start-Sleep -Milliseconds 300
     }
-    $deadline=(Get-Date).AddSeconds(4)
+    $deadline=(Get-Date).AddSeconds(3)
     do{
       try { $all=$windowElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition) }
-      catch [Windows.Automation.ElementNotAvailableException] {
+      catch {
+        if($_.Exception.InnerException -isnot [Windows.Automation.ElementNotAvailableException] -and $_.Exception -isnot [Windows.Automation.ElementNotAvailableException]){throw}
         $windowRow=Get-EtherCatWindowRow
         $windowElement=Get-ElementFromHwnd -Hwnd $windowRow.hwnd
-        $all=$windowElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+        Start-Sleep -Milliseconds 80
+        continue
       }
       $matches=@()
       for($i=0;$i -lt $all.Count;$i++){
@@ -605,9 +653,12 @@ function Select-EtherCatDeviceByModel {
   $activation=Send-DoubleClickToElement -Element $leaf
   $networkAfter=$null
   $added=@()
-  $deadline=(Get-Date).AddSeconds(5)
+  # The project tree is an owner-drawn control and is not materialized on every
+  # KV STUDIO build.  Allow a short observation window; the writable node
+  # address property and the final on-disk mapping are the authoritative gates.
+  $deadline=(Get-Date).AddMilliseconds(750)
   do{
-    $networkAfter=Get-NetworkStructureSnapshot $windowElement
+    try{$networkAfter=Get-NetworkStructureSnapshot $windowElement}catch{$networkAfter=[pscustomobject]@{native_tree_count=0;names=@();tree_materialized=$false;diagnostic_error=$_.Exception.Message}}
     $beforeNames=@($networkBefore.names)
     $added=@($networkAfter.names|Where-Object{$beforeNames -notcontains $_})
     if([int64]$networkAfter.native_tree_count -gt [int64]$networkBefore.native_tree_count){break}
@@ -627,25 +678,39 @@ function Set-SelectedEtherCatNodeAddress {
   $windowElement=Get-ElementFromHwnd -Hwnd $windowRow.hwnd
   Set-ForegroundWindowByHwnd -Hwnd $windowRow.hwnd
   $watch=[Diagnostics.Stopwatch]::StartNew()
-  $propertyTab=Find-SelectableByAutomationId -Root $windowElement -AutomationId '_tabProperty'
+  $deadline=(Get-Date).AddSeconds(4)
+  $propertyTab=$null
+  do{
+    $windowRow=Get-EtherCatWindowRow
+    $windowElement=Get-ElementFromHwnd -Hwnd $windowRow.hwnd
+    $propertyTab=Find-SelectableByAutomationId -Root $windowElement -AutomationId '_tabProperty'
+    if($propertyTab){break}
+    Start-Sleep -Milliseconds 100
+  }while((Get-Date)-lt$deadline)
   if(-not $propertyTab){throw 'KV_ETHERCAT_NODE_PROPERTY_TAB_NOT_SELECTABLE: no enabled _tabProperty instance exposes SelectionItemPattern.'}
   $propertyTab.pattern.Select()
   Start-Sleep -Milliseconds 250
-  $addressEditors=@()
-  $all=$windowElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
-  $availableEditors=@()
-  for($i=0;$i -lt $all.Count;$i++){
-    $candidate=$all.Item($i)
-    try{
-      if($candidate.Current.ControlType.ProgrammaticName -ne 'ControlType.Edit' -or -not $candidate.Current.IsEnabled -or $candidate.Current.IsOffscreen){continue}
-      $pattern=$null
-      if($candidate.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern,[ref]$pattern) -and -not $pattern.Current.IsReadOnly){
-        $row=[pscustomobject]@{element=$candidate;pattern=$pattern;name=[string]$candidate.Current.Name;rect=(Get-ElementRectData $candidate)}
-        $availableEditors += $row
-        if($row.name -eq $NameNodeAddress){$addressEditors += $row}
-      }
-    }catch{}
-  }
+  $addressEditors=@();$availableEditors=@();$deadline=(Get-Date).AddSeconds(4)
+  do{
+    $windowRow=Get-EtherCatWindowRow
+    $windowElement=Get-ElementFromHwnd -Hwnd $windowRow.hwnd
+    $addressEditors=@();$availableEditors=@()
+    $all=$windowElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+    for($i=0;$i -lt $all.Count;$i++){
+      $candidate=$all.Item($i)
+      try{
+        if($candidate.Current.ControlType.ProgrammaticName -ne 'ControlType.Edit' -or -not $candidate.Current.IsEnabled -or $candidate.Current.IsOffscreen){continue}
+        $pattern=$null
+        if($candidate.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern,[ref]$pattern) -and -not $pattern.Current.IsReadOnly){
+          $row=[pscustomobject]@{element=$candidate;pattern=$pattern;name=[string]$candidate.Current.Name;rect=(Get-ElementRectData $candidate)}
+          $availableEditors += $row
+          if($row.name -eq $NameNodeAddress){$addressEditors += $row}
+        }
+      }catch{}
+    }
+    if($addressEditors.Count -gt 0){break}
+    Start-Sleep -Milliseconds 100
+  }while((Get-Date)-lt$deadline)
   if($addressEditors.Count -eq 0){
     $evidence=New-EvidencePath 'node_address_editor_not_found'
     Write-JsonFile $evidence ([pscustomobject]@{property_tab_automation_id=$propertyTab.element.Current.AutomationId;writable_editors=@($availableEditors|ForEach-Object{[pscustomobject]@{name=$_.name;rect=$_.rect}})})
@@ -764,9 +829,41 @@ function Handle-PostOkDialogs {
 function Save-Project {
   $process = Get-KvsProcess
   Set-ForegroundWindowByHwnd -Hwnd $process.MainWindowHandle
-  [System.Windows.Forms.SendKeys]::SendWait('^s')
-  Start-Sleep -Milliseconds 1200
+  Invoke-KvGuardedSendKeys -TargetHwnd ([IntPtr]$process.MainWindowHandle) -Step 'save EtherCAT node configuration Ctrl+S' -Keys '^s' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+S saves configured EtherCAT nodes' -SleepMs 1200
   (Get-KvsProcess).MainWindowTitle
+}
+
+function Restore-EtherCatCleanEndState {
+  $handled=@()
+  $settings=@(Get-KvRelevantWindows|Where-Object{$_.title-like '*EtherCAT*' -and $_.title-notlike 'KV STUDIO*'})
+  foreach($row in $settings){
+    try{
+      $element=Get-StableElementFromHwnd -Hwnd $row.hwnd
+      $cancel=Invoke-ButtonByNamePart -Root $element -NamePart $NameCancel -OwnerHwnd $row.hwnd
+      if($cancel){$handled += [pscustomobject]@{kind='cancel_ethercat_settings';hwnd=$row.hwnd;button=$cancel}}
+    }catch{$handled += [pscustomobject]@{kind='cancel_ethercat_settings_failed';hwnd=$row.hwnd;message=$_.Exception.Message}}
+  }
+  $deadline=(Get-Date).AddSeconds(3)
+  do{
+    $dialogRows=@(Get-KvRelevantWindows|Where-Object{$_.class_name-eq'#32770' -and $_.title-eq'KV STUDIO'})
+    if($dialogRows.Count-eq0){break}
+    foreach($row in $dialogRows){
+      try{
+        $dialog=Get-StableElementFromHwnd -Hwnd $row.hwnd
+        $text=Get-DialogText -Dialog $dialog
+        $button=Invoke-DialogButton -Dialog $dialog -NameParts @($NameConfirm,'OK','Yes')
+        if($button){$handled += [pscustomobject]@{kind='confirm_discard';hwnd=$row.hwnd;text=$text;button=$button}}
+      }catch{$handled += [pscustomobject]@{kind='confirm_discard_failed';hwnd=$row.hwnd;message=$_.Exception.Message}}
+    }
+    Start-Sleep -Milliseconds 150
+  }while((Get-Date)-lt$deadline)
+  $remaining=@(Get-KvRelevantWindows)
+  [pscustomobject]@{
+    ok=(@($remaining|Where-Object{$_.title-like '*EtherCAT*' -and $_.title-notlike 'KV STUDIO*'}).Count-eq0 -and @($remaining|Where-Object{$_.class_name-eq'#32770'}).Count-eq0)
+    handled=$handled
+    remaining_ethercat_windows=@($remaining|Where-Object{$_.title-like '*EtherCAT*' -and $_.title-notlike 'KV STUDIO*'})
+    remaining_dialogs=@($remaining|Where-Object{$_.class_name-eq'#32770'})
+  }
 }
 
 function Assert-EtherCatModelPersisted {
@@ -797,8 +894,44 @@ function Assert-EtherCatModelPersisted {
   throw "KV_ETHERCAT_PERSISTENCE_FAILED: '$Model'$nodeText was not found as an EtherCAT node in $treePath after save."
 }
 
+function Get-BatchNodeRequests {
+  if([string]::IsNullOrWhiteSpace($NodesConfigPath)){return @()}
+  $resolved=[IO.Path]::GetFullPath($NodesConfigPath)
+  if(-not(Test-Path -LiteralPath $resolved -PathType Leaf)){throw "KV_ETHERCAT_NODES_CONFIG_NOT_FOUND: $resolved"}
+  $config=Get-Content -LiteralPath $resolved -Raw -Encoding UTF8|ConvertFrom-Json
+  if([int]$config.schema_version -ne 1){throw 'KV_ETHERCAT_NODES_CONFIG_SCHEMA_UNSUPPORTED: schema_version must be 1.'}
+  $requests=@($config.nodes)
+  if($requests.Count -eq 0){throw 'KV_ETHERCAT_NODES_CONFIG_EMPTY: nodes must contain at least one item.'}
+  $normalized=@()
+  foreach($request in $requests){
+    $address=[int]$request.node_address
+    $model=[string]$request.catalog_model
+    if($address -lt 1 -or $address -gt 65535){throw "KV_ETHERCAT_NODE_ADDRESS_INVALID: '$address' is outside 1..65535."}
+    if([string]::IsNullOrWhiteSpace($model)){throw "KV_ETHERCAT_CATALOG_MODEL_REQUIRED: node '$address' has no catalog_model."}
+    $normalized += [pscustomobject]@{node_address=$address;catalog_model=$model.Trim()}
+  }
+  $duplicates=@($normalized|Group-Object node_address|Where-Object{$_.Count-gt1})
+  if($duplicates.Count){throw "KV_ETHERCAT_NODE_ADDRESS_DUPLICATE: duplicate node address '$($duplicates[0].Name)'."}
+  if($config.batch_axis_registration){$script:BatchAxisRegistration=[string]$config.batch_axis_registration}
+  $script:NodesConfigPath=$resolved
+  $normalized
+}
+
+function Assert-EtherCatMappingsPersisted {
+  param([object[]]$Requests)
+  $verified=@()
+  foreach($request in $Requests){
+    $verified += Assert-EtherCatModelPersisted -Model $request.catalog_model -ExpectedNodeAddress $request.node_address
+  }
+  $verified
+}
+
 try {
-  Log-Event 'workflow_started' @{project_name=$ProjectName;device_model=$DeviceModel;node_address=$NodeAddress;device_path=@($DevicePath);inspect_only=[bool]$InspectOnly;keep_window_open=[bool]$KeepWindowOpen}
+  $batchRequests=@(Get-BatchNodeRequests)
+  $isBatch=$batchRequests.Count -gt 0
+  if($isBatch -and [string]::IsNullOrWhiteSpace($ProjectPath)){throw 'KV_ETHERCAT_PROJECT_PATH_REQUIRED: batch configuration requires ProjectPath.'}
+  if($isBatch -and ($DeviceModel -or $NodeAddress -gt 0)){throw 'KV_ETHERCAT_ARGUMENT_CONFLICT: NodesConfigPath cannot be combined with DeviceModel or NodeAddress.'}
+  Log-Event 'workflow_started' @{project_name=$ProjectName;device_model=$DeviceModel;node_address=$NodeAddress;nodes_config_path=$NodesConfigPath;batch_count=$batchRequests.Count;device_path=@($DevicePath);inspect_only=[bool]$InspectOnly;keep_window_open=[bool]$KeepWindowOpen}
   $normalizedDevicePath = @()
   foreach ($item in @($DevicePath)) {
     foreach ($part in ([string]$item -split ',')) {
@@ -814,11 +947,13 @@ try {
   if ($BatchAxisRegistration -notin @('Yes','No')) { throw "BatchAxisRegistration must be Yes or No." }
   $beforeWindows = @(Get-KvRelevantWindows)
   Log-Event 'precondition_passed' @{step='resolve unique project window';windows=@($beforeWindows)}
-  $open = Open-EtherCatSetting
+  $open = Open-EtherCatSettingStable
   Log-Event 'step_succeeded' @{step='open EtherCAT setting';open=$open}
   $esiRegistration = $null
   $device = $null
+  $devices = @()
   $nodeAddressWrite = $null
+  $nodeAddressWrites = @()
   $inspection = $null
   if ($InspectOnly) {
     $windowRow = Get-EtherCatWindowRow
@@ -831,13 +966,27 @@ try {
       screenshot = Save-Screenshot 'inspect_ethercat_setting.png'
     }
     Log-Event 'inspection_succeeded' @{step='inspect EtherCAT setting';tree_item_count=@($inspection.tree_items).Count;named_item_count=$inspection.named_item_count}
+  } elseif($isBatch) {
+    foreach($request in $batchRequests){
+      $nodeWatch=[Diagnostics.Stopwatch]::StartNew()
+      $deviceResult=Select-EtherCatDeviceByModel -Model $request.catalog_model
+      Log-Event 'step_succeeded' @{step='insert EtherCAT device';selected_leaf=$deviceResult.selected_leaf;catalog_model=$request.catalog_model;node_address=$request.node_address}
+      $addressResult=Set-SelectedEtherCatNodeAddress -RequestedNodeAddress $request.node_address
+      $nodeWatch.Stop()
+      Write-AtomicTiming 'configure one EtherCAT node' $nodeWatch @{catalog_model=$request.catalog_model;node_address=$request.node_address;selected_leaf=$deviceResult.selected_leaf;actual_node_address=$addressResult.actual_node_address}
+      Log-Event 'step_succeeded' @{step='set selected EtherCAT node address';catalog_model=$request.catalog_model;requested_node_address=$request.node_address;actual_node_address=$addressResult.actual_node_address}
+      $devices += $deviceResult
+      $nodeAddressWrites += $addressResult
+    }
   } else {
+    $nodeWatch=[Diagnostics.Stopwatch]::StartNew()
     $device = if($DeviceModel){Select-EtherCatDeviceByModel -Model $DeviceModel}else{Select-EtherCatDeviceByPath}
     Log-Event 'step_succeeded' @{step='insert EtherCAT device';selected_leaf=$device.selected_leaf}
     if($NodeAddress -gt 0){
       $nodeAddressWrite=Set-SelectedEtherCatNodeAddress -RequestedNodeAddress $NodeAddress
       Log-Event 'step_succeeded' @{step='set selected EtherCAT node address';requested_node_address=$NodeAddress;actual_node_address=$nodeAddressWrite.actual_node_address}
     }
+    if($DeviceModel -and $NodeAddress -gt 0){$nodeWatch.Stop();Write-AtomicTiming 'configure one EtherCAT node' $nodeWatch @{catalog_model=$DeviceModel;node_address=$NodeAddress;selected_leaf=$device.selected_leaf;actual_node_address=$nodeAddressWrite.actual_node_address}}
   }
   $mainOk = $null
   $dialogs = @()
@@ -847,13 +996,18 @@ try {
     $mainOk = Invoke-EtherCatMainOk
     $dialogs = @(Handle-PostOkDialogs)
     $savedTitle = Save-Project
-    if($DeviceModel){$persistence=Assert-EtherCatModelPersisted -Model $DeviceModel -ExpectedNodeAddress $NodeAddress;Log-Event 'persistence_verified' @{step='EtherCAT model readback';model=$DeviceModel;node_address=$NodeAddress;tree_path=$persistence.tree_path}}
+    if($isBatch){
+      $persistence=@(Assert-EtherCatMappingsPersisted -Requests $batchRequests)
+      Log-Event 'persistence_verified' @{step='EtherCAT batch mapping readback';mapping_count=$persistence.Count;nodes=@($batchRequests)}
+    }elseif($DeviceModel){$persistence=Assert-EtherCatModelPersisted -Model $DeviceModel -ExpectedNodeAddress $NodeAddress;Log-Event 'persistence_verified' @{step='EtherCAT model readback';model=$DeviceModel;node_address=$NodeAddress;tree_path=$persistence.tree_path}}
   }
   $afterWindows = @(Get-KvRelevantWindows)
   $result = [pscustomobject]@{
     ok = $true
     project_name = $ProjectName
-    route = if($DeviceModel){'unit_configuration_ethercat_model_filter_enter'}else{'unit_configuration_ethercat_manual_device_tree_enter'}
+    route = if($isBatch){'unit_configuration_ethercat_batch_model_filter'}elseif($DeviceModel){'unit_configuration_ethercat_model_filter_enter'}else{'unit_configuration_ethercat_manual_device_tree_enter'}
+    nodes_config_path = $NodesConfigPath
+    requested_nodes = $batchRequests
     device_model = $DeviceModel
     node_address = $NodeAddress
     device_path = $DevicePath
@@ -863,7 +1017,9 @@ try {
     open = $open
     esi_registration = $esiRegistration
     device = $device
+    devices = $devices
     node_address_write = $nodeAddressWrite
+    node_address_writes = $nodeAddressWrites
     inspection = $inspection
     main_ok = $mainOk
     post_ok_dialogs = $dialogs
@@ -876,25 +1032,31 @@ try {
   if (-not $KeepWindowOpen -and ($result.remaining_ethercat_windows.Count -gt 0 -or $result.remaining_dialogs.Count -gt 0)) {
     $result.ok = $false
   }
-  $path = New-EvidencePath 'configure_kv_ethercat_device'
+  $path = New-EvidencePath 'configure_kv_ethercat_nodes'
   Write-JsonFile -Path $path -Value $result
   Log-Event 'workflow_succeeded' @{result_path=$path;inspect_only=[bool]$InspectOnly;remaining_ethercat_windows=@($result.remaining_ethercat_windows).Count;remaining_dialogs=@($result.remaining_dialogs).Count}
   $result | Add-Member -NotePropertyName result_path -NotePropertyValue $path
   $result | ConvertTo-Json -Depth 16
   if (-not $result.ok) { exit 62 }
 } catch {
-  $path = New-EvidencePath 'configure_kv_ethercat_device_failed'
+  $originalError=$_
+  $cleanup=$null
+  try{$cleanup=Restore-EtherCatCleanEndState}catch{$cleanup=[pscustomobject]@{ok=$false;message=$_.Exception.Message}}
+  $path = New-EvidencePath 'configure_kv_ethercat_nodes_failed'
+  $code=if($originalError.Exception.Message -match '^(KV_[A-Z0-9_]+)'){$Matches[1]}else{'KV_ETHERCAT_CONFIGURATION_FAILED'}
   $failure = [pscustomobject]@{
     ok = $false
-    error = $_.Exception.ToString()
+    error_code = $code
+    error = $originalError.Exception.ToString()
     project_name = $ProjectName
     node_address = $NodeAddress
+    nodes_config_path = $NodesConfigPath
     device_path = $DevicePath
+    clean_end_state = $cleanup
     windows = @(try { Get-KvRelevantWindows } catch { @() })
   }
   Write-JsonFile -Path $path -Value $failure
-  $code=if($_.Exception.Message -match '^(KV_[A-Z0-9_]+)'){$Matches[1]}else{'KV_ETHERCAT_CONFIGURATION_FAILED'}
-  Log-Event 'workflow_failed' @{error_code=$code;message=$_.Exception.Message;result_path=$path}
+  Log-Event 'workflow_failed' @{error_code=$code;message=$originalError.Exception.Message;result_path=$path;clean_end_state_ok=[bool]$cleanup.ok}
   $failure | ConvertTo-Json -Depth 10
   exit 1
 }

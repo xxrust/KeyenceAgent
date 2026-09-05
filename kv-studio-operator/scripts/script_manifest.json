@@ -113,6 +113,15 @@
         ]
       },
       {
+        "path": "workflows/configure_kv_ethercat_nodes.ps1",
+        "status": "published",
+        "customer_callable": true,
+        "capabilities": [
+          "configure_ethercat_nodes_by_catalog_model",
+          "verify_ethercat_node_model_persistence"
+        ]
+      },
+      {
         "path": "workflows/set_kv_variables.ps1",
         "status": "published",
         "customer_callable": true,
@@ -195,6 +204,12 @@
       },
       {
         "path": "runner_children/configure_expansion_units_guarded.ps1",
+        "status": "approved",
+        "customer_callable": false,
+        "ui_guard_required": true
+      },
+      {
+        "path": "runner_children/configure_ethercat_nodes_guarded.ps1",
         "status": "approved",
         "customer_callable": false,
         "ui_guard_required": true

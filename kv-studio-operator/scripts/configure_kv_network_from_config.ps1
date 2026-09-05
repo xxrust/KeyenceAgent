@@ -13,7 +13,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $scriptRoot = Split-Path -Parent $PSCommandPath
 $ethernetScript = Join-Path $scriptRoot 'configure_kv_ethernet_ip_device.ps1'
-$ethercatScript = Join-Path $scriptRoot 'configure_kv_ethercat_device.ps1'
+$ethercatScript = Join-Path $scriptRoot 'runner_children\configure_ethercat_nodes_guarded.ps1'
 
 if ([string]::IsNullOrWhiteSpace($OutDir)) {
   $OutDir = Join-Path (Join-Path ([IO.Path]::GetTempPath()) 'kv-studio-operator') 'kv_network_config_runs'

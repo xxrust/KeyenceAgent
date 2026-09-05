@@ -40,7 +40,16 @@ configuration_script_status:
     required_success_evidence: [UnitSet.ue2 same-run readback, project-tree/UI confirmation, clean main-window end state]
   ethercat:
     evidence_source: references\capability-status.md
-    customer_mode: requires_manifest_customer_workflow
+    customer_mode: configure_kv_ethercat_nodes workflow
+    supported_models: any uniquely matching model already present in the current KV STUDIO EtherCAT catalog
+    input_schema:
+      schema_version: 1
+      batch_axis_registration: Yes_or_No
+      nodes:
+        - node_address: integer_1_to_65535_unique
+          catalog_model: exact_or_unique_catalog_search_text
+    required_success_evidence: [node-address editor readback, exact node/model WsTreeEnv.xml readback, clean main-window end state]
+    per_node_budget_seconds: 10
   ethernet_ip:
     evidence_source: references\capability-status.md
     customer_mode: requires_manifest_customer_workflow

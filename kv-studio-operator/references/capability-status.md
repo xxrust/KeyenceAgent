@@ -10,6 +10,7 @@ customer_workflow:
     - scripts\workflows\run_kv_mvp_repair_existing_project.ps1
     - scripts\workflows\export_mnm_project_copy_default_folder.ps1
     - scripts\workflows\configure_kv_expansion_units.ps1
+    - scripts\workflows\configure_kv_ethercat_nodes.ps1
     - scripts\workflows\set_kv_variables.ps1
     - scripts\workflows\set_kv_fb_arguments.ps1
 
@@ -83,8 +84,13 @@ project_configuration:
     verification: UnitSet.ue2 same-run readback plus clean main-window end state
     per_module_budget_seconds: 10
   ethercat:
-    customer_callable: false
-    customer_mode_status: ROUTE_RESEARCH_REQUIRED
+    customer_callable: true
+    customer_workflow: scripts\workflows\configure_kv_ethercat_nodes.ps1
+    supported_models: any uniquely matching catalog_model already present in the current KV STUDIO EtherCAT catalog
+    required_input: nodes JSON with unique node_address and catalog_model
+    verification: per-node editor readback plus exact node/model WsTreeEnv.xml readback and clean main-window end state
+    per_node_budget_seconds: 10
+    exclusions: [missing_ESI, ambiguous_catalog_match, unknown_catalog_model]
   ethernet_ip:
     customer_callable: false
     customer_mode_status: ROUTE_RESEARCH_REQUIRED

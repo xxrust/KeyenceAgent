@@ -167,6 +167,15 @@ project_configuration_policy:
   evidence_reference: references\capability-status.md
 ```
 
+```yaml
+ethercat_customer_api:
+  manifest_capability: configure_ethercat_nodes_by_catalog_model
+  input: nodes JSON with unique node_address and catalog_model
+  execution: one EtherCAT editor session, batch insert, one save, exact node/model readback
+  supported_boundary: any catalog_model that uniquely matches an item already present in the current KV STUDIO EtherCAT catalog
+  stable_failures: [KV_ETHERCAT_DEVICE_MODEL_NOT_FOUND, KV_ETHERCAT_DEVICE_MODEL_AMBIGUOUS, KV_ETHERCAT_NODE_ADDRESS_DUPLICATE]
+```
+
 PLC 扩展单元、单元首地址、EtherCAT、EtherNet/IP 等配置能力以 manifest 中的客户态 workflow 为准。manifest 没有对应客户态 workflow 时，客户态结果为 `ROUTE_RESEARCH_REQUIRED`；能力状态见 `references\capability-status.md`。
 
 项目配置意图、EtherNet/IP 成员查询、EtherCAT ESI 状态和配置脚本成熟度见 `references\project-configuration.md`。
