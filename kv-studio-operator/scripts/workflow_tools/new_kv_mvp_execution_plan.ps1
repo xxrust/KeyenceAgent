@@ -175,6 +175,11 @@ try {
     $entryLocalTsv = Resolve-ScaffoldPath ([string]$entry.variables.local_tsv)
     if (-not (Test-Path -LiteralPath $entryGlobalTsv -PathType Leaf)) { throw "Global variable TSV not found for ${moduleName}: $entryGlobalTsv" }
     if (-not (Test-Path -LiteralPath $entryLocalTsv -PathType Leaf)) { throw "Local variable TSV not found for ${moduleName}: $entryLocalTsv" }
+    if ($Mode -eq 'repair_existing_project') {
+      $writeRows = @(Get-ExecutableVariableRowsFromPath $entryGlobalTsv 'global') + @(Get-ExecutableVariableRowsFromPath $entryLocalTsv 'local')
+      $writeErrors = @(Get-KvVariableWriteCapabilityErrors -Rows $writeRows)
+      if ($writeErrors.Count) { throw "$($writeErrors[0].code): $($writeErrors[0].message)" }
+    }
     $entryArgumentsTsv = ''
     if ($moduleType -eq 2) {
       $entryArgumentsTsv = Resolve-ScaffoldPath ([string]$entry.arguments.tsv)
@@ -208,6 +213,7 @@ try {
   $variableArtifactDir = Join-Path $artifactRoot 'variables'
   $mergedGlobal = New-MergedGlobalVariablesTsv $resolvedMnmFiles $variableArtifactDir
   $projectPathForRun = if ($Mode -eq 'new_project') { Join-Path (Join-Path $projectRoot $ProjectName) ($ProjectName + '.kpr') } else { $ProjectPath }
+  if ($Mode -eq 'new_project' -and (Test-Path -LiteralPath $projectPathForRun)) { throw "KV_NEW_PROJECT_ALREADY_EXISTS: use a fresh output directory or the existing-project repair workflow: $projectPathForRun" }
   $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($projectPathForRun)
   $projectSearchRoot = if ($Mode -eq 'new_project') { Join-Path $projectRoot $ProjectName } else { Split-Path -Parent $ProjectPath }
   $resultPath = if ($Mode -eq 'new_project') { Join-Path $runRoot 'mvp_result.json' } else { Join-Path $runRoot 'repair_result.json' }
@@ -285,6 +291,7 @@ try {
     Add-Arg -List $setArgs -Name '-LocalVariablesTsv' -Value $entry.local_tsv
     Add-Arg -List $setArgs -Name '-LocalProgramName' -Value $entry.module_name
     Add-Arg -List $setArgs -Name '-LocalPasteFormat' -Value $LocalPasteFormat
+    if ($Mode -eq 'new_project') { Add-SwitchArg -List $setArgs -Name '-NewProjectDefaults' -Enabled $true }
     Add-Arg -List $setArgs -Name '-ChecklistPath' -Value $ChecklistPath
     Add-Arg -List $setArgs -Name '-OutDir' -Value $moduleOutDir
     if ($Mode -eq 'repair_existing_project') { Add-SwitchArg -List $setArgs -Name '-AppendGlobalVariables' -Enabled $true }
@@ -299,7 +306,8 @@ try {
         if ($j -eq $i) { continue }
         $forbiddenLocalNames += @(Get-ExecutableVariableNames $resolvedMnmFiles[$j].local_tsv 'local')
       }
-      $forbiddenLocalNames = @($forbiddenLocalNames | Where-Object { $_ } | Select-Object -Unique)
+      $ownedLocalNames = @(Get-ExecutableVariableNames $entry.local_tsv 'local')
+      $forbiddenLocalNames = @($forbiddenLocalNames | Where-Object { $_ -and $ownedLocalNames -notcontains $_ } | Select-Object -Unique)
       if ($forbiddenLocalNames.Count -gt 0) { Add-Arg -List $setArgs -Name '-ForbiddenLocalNamesCsv' -Value ($forbiddenLocalNames -join ',') }
     }
     $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })set_variables_$($entry.module_name)" 'set_variables_guarded.ps1' @('runner_child_approved') $setArgs.ToArray() $moduleOutDir 'runner_child'))

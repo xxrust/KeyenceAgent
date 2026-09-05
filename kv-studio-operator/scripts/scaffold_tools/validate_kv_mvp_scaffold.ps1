@@ -340,6 +340,8 @@ foreach ($entry in $mnmEntries) {
   $noLocalMarkers = @($localRows | Where-Object { Test-KvNoLocalVariablesMarkerRow $_ })
   Assert-KvVariableDefinitions $definedGlobalRows 'global' $entryGlobalTsv '' $fbTypeNames
   Assert-KvVariableDefinitions $definedLocalRows 'local' $entryLocalTsv $moduleName $fbTypeNames
+  $writeErrors = @(Get-KvVariableWriteCapabilityErrors -Rows @($definedGlobalRows + $definedLocalRows) -AllowDefaultInitialValues)
+  if ($writeErrors.Count) { Stop-ScaffoldValidation $writeErrors[0].code $writeErrors[0].message @($entryGlobalTsv,$entryLocalTsv) }
   $noLocalMarkerErrors = @(Get-KvNoLocalVariablesMarkerErrors -Rows $localRows -SourcePath $entryLocalTsv -ExpectedOwnerProgram $moduleName)
   if ($noLocalMarkerErrors.Count -gt 0) {
     $evidencePath = Join-Path $OutDir ("no_local_variables_marker_errors_{0}.json" -f ([IO.Path]::GetFileNameWithoutExtension($entryLocalTsv)))
@@ -466,6 +468,56 @@ foreach ($entry in $mnmEntries) {
 }
 
 if ($sourceModel) {
+  # Generated artifacts are an ordered program, not a set of token names.
+  # Re-render without touching the submitted scaffold, then compare all
+  # executable adapter bytes and the import schedule against that model.
+  $referenceRoot = Join-Path $OutDir ('model_reference_' + [guid]::NewGuid().ToString('N'))
+  $renderer = Join-Path $scriptRoot 'render_kv_mvp_scaffold_model.ps1'
+  $previousPreference = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  $renderOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $renderer -ModelPath $sourceModelPath -ScaffoldRoot $referenceRoot 2>&1
+  $renderExit = $LASTEXITCODE
+  $ErrorActionPreference = $previousPreference
+  if ($renderExit -ne 0) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_FAILED' "Source model cannot be rendered: $($renderOutput | Out-String)" @($sourceModelPath)
+  }
+  $referenceManifest = Get-Content (Join-Path $referenceRoot 'scaffold.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+  foreach ($field in @('name','cpu_model','local_program')) {
+    if ([string]$manifest.project.$field -cne [string]$referenceManifest.project.$field) {
+      Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' "Project $field differs from source model." @($sourceModelPath,$manifestPath)
+    }
+  }
+  $referenceEntries = @($referenceManifest.mnm_files)
+  if ($referenceEntries.Count -ne $mnmEntries.Count) {
+    Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' 'Module count differs from source model.' @($sourceModelPath,$manifestPath)
+  }
+  for ($index=0; $index -lt $mnmEntries.Count; $index++) {
+    $actualEntry = $mnmEntries[$index]
+    $expectedEntry = $referenceEntries[$index]
+    foreach ($field in @('module_name','module_type','category','device')) {
+      if ([string]$actualEntry.$field -cne [string]$expectedEntry.$field) {
+        Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' "Module index $index field $field differs from source model; import order is significant." @($sourceModelPath,$manifestPath)
+      }
+    }
+    $pairs = @(
+      @{actual=$actualEntry.path;expected=$expectedEntry.path},
+      @{actual=$actualEntry.variables.global_tsv;expected=$expectedEntry.variables.global_tsv},
+      @{actual=$actualEntry.variables.local_tsv;expected=$expectedEntry.variables.local_tsv}
+    )
+    if ([int]$expectedEntry.module_type -eq 2) { $pairs += @{actual=$actualEntry.arguments.tsv;expected=$expectedEntry.arguments.tsv} }
+    foreach ($pair in $pairs) {
+      $actualPath = Resolve-ScaffoldPath ([string]$pair.actual)
+      $expectedPath = Join-Path $referenceRoot ([string]$pair.expected)
+      if ((Get-FileHashText $actualPath) -ne (Get-FileHashText $expectedPath)) {
+        Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' "Generated artifact differs from source model: $actualPath. Re-render after changing the model; do not patch adapters independently." @($sourceModelPath,$actualPath,$expectedPath)
+      }
+    }
+  }
+  foreach ($criterion in @($sourceModel.task.acceptance)) {
+    if ($criterion -and -not ([IO.File]::ReadAllText((Join-Path $ScaffoldRoot 'TASK.md')).Contains([string]$criterion))) {
+      Stop-ScaffoldValidation 'KV_SCAFFOLD_ACCEPTANCE_MISSING' 'TASK.md lost a source-model acceptance criterion.' @($sourceModelPath,(Join-Path $ScaffoldRoot 'TASK.md'))
+    }
+  }
   $modelModules = @($sourceModel.modules)
   if ($modelModules.Count -ne $mnmEntries.Count) {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' "scaffold.model.json module count does not match scaffold.json mnm_files count. model=$($modelModules.Count) manifest=$($mnmEntries.Count)" @($sourceModelPath, $manifestPath)
@@ -483,9 +535,9 @@ if ($sourceModel) {
     $globalRows = Read-TsvRows $entryGlobalTsv $requiredTsvColumns "global variable TSV for $moduleName model check"
     $localRows = Read-TsvRows $entryLocalTsv $requiredTsvColumns "local variable TSV for $moduleName model check"
     $actualGlobals = @(Get-ExecutableRows $globalRows 'global' | ForEach-Object { [string]$_.name } | Sort-Object)
-    $expectedGlobals = @(@($module.variables.global) | ForEach-Object { [string]$_.name } | Sort-Object)
+    $expectedGlobals = @(@($module.variables.global) | Where-Object { $_ -and $_.status -notin @('display_name','no_local_variables') } | ForEach-Object { [string]$_.name } | Sort-Object)
     $actualLocals = @(Get-ExecutableRows $localRows 'local' | ForEach-Object { [string]$_.name } | Sort-Object)
-    $expectedLocals = @(@($module.variables.local) | ForEach-Object { [string]$_.name } | Sort-Object)
+    $expectedLocals = @(@($module.variables.local) | Where-Object { $_ -and $_.status -notin @('display_name','no_local_variables') } | ForEach-Object { [string]$_.name } | Sort-Object)
     if ((Compare-Object $expectedGlobals $actualGlobals).Count -gt 0) {
       Stop-ScaffoldValidation 'KV_SCAFFOLD_MODEL_RENDER_MISMATCH' "Generated global TSV for $moduleName does not match scaffold.model.json variable names." @($sourceModelPath, $entryGlobalTsv)
     }
@@ -521,6 +573,9 @@ $payload = [ordered]@{
   network_config_hash = Get-FileHashText $networkConfigPath
   source_model = $sourceModelPath
   source_model_hash = Get-FileHashText $sourceModelPath
+  ordered_model_render_verified = [bool]$sourceModel
+  variable_write_verified_fields = @('name','data_type')
+  full_project_replication_verified = $false
   variable_sets = $variableSetChecks
   executable_global_variable_count = $globalDefinitions.Count
   executable_local_variable_count = @($variableSetChecks | ForEach-Object { $_.executable_local_variable_count } | Measure-Object -Sum).Sum

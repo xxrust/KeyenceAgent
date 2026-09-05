@@ -186,6 +186,26 @@ function Get-KvNoLocalVariablesMarkerErrors {
   return @($errors)
 }
 
+function Get-KvVariableWriteCapabilityErrors {
+  param([object[]]$Rows, [switch]$AllowDefaultInitialValues)
+  foreach ($row in $Rows) {
+    $unsupported = @()
+    if ([string]$row.device) { $unsupported += 'device' }
+    $initial = ([string]$row.initial_value).Trim()
+    $type = ([string]$row.data_type).Trim().ToUpperInvariant()
+    $isDefault = -not $initial -or ($type -eq 'BOOL' -and $initial -in @('FALSE','0')) -or
+      ($type -in @('INT','DINT','UINT','UDINT','REAL','LREAL') -and $initial -match '^[-+]?0(?:\.0+)?$')
+    if ($initial -and (-not $AllowDefaultInitialValues -or -not $isDefault)) { $unsupported += 'initial_value' }
+    foreach ($field in @('retain','constant','group_name','assignment_target','opc_ua','file_export')) {
+      $value = ([string]$row.$field).Trim()
+      if ($value -and $value -notin @('False','0')) { $unsupported += $field }
+    }
+    if ($unsupported.Count) {
+      [pscustomobject]@{code='KV_VARIABLE_WRITE_CAPABILITY_UNSUPPORTED';name=[string]$row.name;fields=$unsupported;message="Variable '$($row.name)' requires unsupported write/readback fields: $($unsupported -join ', '). Current variable API verifies name and data_type only."}
+    }
+  }
+}
+
 function New-KvVariableDefinition {
   param(
     [ValidateSet('global','local')]

@@ -25,6 +25,9 @@ if ([int]$model.schema_version -ne 1) {
 }
 if (-not $model.project.name) { throw 'scaffold model missing project.name.' }
 if (-not $model.project.cpu_model) { throw 'scaffold model missing project.cpu_model.' }
+foreach ($field in @('data_types','structures','dependencies','official_fbs','libraries')) {
+  if ($model.$field) { throw "KV_SCAFFOLD_DEPENDENCY_ROUTE_UNSUPPORTED: '$field' has no type/library creation and verification workflow. Keep it in source inventory until that route exists." }
+}
 
 $modules = @($model.modules)
 if ($modules.Count -eq 0) { throw 'scaffold model must contain at least one module.' }
@@ -48,14 +51,23 @@ function Write-Text([string]$Path, [string]$Text, [Text.Encoding]$Encoding) {
 
 function New-VariableTsv([string]$Scope, [string]$OwnerProgram, [object[]]$Rows, [string]$Evidence) {
   $lines = @('scope' + "`t" + 'owner_program' + "`t" + 'name' + "`t" + 'data_type' + "`t" + 'device' + "`t" + 'initial_value' + "`t" + 'comment' + "`t" + 'evidence' + "`t" + 'status')
+  if ($Scope -eq 'local' -and @($Rows | Where-Object { $null -ne $_ }).Count -eq 0) {
+    $lines += (@('local',$OwnerProgram,'__NO_LOCAL_VARIABLES__','','','','No local state declared in source model.',$Evidence,'no_local_variables') -join "`t")
+  }
   foreach ($row in @($Rows)) {
+    if ($null -eq $row) { continue }
+    $supportedFields = @('name','data_type','device','initial_value','comment','status')
+    foreach ($property in $row.PSObject.Properties) {
+      if ($supportedFields -notcontains $property.Name) { throw "KV_SCAFFOLD_VARIABLE_FIELD_UNSUPPORTED: $Scope $OwnerProgram/$($row.name) field '$($property.Name)' has no rendered/written/readback contract." }
+      if ([string]$property.Value -match "[`t`r`n]") { throw "KV_SCAFFOLD_TSV_FIELD_INVALID: $OwnerProgram/$($row.name) contains a TSV delimiter." }
+    }
     $definition = New-KvVariableDefinition `
       -Scope $Scope `
       -OwnerProgram $OwnerProgram `
       -Name ([string]$row.name) `
       -DataType ([string]$row.data_type) `
       -Device ([string]$row.device) `
-      -InitialValue $(if ($null -ne $row.initial_value) { [string]$row.initial_value } else { 'FALSE' }) `
+      -InitialValue $(if ($null -ne $row.initial_value) { [string]$row.initial_value } else { '' }) `
       -Comment ([string]$row.comment) `
       -Evidence $Evidence `
       -Status $(if ($row.status) { [string]$row.status } else { 'defined' }) `
@@ -98,6 +110,7 @@ function New-MnmText($Module) {
   $comment = if ($Module.mnm.comment) { [string]$Module.mnm.comment } else { "Generated scan module $moduleName." }
   $instructions = @($Module.mnm.instructions | ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })
   $stLines = @($Module.mnm.st_lines | ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })
+  if ($instructions.Count -gt 0 -and $stLines.Count -gt 0) { throw "KV_SCAFFOLD_MNM_BODY_AMBIGUOUS: $moduleName declares both instructions and st_lines." }
   if ($instructions.Count -eq 0 -and $stLines.Count -eq 0) { throw "Module $moduleName has neither mnm.instructions nor mnm.st_lines." }
   $lines = @(
     "DEVICE:$deviceCode"
@@ -144,11 +157,12 @@ function New-DefaultNetworkConfig {
 
 $mnmEntries = @()
 $variableSets = @()
-$allModuleNames = [System.Collections.Generic.HashSet[string]]::new()
+$allModuleNames = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 
 foreach ($module in $modules) {
   $moduleName = [string]$module.name
   if (-not $moduleName) { throw 'Every module must have a name.' }
+  if ($moduleName -match '[\\/:*?"<>|\x00-\x1f]' -or $moduleName -match '[. ]$' -or $moduleName -match '^(?i:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)') { throw "KV_SCAFFOLD_MODULE_NAME_INVALID: '$moduleName' cannot be an artifact directory name." }
   if (-not $allModuleNames.Add($moduleName)) { throw "Duplicate module name in scaffold model: $moduleName" }
 }
 
@@ -282,6 +296,9 @@ $TaskSummary
 - Define local variables per module and verify them with AuditVariablePersistence for multi-MNM work.
 - Compile/convert through KV STUDIO with copied result text showing OK.
 "@
+if (@($model.task.acceptance).Count -gt 0 -and $model.task.acceptance) {
+  $taskText += "`r`n## Project Acceptance`r`n`r`n" + ((@($model.task.acceptance) | ForEach-Object { '- ' + [string]$_ }) -join "`r`n") + "`r`n"
+}
 Set-Content -LiteralPath (Join-Path $ScaffoldRoot 'TASK.md') -Value $taskText -Encoding UTF8
 
 $checklistText = @"

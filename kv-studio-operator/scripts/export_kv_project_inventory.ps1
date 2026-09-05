@@ -258,7 +258,12 @@ try {
     }
   }
 
-  $motionAxes = @($treeNodes | Where-Object { $_.text -match 'Axis_[0-9]+' } | ForEach-Object {
+  $typeRootName = -join ([char[]](0x6570,0x636E,0x7C7B,0x578B))
+  $variableRootName = -join ([char[]](0x53D8,0x91CF))
+  $scanCategoryName = -join ([char[]](0x6BCF,0x6B21,0x626B,0x63CF,0x6267,0x884C,0x578B,0x6A21,0x5757))
+  $standbyCategoryName = -join ([char[]](0x540E,0x5907,0x6A21,0x5757))
+  $bookmarkName = -join ([char[]](0x4E66,0x7B7E))
+  $motionAxes = @($treeNodes | Where-Object { $_.text -match '^(?:[0-9]+\s*:\s*)?Axis_[0-9]+(?:\s|:|$)' -and $_.path -notcontains 'EtherCAT' -and $_.path -notcontains $typeRootName -and $_.path -notcontains $variableRootName } | ForEach-Object {
     $axisNo = $null
     $mNo = [regex]::Match($_.text, '([0-9]+):Axis_([0-9]+)|Axis_([0-9]+)')
     if ($mNo.Success) {
@@ -273,7 +278,9 @@ try {
     }
   })
 
-  $dataTypes = @($treeNodes | Where-Object { $_.text -match '^(_[A-Z0-9_]+|AXIS)(?::|$)' } | ForEach-Object {
+  $parentsWithChildren = @{}
+  foreach ($node in $treeNodes) { if ($null -ne $node.parent_id) { $parentsWithChildren[[string]$node.parent_id] = $true } }
+  $dataTypes = @($treeNodes | Where-Object { $_.path[0] -eq $typeRootName -and $_.depth -gt 0 -and -not $parentsWithChildren.ContainsKey([string]$_.id) } | ForEach-Object {
     $m = [regex]::Match($_.text, '^([^:]+)(?::(.*))?$')
     [ordered]@{
       name = $m.Groups[1].Value.Trim()
@@ -282,8 +289,8 @@ try {
     }
   })
 
-  $programModules = @($treeNodes | Where-Object { $_.text -match '^[A-Za-z_][A-Za-z0-9_]*\s+\[\d+\]$' } | ForEach-Object {
-    $m = [regex]::Match($_.text, '^([A-Za-z_][A-Za-z0-9_]*)\s+\[(\d+)\]$')
+  $programModules = @($treeNodes | Where-Object { $_.text -match '^.+\s+\[\d+\]$' -and ($_.path -contains $scanCategoryName -or $_.path -contains $standbyCategoryName) -and $_.path -notcontains $bookmarkName } | ForEach-Object {
+    $m = [regex]::Match($_.text, '^(.+?)\s+\[(\d+)\]$')
     [ordered]@{
       module_name = $m.Groups[1].Value
       execution_order = [int]$m.Groups[2].Value

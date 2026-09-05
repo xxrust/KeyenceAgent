@@ -20,6 +20,7 @@
   [string]$ForbiddenLocalNamesCsv = '',
   [ValidateSet('Full','NameType')]
   [string]$LocalPasteFormat = 'NameType',
+  [switch]$NewProjectDefaults,
 
   [switch]$AppendGlobalVariables,
   [string[]]$AllowedCustomDataTypes = @(),
@@ -927,6 +928,10 @@ function Assert-NoSoftDeviceLikeVariableNames([object[]]$Rows, [string]$Scope, [
 }
 
 function Assert-KvVariableDefinitionsBeforePaste([object[]]$Rows, [string]$Scope, [string]$SourcePath, [string]$ExpectedOwnerProgram = '') {
+  $writeErrors = @(Get-KvVariableWriteCapabilityErrors -Rows $Rows -AllowDefaultInitialValues:$NewProjectDefaults)
+  if ($writeErrors.Count) {
+    Fail-Guard $writeErrors[0].code "preflight $Scope variable write capability" $writeErrors[0].message @($SourcePath)
+  }
   $errors = @(Get-KvVariableDefinitionErrors -Rows $Rows -Scope $Scope -SourcePath $SourcePath -ExpectedOwnerProgram $ExpectedOwnerProgram -AllowedCustomDataTypes $script:AllowedCustomDataTypeNames)
   if ($errors.Count -gt 0) {
     $evidencePath = Join-Path $OutDir "${Scope}_variable_definition_errors.json"
@@ -1614,6 +1619,8 @@ try {
   $requiredNames = @($definedGlobalNames + $definedLocalNames | Where-Object { $_ } | Select-Object -Unique)
   $validation = [pscustomobject]@{
     Ok = $true
+    VerifiedFields = @('name','data_type')
+    UnverifiedFields = @('initial_value','device','retain','constant','comment','group_name')
     Basis = if ($AuditPersistence) { 'variable editor route completed without modal; local executable names were verified by closing/reopening the variable editor, selecting the same program, copying the local grid text, and matching expected names' } else { 'fast variable editor route completed without modal; variable correctness is completed by the later compile gate unless audit flags are enabled' }
     RequiredNames = $requiredNames
     GlobalNames = $definedGlobalNames

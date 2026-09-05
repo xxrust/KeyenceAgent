@@ -15,6 +15,14 @@ $start = Get-Date
 $script:currentStep = 'init'
 $script:lastFailure = $null
 $script:flatSteps = [System.Collections.Generic.List[object]]::new()
+$script:unifiedRunLog = ''
+
+function Write-WorkflowLog([string]$Type, [hashtable]$Data = @{}) {
+  if (-not $script:unifiedRunLog) { return }
+  $entry = [ordered]@{timestamp=(Get-Date).ToString('o');type=$Type;step=$script:currentStep}
+  foreach ($key in $Data.Keys) { $entry[$key]=$Data[$key] }
+  [IO.File]::AppendAllText($script:unifiedRunLog,(($entry | ConvertTo-Json -Compress -Depth 8)+[Environment]::NewLine),[Text.Encoding]::UTF8)
+}
 
 function New-Cn([int[]]$CodePoints) {
   -join ($CodePoints | ForEach-Object { [char]$_ })
@@ -159,6 +167,7 @@ function Invoke-FlatWorkflowStep([object]$Step) {
   # points; non-UI gates remain compatible with STA.
   $command = @('-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath) + $arguments
   $stepStart = Get-Date
+  Write-WorkflowLog 'step_started' @{script=$scriptPath;out_dir=$outDir}
   $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $command -NoNewWindow -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
   $stepTimeoutSeconds = Get-StepTimeoutSeconds $Step
   $deadline = (Get-Date).AddSeconds($stepTimeoutSeconds)
@@ -200,6 +209,7 @@ function Invoke-FlatWorkflowStep([object]$Step) {
     })
     $script:lastFailure = Get-StepFailureSummary $Step -2
     $script:lastFailure.error_code = 'KV_FLAT_WORKFLOW_STEP_TIMEOUT'
+    Write-WorkflowLog 'step_failed' @{error_code='KV_FLAT_WORKFLOW_STEP_TIMEOUT';elapsed_seconds=$elapsed}
     throw "Flat workflow step timed out: $($Step.name)"
   }
   $process.WaitForExit()
@@ -215,6 +225,7 @@ function Invoke-FlatWorkflowStep([object]$Step) {
     if ($outDir) { 'Child step wrote to stderr; treating this as a failed guarded step.' | Set-Content -LiteralPath (Join-Path $outDir 'fail.txt') -Encoding UTF8 }
   }
   $elapsed = [math]::Round(((Get-Date) - $stepStart).TotalSeconds, 3)
+  Write-WorkflowLog $(if ($exit -eq 0) {'step_succeeded'} else {'step_failed'}) @{exit_code=$exit;elapsed_seconds=$elapsed;out_dir=$outDir}
   $script:flatSteps.Add([pscustomobject]@{
     name = [string]$Step.name
     kind = [string]$Step.kind
@@ -272,6 +283,7 @@ function Write-FlatWorkflowResult([object]$Plan, [string]$ResolvedPlanPath, [boo
     error_code = if ($script:lastFailure -and $script:lastFailure.error_code) { [string]$script:lastFailure.error_code } elseif (-not $Ok) { 'KV_FLAT_WORKFLOW_FAILED' } else { '' }
     failure = $script:lastFailure
     steps = @($script:flatSteps)
+    run_log_path = $script:unifiedRunLog
   } | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath ([string]$Plan.result_path) -Encoding UTF8
 }
 
@@ -282,6 +294,9 @@ $plan = $null
 try {
   $plan = Get-Content -Raw -LiteralPath $PlanPath -Encoding UTF8 | ConvertFrom-Json
   if (-not $plan.ok) { throw "Execution plan is not ok: $PlanPath" }
+  $script:unifiedRunLog = Join-Path ([string]$plan.run_root) 'run.log'
+  $env:KV_WORKFLOW_RUN_LOG = $script:unifiedRunLog
+  Write-WorkflowLog 'workflow_started' @{plan_path=$PlanPath;project_path=$plan.project_path}
   if ($TimeoutSeconds -le 0) {
     if ($plan.timeout_seconds) { $TimeoutSeconds = [int]$plan.timeout_seconds } else { $TimeoutSeconds = 600 }
   }
@@ -300,8 +315,10 @@ try {
     throw 'Copied compile result does not contain the OK conversion result.'
   }
   Write-FlatWorkflowResult $plan $PlanPath $true 'pass' ''
+  Write-WorkflowLog 'workflow_succeeded' @{result_path=$plan.result_path;elapsed_seconds=(Get-ElapsedSeconds)}
   exit 0
 } catch {
+  Write-WorkflowLog 'workflow_failed' @{message=$_.Exception.Message;elapsed_seconds=(Get-ElapsedSeconds)}
   if ($plan -and $plan.result_path) {
     Write-FlatWorkflowResult $plan $PlanPath $false 'fail' $_.Exception.ToString()
   }

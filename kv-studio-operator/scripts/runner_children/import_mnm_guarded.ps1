@@ -564,7 +564,7 @@ function OpenProjectModuleEditor([string]$moduleName){
 }
 function FindProjectModuleTreeItem([string]$moduleName){
   if(-not $moduleName){ return $null }
-  $root=[System.Windows.Automation.AutomationElement]::RootElement
+  $root=[System.Windows.Automation.AutomationElement]::FromHandle($script:KvGuardTargetHwnd)
   $tree=$root.FindFirst(
     [System.Windows.Automation.TreeScope]::Descendants,
     (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty,'ProjectTreeView'))
@@ -1958,6 +1958,9 @@ try{
   Shot '00_before_import.png'
   DismissInstructionErrorDialogs 'before_import'
   DismissUnitConfigDialogIfPresent 'before_import' | Out-Null
+  if(-not $DeleteExistingModuleBeforeImport -and $ExpectedModuleName -and (FindProjectModuleTreeItem $ExpectedModuleName)) {
+    throw "KV_MNM_SAME_NAME_IMPORT_REQUIRES_PREDELETE: target project already contains '$ExpectedModuleName'; no import input was sent."
+  }
   if($DeleteExistingModuleBeforeImport -and $ExpectedModuleName){
     if(-not (RemoveProjectModuleIfPresent $ExpectedModuleName)){
       throw "Failed to delete existing module before import: $ExpectedModuleName"

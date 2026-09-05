@@ -47,7 +47,7 @@ function Initialize-KvUiGuard {
   if ([string]::IsNullOrWhiteSpace($safeCheckpointSubdir)) { $safeCheckpointSubdir = 'ui_cp' }
   $script:KvUiGuardCheckpointDir = Join-Path $script:KvUiGuardOutDir $safeCheckpointSubdir
   New-Item -ItemType Directory -Force -Path $script:KvUiGuardCheckpointDir | Out-Null
-  $script:KvUiGuardRunLogPath = Join-Path $script:KvUiGuardOutDir 'run.log'
+  $script:KvUiGuardRunLogPath = if ($env:KV_WORKFLOW_RUN_LOG) { [IO.Path]::GetFullPath($env:KV_WORKFLOW_RUN_LOG) } else { Join-Path $script:KvUiGuardOutDir 'run.log' }
   # One append-only log is the contract for a workflow run.  Keep JSON lines so
   # callers can stream/parse entries while retaining human-readable fields.
   $header = [ordered]@{ timestamp = (Get-Date).ToString('o'); type = 'guard_initialized'; out_dir = $script:KvUiGuardOutDir }
