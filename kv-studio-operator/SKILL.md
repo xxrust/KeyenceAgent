@@ -109,6 +109,8 @@ success:
 
 正常编辑入口是 `scaffold.model.json`。生成后的 MNM/TSV 是 KV STUDIO adapter artifact；诊断旧脚手架时才直接编辑生成物。
 
+模型脚手架校验须证明生成产物及模块导入顺序与模型一致；通过不等于完整项目复刻。当前变量接口只回读名称/类型，设备绑定、非默认初值、保持属性、结构体成员和库依赖的完整重建尚未实现，不得省略这些需求后宣称复刻成功。细节见 `references/mvp-runner-contract.md`。
+
 ## 现有项目修复
 
 ```yaml

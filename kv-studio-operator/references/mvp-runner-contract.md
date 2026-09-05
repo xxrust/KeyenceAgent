@@ -81,6 +81,33 @@ The gate reads the verified source snapshot MNM inventory and the incoming scaff
 
 Required files:
 
+Model-backed scaffolds are validated by re-rendering into an isolated validation
+directory and comparing every MNM/variable/FB-argument artifact byte-for-byte,
+plus project identity and ordered module entries. Instruction membership is not
+an execution-order check. `task.acceptance[]` is preserved in generated TASK.md.
+Empty, null, or omitted local variables render an explicit no-local-state marker.
+
+The current variable writer proves `name` and `data_type`, not complete variable
+attributes. Device bindings, non-default initial values, retain/constant flags,
+and structure/library creation are not implemented by this scaffold workflow.
+Unsupported write fields fail before UI input. Explicit default initial values
+are permitted only in a newly created project; repair/direct writes require an
+empty initial_value until full value write/readback exists. Comments in the model
+remain source documentation and are not currently a UI persistence guarantee.
+
+Local names may be reused across modules. Isolation checks exclude names owned by
+the selected module from other-module forbidden names; uniqueness is scoped to
+the module, not to the project.
+
+`modules[]` order controls the import schedule, but the existing placement check
+does not yet prove the saved PLC scan execution order. Full reproduction also
+requires a separate source/target execution-order comparison, variable/structure
+snapshot, library dependency evidence, and the same-run conversion result.
+
+The flat workflow creates `<RunRoot>/run.log` before its first child and passes
+`KV_WORKFLOW_RUN_LOG` to children so guard actions and workflow stage results share
+one JSONL audit file. Per-step stdout/stderr remain supporting evidence.
+
 - `scaffold.json`
 - `CHECKLIST.md`
 - `TASK.md`

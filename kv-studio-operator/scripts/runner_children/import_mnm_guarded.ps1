@@ -630,6 +630,17 @@ function RemoveProjectModuleIfPresent([string]$moduleName){
   }
   Start-Sleep -Milliseconds 250
   try{ $item.SetFocus() }catch{}
+  # SelectionItem.Select/SetFocus may leave keyboard focus in the ladder.
+  # Activate the resolved tree label before Delete, then prove its identity.
+  $bounds=$item.Current.BoundingRectangle
+  if ($item.Current.IsOffscreen -or $bounds.Width -le 0 -or $bounds.Height -le 0) { throw 'KV_MNM_DELETE_ITEM_OFFSCREEN: no visible tree label bounds.' }
+  Invoke-KvGuardedMouseClick -TargetHwnd $script:KvGuardTargetHwnd -Step ('focus project module before delete '+$name) -X ([int]($bounds.Left+$bounds.Width/2)) -Y ([int]($bounds.Top+$bounds.Height/2)) -ExpectedTitleLike $script:KvGuardExpectedTitleLike -SleepMs 100
+  $focused=[System.Windows.Automation.AutomationElement]::FocusedElement
+  if ($focused.Current.ProcessId -ne $item.Current.ProcessId -or
+      $focused.Current.ControlType -ne [System.Windows.Automation.ControlType]::TreeItem -or
+      $focused.Current.Name -ne $name) {
+    throw "KV_MNM_DELETE_FOCUS_NOT_PROVEN: '$name' is not the focused project tree item."
+  }
   Invoke-KvGuardedSendKeys -TargetHwnd $script:KvGuardTargetHwnd -Step ('delete existing module '+$name) -Keys '{DELETE}' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Delete selected existing project module before MNM repair import' -SleepMs 700
   if(-not (ConfirmDeleteDialogIfPresent)){
     Log ('delete confirmation dialog not found for '+$name)

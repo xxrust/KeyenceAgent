@@ -324,7 +324,7 @@ try {
   $compileOutDir = Join-Path $artifactRoot 'compile_convert'
   $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })compile_convert" 'compile_and_copy_result_bounded.ps1' @('runner_child_approved') @('-ProjectPath',$projectPathForRun,'-OutDir',$compileOutDir,'-WaitSeconds','40','-ChecklistPath',$ChecklistPath,'-ConvertAction','CtrlF9') $compileOutDir 'runner_child'))
   $copyOutDir = Join-Path $artifactRoot 'copy_result'
-  $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })copy_convert_result" 'copy_convert_result_from_tree_handle.ps1' @('runner_child_approved') @('-ProjectNeedle',$projectNeedle,'-OutDir',$copyOutDir,'-ChecklistPath',$ChecklistPath,'-MaxLookupMs','60000') $copyOutDir 'runner_child'))
+  $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })copy_convert_result" 'copy_convert_result_from_tree_handle.ps1' @('runner_child_approved') @('-ProjectNeedle',$projectNeedle,'-OutDir',$copyOutDir,'-ChecklistPath',$ChecklistPath,'-MaxLookupMs','8000') $copyOutDir 'runner_child'))
 
   $plan = [ordered]@{
     ok = $true

@@ -16,6 +16,8 @@ foreach ($field in @('device','initial_value','retain','constant')) {
   Check "unsupported $field rejected" ($errors.Count -eq 1 -and $errors[0].code -eq 'KV_VARIABLE_WRITE_CAPABILITY_UNSUPPORTED')
 }
 Check 'name/type declaration allowed' (@(Get-KvVariableWriteCapabilityErrors @([pscustomobject]@{name='State';data_type='BOOL'})).Count -eq 0)
+Check 'direct explicit FALSE rejected' (@(Get-KvVariableWriteCapabilityErrors @([pscustomobject]@{name='State';data_type='BOOL';initial_value='FALSE'})).Count -eq 1)
+Check 'new project default allowed' (@(Get-KvVariableWriteCapabilityErrors @([pscustomobject]@{name='State';data_type='BOOL';initial_value='FALSE'}) -AllowDefaultInitialValues).Count -eq 0)
 $cases=@(
   @{name='empty_local';mutate={param($m) $m.modules[0].variables.local=@()};allowed=$true},
   @{name='null_local';mutate={param($m) $m.modules[0].variables.local=$null};allowed=$true},

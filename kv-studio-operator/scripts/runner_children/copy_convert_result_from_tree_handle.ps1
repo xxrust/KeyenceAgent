@@ -4,11 +4,14 @@
   [Parameter(Mandatory=$true)]
   [string]$OutDir,
   [string]$ChecklistPath = '',
-  [int]$MaxLookupMs = 60000
+  [ValidateRange(1,9000)]
+  [int]$MaxLookupMs = 8000
 )
 
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+[pscustomobject]@{ok=$false;error_code='KV_COMPILE_RESULT_NOT_COMPLETED';compile_success_verified=$false;started_at=(Get-Date).ToString('o')} |
+  ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutDir 'result.json') -Encoding UTF8
 
 $checklistGuard = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'assert_kv_operation_checklist.ps1'
 if (-not (Test-Path -LiteralPath $checklistGuard)) { throw "Checklist guard script not found: $checklistGuard" }
@@ -19,6 +22,9 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type -AssemblyName System.Windows.Forms
+$sharedUiGuard = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'guards\kv_ui_guard.ps1'
+. $sharedUiGuard
+Initialize-KvUiGuard -OutDir $OutDir -CheckpointSubdir 'shared_ui_guard_checkpoints'
 Add-Type @"
 using System;
 using System.Collections.Generic;
@@ -50,13 +56,15 @@ $BM_CLICK = 0x00F5
 
 function Log {
   param([string]$Message)
-  $line = (Get-Date -Format s) + ' ' + $Message + [Environment]::NewLine
-  [IO.File]::AppendAllText((Join-Path $OutDir 'run.log'), $line, [Text.Encoding]::UTF8)
+  $path = if ($env:KV_WORKFLOW_RUN_LOG) { $env:KV_WORKFLOW_RUN_LOG } else { Join-Path $OutDir 'run.log' }
+  $line = ([ordered]@{timestamp=(Get-Date).ToString('o');type='result_readback';message=$Message} | ConvertTo-Json -Compress) + [Environment]::NewLine
+  [IO.File]::AppendAllText($path, $line, [Text.Encoding]::UTF8)
 }
 
 function Get-KvWindows {
   param([int]$ProcessIdValue)
-  $root = [Windows.Automation.AutomationElement]::RootElement
+  $targetProcess = Get-Process -Id $ProcessIdValue -ErrorAction Stop
+  $root = [Windows.Automation.AutomationElement]::FromHandle($targetProcess.MainWindowHandle)
   $pidCondition = New-Object Windows.Automation.PropertyCondition(
     [Windows.Automation.AutomationElement]::ProcessIdProperty,
     $ProcessIdValue
@@ -149,18 +157,35 @@ function Get-ConversionResultDialogText {
   @($lines | Select-Object -Unique)
 }
 
+$conversionFailed = $false
+$currentResult = $null
 try {
-  $process = Get-Process Kvs -ErrorAction Stop |
-    Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectNeedle*" } |
-    Select-Object -First 1
-  if (-not $process) {
+  $processes = @(Get-Process Kvs -ErrorAction Stop |
+    Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectNeedle*" })
+  if ($processes.Count -eq 0) {
     throw "No visible Kvs process found for project needle $ProjectNeedle."
   }
+  if ($processes.Count -ne 1) { throw 'KV_TARGET_WINDOW_AMBIGUOUS: More than one project matches.' }
+  $process = $processes[0]
 
   $mainTitle = Get-WindowTitle $process.MainWindowHandle
   Log "main_hwnd=$($process.MainWindowHandle) title=$mainTitle"
   if ($mainTitle -notlike "KV STUDIO*$ProjectNeedle*") {
     throw "Main window title mismatch: $mainTitle"
+  }
+
+  # Dismiss only the proven conversion-failed modal before result lookup.
+  # Owner-drawn error rows may still expose empty UIA names after dismissal.
+  $failedMessage = -join ([char[]](0x8F6C,0x6362,0x5931,0x8D25,0x3002))
+  foreach ($window in @(Get-KvWindows $process.Id)) {
+    if ($window.Current.ClassName -ne '#32770' -or $window.Current.Name -ne 'KV STUDIO') { continue }
+    $dialogLines = @(Get-ConversionResultDialogText $window)
+    if ($dialogLines -notcontains $failedMessage) { continue }
+    $conversionFailed = $true
+    $dialogHwnd = [IntPtr]$window.Current.NativeWindowHandle
+    Log "conversion_failed_modal_detected hwnd=$dialogHwnd text=$failedMessage"
+    Invoke-KvGuardedVkTapCallerOracle -TargetHwnd $dialogHwnd -Step 'dismiss proven conversion failure before result readback' -Vk 0x0D -ExpectedTitleLike 'KV STUDIO' -SleepMs 200
+    Assert-KvUiForegroundHwnd -ExpectedHwnd $process.MainWindowHandle -Step 'conversion failure dismissed to target project' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" | Out-Null
   }
 
   $lookupWatch = [Diagnostics.Stopwatch]::StartNew()
@@ -259,7 +284,7 @@ try {
   if ($lookupWatch.ElapsedMilliseconds -gt $MaxLookupMs) {
     throw "Result handle lookup exceeded ${MaxLookupMs}ms: $($lookupWatch.ElapsedMilliseconds)ms"
   }
-  if ($lines.Count -eq 0) { throw 'Result tree items had no text.' }
+  if ($lines.Count -eq 0) { throw 'KV_COMPILE_RESULT_TEXT_UNAVAILABLE: Result tree items had no text.' }
 
   $text = ($lines -join "`r`n")
   $compileResultPath = Join-Path $OutDir 'compile_result_copied.txt'
@@ -270,15 +295,10 @@ try {
   $ngNeedle = (-join ([char[]](0x8F6C,0x6362,0x7ED3,0x679C))) + ' NG'
   $clipboard = ''
   $clipboardOk = $false
-  try {
-    [Windows.Forms.Clipboard]::SetText($text)
-    $clipboard = [Windows.Forms.Clipboard]::GetText()
-    $clipboardOk = (-not [string]::IsNullOrWhiteSpace($clipboard) -and $clipboard.Contains($okNeedle))
-  } catch {
-    Log "clipboard mirror failed: $($_.Exception.Message)"
-  }
-  if ($text.Contains($ngNeedle)) {
-    [pscustomobject]@{
+  # The file is authoritative; do not overwrite the user's clipboard merely
+  # to mirror text already read through a scoped control API.
+  if ($conversionFailed -or $text.Contains($ngNeedle)) {
+    $currentResult = [pscustomobject]@{
       ok = $false
       error_code = 'KV_COMPILE_RESULT_NG'
       message = 'KV STUDIO conversion result is NG.'
@@ -290,7 +310,8 @@ try {
       contains_ng = $true
       clipboard_contains_ok = $clipboardOk
       compile_result_path = $compileResultPath
-    } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'result.json') -Encoding UTF8
+    }
+    $currentResult | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'result.json') -Encoding UTF8
     throw 'KV_COMPILE_RESULT_NG: KV STUDIO conversion result is NG. See compile_result_copied.txt.'
   }
   if (-not $text.Contains($okNeedle)) { throw "Copied text does not contain expected OK marker: $okNeedle" }
@@ -311,5 +332,9 @@ try {
 } catch {
   Log ('ERROR ' + $_.Exception.ToString())
   $_.Exception.ToString() | Set-Content -LiteralPath (Join-Path $OutDir 'fail.txt') -Encoding UTF8
+  $code = if ($_.Exception.Message -match '(KV_[A-Z0-9_]+)') { $Matches[1] } else { 'KV_COMPILE_RESULT_READBACK_FAILED' }
+  if ($conversionFailed) { $code = 'KV_COMPILE_RESULT_NG' }
+  if (-not $currentResult) { $currentResult = [pscustomobject]@{ok=$false;error_code=$code;message=$_.Exception.Message;compile_success_verified=$false;conversion_failed_modal_observed=$conversionFailed} }
+  $currentResult | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'result.json') -Encoding UTF8
   exit 1
 }
