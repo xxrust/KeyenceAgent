@@ -502,6 +502,24 @@ function Invoke-KvGuardedMouseRightClick {
   Stop-KvUiGuard -ErrorCode $code -Step $Step -Message "Right click postcondition failed. Actual foreground title='$($after.title)' class='$($after.class_name)' process='$($after.process_name)'." -Evidence @($beforePath, $failurePath)
 }
 
+function Invoke-KvGuardedShiftTab {
+  param([Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,[Parameter(Mandatory=$true)][string]$Step,[string]$ExpectedTitleLike='',[scriptblock]$FocusOracle)
+  $watch=[Diagnostics.Stopwatch]::StartNew()
+  $before=Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike
+  if($FocusOracle){& $FocusOracle}
+  try {
+    [KvSharedUiGuardWin32]::keybd_event(0x10,0,0,0)
+    Start-Sleep -Milliseconds 35
+    [KvSharedUiGuardWin32]::keybd_event(0x09,0,0,0)
+    Start-Sleep -Milliseconds 35
+    [KvSharedUiGuardWin32]::keybd_event(0x09,0,2,0)
+  } finally {[KvSharedUiGuardWin32]::keybd_event(0x10,0,2,0)}
+  Start-Sleep -Milliseconds 120
+  $after=Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step "$Step postcondition" -ExpectedTitleLike $ExpectedTitleLike
+  Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action 'physical Shift+Tab' -Before $before -After $after -Message 'Caller must prove successor control before further input.'|Out-Null
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'physical Shift+Tab' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike|Out-Null
+}
+
 function Invoke-KvGuardedVkTap {
   param(
     [Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,
@@ -551,10 +569,12 @@ function Invoke-KvGuardedCtrlChord {
     [string]$ExpectedTitleLike = '',
     [string]$Action = 'Ctrl chord',
     [int]$SleepMs = 250,
-    [switch]$AllowModalAfter
+    [switch]$AllowModalAfter,
+    [scriptblock]$FocusOracle
   )
   $watch = [Diagnostics.Stopwatch]::StartNew()
-  $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
+  $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery:(-not [bool]$FocusOracle)
+  if ($FocusOracle) { & $FocusOracle }
   $beforePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Action $Action -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk; ctrl = $true } -Before $before -Message 'Precondition passed; target owns foreground.'
   [KvSharedUiGuardWin32]::keybd_event(0x11, 0, 0, 0)
   Start-Sleep -Milliseconds 35
