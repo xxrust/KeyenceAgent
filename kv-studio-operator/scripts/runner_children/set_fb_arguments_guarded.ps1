@@ -758,7 +758,16 @@ try {
     Invoke-KvGuardedMouseRightClick -TargetHwnd $process.MainWindowHandle -Step "FB snapshot context menu $FbModuleName" -X $pt.x -Y $pt.y -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 180
     $fg=Get-KvForegroundSnapshot
     $menuHwnd=if([string]$fg.class_name -eq '#32768'){[IntPtr]$fg.hwnd}else{$process.MainWindowHandle}
-    Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $menuHwnd -Step "open FB argument table by O $FbModuleName" -Keys 'o' -ExpectedTitleLike '*' -SuccessTitleLike @('*KV STUDIO*') -Action 'press O on FB context menu to open self-variable table' -SleepMs 300
+    $menuRoot=[Windows.Automation.AutomationElement]::RootElement
+    $menuWindows=@($menuRoot.FindAll([Windows.Automation.TreeScope]::Children,[Windows.Automation.Condition]::TrueCondition)|Where-Object {$_.Current.ProcessId -eq $process.Id -and [string]$_.Current.ClassName -eq '#32768'})
+    $menuItems=@(); foreach($mw in $menuWindows){$menuItems+=@($mw.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::MenuItem))))}
+    $openItems=@($menuItems|Where-Object {([string]$_.Current.Name -match '打开') -and -not $_.Current.IsOffscreen})
+    if($openItems.Count -eq 1){
+      $openInvoke=$null
+      if($openItems[0].TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$openInvoke)){$openInvoke.Invoke();Log 'invoked FB context-menu Open(O) by UIA InvokePattern'}else{throw 'KV_FB_OPEN_MENU_INVOKE_UNAVAILABLE'}
+    } else {
+      Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $menuHwnd -Step "open FB argument table by O $FbModuleName" -Keys 'o' -ExpectedTitleLike '*' -SuccessTitleLike @('*KV STUDIO*') -Action 'press O on FB context menu to open self-variable table' -SleepMs 300
+    }
     }
     # The embedded FB surface is created asynchronously. Reacquire the exact
     # visible TabItem and require the same identity twice before selecting it;
@@ -786,6 +795,16 @@ try {
       $all=@($root.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'_tabFBMacroParam'))))
       $tabs=@($all|Where-Object {[string]$_.Current.ControlType.ProgrammaticName -eq 'ControlType.TabItem' -and -not $_.Current.IsOffscreen})
       if($tabs.Count -eq 1){$tab=$tabs[0]}
+    }
+    if(-not $tab){
+      # The parameter surface itself is the stronger identity on KVS12. Some
+      # builds expose its child TabItem only after the pane is focused, while
+      # the stable FuncBlockParamVariableControl is already present.
+      $surface=Wait-FbArgumentSurface $process.Id 3
+      if($surface){
+        $surfaceTabs=@($surface.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'_tabFBMacroParam')))|Where-Object {[string]$_.Current.ControlType.ProgrammaticName -eq 'ControlType.TabItem' -and -not $_.Current.IsOffscreen})
+        if($surfaceTabs.Count -eq 1){$tab=$surfaceTabs[0];Log 'recovered FB argument tab from stable parameter surface'}
+      }
     }
     if(-not $tab){
       $diagPath=Join-Path $OutDir 'fb_argument_tab_diagnostics.json'
