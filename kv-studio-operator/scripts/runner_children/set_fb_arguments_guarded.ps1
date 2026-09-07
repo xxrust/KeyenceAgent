@@ -731,7 +731,11 @@ try {
 
   $process = Get-VisibleKvsProcess $projectNeedle 10
   if (-not $process) { Fail-Step 'KV_PROJECT_PROCESS_NOT_FOUND' 'find target KV STUDIO project' "No visible KV STUDIO process matched project needle '$projectNeedle'. Refusing to operate another project window." @() }
-  Restore-KvForeground $process $projectNeedle 'set FB arguments start'
+  if($SnapshotOnly){
+    Assert-KvUiForegroundHwnd -ExpectedHwnd $process.MainWindowHandle -Step 'FB snapshot preflight' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -AllowSingleRecovery | Out-Null
+  } else {
+    Restore-KvForeground $process $projectNeedle 'set FB arguments start'
+  }
   Assert-NoKvsModal $process.Id 'before FB argument route'
 
   $item = FindProjectModuleTreeItem $process.Id $FbModuleName
@@ -740,135 +744,46 @@ try {
     Fail-Step 'KV_FB_MODULE_TREE_ITEM_MISSING' 'select FB module' "Function-block tree item was not found: $FbModuleName" @($dumpPath)
   }
   if ($SnapshotOnly) {
-    # Correct FB workflow: selecting the FB and pressing Alt+L opens the
-    # self-variable pane; no context-menu/Open action is involved.
-    try { $item.SetFocus() } catch {}
-    try { $sp=$item.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern); $sp.Select() } catch {}
-    Start-Sleep -Milliseconds 100
     . (Join-Path $operatorScriptRoot 'guards\kv_fb_snapshot.ps1')
-    $preRoot=[Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
-    $prePane=$null
-    Invoke-KvGuardedAltVk -TargetHwnd $process.MainWindowHandle -Step "FB snapshot Alt L $FbModuleName" -Vk 0x4C -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 180
-    for($wi=0;$wi -lt 20 -and -not $prePane;$wi++){
-      try {
-        $focused=[Windows.Automation.AutomationElement]::FocusedElement
-        if($focused -and ($focused.Current.AutomationId -eq '_usageFilterComboBox' -or ($focused.Current.ControlType -eq [Windows.Automation.ControlType]::Pane -and ($focused.Current.AutomationId -eq '_grid' -or $focused.FindFirst([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'_hScrollBar'))))))){
-          $e=$focused
-          for($ai=0;$e -and $ai -lt 8;$ai++){
-            if($e.Current.AutomationId -eq '_tabFBMacroParam' -and [string]$e.Current.ControlType.ProgrammaticName -eq 'ControlType.Pane'){$prePane=$e;break}
-            $e=[Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($e)
-          }
-        }
-      } catch {}
-      if(-not $prePane){Start-Sleep -Milliseconds 100}
-    }
-    if(-not $prePane){
-      Log 'FB argument pane missing after Alt+L; applying documented Ctrl+F4 recovery and retrying once'
-      Invoke-KvGuardedCtrlChord -TargetHwnd $process.MainWindowHandle -Step "FB snapshot recover Ctrl F4 $FbModuleName" -Vk 0x34 -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 300
-      Assert-NoKvsModal $process.Id 'after FB Ctrl+F4 recovery'
+    for ($attempt=0; $attempt -lt 2; $attempt++) {
+      $selectionWatch=[Diagnostics.Stopwatch]::StartNew()
+      Assert-KvUiForegroundHwnd -ExpectedHwnd $process.MainWindowHandle -Step 'activate snapshot FB' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -AllowSingleRecovery | Out-Null
       $item=FindProjectModuleTreeItem $process.Id $FbModuleName
-      if(-not $item){throw 'KV_FB_MODULE_TREE_ITEM_MISSING_AFTER_RECOVERY'}
-      try {$item.SetFocus();$sp=$item.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern);$sp.Select()} catch {}
-      # Ctrl+F4 closes the FB editor; reopen the selected FB before retrying
-      # Alt+L so KV recreates the self-variable surface.
-      try {$iv=$item.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern);$iv.Invoke();Log 'reopened FB after Ctrl+F4 recovery'} catch {}
-      Start-Sleep -Milliseconds 250
-      try {$item.SetFocus();$sp=$item.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern);$sp.Select()} catch {}
-      Invoke-KvGuardedAltVk -TargetHwnd $process.MainWindowHandle -Step "FB snapshot Alt L retry $FbModuleName" -Vk 0x4C -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 180
-      for($wi=0;$wi -lt 20 -and -not $prePane;$wi++){
-        try {$focused=[Windows.Automation.AutomationElement]::FocusedElement;if($focused -and $focused.Current.AutomationId -eq '_usageFilterComboBox'){$e=$focused;for($ai=0;$e -and $ai -lt 8;$ai++){$e=[Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($e);if($e -and $e.Current.AutomationId -eq '_tabFBMacroParam' -and [string]$e.Current.ControlType.ProgrammaticName -eq 'ControlType.Pane'){$prePane=$e;break}}}} catch {}
-        if(-not $prePane){Start-Sleep -Milliseconds 100}
+      if(-not $item){throw 'KV_FB_MODULE_TREE_ITEM_MISSING'}
+      $item.SetFocus()
+      $selection=$item.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern)
+      $selection.Select()
+      if(-not $selection.Current.IsSelected){throw 'KV_FB_TREE_SELECTION_FAILED'}
+      Write-KvUiGuardRunLog -Event 'fb_target_selected' -Data @{module=$FbModuleName;tree_name=$item.Current.Name;attempt=$attempt}
+      # Tree selection alone does not switch the active editor document.
+      Invoke-KvGuardedVkTap -TargetHwnd $process.MainWindowHandle -Step "activate FB $FbModuleName with Enter" -Vk 0x0D -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 200
+      Assert-NoKvsModal $process.Id 'after activating snapshot FB'
+      $editor=Get-KvFbFocusAncestor '_ladderSplitContainer' $process.Id
+      if(-not $editor){throw 'KV_FB_ACTIVE_EDITOR_UNPROVEN'}
+      $pane=Select-KvFbArgumentPane $editor $process.Id
+      Complete-KvUiGuardAtomicAction -Stopwatch $selectionWatch -Step 'activate target FB argument pane' -Action 'verified tree selection, Enter and argument tab' -TargetHwnd $process.MainWindowHandle -ExpectedTitleLike "KV STUDIO*$projectNeedle*" | Out-Null
+      try {
+        $copied=Copy-KvFbArgumentPane $pane $process.MainWindowHandle $projectNeedle $OutDir
+        break
+      } catch {
+        if($attempt -ne 0 -or $_.Exception.Message -notmatch '^KV_FB_(FILTER_FOCUS_MISMATCH|GRID_FOCUS_LOST|GRID_OWNER_MISMATCH)$'){throw}
+        Write-KvUiGuardRunLog -Event 'fb_focus_recovery' -Data @{module=$FbModuleName;reason=$_.Exception.Message;attempt=1;vk=0x73}
+        # Only close the document whose editor was just activated and proven.
+        $focusedEditor=Get-KvFbFocusAncestor '_ladderSplitContainer' $process.Id
+        if(-not $focusedEditor -or -not $focusedEditor.Equals($editor)){throw 'KV_FB_RECOVERY_DOCUMENT_UNPROVEN'}
+        Invoke-KvGuardedCtrlChord -TargetHwnd $process.MainWindowHandle -Step "recover FB $FbModuleName Ctrl F4" -Vk 0x73 -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 200 -AllowModalAfter
+        Assert-NoKvsModal $process.Id 'after FB Ctrl+F4 recovery; never accept save prompts'
       }
     }
-    if(-not $prePane){throw 'KV_FB_ARGUMENT_PANE_MISSING_AFTER_ALT_L'}
-    # Copy helper repeats Alt+L only after a verified pane and then proves the
-    # filter->grid focus route before Ctrl+A/C.
-    $copied=Copy-KvFbArgumentPane $prePane $process.MainWindowHandle $projectNeedle $OutDir
-    [pscustomobject]@{ok=$true;read_only=$true;project_path=$ProjectPath;module_name=$FbModuleName;raw_path=$copied.raw_path;row_count=$copied.row_count;focus_verified=$true;clipboard_fresh=$true;copy_elapsed_ms=$copied.elapsed_ms;all_columns_preserved=$true;unfiltered_completeness_verified=$false}|ConvertTo-Json -Depth 4|Set-Content (Join-Path $OutDir 'fb_snapshot_result.json') -Encoding UTF8
-    return
-
-    # Reuse an already-open argument surface; invoking Open(O) again can
-    # toggle the embedded editor and create a transient UIA gap.
-    $tab=$null
-    $preRoot=[Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
-    $preAll=@($preRoot.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'_tabFBMacroParam'))))
-    $preTabs=@($preAll|Where-Object {[string]$_.Current.ControlType.ProgrammaticName -eq 'ControlType.TabItem' -and -not $_.Current.IsOffscreen})
-    if($preTabs.Count -eq 1){$tab=$preTabs[0];Log 'reusing already-open FB argument tab'}
-    if(-not $tab){
-    # Open the existing FB through its context-menu Open(O) command. The
-    # tree item's default Invoke action only selects/opens the ladder editor;
-    # it does not create the embedded self-variable surface.
-    try { $item.SetFocus() } catch {}
-    $rr=$item.Current.BoundingRectangle
-    if($rr.Width -lt 10 -or $rr.Height -lt 10){throw 'KV_FB_MODULE_TREE_ITEM_BOUNDS_INVALID'}
-    $pt=Convert-UiaPointToPhysicalScreen $process.Id ($rr.X + [math]::Min(100,[math]::Max(12,$rr.Width/2))) ($rr.Y + $rr.Height/2)
-    Invoke-KvGuardedMouseRightClick -TargetHwnd $process.MainWindowHandle -Step "FB snapshot context menu $FbModuleName" -X $pt.x -Y $pt.y -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 180
-    $fg=Get-KvForegroundSnapshot
-    $menuHwnd=if([string]$fg.class_name -eq '#32768'){[IntPtr]$fg.hwnd}else{$process.MainWindowHandle}
-    $menuRoot=[Windows.Automation.AutomationElement]::RootElement
-    $menuWindows=@($menuRoot.FindAll([Windows.Automation.TreeScope]::Children,[Windows.Automation.Condition]::TrueCondition)|Where-Object {$_.Current.ProcessId -eq $process.Id -and [string]$_.Current.ClassName -eq '#32768'})
-    $menuItems=@(); foreach($mw in $menuWindows){$menuItems+=@($mw.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::MenuItem))))}
-    $openItems=@($menuItems|Where-Object {([string]$_.Current.Name -match '打开') -and -not $_.Current.IsOffscreen})
-    if($openItems.Count -eq 1){
-      $openInvoke=$null
-      if($openItems[0].TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$openInvoke)){$openInvoke.Invoke();Log 'invoked FB context-menu Open(O) by UIA InvokePattern'}else{throw 'KV_FB_OPEN_MENU_INVOKE_UNAVAILABLE'}
-    } else {
-      Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $menuHwnd -Step "open FB argument table by O $FbModuleName" -Keys 'o' -ExpectedTitleLike '*' -SuccessTitleLike @('*KV STUDIO*') -Action 'press O on FB context menu to open self-variable table' -SleepMs 300
+    $result=[pscustomobject]@{ok=$true;read_only=$true;project_path=$ProjectPath;module_name=$FbModuleName;raw_path=$copied.raw_path;row_count=$copied.row_count;focus_verified=$true;clipboard_fresh=$true;copy_elapsed_ms=$copied.elapsed_ms;recovery_count=$attempt;all_columns_preserved=$true;unfiltered_completeness_verified=$false}
+    $result | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $OutDir 'fb_snapshot_result.json') -Encoding UTF8
+    '0' | Set-Content (Join-Path $OutDir 'exit_code.txt') -Encoding ASCII
+    Write-KvUiGuardRunLog -Event 'fb_snapshot_completed' -Data @{
+      ok=$result.ok; read_only=$result.read_only; project_path=$result.project_path
+      module_name=$result.module_name; raw_path=$result.raw_path; row_count=$result.row_count
+      focus_verified=$result.focus_verified; clipboard_fresh=$result.clipboard_fresh
+      copy_elapsed_ms=$result.copy_elapsed_ms; recovery_count=$result.recovery_count
     }
-    }
-    # The embedded FB surface is created asynchronously. Reacquire the exact
-    # visible TabItem and require the same identity twice before selecting it;
-    # a one-shot FindAll can see transient/stale controls during this handoff.
-    $root=$preRoot; $lastTabKey = ''; $stable = 0; $diag = New-Object System.Collections.Generic.List[object]
-    if($tab){$lastTabKey='{0}:{1}:{2}' -f $tab.Current.NativeWindowHandle,$tab.Current.AutomationId,$tab.Current.Name;$stable=2}
-    $deadline = [Diagnostics.Stopwatch]::StartNew()
-    while($deadline.ElapsedMilliseconds -lt 8000 -and $stable -lt 2){
-      $root=[Windows.Automation.AutomationElement]::RootElement
-      $all=@($root.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'_tabFBMacroParam'))))
-      $diag.Add(@($all | ForEach-Object {[pscustomobject]@{type=$_.Current.ControlType.ProgrammaticName;hwnd=$_.Current.NativeWindowHandle;offscreen=$_.Current.IsOffscreen;pid=$_.Current.ProcessId;name=$_.Current.Name}}))
-      $tabs=@($all|Where-Object {[string]$_.Current.ControlType.ProgrammaticName -eq 'ControlType.TabItem' -and -not $_.Current.IsOffscreen -and ($_.Current.ProcessId -eq $process.Id -or $_.Current.ProcessId -eq 0)})
-      if($tabs.Count -eq 1){
-        $key='{0}:{1}:{2}' -f $tabs[0].Current.NativeWindowHandle,$tabs[0].Current.AutomationId,$tabs[0].Current.Name
-        if($key -eq $lastTabKey){$stable++}else{$stable=1;$lastTabKey=$key}
-        $tab=$tabs[0]
-      } else {$stable=0;$lastTabKey='';$tab=$null}
-      if($stable -lt 2){Start-Sleep -Milliseconds 100}
-    }
-    if(-not $tab){
-      # Some KV builds expose the embedded pane with a transient/zero UIA
-      # process id. Reacquire from the owned main-window subtree and retain
-      # the same uniqueness/type/visibility checks.
-      $root=[Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
-      $all=@($root.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'_tabFBMacroParam'))))
-      $tabs=@($all|Where-Object {[string]$_.Current.ControlType.ProgrammaticName -eq 'ControlType.TabItem' -and -not $_.Current.IsOffscreen})
-      if($tabs.Count -eq 1){$tab=$tabs[0]}
-    }
-    if(-not $tab){
-      # The parameter surface itself is the stronger identity on KVS12. Some
-      # builds expose its child TabItem only after the pane is focused, while
-      # the stable FuncBlockParamVariableControl is already present.
-      $surface=Wait-FbArgumentSurface $process.Id 3
-      if($surface){
-        $surfaceTabs=@($surface.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'_tabFBMacroParam')))|Where-Object {[string]$_.Current.ControlType.ProgrammaticName -eq 'ControlType.TabItem' -and -not $_.Current.IsOffscreen})
-        if($surfaceTabs.Count -eq 1){$tab=$surfaceTabs[0];Log 'recovered FB argument tab from stable parameter surface'}
-      }
-    }
-    if(-not $tab){
-      $diagPath=Join-Path $OutDir 'fb_argument_tab_diagnostics.json'
-      $diag | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $diagPath -Encoding UTF8
-      throw 'KV_FB_ARGUMENT_TAB_AMBIGUOUS'
-    }
-    $selection=$tab.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern)
-    $selection.Select()
-    if(-not $selection.Current.IsSelected){throw 'KV_FB_ARGUMENT_TAB_NOT_SELECTED'}
-    $panes=@($root.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.AndCondition(
-      (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ProcessIdProperty,$process.Id)),
-      (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'_tabFBMacroParam'))))))|Where-Object {[string]$_.Current.ControlType.ProgrammaticName -eq 'ControlType.Pane' -and -not $_.Current.IsOffscreen -and $_.Current.NativeWindowHandle -ne 0}
-    if($panes.Count -ne 1){throw 'KV_FB_ARGUMENT_PANE_AMBIGUOUS'}
-    Log "snapshot target opened by exact tree item invoke: $($item.Current.Name); argument tab selected"
-    . (Join-Path $operatorScriptRoot 'guards\kv_fb_snapshot.ps1')
-    $copied=Copy-KvFbArgumentPane $panes[0] $process.MainWindowHandle $projectNeedle $OutDir
-    [pscustomobject]@{ok=$true;read_only=$true;project_path=$ProjectPath;module_name=$FbModuleName;raw_path=$copied.raw_path;row_count=$copied.row_count;focus_verified=$true;clipboard_fresh=$true;copy_elapsed_ms=$copied.elapsed_ms;all_columns_preserved=$true;unfiltered_completeness_verified=$false}|ConvertTo-Json -Depth 4|Set-Content (Join-Path $OutDir 'fb_snapshot_result.json') -Encoding UTF8
     return
   }
   Bring-ProjectTreeItemIntoView $item $process.Id

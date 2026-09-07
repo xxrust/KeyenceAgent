@@ -9,7 +9,40 @@ public class KvFbSnapshotNative {
 function Find-KvFbElement($Root,[string]$Id){
  $Root.FindFirst([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,$Id)))
 }
+function Get-KvFbFocusAncestor([string]$Id,[int]$ProcessIdValue){
+ $e=[Windows.Automation.AutomationElement]::FocusedElement
+ for($i=0;$e -and $i -lt 18;$i++){
+  if($e.Current.ProcessId -ne $ProcessIdValue){return $null}
+  if($e.Current.AutomationId -eq $Id){return $e}
+  $e=[Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($e)
+ }
+ return $null
+}
+function Select-KvFbArgumentPane($Editor,[int]$ProcessIdValue){
+ $surfaces=@($Editor.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'FuncBlockParamVariableControl')))|Where-Object {-not $_.Current.IsOffscreen -and $_.Current.ProcessId -eq $ProcessIdValue})
+ if($surfaces.Count -gt 1){throw 'KV_FB_ARGUMENT_PANE_AMBIGUOUS'}
+ if($surfaces.Count -eq 1){
+  if(-not (Find-KvFbElement $surfaces[0] '_grid') -or -not (Find-KvFbElement $surfaces[0] '_usageFilterComboBox')){throw 'KV_FB_ARGUMENT_SURFACE_SIGNATURE_MISMATCH'}
+  Write-KvUiGuardRunLog -Event 'fb_argument_pane_selected' -Data @{editor_hwnd=$Editor.Current.NativeWindowHandle;pane_hwnd=$surfaces[0].Current.NativeWindowHandle;pane_id='FuncBlockParamVariableControl';process_id=$ProcessIdValue}
+  return $surfaces[0]
+ }
+ $matches=@($Editor.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'_tabFBMacroParam'))))
+ $tabs=@($matches|Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::TabItem -and -not $_.Current.IsOffscreen -and $_.Current.ProcessId -eq $ProcessIdValue})
+ if($tabs.Count -ne 1){
+  $all=@($Editor.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition))
+  Write-KvUiGuardRunLog -Event 'fb_argument_tab_diagnostic' -Data @{editor_hwnd=$Editor.Current.NativeWindowHandle;matches_count=$matches.Count;tab_count=$tabs.Count;controls=@($all|ForEach-Object {@{id=$_.Current.AutomationId;type=$_.Current.ControlType.ProgrammaticName;name=$_.Current.Name;off=$_.Current.IsOffscreen}})}
+  throw 'KV_FB_ARGUMENT_TAB_AMBIGUOUS'
+ }
+ $selection=$tabs[0].GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern)
+ if(-not $selection.Current.IsSelected){$selection.Select()}
+ if(-not $selection.Current.IsSelected){throw 'KV_FB_ARGUMENT_TAB_NOT_SELECTED'}
+ $panes=@($matches|Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::Pane -and -not $_.Current.IsOffscreen -and $_.Current.ProcessId -eq $ProcessIdValue})
+ if($panes.Count -ne 1){throw 'KV_FB_ARGUMENT_PANE_AMBIGUOUS'}
+ Write-KvUiGuardRunLog -Event 'fb_argument_pane_selected' -Data @{editor_hwnd=$Editor.Current.NativeWindowHandle;pane_hwnd=$panes[0].Current.NativeWindowHandle;process_id=$ProcessIdValue}
+ return $panes[0]
+}
 function Assert-KvFbGridFocus($Pane,$Grid){
+ if(-not $Pane -or $Pane.Current.AutomationId -notin @('_tabFBMacroParam','FuncBlockParamVariableControl') -or $Pane.Current.IsOffscreen){throw 'KV_FB_ARGUMENT_PANE_IDENTITY_MISMATCH'}
  $f=[Windows.Automation.AutomationElement]::FocusedElement
  if(-not $f -or -not $f.Equals($Grid) -or $f.Current.ProcessId -ne $Pane.Current.ProcessId){throw 'KV_FB_GRID_FOCUS_LOST'}
  $e=$f;$owned=$false
@@ -25,11 +58,10 @@ function Copy-KvFbArgumentPane($Pane,[IntPtr]$MainHwnd,[string]$ProjectNeedle,[s
  Assert-KvUiForegroundHwnd -ExpectedHwnd $MainHwnd -Step 'FB copy foreground before focus' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -AllowSingleRecovery|Out-Null
  Invoke-KvGuardedAltVk -TargetHwnd $MainHwnd -Step 'FB copy Alt L' -Vk 0x4C -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -SleepMs 120
  $afterAlt=[Windows.Automation.AutomationElement]::FocusedElement
- # KVS12 may place focus directly on the native grid pane after Alt+L. In
- # that state Shift+Tab/Ctrl+Tab are no-ops; accept only a proven grid
- # signature and continue without sending another navigation key.
+ # A scrollbar alone also matches the ladder editor. Direct-grid acceptance
+ # requires argument-pane ancestry, not merely a grid-like shape.
  $directGrid=$false
- try { if($afterAlt -and $afterAlt.Current.ProcessId -eq $Pane.Current.ProcessId -and ($afterAlt.Current.AutomationId -eq '_grid' -or ($afterAlt.Current.ControlType -eq [Windows.Automation.ControlType]::Pane -and (Find-KvFbElement $afterAlt '_hScrollBar')))){$directGrid=$true} } catch {}
+ try { Assert-KvFbGridFocus $Pane $afterAlt; $directGrid=$true } catch {}
  if($directGrid){
    $grid=$afterAlt
    Write-KvUiGuardRunLog -Event 'control_focus_verified' -Data @{step='FB grid direct focus after Alt L';hwnd=$grid.Current.NativeWindowHandle;automation_id=$grid.Current.AutomationId;route='AltL-direct-grid'}
