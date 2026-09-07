@@ -752,7 +752,7 @@ try {
     for($wi=0;$wi -lt 20 -and -not $prePane;$wi++){
       try {
         $focused=[Windows.Automation.AutomationElement]::FocusedElement
-        if($focused -and $focused.Current.AutomationId -eq '_usageFilterComboBox'){
+        if($focused -and ($focused.Current.AutomationId -eq '_usageFilterComboBox' -or ($focused.Current.ControlType -eq [Windows.Automation.ControlType]::Pane -and ($focused.Current.AutomationId -eq '_grid' -or $focused.FindFirst([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'_hScrollBar'))))))){
           $e=$focused
           for($ai=0;$e -and $ai -lt 8;$ai++){
             if($e.Current.AutomationId -eq '_tabFBMacroParam' -and [string]$e.Current.ControlType.ProgrammaticName -eq 'ControlType.Pane'){$prePane=$e;break}

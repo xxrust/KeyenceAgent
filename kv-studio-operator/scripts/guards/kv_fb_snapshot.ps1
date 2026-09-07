@@ -24,11 +24,23 @@ function Copy-KvFbArgumentPane($Pane,[IntPtr]$MainHwnd,[string]$ProjectNeedle,[s
  if(-not $filter -or $Pane.Current.IsOffscreen){throw 'KV_FB_ARGUMENT_FILTER_MISSING'}
  Assert-KvUiForegroundHwnd -ExpectedHwnd $MainHwnd -Step 'FB copy foreground before focus' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -AllowSingleRecovery|Out-Null
  Invoke-KvGuardedAltVk -TargetHwnd $MainHwnd -Step 'FB copy Alt L' -Vk 0x4C -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -SleepMs 120
+ $afterAlt=[Windows.Automation.AutomationElement]::FocusedElement
+ # KVS12 may place focus directly on the native grid pane after Alt+L. In
+ # that state Shift+Tab/Ctrl+Tab are no-ops; accept only a proven grid
+ # signature and continue without sending another navigation key.
+ $directGrid=$false
+ try { if($afterAlt -and $afterAlt.Current.ProcessId -eq $Pane.Current.ProcessId -and ($afterAlt.Current.AutomationId -eq '_grid' -or ($afterAlt.Current.ControlType -eq [Windows.Automation.ControlType]::Pane -and (Find-KvFbElement $afterAlt '_hScrollBar')))){$directGrid=$true} } catch {}
+ if($directGrid){
+   $grid=$afterAlt
+   Write-KvUiGuardRunLog -Event 'control_focus_verified' -Data @{step='FB grid direct focus after Alt L';hwnd=$grid.Current.NativeWindowHandle;automation_id=$grid.Current.AutomationId;route='AltL-direct-grid'}
+ } else {
  $assertFilter={if(-not [Windows.Automation.AutomationElement]::FocusedElement.Equals($filter)){throw 'KV_FB_FILTER_FOCUS_MISMATCH'}}
  & $assertFilter
  Write-KvUiGuardRunLog -Event 'control_focus_verified' -Data @{step='FB usage filter';hwnd=$filter.Current.NativeWindowHandle;automation_id=$filter.Current.AutomationId}
  Invoke-KvGuardedShiftTab -TargetHwnd $MainHwnd -Step 'FB copy Shift Tab from verified filter' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -FocusOracle $assertFilter
  $grid=[Windows.Automation.AutomationElement]::FocusedElement
+ Assert-KvFbGridFocus $Pane $grid
+ }
  Assert-KvFbGridFocus $Pane $grid
  $focus=@{grid_hwnd=$grid.Current.NativeWindowHandle;grid_id=$grid.Current.AutomationId;pane_hwnd=$Pane.Current.NativeWindowHandle;pane_id=$Pane.Current.AutomationId;owner_verified=$true}
  $focus|ConvertTo-Json|Set-Content (Join-Path $OutDir 'fb_grid_focus.json') -Encoding UTF8
