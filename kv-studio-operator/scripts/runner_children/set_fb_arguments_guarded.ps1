@@ -732,6 +732,8 @@ try {
   $process = Get-VisibleKvsProcess $projectNeedle 10
   if (-not $process) { Fail-Step 'KV_PROJECT_PROCESS_NOT_FOUND' 'find target KV STUDIO project' "No visible KV STUDIO process matched project needle '$projectNeedle'. Refusing to operate another project window." @() }
   if($SnapshotOnly){
+    . (Join-Path $operatorScriptRoot 'guards\kv_fb_snapshot.ps1')
+    Assert-KvFbNoPopup $process.MainWindowHandle
     Assert-KvUiForegroundHwnd -ExpectedHwnd $process.MainWindowHandle -Step 'FB snapshot preflight' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -AllowSingleRecovery | Out-Null
   } else {
     Restore-KvForeground $process $projectNeedle 'set FB arguments start'
@@ -758,6 +760,7 @@ try {
       # Tree selection alone does not switch the active editor document.
       Invoke-KvGuardedVkTap -TargetHwnd $process.MainWindowHandle -Step "activate FB $FbModuleName with Enter" -Vk 0x0D -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 200
       Assert-NoKvsModal $process.Id 'after activating snapshot FB'
+      Assert-KvFbNoPopup $process.MainWindowHandle
       $editor=Get-KvFbFocusAncestor '_ladderSplitContainer' $process.Id
       if(-not $editor){throw 'KV_FB_ACTIVE_EDITOR_UNPROVEN'}
       $pane=Select-KvFbArgumentPane $editor $process.Id
@@ -773,17 +776,18 @@ try {
         if(-not $focusedEditor -or -not $focusedEditor.Equals($editor)){throw 'KV_FB_RECOVERY_DOCUMENT_UNPROVEN'}
         Invoke-KvGuardedCtrlChord -TargetHwnd $process.MainWindowHandle -Step "recover FB $FbModuleName Ctrl F4" -Vk 0x73 -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 200 -AllowModalAfter
         Assert-NoKvsModal $process.Id 'after FB Ctrl+F4 recovery; never accept save prompts'
+        Assert-KvFbNoPopup $process.MainWindowHandle
       }
     }
     $result=[pscustomobject]@{ok=$true;read_only=$true;project_path=$ProjectPath;module_name=$FbModuleName;raw_path=$copied.raw_path;row_count=$copied.row_count;focus_verified=$true;clipboard_fresh=$true;copy_elapsed_ms=$copied.elapsed_ms;recovery_count=$attempt;all_columns_preserved=$true;unfiltered_completeness_verified=$false}
-    $result | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $OutDir 'fb_snapshot_result.json') -Encoding UTF8
-    '0' | Set-Content (Join-Path $OutDir 'exit_code.txt') -Encoding ASCII
     Write-KvUiGuardRunLog -Event 'fb_snapshot_completed' -Data @{
       ok=$result.ok; read_only=$result.read_only; project_path=$result.project_path
       module_name=$result.module_name; raw_path=$result.raw_path; row_count=$result.row_count
       focus_verified=$result.focus_verified; clipboard_fresh=$result.clipboard_fresh
       copy_elapsed_ms=$result.copy_elapsed_ms; recovery_count=$result.recovery_count
     }
+    $result | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $OutDir 'fb_snapshot_result.json') -Encoding UTF8
+    '0' | Set-Content (Join-Path $OutDir 'exit_code.txt') -Encoding ASCII
     return
   }
   Bring-ProjectTreeItemIntoView $item $process.Id
@@ -845,14 +849,6 @@ try {
   }
   $formDumpPath = ''
   Assert-FbArgumentSurfaceTarget $form $process.Id ([IntPtr]$process.MainWindowHandle) $FbModuleName
-  if ($SnapshotOnly) {
-    Focus-FbArgumentGrid $form $process.MainWindowHandle $projectNeedle 'FB snapshot grid' -InitialSurfaceFocus
-    $copied = Test-FbArgumentPasteVisible $process.MainWindowHandle $projectNeedle @() $FbModuleName 'snapshot'
-    $raw = Get-Content -LiteralPath $copied.copy_path -Raw -Encoding UTF8
-    if ([string]::IsNullOrWhiteSpace($raw)) { throw 'KV_FB_SNAPSHOT_EMPTY_UNPROVEN' }
-    [pscustomobject]@{ok=$true;read_only=$true;project_path=$ProjectPath;module_name=$FbModuleName;raw_path=$copied.copy_path;all_columns_preserved=$true;unfiltered_completeness_verified=$false} | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $OutDir 'fb_snapshot_result.json') -Encoding UTF8
-    return
-  }
   # The surface is already stable after Wait-FbArgumentSurface; avoid an
   # additional fixed delay before the fast row-write path.
 
@@ -913,6 +909,10 @@ try {
   Log ('ERROR ' + $_.Exception.ToString())
   $_.Exception.ToString() | Set-Content -LiteralPath (Join-Path $OutDir 'fail.txt') -Encoding UTF8
   $errorCode = if ($script:LastErrorCode) { $script:LastErrorCode } else { 'KV_FB_ARGUMENT_STEP_FAILED' }
+  if($SnapshotOnly){
+    if($_.Exception.Message -match '^(KV_[A-Z0-9_]+)$'){$errorCode=$Matches[1]}
+    @{ok=$false;error_code=$errorCode;message=$_.Exception.Message;module_name=$FbModuleName} | ConvertTo-Json | Set-Content (Join-Path $OutDir 'fb_snapshot_result.json') -Encoding UTF8
+  }
   $currentStep = if ($script:LastErrorStep) { $script:LastErrorStep } else { 'set_fb_arguments' }
   [pscustomobject]@{
     ok = $false

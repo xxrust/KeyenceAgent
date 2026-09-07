@@ -4,8 +4,17 @@ if(-not ('KvFbSnapshotNative' -as [type])){Add-Type @'
 using System;using System.Runtime.InteropServices;
 public class KvFbSnapshotNative {
  [DllImport("user32.dll")]public static extern uint GetClipboardSequenceNumber();
+ [DllImport("user32.dll")]public static extern IntPtr GetWindow(IntPtr hwnd,uint cmd);
+ [DllImport("user32.dll")]public static extern bool IsWindowVisible(IntPtr hwnd);
 }
 '@}
+function Assert-KvFbNoPopup([IntPtr]$MainHwnd){
+ $popup=[KvFbSnapshotNative]::GetWindow($MainHwnd,6)
+ if($popup -ne [IntPtr]::Zero -and $popup -ne $MainHwnd -and [KvFbSnapshotNative]::IsWindowVisible($popup)){
+  Write-KvUiGuardRunLog -Event 'fb_snapshot_blocked_popup' -Data @{main_hwnd=$MainHwnd.ToInt64();popup_hwnd=$popup.ToInt64();error_code='KV_MODAL_PRESENT'}
+  throw 'KV_MODAL_PRESENT'
+ }
+}
 function Find-KvFbElement($Root,[string]$Id){
  $Root.FindFirst([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,$Id)))
 }
