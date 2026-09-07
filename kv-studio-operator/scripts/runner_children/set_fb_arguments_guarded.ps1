@@ -740,6 +740,53 @@ try {
     Fail-Step 'KV_FB_MODULE_TREE_ITEM_MISSING' 'select FB module' "Function-block tree item was not found: $FbModuleName" @($dumpPath)
   }
   if ($SnapshotOnly) {
+    # Correct FB workflow: selecting the FB and pressing Alt+L opens the
+    # self-variable pane; no context-menu/Open action is involved.
+    try { $item.SetFocus() } catch {}
+    try { $sp=$item.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern); $sp.Select() } catch {}
+    Start-Sleep -Milliseconds 100
+    . (Join-Path $operatorScriptRoot 'guards\kv_fb_snapshot.ps1')
+    $preRoot=[Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
+    $prePane=$null
+    Invoke-KvGuardedAltVk -TargetHwnd $process.MainWindowHandle -Step "FB snapshot Alt L $FbModuleName" -Vk 0x4C -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 180
+    for($wi=0;$wi -lt 20 -and -not $prePane;$wi++){
+      try {
+        $focused=[Windows.Automation.AutomationElement]::FocusedElement
+        if($focused -and $focused.Current.AutomationId -eq '_usageFilterComboBox'){
+          $e=$focused
+          for($ai=0;$e -and $ai -lt 8;$ai++){
+            if($e.Current.AutomationId -eq '_tabFBMacroParam' -and [string]$e.Current.ControlType.ProgrammaticName -eq 'ControlType.Pane'){$prePane=$e;break}
+            $e=[Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($e)
+          }
+        }
+      } catch {}
+      if(-not $prePane){Start-Sleep -Milliseconds 100}
+    }
+    if(-not $prePane){
+      Log 'FB argument pane missing after Alt+L; applying documented Ctrl+F4 recovery and retrying once'
+      Invoke-KvGuardedCtrlChord -TargetHwnd $process.MainWindowHandle -Step "FB snapshot recover Ctrl F4 $FbModuleName" -Vk 0x34 -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 300
+      Assert-NoKvsModal $process.Id 'after FB Ctrl+F4 recovery'
+      $item=FindProjectModuleTreeItem $process.Id $FbModuleName
+      if(-not $item){throw 'KV_FB_MODULE_TREE_ITEM_MISSING_AFTER_RECOVERY'}
+      try {$item.SetFocus();$sp=$item.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern);$sp.Select()} catch {}
+      # Ctrl+F4 closes the FB editor; reopen the selected FB before retrying
+      # Alt+L so KV recreates the self-variable surface.
+      try {$iv=$item.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern);$iv.Invoke();Log 'reopened FB after Ctrl+F4 recovery'} catch {}
+      Start-Sleep -Milliseconds 250
+      try {$item.SetFocus();$sp=$item.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern);$sp.Select()} catch {}
+      Invoke-KvGuardedAltVk -TargetHwnd $process.MainWindowHandle -Step "FB snapshot Alt L retry $FbModuleName" -Vk 0x4C -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 180
+      for($wi=0;$wi -lt 20 -and -not $prePane;$wi++){
+        try {$focused=[Windows.Automation.AutomationElement]::FocusedElement;if($focused -and $focused.Current.AutomationId -eq '_usageFilterComboBox'){$e=$focused;for($ai=0;$e -and $ai -lt 8;$ai++){$e=[Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($e);if($e -and $e.Current.AutomationId -eq '_tabFBMacroParam' -and [string]$e.Current.ControlType.ProgrammaticName -eq 'ControlType.Pane'){$prePane=$e;break}}}} catch {}
+        if(-not $prePane){Start-Sleep -Milliseconds 100}
+      }
+    }
+    if(-not $prePane){throw 'KV_FB_ARGUMENT_PANE_MISSING_AFTER_ALT_L'}
+    # Copy helper repeats Alt+L only after a verified pane and then proves the
+    # filter->grid focus route before Ctrl+A/C.
+    $copied=Copy-KvFbArgumentPane $prePane $process.MainWindowHandle $projectNeedle $OutDir
+    [pscustomobject]@{ok=$true;read_only=$true;project_path=$ProjectPath;module_name=$FbModuleName;raw_path=$copied.raw_path;row_count=$copied.row_count;focus_verified=$true;clipboard_fresh=$true;copy_elapsed_ms=$copied.elapsed_ms;all_columns_preserved=$true;unfiltered_completeness_verified=$false}|ConvertTo-Json -Depth 4|Set-Content (Join-Path $OutDir 'fb_snapshot_result.json') -Encoding UTF8
+    return
+
     # Reuse an already-open argument surface; invoking Open(O) again can
     # toggle the embedded editor and create a transient UIA gap.
     $tab=$null
