@@ -14,6 +14,15 @@ Build a variable inventory before editing MNM:
 
 ## Reconstruction Order
 
+## Structure Definition Extraction
+
+For existing projects, run `scripts\workflows\export_kv_structure_definitions.ps1`
+before rebuilding variables. The workflow opens each requested user data type and
+copies the complete owner-drawn grid (`Ctrl+Shift+End`, `Ctrl+C`) as TSV. The
+result `structure_definitions.json` preserves member order, `data_type` text
+(including `ARRAY[...] OF` and `STRING[n]`), comments, and raw columns. A missing
+or empty member/type row is a hard failure; no incomplete structure is accepted.
+
 1. Register global groups and global variables.
 2. Register FB instance variables before program statements that call them.
 3. Register local variables for each program through the local-variable view.

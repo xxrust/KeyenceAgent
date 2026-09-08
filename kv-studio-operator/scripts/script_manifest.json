@@ -138,6 +138,15 @@
           "set_fb_arguments",
           "verify_fb_argument_copyback"
         ]
+      },
+      {
+        "path": "workflows/export_kv_structure_definitions.ps1",
+        "status": "published",
+        "customer_callable": true,
+        "capabilities": [
+          "export_user_structure_definitions",
+          "verify_structure_member_types"
+        ]
       }
     ],
     "regression_harness": [
@@ -208,12 +217,18 @@
         "customer_callable": false,
         "ui_guard_required": true
       },
-      {
-        "path": "runner_children/configure_ethercat_nodes_guarded.ps1",
-        "status": "approved",
-        "customer_callable": false,
-        "ui_guard_required": true
-      }
+    {
+      "path": "runner_children/configure_ethercat_nodes_guarded.ps1",
+      "status": "approved",
+      "customer_callable": false,
+      "ui_guard_required": true
+    },
+    {
+      "path": "runner_children/export_structure_definitions_guarded.ps1",
+      "status": "approved",
+      "customer_callable": false,
+      "ui_guard_required": true
+    }
     ],
     "runner_child_pending": [],
     "workflow_tool": [

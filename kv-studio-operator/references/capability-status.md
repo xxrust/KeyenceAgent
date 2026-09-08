@@ -13,6 +13,7 @@ customer_workflow:
     - scripts\workflows\configure_kv_ethercat_nodes.ps1
     - scripts\workflows\set_kv_variables.ps1
     - scripts\workflows\set_kv_fb_arguments.ps1
+    - scripts\workflows\export_kv_structure_definitions.ps1
 
 regression_harness:
   customer_callable: true
@@ -41,6 +42,7 @@ internal_runner_child:
     - scripts\runner_children\export_mnm_browse_default_folder_guarded.ps1
     - scripts\runner_children\configure_expansion_units_guarded.ps1
     - scripts\runner_children\set_fb_arguments_guarded.ps1
+    - scripts\runner_children\export_structure_definitions_guarded.ps1
 
 pending_runner_child:
   customer_callable: false
@@ -51,11 +53,13 @@ customer_api_contract:
     - set_kv_variables(project_path, global_variables_tsv, local_variables_tsv, local_program_name)
     - set_kv_fb_arguments(project_path, fb_module_name, arguments_tsv)
     - configure_kv_expansion_units(project_path, models)
+    - export_kv_structure_definitions(project_path, structure_names?)
   guarantees:
     - agent supplies only named project targets and structured payload paths
     - workflow owns focus, menu, grid, clipboard, modal, persistence, and timing operations
     - variables use close_reopen_copyback verification on every successful public call
     - FB arguments use copyback verification on every successful public call
+    - structure extraction returns member names, data types, array dimensions, raw columns, and comments with same-run timing evidence
 
 known_route_limits:
   mnm_import:

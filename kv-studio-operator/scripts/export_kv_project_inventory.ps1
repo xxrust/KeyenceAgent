@@ -4,7 +4,8 @@ param(
 
   [string]$MnmDir = '',
   [Parameter(Mandatory=$true)]
-  [string]$OutDir
+  [string]$OutDir,
+  [string]$StructureDefinitionsPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -393,6 +394,7 @@ try {
     ethercat = $ethercat.status
     motion_axes = if ($motionAxes.Count -gt 0) { 'axis_names_extracted_from_WsTreeEnv' } else { 'missing' }
     axis_parameters = 'missing_ui_export_or_binary_parser_required'
+    structure_definitions = if ($StructureDefinitionsPath -and (Test-Path -LiteralPath $StructureDefinitionsPath -PathType Leaf)) { 'extracted_from_structure_editor_workflow' } else { 'not_supplied' }
     mnm = if ($mnmInventory.Count -gt 0) { 'fresh_mnm_inventory_extracted' } else { 'not_supplied' }
   }
 
@@ -424,6 +426,9 @@ try {
       }
     }
     data_types = $dataTypes
+    structure_definitions = if ($StructureDefinitionsPath -and (Test-Path -LiteralPath $StructureDefinitionsPath -PathType Leaf)) {
+      try { (Get-Content -Raw -LiteralPath $StructureDefinitionsPath -Encoding UTF8 | ConvertFrom-Json).structures } catch { @() }
+    } else { @() }
     program_modules = $programModules
     official_or_library_names_from_tree = $officialNames
     mnm_inventory = $mnmInventory
