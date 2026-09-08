@@ -23,6 +23,17 @@ result `structure_definitions.json` preserves member order, `data_type` text
 (including `ARRAY[...] OF` and `STRING[n]`), comments, and raw columns. A missing
 or empty member/type row is a hard failure; no incomplete structure is accepted.
 
+To change user types, use the manifest entry
+`scripts\workflows\mutate_kv_structure_definitions.ps1` with a JSON plan. Folder
+creation uses the selected `数据类型` tree item context command `F`; data-type
+creation uses `R`, the name field is filled by guarded clipboard paste, and the
+kind selector is changed with `Alt+P` followed by `Up` (structure) or `Down`
+(tuple). Create operations are intentionally ordered: a nested custom type must
+exist before the type that references it. `(System)` is excluded. Create and
+update operations are reopened and copied back before the workflow reports
+success; delete operations require a confirmation dialog and a tree absence
+check.
+
 1. Register global groups and global variables.
 2. Register FB instance variables before program statements that call them.
 3. Register local variables for each program through the local-variable view.

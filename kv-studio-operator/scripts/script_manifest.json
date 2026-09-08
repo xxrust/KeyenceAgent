@@ -147,6 +147,18 @@
           "export_user_structure_definitions",
           "verify_structure_member_types"
         ]
+      },
+      {
+        "path": "workflows/mutate_kv_structure_definitions.ps1",
+        "status": "published",
+        "customer_callable": true,
+        "capabilities": [
+          "create_user_structure_definitions",
+          "update_user_structure_definitions",
+          "delete_user_structure_definitions",
+          "create_user_structure_folders",
+          "verify_structure_mutation_persistence"
+        ]
       }
     ],
     "regression_harness": [

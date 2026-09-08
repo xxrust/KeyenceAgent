@@ -14,6 +14,7 @@ customer_workflow:
     - scripts\workflows\set_kv_variables.ps1
     - scripts\workflows\set_kv_fb_arguments.ps1
     - scripts\workflows\export_kv_structure_definitions.ps1
+    - scripts\workflows\mutate_kv_structure_definitions.ps1
 
 regression_harness:
   customer_callable: true
@@ -54,12 +55,26 @@ customer_api_contract:
     - set_kv_fb_arguments(project_path, fb_module_name, arguments_tsv)
     - configure_kv_expansion_units(project_path, models)
     - export_kv_structure_definitions(project_path, structure_names?)
+    - mutate_kv_structure_definitions(project_path, plan_path)
   guarantees:
     - agent supplies only named project targets and structured payload paths
     - workflow owns focus, menu, grid, clipboard, modal, persistence, and timing operations
     - variables use close_reopen_copyback verification on every successful public call
     - FB arguments use copyback verification on every successful public call
     - structure extraction returns member names, data types, array dimensions, raw columns, and comments with same-run timing evidence
+    - structure mutation accepts ordered create/update/delete operations, creates folders through the project-tree context menu, excludes `(System)`, and verifies every changed structure by close/reopen copy-back
+
+structure_mutation:
+  customer_callable: true
+  entry: scripts\workflows\mutate_kv_structure_definitions.ps1
+  plan_schema:
+    folder_operations: [{ action: create, parent_path: ["数据类型"], name: "Folder" }]
+    structure_operations: [{ action: create|update|delete, parent_path: ["数据类型", "Folder"], name: "Type", kind: structure|tuple, members: [{ name: "member", data_type: "BOOL" }] }]
+  rules:
+    - `(System)` is read-only and is never created, updated, or deleted
+    - create operations execute in plan order; custom nested member types must already exist or be created earlier in the same plan
+    - every create/update is reopened and copied back before success is reported
+    - a failed dialog/focus/persistence check stops the workflow and writes failure.json
 
 known_route_limits:
   mnm_import:
