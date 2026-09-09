@@ -34,6 +34,11 @@ update operations are reopened and copied back before the workflow reports
 success; delete operations require a confirmation dialog and a tree absence
 check.
 
+Use `fill_empty` only when the caller already knows that an existing type has
+no persisted members. It opens the type, pastes from the top-left cell, and
+performs the same close/reopen copy-back verification without a redundant
+pre-read.
+
 When an existing type is opened, the workflow sends `Ctrl+Home` immediately
 after `Enter` to reset the member grid to its top-left cell. Update then selects
 all existing rows with `Ctrl+Shift+End`, deletes them through the confirmation
@@ -50,6 +55,13 @@ window between those keys, because doing so removes focus from the dialog.
 Project-tree context commands use UI Automation to identify one enabled menu
 item, then click that item's reported bounds. They do not send `F`, `R`, or `D`
 and therefore remain independent of the active Chinese or English input method.
+
+New-type creation uses only approved atomic actions. After confirming the name
+dialog, the runner explicitly selects and opens the newly created tree item,
+then pastes its members from the top-left cell. It does not introduce a custom
+compound Enter/paste input route. Copy-back writes a unique clipboard sentinel first and
+must observe KV STUDIO replace it. The trailing all-empty row that KV STUDIO
+keeps for the next member is ignored when counting persisted members.
 
 1. Register global groups and global variables.
 2. Register FB instance variables before program statements that call them.

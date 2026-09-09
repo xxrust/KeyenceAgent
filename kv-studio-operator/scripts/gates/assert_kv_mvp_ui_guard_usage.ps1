@@ -35,12 +35,16 @@ function Stop-GuardUsageCheck([string]$ErrorCode, [string]$Message, [object[]]$F
 
 $ScriptsRoot = [IO.Path]::GetFullPath($ScriptsRoot)
 $ManifestPath = [IO.Path]::GetFullPath($ManifestPath)
+$manifest = $null
+
+if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) {
+  throw "Script manifest is required: $ManifestPath"
+}
+$manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+$approvedAtomicActions = @($manifest.ui_atomic_actions.approved | ForEach-Object { [string]$_ } | Where-Object { $_ })
+$pendingAtomicActions = @($manifest.ui_atomic_actions.pending | ForEach-Object { [string]$_ } | Where-Object { $_ })
 
 if ($ScriptNames.Count -eq 0) {
-  if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) {
-    throw "Script manifest is required: $ManifestPath"
-  }
-  $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
   $ScriptNames = @(
     @($manifest.classes.runner_child_approved | Where-Object { $_.ui_guard_required } | ForEach-Object { $_.path })
     @($manifest.classes.runner_child_pending | Where-Object { $_.ui_guard_required } | ForEach-Object { $_.path })
@@ -63,6 +67,14 @@ $patterns = @(
 )
 
 $findings = @()
+if ($approvedAtomicActions.Count -eq 0) {
+  $findings += [pscustomobject]@{
+    file = $ManifestPath
+    line = 0
+    pattern = 'MissingApprovedAtomicRegistry'
+    text = 'ui_atomic_actions.approved must explicitly list customer-workflow atomic APIs.'
+  }
+}
 foreach ($name in $ScriptNames) {
   $path = [IO.Path]::GetFullPath((Join-Path $ScriptsRoot $name))
   if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -75,7 +87,7 @@ foreach ($name in $ScriptNames) {
     continue
   }
   if ($allowedFiles -contains $path) { continue }
-  $lines = Get-Content -LiteralPath $path
+  $lines = @(Get-Content -LiteralPath $path)
   for ($i = 0; $i -lt $lines.Count; $i++) {
     $line = [string]$lines[$i]
     if ($line -match '^\s*#') { continue }
@@ -89,13 +101,60 @@ foreach ($name in $ScriptNames) {
         }
       }
     }
+    foreach ($match in [regex]::Matches($line, '\b(?:Assert-KvUiForegroundHwnd|Invoke-KvGuarded[A-Za-z0-9_-]+)\b')) {
+      $actionName = $match.Value
+      if ($approvedAtomicActions -notcontains $actionName) {
+        $status = if ($pendingAtomicActions -contains $actionName) { 'pending' } else { 'unregistered' }
+        $findings += [pscustomobject]@{
+          file = $path
+          line = $i + 1
+          pattern = 'UnapprovedAtomicAction'
+          text = "$actionName is $status and cannot be called by an approved runner child."
+        }
+      }
+    }
+  }
+}
+
+$guardPath = [IO.Path]::GetFullPath((Join-Path $ScriptsRoot 'guards\kv_ui_guard.ps1'))
+if (-not (Test-Path -LiteralPath $guardPath -PathType Leaf)) {
+  $findings += [pscustomobject]@{ file=$guardPath; line=0; pattern='MissingGuardLibrary'; text='Guard library is required.' }
+} else {
+  $guardText = Get-Content -LiteralPath $guardPath -Raw
+  $tokens = $null
+  $parseErrors = $null
+  $ast = [System.Management.Automation.Language.Parser]::ParseInput($guardText, [ref]$tokens, [ref]$parseErrors)
+  foreach ($error in @($parseErrors)) {
+    $findings += [pscustomobject]@{ file=$guardPath; line=$error.Extent.StartLineNumber; pattern='GuardParseError'; text=$error.Message }
+  }
+  $guardFunctions = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true))
+  foreach ($fn in $guardFunctions) {
+    $fnName = [string]$fn.Name
+    if (($fnName -like 'Invoke-KvGuarded*' -or $fnName -eq 'Assert-KvUiForegroundHwnd') -and $approvedAtomicActions -notcontains $fnName -and $pendingAtomicActions -notcontains $fnName) {
+      $findings += [pscustomobject]@{
+        file = $guardPath
+        line = $fn.Extent.StartLineNumber
+        pattern = 'UnclassifiedAtomicAction'
+        text = "$fnName must be classified as approved or pending before it can exist in the guard library."
+      }
+    }
+  }
+  foreach ($actionName in @($approvedAtomicActions + $pendingAtomicActions | Sort-Object -Unique)) {
+    if (@($guardFunctions | Where-Object Name -eq $actionName).Count -ne 1) {
+      $findings += [pscustomobject]@{
+        file = $guardPath
+        line = 0
+        pattern = 'AtomicActionImplementationMissing'
+        text = "$actionName must have exactly one guard-library implementation."
+      }
+    }
   }
 }
 
 if ($findings.Count -gt 0) {
   Stop-GuardUsageCheck `
     -ErrorCode 'KV_UI_GUARD_STATIC_VIOLATION' `
-    -Message 'KV MVP child scripts still contain raw global UI input outside scripts/guards/kv_ui_guard.ps1.' `
+    -Message 'KV MVP scripts contain raw input or an unapproved atomic UI action.' `
     -Findings $findings `
     -ExitCode 32
 }
@@ -106,4 +165,6 @@ if ($findings.Count -gt 0) {
   scripts_root = $ScriptsRoot
   manifest_path = $ManifestPath
   checked_scripts = $ScriptNames
+  approved_atomic_actions = $approvedAtomicActions
+  pending_atomic_actions = $pendingAtomicActions
 } | ConvertTo-Json -Depth 4

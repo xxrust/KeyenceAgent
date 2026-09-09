@@ -36,6 +36,8 @@ quick_start:
 
 UI workflow 启动前必须完成并记录前置检查：项目文件存在、目标项目窗口唯一、窗口可前台接收输入、无残留模态框/待机界面、目标状态与 workflow 第一步匹配。前置检查失败时不得发送任何 UI 输入，应输出 `failure.json` 和 `run.log` 后停止。每个原子动作预算为 10 秒（`elapsed_ms < 10000`）；超时必须记录 `KV_UI_ATOMIC_STEP_TIMEOUT` 并停止。只有在统一日志写入成功且结果/失败证据齐全后，agent 才可汇报本次运行。
 
+把输入代码放入 `guards\kv_ui_guard.ps1` 并不等于原子动作已获批准。客户态 runner 只能调用 `scripts\script_manifest.json` 中 `ui_atomic_actions.approved` 列出的 API；`pending` 或未登记动作必须被 `assert_kv_mvp_ui_guard_usage.ps1` 拒绝。发布的 UI workflow 必须从 manifest 解析其 runner 依赖，并在调用 runner、接管 KV STUDIO 之前运行该门禁。新增复合按键、焦点恢复或剪贴板路线先保持 pending，经隔离验证和重复回归后才能提升为 approved；不得为了完成当前任务直接把新函数加入 approved。
+
 `runner_children`、`guards`、`probes` 是 workflow 内部实现或研发工具。客户态失败诊断读取同次 result/evidence；研发态操作需要用户明确授权。references 只提供状态、schema 和失败归因；执行入口仍由 manifest 决定。
 
 ## 术语

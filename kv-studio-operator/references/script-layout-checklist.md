@@ -47,6 +47,10 @@ manifest_rule:
   guards:
     callable_by:
       - runner_child
+    atomic_registry:
+      source: scripts/script_manifest.json ui_atomic_actions
+      default: reject_unregistered_or_pending
+      customer_workflow_preflight: required_before_runner_child
   probes:
     callable_by:
       - research_mode

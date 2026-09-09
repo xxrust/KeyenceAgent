@@ -32,6 +32,24 @@
       "set_kv_admin_credential.ps1"
     ]
   },
+  "ui_atomic_actions": {
+    "approved": [
+      "Assert-KvUiForegroundHwnd",
+      "Invoke-KvGuardedAltVk",
+      "Invoke-KvGuardedClipboardPaste",
+      "Invoke-KvGuardedClipboardSetText",
+      "Invoke-KvGuardedCtrlChord",
+      "Invoke-KvGuardedMouseClick",
+      "Invoke-KvGuardedMouseClickAllowProcessSuccessor",
+      "Invoke-KvGuardedMouseRightClick",
+      "Invoke-KvGuardedSendKeys",
+      "Invoke-KvGuardedSendKeysAllowTargetClose",
+      "Invoke-KvGuardedShiftTab",
+      "Invoke-KvGuardedVkTap",
+      "Invoke-KvGuardedVkTapCallerOracle"
+    ],
+    "pending": []
+  },
   "classes": {
     "customer_scaffold_tool": [
       {
@@ -152,6 +170,9 @@
         "path": "workflows/mutate_kv_structure_definitions.ps1",
         "status": "published",
         "customer_callable": true,
+        "runner_children": [
+          "runner_children/mutate_structure_definitions_guarded.ps1"
+        ],
         "capabilities": [
           "create_user_structure_definitions",
           "update_user_structure_definitions",
@@ -237,6 +258,12 @@
     },
     {
       "path": "runner_children/export_structure_definitions_guarded.ps1",
+      "status": "approved",
+      "customer_callable": false,
+      "ui_guard_required": true
+    },
+    {
+      "path": "runner_children/mutate_structure_definitions_guarded.ps1",
       "status": "approved",
       "customer_callable": false,
       "ui_guard_required": true

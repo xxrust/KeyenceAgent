@@ -6,6 +6,13 @@ Read this file only when modifying KV STUDIO UI automation scripts or diagnosing
 
 All process-wide input must go through `scripts\guards\kv_ui_guard.ps1`.
 
+Being implemented in the guard library is not sufficient for customer-mode
+use. `scripts\script_manifest.json` classifies atomic actions as `approved` or
+`pending`, and approved runner children may call only approved actions. A new
+or changed input route remains pending until its isolated evidence and repeat
+regression have passed. Published UI workflows must run the guard-usage gate
+before invoking their manifest-declared runner child.
+
 Process-wide input means:
 
 - `SendKeys`
@@ -42,7 +49,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\gates\a
   -OutDir <work-root>\guard_static_probe
 ```
 
-Success means runner child scripts no longer contain raw global input outside `scripts\guards\kv_ui_guard.ps1`.
+Success means runner child scripts contain no raw global input outside the
+guard library and call no unregistered or pending atomic action.
 
 Failure code:
 
