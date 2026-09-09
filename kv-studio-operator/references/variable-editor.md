@@ -34,6 +34,19 @@ update operations are reopened and copied back before the workflow reports
 success; delete operations require a confirmation dialog and a tree absence
 check.
 
+When an existing type is opened, the workflow sends `Ctrl+Home` immediately
+after `Enter` to reset the member grid to its top-left cell. Update then selects
+all existing rows with `Ctrl+Shift+End`, deletes them through the confirmation
+dialog (`Left`, `Enter`), resets to the top-left with `Ctrl+Shift+Home`, pastes
+the replacement TSV, saves, and verifies the exact row count by close/reopen
+copy-back. New-type confirmation already focuses the new grid at its top-left;
+that path pastes directly without an extra reset.
+
+The selected-row deletion dialog is a separate `#32770` modal whose default
+button is Cancel. The guarded route treats `Shift+Delete`, `Left`, and `Enter`
+as one continuous modal transition and must never foreground-recover the main
+window between those keys, because doing so removes focus from the dialog.
+
 1. Register global groups and global variables.
 2. Register FB instance variables before program statements that call them.
 3. Register local variables for each program through the local-variable view.
