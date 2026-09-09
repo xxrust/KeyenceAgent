@@ -156,6 +156,23 @@ function Read-JsonFileIfPresent([string]$Path) {
   try { return (Get-Content -Raw -LiteralPath $Path -Encoding UTF8 | ConvertFrom-Json) } catch { return $null }
 }
 
+function Unblock-KeyencePowerShellFiles([string]$Root) {
+  if ([string]::IsNullOrWhiteSpace($Root) -or -not (Test-Path -LiteralPath $Root -PathType Container)) {
+    return 0
+  }
+  $files = @(Get-ChildItem -LiteralPath $Root -Recurse -File -ErrorAction Stop |
+    Where-Object { $_.Extension -in @('.ps1', '.psm1', '.psd1') })
+  $unblocked = 0
+  foreach ($file in $files) {
+    $zone = Get-Item -LiteralPath $file.FullName -Stream Zone.Identifier -ErrorAction SilentlyContinue
+    if ($zone) {
+      Unblock-File -LiteralPath $file.FullName
+      $unblocked++
+    }
+  }
+  return $unblocked
+}
+
 function Copy-SkillDirectory([string]$SourceDir, [string]$TargetRoot) {
   $name = Split-Path -Leaf $SourceDir
   $target = Join-Path $TargetRoot $name
@@ -299,6 +316,10 @@ if ($Help) {
 }
 
 $repoRoot = Split-Path -Parent $PSCommandPath
+# ZIP downloads carry Zone.Identifier ADS entries. Under RemoteSigned those
+# entries block every unsigned child script, even when the repository is trusted.
+# Clear them once for this repository; do not weaken the machine policy.
+$repoScriptsUnblocked = Unblock-KeyencePowerShellFiles $repoRoot
 if ([string]::IsNullOrWhiteSpace($CodexSkillsRoot)) {
   $CodexSkillsRoot = Join-Path $env:USERPROFILE '.codex\skills'
 }
@@ -401,6 +422,7 @@ if ((Test-Selected 'skills') -and -not $SkipSkillInstall) {
   foreach ($skill in $skillDirs) {
     $installedSkills += Copy-SkillDirectory -SourceDir $skill.FullName -TargetRoot $CodexSkillsRoot
   }
+  $installedSkillsUnblocked = Unblock-KeyencePowerShellFiles $CodexSkillsRoot
 }
 
 $configObject = [ordered]@{

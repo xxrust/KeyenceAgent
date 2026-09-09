@@ -54,6 +54,11 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -File .\setup_keyence_agent.ps1
 ```
 
+The initial `Bypass` is required only for a ZIP-downloaded checkout: Windows
+may mark its unsigned PowerShell files with `Zone.Identifier`. The setup
+script removes that download mark from the repository and installed skills
+while leaving `RemoteSigned` unchanged. Later script calls can run normally.
+
 不要把仓库直接克隆到 `%USERPROFILE%\.codex\skills`。安装脚本会配置：
 
 - 三个 KEYENCE skills

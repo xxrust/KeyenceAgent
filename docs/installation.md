@@ -33,6 +33,12 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -File .\setup_keyence_agent.ps1
 ```
 
+The first invocation uses `-ExecutionPolicy Bypass` because a ZIP download may
+carry Windows `Zone.Identifier` metadata and `RemoteSigned` will block unsigned
+scripts. Setup removes that metadata from the repository and installed skill
+PowerShell files without changing the system execution policy. After setup,
+scripts can be loaded directly in the normal user session.
+
 按提示填写 `Kvs.exe`、一次性工作目录和 Wiki V2 根目录。管理员凭据使用 Windows DPAPI 写入用户配置目录，不进入 Git 仓库。
 
 验证：
