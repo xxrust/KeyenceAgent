@@ -158,6 +158,15 @@
         ]
       },
       {
+        "path": "workflows/import_kv_fb_module.ps1",
+        "status": "published",
+        "customer_callable": true,
+        "capabilities": [
+          "import_kv_fb_module",
+          "create_kv_function_block_from_mnm"
+        ]
+      },
+      {
         "path": "workflows/export_kv_structure_definitions.ps1",
         "status": "published",
         "customer_callable": true,

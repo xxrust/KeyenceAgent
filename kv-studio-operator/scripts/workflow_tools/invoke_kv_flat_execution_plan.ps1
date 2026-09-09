@@ -245,8 +245,10 @@ function Invoke-FlatWorkflowStep([object]$Step) {
 
 function Write-FlatWorkflowResult([object]$Plan, [string]$ResolvedPlanPath, [bool]$Ok, [string]$Status, [string]$Message = '') {
   $compileResultPath = [string]$Plan.compile_result_path
+  $compileAcceptanceRequired = $true
+  if ($null -ne $Plan.require_compile_result) { $compileAcceptanceRequired = [bool]$Plan.require_compile_result }
   $compileText = ''
-  if (Test-Path -LiteralPath $compileResultPath -PathType Leaf) {
+  if ($compileResultPath -and (Test-Path -LiteralPath $compileResultPath -PathType Leaf)) {
     $compileText = [IO.File]::ReadAllText($compileResultPath, [Text.Encoding]::UTF8)
   }
   $okNeedle = (New-Cn @(0x8F6C,0x6362,0x7ED3,0x679C)) + ' OK'
@@ -277,6 +279,7 @@ function Write-FlatWorkflowResult([object]$Plan, [string]$ResolvedPlanPath, [boo
     merged_global_variables_tsv = [string]$Plan.merged_global_variables_tsv
     variable_sets = @($Plan.variable_sets)
     compile_result_path = $compileResultPath
+    compile_acceptance_required = $compileAcceptanceRequired
     compile_result_contains_ok = ($compileText.Contains($okNeedle))
     compile_result_contains_ng = ($compileText.Contains($ngNeedle))
     compile_result_length = $compileText.Length
@@ -305,14 +308,18 @@ try {
     Invoke-FlatWorkflowStep $step
   }
 
-  $compileResultPath = [string]$plan.compile_result_path
-  if (-not (Test-Path -LiteralPath $compileResultPath -PathType Leaf)) {
-    throw "Copied compile result file is missing: $compileResultPath"
-  }
-  $copyText = [IO.File]::ReadAllText($compileResultPath, [Text.Encoding]::UTF8)
-  $okNeedle = (New-Cn @(0x8F6C,0x6362,0x7ED3,0x679C)) + ' OK'
-  if (-not $copyText.Contains($okNeedle)) {
-    throw 'Copied compile result does not contain the OK conversion result.'
+  $compileAcceptanceRequired = $true
+  if ($null -ne $plan.require_compile_result) { $compileAcceptanceRequired = [bool]$plan.require_compile_result }
+  if ($compileAcceptanceRequired) {
+    $compileResultPath = [string]$plan.compile_result_path
+    if (-not (Test-Path -LiteralPath $compileResultPath -PathType Leaf)) {
+      throw "Copied compile result file is missing: $compileResultPath"
+    }
+    $copyText = [IO.File]::ReadAllText($compileResultPath, [Text.Encoding]::UTF8)
+    $okNeedle = (New-Cn @(0x8F6C,0x6362,0x7ED3,0x679C)) + ' OK'
+    if (-not $copyText.Contains($okNeedle)) {
+      throw 'Copied compile result does not contain the OK conversion result.'
+    }
   }
   Write-FlatWorkflowResult $plan $PlanPath $true 'pass' ''
   Write-WorkflowLog 'workflow_succeeded' @{result_path=$plan.result_path;elapsed_seconds=(Get-ElapsedSeconds)}

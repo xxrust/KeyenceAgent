@@ -13,6 +13,7 @@ customer_workflow:
     - scripts\workflows\configure_kv_ethercat_nodes.ps1
     - scripts\workflows\set_kv_variables.ps1
     - scripts\workflows\set_kv_fb_arguments.ps1
+    - scripts\workflows\import_kv_fb_module.ps1
     - scripts\workflows\export_kv_structure_definitions.ps1
     - scripts\workflows\mutate_kv_structure_definitions.ps1
 
@@ -53,6 +54,7 @@ customer_api_contract:
   ui_payload_boundary:
     - set_kv_variables(project_path, global_variables_tsv, local_variables_tsv, local_program_name)
     - set_kv_fb_arguments(project_path, fb_module_name, arguments_tsv)
+    - import_kv_fb_module(project_path, fb_mnm_path, expected_module_name?)
     - configure_kv_expansion_units(project_path, models)
     - export_kv_structure_definitions(project_path, structure_names?)
     - mutate_kv_structure_definitions(project_path, plan_path)
@@ -61,6 +63,7 @@ customer_api_contract:
     - workflow owns focus, menu, grid, clipboard, modal, persistence, and timing operations
     - variables use close_reopen_copyback verification on every successful public call
     - FB arguments use copyback verification on every successful public call
+    - FB creation/import accepts only MNM files declaring MODULE_TYPE:2 and reuses the shared MNM import runner
     - structure extraction returns member names, data types, array dimensions, raw columns, and comments with same-run timing evidence
     - structure mutation accepts ordered create/update/delete operations, creates folders through the project-tree context menu, excludes `(System)`, and verifies every changed structure by close/reopen copy-back
 
