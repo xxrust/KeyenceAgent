@@ -1,0 +1,49 @@
+param([Parameter(Mandatory=$true)][string]$ProjectNeedle,[Parameter(Mandatory=$true)][string]$OutDir,[switch]$Copy,[switch]$Menu,[switch]$InvokeCopy)
+$ErrorActionPreference='Stop'
+New-Item -ItemType Directory -Force $OutDir | Out-Null
+$env:KV_WORKFLOW_RUN_LOG=Join-Path $OutDir 'run.log'
+. (Join-Path $PSScriptRoot '..\guards\kv_ui_guard.ps1')
+Initialize-KvUiGuard -OutDir $OutDir
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type @'
+using System;using System.Collections.Generic;using System.Runtime.InteropServices;using System.Text;
+public class ErrorCopyProbe {
+ public delegate bool Callback(IntPtr h,IntPtr l);
+ [DllImport("user32.dll")]public static extern bool EnumChildWindows(IntPtr h,Callback cb,IntPtr l);
+ [DllImport("user32.dll")]public static extern bool IsWindowVisible(IntPtr h);
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)]public static extern int GetClassName(IntPtr h,StringBuilder s,int n);
+ public static List<IntPtr> Trees(IntPtr root){var list=new List<IntPtr>();EnumChildWindows(root,delegate(IntPtr h,IntPtr l){var s=new StringBuilder(256);GetClassName(h,s,256);if(IsWindowVisible(h)&&s.ToString().Contains("SysTreeView32"))list.Add(h);return true;},IntPtr.Zero);return list;}
+}
+'@
+$ps=@(Get-Process Kvs | Where-Object {$_.MainWindowTitle -like "*$ProjectNeedle*"})
+if($ps.Count -ne 1){throw 'Expected unique project'}
+$p=$ps[0]
+$trees=@([ErrorCopyProbe]::Trees($p.MainWindowHandle) | ForEach-Object {$e=[Windows.Automation.AutomationElement]::FromHandle($_);$r=$e.Current.BoundingRectangle;if($r.Width -gt 300){[pscustomobject]@{element=$e;hwnd=$_.ToInt64();left=$r.Left;top=$r.Top;width=$r.Width;height=$r.Height}}})
+$trees | Select-Object hwnd,left,top,width,height | ConvertTo-Json | Set-Content (Join-Path $OutDir 'trees.json') -Encoding UTF8
+$tree=$trees | Sort-Object top -Descending | Select-Object -First 1
+if(-not $tree){throw 'No output tree'}
+if($Copy){
+ $tree.element.SetFocus()
+ $focus=[Windows.Automation.AutomationElement]::FocusedElement
+ if($focus.Current.NativeWindowHandle -ne $tree.hwnd){throw 'Result tree focus not proven'}
+ Invoke-KvGuardedCtrlChord -TargetHwnd $p.MainWindowHandle -Step 'copy focused conversion result tree' -Vk 0x43 -ExpectedTitleLike "*$ProjectNeedle*"
+ [Windows.Forms.Clipboard]::GetText() | Set-Content (Join-Path $OutDir 'clipboard.txt') -Encoding UTF8
+}
+if($Menu -or $InvokeCopy){
+ Invoke-KvGuardedMouseRightClick -TargetHwnd $p.MainWindowHandle -Step 'inspect output tree menu' -X ([int]$tree.left+80) -Y ([int]$tree.top+12) -ExpectedTitleLike "*$ProjectNeedle*"
+ $root=[Windows.Automation.AutomationElement]::RootElement
+ $children=$root.FindAll([Windows.Automation.TreeScope]::Children,[Windows.Automation.Condition]::TrueCondition)
+ $copyItems=@()
+ foreach($w in $children){if($w.Current.ProcessId -ne $p.Id){continue};$els=$w.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::MenuItem)));$els | ForEach-Object {$_.Current.Name} | Add-Content (Join-Path $OutDir 'menu.txt') -Encoding UTF8; $copyItems+=@($els | Where-Object {$_.Current.Name -eq ((-join [char[]](0x590D,0x5236))+'(C)')})}
+ if($InvokeCopy){
+  if($copyItems.Count -ne 1){throw 'Copy menu not unique'}
+  $pattern=$copyItems[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)
+  $pattern.Invoke(); Start-Sleep -Milliseconds 150
+  [Windows.Forms.Clipboard]::GetText() | Set-Content (Join-Path $OutDir 'clipboard.txt') -Encoding UTF8
+  Assert-KvUiForegroundHwnd -ExpectedHwnd $p.MainWindowHandle -Step 'copy menu completed' -ExpectedTitleLike "*$ProjectNeedle*" | Out-Null
+  exit
+ }
+ Invoke-KvGuardedVkTapCallerOracle -TargetHwnd ([IntPtr](Get-KvForegroundSnapshot).hwnd) -Step 'close result menu research' -Vk 0x1B
+ Assert-KvUiForegroundHwnd -ExpectedHwnd $p.MainWindowHandle -Step 'result menu closed' -ExpectedTitleLike "*$ProjectNeedle*" | Out-Null
+}
