@@ -47,6 +47,10 @@ button is Cancel. The guarded route treats `Shift+Delete`, `Left`, and `Enter`
 as one continuous modal transition and must never foreground-recover the main
 window between those keys, because doing so removes focus from the dialog.
 
+Project-tree context commands use the unique enabled menu item's UI Automation
+`InvokePattern`; they do not send `F`, `R`, or `D`. This keeps structure create,
+update, and delete independent of the active Chinese or English input method.
+
 1. Register global groups and global variables.
 2. Register FB instance variables before program statements that call them.
 3. Register local variables for each program through the local-variable view.
