@@ -78,19 +78,16 @@ structure_mutation:
 
 known_route_limits:
   mnm_import:
-    status: conditional
-    fresh_project_behavior: ROUTE_RESEARCH_REQUIRED
-    evidence: H:\\kvOp\\generic_replication_api_regression\\run_20260903_01\\workflow\\GenericReplica_20260903\\artifacts\\import_mnm_1\\run.log
-    note: >-
-      A fresh generic project reached the published import workflow with a
-      valid editor foreground, but neither guarded Alt+F,R,R nor the PID-bound
-      UIA File -> Mnemonic List -> Read route produced a standard file-open
-      dialog. Existing-project success evidence must not be generalized to
-      fresh projects until this route is independently repaired and repeated.
+    status: published
+    customer_workflow: [scripts\\workflows\\run_kv_mvp_scaffold.ps1, scripts\\workflows\\run_kv_mvp_repair_existing_project.ps1]
+    runner_child: scripts\\runner_children\\import_mnm_guarded.ps1
     policy: >-
-      Keep the failure gate and stop the workflow; do not add sample-specific
-      coordinates, fixed module names, direct ladder input, or relaxed
-      persistence/compile checks as a workaround.
+      A project created by the scaffold and an existing project both use the
+      same MNM import runner after a project window is available. Function
+      blocks are MNM modules with MODULE_TYPE:2; their import is not a
+      separate UI route. Same-name conflicts remain a deterministic pre-delete
+      decision, and module existence checks use one bounded direct name query
+      rather than project-tree enumeration.
 
 project_configuration:
   plc_units:

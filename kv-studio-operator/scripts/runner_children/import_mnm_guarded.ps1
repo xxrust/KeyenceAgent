@@ -564,23 +564,34 @@ function OpenProjectModuleEditor([string]$moduleName){
 }
 function FindProjectModuleTreeItem([string]$moduleName){
   if(-not $moduleName){ return $null }
+  $lookupTimer = [Diagnostics.Stopwatch]::StartNew()
+  $maxLookupMs = 1000
   $root=[System.Windows.Automation.AutomationElement]::FromHandle($script:KvGuardTargetHwnd)
   $tree=$root.FindFirst(
     [System.Windows.Automation.TreeScope]::Descendants,
     (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty,'ProjectTreeView'))
   )
-  if(-not $tree){ return $null }
-  $items=$tree.FindAll(
-    [System.Windows.Automation.TreeScope]::Descendants,
-    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::TreeItem))
-  )
-  for($i=0;$i -lt $items.Count;$i++){
-    $item=$items.Item($i)
-    $name=[string]$item.Current.Name
-    if($name -eq $moduleName -or $name -match ('^' + [regex]::Escape($moduleName) + '\s+\[\d+\]$')){
-      return $item
+  if(-not $tree){
+    $lookupElapsedMs = [int]$lookupTimer.ElapsedMilliseconds
+    LogContract 'module_lookup' @{ module_name=$moduleName; elapsed_ms=$lookupElapsedMs; direct_name_query=$true; project_tree_found=$false }
+    if($lookupElapsedMs -ge $maxLookupMs){
+      $script:LastErrorCode = 'KV_MODULE_LOOKUP_TIMEOUT'
+      throw "KV_MODULE_LOOKUP_TIMEOUT: project-tree lookup exceeded ${maxLookupMs}ms: $moduleName"
     }
+    return $null
   }
+  # Use one direct UIA name query. Do not enumerate project-tree descendants
+  # or retry a second traversal for one module existence check.
+  $nameCondition = New-Object System.Windows.Automation.PropertyCondition(
+    [System.Windows.Automation.AutomationElement]::NameProperty, $moduleName)
+  $item = $tree.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $nameCondition)
+  $lookupElapsedMs = [int]$lookupTimer.ElapsedMilliseconds
+  LogContract 'module_lookup' @{ module_name=$moduleName; elapsed_ms=$lookupElapsedMs; direct_name_query=$true; project_tree_found=$true }
+  if($lookupElapsedMs -ge $maxLookupMs){
+    $script:LastErrorCode = 'KV_MODULE_LOOKUP_TIMEOUT'
+    throw "KV_MODULE_LOOKUP_TIMEOUT: target module lookup exceeded ${maxLookupMs}ms: $moduleName"
+  }
+  if($item){ return $item }
   return $null
 }
 function ConfirmDeleteDialogIfPresent(){
