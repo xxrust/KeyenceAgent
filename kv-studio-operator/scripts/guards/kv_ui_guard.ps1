@@ -471,6 +471,34 @@ function Invoke-KvGuardedMouseClick {
   Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'mouse left click' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
 }
 
+function Invoke-KvGuardedMouseClickAllowProcessSuccessor {
+  param(
+    [Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,
+    [Parameter(Mandatory=$true)][string]$Step,
+    [Parameter(Mandatory=$true)][int]$X,
+    [Parameter(Mandatory=$true)][int]$Y,
+    [Parameter(Mandatory=$true)][int]$SuccessProcessId,
+    [int]$SleepMs = 180
+  )
+  $watch = [Diagnostics.Stopwatch]::StartNew()
+  $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -AllowSingleRecovery
+  $beforePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Action 'mouse left click allowing process-owned successor' -Expected @{ hwnd = $TargetHwnd.ToInt64(); x = $X; y = $Y; successor_process_id = $SuccessProcessId } -Before $before -Message 'Precondition passed; the verified popup owns foreground.'
+  [KvSharedUiGuardWin32]::SetCursorPos($X, $Y) | Out-Null
+  Start-Sleep -Milliseconds 40
+  [KvSharedUiGuardWin32]::mouse_event(0x0002, 0, 0, 0, 0)
+  Start-Sleep -Milliseconds 30
+  [KvSharedUiGuardWin32]::mouse_event(0x0004, 0, 0, 0, 0)
+  Start-Sleep -Milliseconds $SleepMs
+  $after = Get-KvForegroundSnapshot
+  if ($after.process_id -ne $SuccessProcessId) {
+    $code = Get-KvUiGuardForegroundErrorCode $after $TargetHwnd
+    $failurePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'failed' -Action 'mouse left click allowing process-owned successor' -Expected @{ hwnd = $TargetHwnd.ToInt64(); x = $X; y = $Y; successor_process_id = $SuccessProcessId } -Before $before -After $after -ErrorCode $code -Message 'Click did not leave a foreground window owned by the expected process.' -Evidence @($beforePath)
+    Stop-KvUiGuard -ErrorCode $code -Step $Step -Message "Click successor is not owned by process $SuccessProcessId." -Evidence @($beforePath, $failurePath)
+  }
+  Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action 'mouse left click allowing process-owned successor' -Expected @{ hwnd = $TargetHwnd.ToInt64(); x = $X; y = $Y; successor_process_id = $SuccessProcessId } -Before $before -After $after -Message 'Postcondition passed; the target process owns the successor foreground.' -Evidence @($beforePath) | Out-Null
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'mouse left click allowing process-owned successor' -TargetHwnd $TargetHwnd | Out-Null
+}
+
 function Invoke-KvGuardedMouseRightClick {
   param(
     [Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,
