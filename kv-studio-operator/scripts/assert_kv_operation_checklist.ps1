@@ -6,6 +6,20 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# A published workflow supplies its actual prevalidated plan. Keep explicit
+# legacy checklists for scaffold callers, but do not require agents to create a
+# second, keyword-only description of an already validated operation plan.
+if (-not $ChecklistPath -and $env:KV_WORKFLOW_VALIDATED_PLAN -and $env:KV_WORKFLOW_RUN_ID) {
+  $planPath=$env:KV_WORKFLOW_VALIDATED_PLAN
+  if (-not (Test-Path -LiteralPath $planPath -PathType Leaf) -or (Get-FileHash -LiteralPath $planPath -Algorithm SHA256).Hash -ne $env:KV_WORKFLOW_PLAN_SHA256) { throw 'KV_VALIDATED_PLAN_CHANGED' }
+  $plan=Get-Content -Raw -Encoding UTF8 -LiteralPath $planPath | ConvertFrom-Json
+  $allowedRoots=@([string]$plan.project_path)+@($plan.steps | ForEach-Object { [string]$_.out_dir })
+  $matches=@($SearchRoots | Where-Object { $_ -and [IO.Path]::GetFullPath($_) -in $allowedRoots })
+  if ($plan.ok -isnot [bool] -or -not $plan.ok -or $matches.Count -eq 0) { throw 'KV_VALIDATED_PLAN_TARGET_MISMATCH' }
+  @{ok=$true;operation=$OperationName;plan_path=$planPath;run_id=$env:KV_WORKFLOW_RUN_ID;basis='manifest-resolved execution plan validated before child launch'} | ConvertTo-Json
+  return
+}
+
 function Stop-ChecklistGuard([string]$ErrorCode, [string]$Message, [int]$ExitCode) {
   $payload = [ordered]@{
     ok = $false

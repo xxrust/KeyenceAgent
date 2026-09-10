@@ -1,5 +1,0 @@
-$resolver = Join-Path $PSScriptRoot 'Resolve-KvStudioOperatorScript.ps1'; . $resolver
-$root = Get-KvStudioOperatorScriptsRoot -StartPath $PSCommandPath
-$target = Resolve-KvStudioOperatorScriptPath -ScriptRoot $root -Name 'run_kv_mvp_repair_existing_project.ps1' -Classes @('customer_workflow')
-& $target @args
-exit $LASTEXITCODE

@@ -18,9 +18,8 @@ $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force -Path $OutDir, $ExportDir | Out-Null
 
 function Log([string]$Message) {
-  $line = (Get-Date -Format s) + ' ' + $Message
-  Add-Content -LiteralPath (Join-Path $OutDir 'run.log') -Value $line -Encoding UTF8
-  Write-Host $line
+  $path=if($env:KV_WORKFLOW_RUN_LOG){$env:KV_WORKFLOW_RUN_LOG}else{Join-Path $OutDir 'run.log'}
+  @{timestamp=(Get-Date).ToString('o');run_id=$env:KV_WORKFLOW_RUN_ID;type='export_step';message=$Message} | ConvertTo-Json -Compress | Add-Content -LiteralPath $path -Encoding UTF8
 }
 
 function Write-Result([bool]$Ok, [string]$Code, [string]$Message, [object[]]$MnmFiles = @()) {

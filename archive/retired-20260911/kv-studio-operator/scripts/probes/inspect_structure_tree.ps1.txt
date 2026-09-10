@@ -1,0 +1,17 @@
+# Historical source only. Use the current operator manifest for execution.
+param([Parameter(Mandatory=$true)][string]$OutDir,[Parameter(Mandatory=$true)][string]$ProjectPath)
+$ErrorActionPreference='Stop'
+New-Item -ItemType Directory -Force $OutDir|Out-Null
+$env:KV_WORKFLOW_RUN_LOG=Join-Path $OutDir 'run.log'
+. (Join-Path $PSScriptRoot '..\guards\kv_ui_guard.ps1')
+Initialize-KvUiGuard -OutDir $OutDir
+$needle=[IO.Path]::GetFileNameWithoutExtension($ProjectPath)
+$ps=@(Get-Process Kvs|Where-Object {$_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$needle*"})
+if($ps.Count -ne 1){throw 'KV_PROJECT_WINDOW_AMBIGUOUS'}
+$watch=[Diagnostics.Stopwatch]::StartNew()
+$root=[Windows.Automation.AutomationElement]::FromHandle($ps[0].MainWindowHandle)
+$tree=$root.FindFirst([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'ProjectTreeView')))
+if(-not $tree){throw 'KV_PROJECT_TREE_MISSING'}
+$items=@($tree.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)|ForEach-Object {@{name=$_.Current.Name;id=$_.Current.AutomationId;type=$_.Current.ControlType.ProgrammaticName;offscreen=$_.Current.IsOffscreen}})
+$items|ConvertTo-Json -Depth 4|Set-Content (Join-Path $OutDir 'project_tree.json') -Encoding UTF8
+Write-KvUiGuardRunLog -Event 'structure_tree_inspected' -Data @{project_path=$ProjectPath;elapsed_ms=$watch.ElapsedMilliseconds;read_only=$true;items=$items.Count}

@@ -336,6 +336,8 @@ try {
   $script:codeFingerprint = Get-KvCodeFingerprint $scriptRoot
   $script:codeFingerprint | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path ([string]$plan.run_root) 'code_fingerprint.json') -Encoding UTF8
   Write-WorkflowLog 'plan_validated' @{step_count=$script:preparedSteps.Count;code_sha256=$script:codeFingerprint.sha256}
+  $env:KV_WORKFLOW_VALIDATED_PLAN=$PlanPath
+  $env:KV_WORKFLOW_PLAN_SHA256=(Get-FileHash -LiteralPath $PlanPath -Algorithm SHA256).Hash
   foreach ($step in @($plan.steps)) {
     Invoke-FlatWorkflowStep $step
   }

@@ -37,13 +37,13 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Set-Content -LiteralPath (Join-Path $out 'bootstrap.log') -Value ((Get-Date -Format s) + ' bootstrap start') -Encoding UTF8
 function Log($m){
-  $line = (Get-Date -Format s) + ' ' + $m + [Environment]::NewLine
-  [IO.File]::AppendAllText((Join-Path $out 'run.log'), $line, [Text.Encoding]::UTF8)
+  LogContract 'import_step' @{message=[string]$m}
 }
 function LogContract([string]$Type, [hashtable]$Data = @{}) {
-  $entry = [ordered]@{ timestamp=(Get-Date).ToString('o'); type=$Type }
+  $entry = [ordered]@{ timestamp=(Get-Date).ToString('o'); run_id=$env:KV_WORKFLOW_RUN_ID; type=$Type }
   foreach($key in $Data.Keys){ $entry[$key]=$Data[$key] }
-  [IO.File]::AppendAllText((Join-Path $out 'run.log'), (($entry | ConvertTo-Json -Compress -Depth 8)+[Environment]::NewLine), [Text.Encoding]::UTF8)
+  $path=if($env:KV_WORKFLOW_RUN_LOG){$env:KV_WORKFLOW_RUN_LOG}else{Join-Path $out 'run.log'}
+  [IO.File]::AppendAllText($path, (($entry | ConvertTo-Json -Compress -Depth 8)+[Environment]::NewLine), [Text.Encoding]::UTF8)
 }
 
 function ConvertTo-BoolValue([object]$Value, [bool]$Default) {

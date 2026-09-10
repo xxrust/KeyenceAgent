@@ -20,7 +20,7 @@ $inventory=@(foreach($f in $files){
  $commands=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.CommandAst]},$true)|ForEach-Object {$_.GetCommandName()}|Where-Object {$_}|Sort-Object -Unique)
  $strings=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.StringConstantExpressionAst]},$true)|ForEach-Object {$_.Value}|Where-Object {$_ -match '\.ps1$'}|Sort-Object -Unique)
  $text=[IO.File]::ReadAllText($f.FullName)
- [pscustomobject]@{path=$relative;hash=(Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash;lines=@($text -split '\n').Count;manifest_classes=@($entries|Where-Object path -eq $relative|ForEach-Object {$_.class});wrapper=($text -match 'Invoke-KvStudioOperatorWrapper');flat_executor=($text -match 'invoke_kv_flat_execution_plan');raw_input=($text -match 'SendKeys\]::|keybd_event\(|mouse_event\(');script_references=$strings;parse_errors=@($errors|ForEach-Object {$_.Message})}
+ [pscustomobject]@{path=$relative;hash=(Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash;lines=@($text -split '\n').Count;manifest_classes=@($entries|Where-Object path -eq $relative|ForEach-Object {$_.class});wrapper=($text -match 'Invoke-KvStudioOperatorWrapper');flat_executor=($text -match 'invoke_kv_flat_execution_plan|Submit-KvWorkflowPlan');raw_input=($text -match 'SendKeys\]::|keybd_event\(|mouse_event\(');script_references=$strings;parse_errors=@($errors|ForEach-Object {$_.Message})}
 })
 $installation=@(foreach($skill in @('kv-studio-operator','keyence-plc-programmer','kv-studio-kb-programming')){
  $source=Join-Path $RepoRoot $skill;$installed=Join-Path $SkillsRoot $skill

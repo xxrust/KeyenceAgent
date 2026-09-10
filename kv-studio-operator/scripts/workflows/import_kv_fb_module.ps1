@@ -86,10 +86,16 @@ foreach ($pair in @(@('-MnmPath',$MnmPath),@('-ProjectPath',$ProjectPath),@('-Ou
 $importArgs.Add('-SaveAfterImport')
 if ($KvsExe) { $importArgs.Add('-KvsExe'); $importArgs.Add($KvsExe) }
 if ($DeleteExistingModuleBeforeImport) { $importArgs.Add('-DeleteExistingModuleBeforeImport') }
-if ($RestartKvs) { $importArgs.Add('-RestartKvs'); }
+$importArgs.Add('-RestartKvs')
+$importArgs.Add(([bool]$RestartKvs).ToString())
 $steps.Add([ordered]@{
   name = 'import_fb_mnm'; kind = 'runner_child'; script_name = 'import_mnm_guarded.ps1'; classes = @('runner_child_approved')
   arguments = @($importArgs); out_dir = $importOut
+})
+$placementOut=Join-Path $artifactRoot 'module_placement'
+$steps.Add([ordered]@{
+  name='verify_fb_placement';kind='tool';script_name='workflow_tools/assert_kv_module_placement.ps1';classes=@('workflow_tool');out_dir=$placementOut
+  arguments=@('-ProjectTreePath',(Join-Path (Split-Path -Parent $ProjectPath) 'WsTreeEnv.xml'),'-ModuleName',$ExpectedModuleName,'-Category','function_block','-OutDir',$placementOut)
 })
 
 $plan = [ordered]@{

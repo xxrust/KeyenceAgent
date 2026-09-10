@@ -1,5 +1,5 @@
-﻿{
-  "schema_version": 1,
+{
+  "schema_version": 2,
   "layout_policy": "role_directories",
   "notes": [
     "Scripts are physically separated by role.",
@@ -19,9 +19,12 @@
       "runner_child_approved",
       "runner_child_pending",
       "guard_library",
-      "probe_research"
+      "probe_research",
+      "support_library",
+      "internal_non_ui_tool",
+      "maintenance_tool"
     ],
-    "unlisted_root_scripts": "unclassified_until_added_to_manifest",
+    "unlisted_root_scripts": "reject_until_classified",
     "project_configuration_without_customer_workflow": "ROUTE_RESEARCH_REQUIRED",
     "requires_research_mode_patterns": [
       "configure_kv_*.ps1",
@@ -51,26 +54,126 @@
     "pending": []
   },
   "step_result_contracts": {
-    "gates/assert_kv_mvp_ui_guard_usage.ps1": {"files": ["ui_guard_usage_result.json"]},
-    "gates/assert_kv_mvp_agent_boundary.ps1": {"files": ["agent_boundary_contract.json"]},
-    "scaffold_tools/validate_kv_mvp_scaffold.ps1": {"files": ["scaffold_validation.json"]},
-    "scaffold_tools/assert_kv_mnm_import_plan.ps1": {"files": ["mnm_import_plan_gate.json"]},
-    "assert_kv_existing_project_snapshot.ps1": {"files": ["existing_project_snapshot_gate.json"]},
-    "runner_children/create_project_local_guarded.ps1": {"files": ["create_project_result.json"]},
-    "runner_children/import_mnm_guarded.ps1": {"files": ["import_result.json"]},
-    "runner_children/set_variables_guarded.ps1": {"files": ["set_variables_result.json", "variable_persistence_validation.json"], "variants": [{"switch": "-SnapshotOnly", "files": ["variable_snapshot_result.json"]}]},
-    "runner_children/set_fb_arguments_guarded.ps1": {"files": ["set_fb_arguments_result.json"], "variants": [{"switch": "-SnapshotOnly", "files": ["fb_snapshot_result.json"]}]},
-    "runner_children/compile_and_copy_result_bounded.ps1": {"files": ["result.json"]},
-    "runner_children/copy_convert_result_from_tree_handle.ps1": {"files": ["result.json"], "artifacts": ["compile_result_copied.txt"]},
-    "runner_children/export_mnm_browse_default_folder_guarded.ps1": {"files": ["browse_folder_export_result.json"]},
-    "runner_children/configure_expansion_units_guarded.ps1": {"files": ["result.json"]},
-    "runner_children/configure_ethercat_nodes_guarded.ps1": {"files": ["result.json"]},
-    "runner_children/export_structure_definitions_guarded.ps1": {"files": ["structure_definitions.json"]},
-    "runner_children/mutate_structure_definitions_guarded.ps1": {"files": ["result.json"]},
-    "workflow_tools/assert_kv_module_placement.ps1": {"files": ["module_placement_result.json"]},
-    "workflow_tools/new_kv_mvp_execution_plan.ps1": {"files": ["execution_plan_result.json"]},
-    "workflow_tools/new_kv_mnm_export_workspace.ps1": {"files": ["export_workspace_plan.json"]},
-    "workflow_tools/collect_kv_mnm_export_workspace.ps1": {"files": ["export_mnm_project_copy_result.json"]}
+    "gates/assert_kv_mvp_ui_guard_usage.ps1": {
+      "files": [
+        "ui_guard_usage_result.json"
+      ]
+    },
+    "gates/assert_kv_mvp_agent_boundary.ps1": {
+      "files": [
+        "agent_boundary_contract.json"
+      ]
+    },
+    "scaffold_tools/validate_kv_mvp_scaffold.ps1": {
+      "files": [
+        "scaffold_validation.json"
+      ]
+    },
+    "scaffold_tools/assert_kv_mnm_import_plan.ps1": {
+      "files": [
+        "mnm_import_plan_gate.json"
+      ]
+    },
+    "assert_kv_existing_project_snapshot.ps1": {
+      "files": [
+        "existing_project_snapshot_gate.json"
+      ]
+    },
+    "runner_children/create_project_local_guarded.ps1": {
+      "files": [
+        "create_project_result.json"
+      ]
+    },
+    "runner_children/import_mnm_guarded.ps1": {
+      "files": [
+        "import_result.json"
+      ]
+    },
+    "runner_children/set_variables_guarded.ps1": {
+      "files": [
+        "set_variables_result.json",
+        "variable_persistence_validation.json"
+      ],
+      "variants": [
+        {
+          "switch": "-SnapshotOnly",
+          "files": [
+            "variable_snapshot_result.json"
+          ]
+        }
+      ]
+    },
+    "runner_children/set_fb_arguments_guarded.ps1": {
+      "files": [
+        "set_fb_arguments_result.json"
+      ],
+      "variants": [
+        {
+          "switch": "-SnapshotOnly",
+          "files": [
+            "fb_snapshot_result.json"
+          ]
+        }
+      ]
+    },
+    "runner_children/compile_and_copy_result_bounded.ps1": {
+      "files": [
+        "result.json"
+      ]
+    },
+    "runner_children/copy_convert_result_from_tree_handle.ps1": {
+      "files": [
+        "result.json"
+      ],
+      "artifacts": [
+        "compile_result_copied.txt"
+      ]
+    },
+    "runner_children/export_mnm_browse_default_folder_guarded.ps1": {
+      "files": [
+        "browse_folder_export_result.json"
+      ]
+    },
+    "runner_children/configure_expansion_units_guarded.ps1": {
+      "files": [
+        "result.json"
+      ]
+    },
+    "runner_children/configure_ethercat_nodes_guarded.ps1": {
+      "files": [
+        "result.json"
+      ]
+    },
+    "runner_children/export_structure_definitions_guarded.ps1": {
+      "files": [
+        "structure_definitions.json"
+      ]
+    },
+    "runner_children/mutate_structure_definitions_guarded.ps1": {
+      "files": [
+        "result.json"
+      ]
+    },
+    "workflow_tools/assert_kv_module_placement.ps1": {
+      "files": [
+        "module_placement_result.json"
+      ]
+    },
+    "workflow_tools/new_kv_mvp_execution_plan.ps1": {
+      "files": [
+        "execution_plan_result.json"
+      ]
+    },
+    "workflow_tools/new_kv_mnm_export_workspace.ps1": {
+      "files": [
+        "export_workspace_plan.json"
+      ]
+    },
+    "workflow_tools/collect_kv_mnm_export_workspace.ps1": {
+      "files": [
+        "export_mnm_project_copy_result.json"
+      ]
+    }
   },
   "classes": {
     "customer_scaffold_tool": [
@@ -125,23 +228,61 @@
         "path": "get_kv_ethernet_ip_device_members.ps1",
         "status": "published",
         "customer_callable": true
+      },
+      {
+        "path": "get_kv_capabilities.ps1",
+        "status": "published",
+        "customer_callable": true,
+        "capabilities": [
+          "list_kv_operations"
+        ]
       }
     ],
     "customer_workflow": [
       {
         "path": "workflows/run_kv_mvp_scaffold.ps1",
         "status": "published",
-        "customer_callable": true
+        "customer_callable": true,
+        "runner_children": [
+          "runner_children/create_project_local_guarded.ps1",
+          "runner_children/import_mnm_guarded.ps1",
+          "runner_children/set_variables_guarded.ps1",
+          "runner_children/set_fb_arguments_guarded.ps1",
+          "runner_children/compile_and_copy_result_bounded.ps1",
+          "runner_children/copy_convert_result_from_tree_handle.ps1"
+        ],
+        "execution": "flat_manifest_steps",
+        "capabilities": [
+          "run_kv_mvp_scaffold"
+        ]
       },
       {
         "path": "workflows/run_kv_mvp_repair_existing_project.ps1",
         "status": "published",
-        "customer_callable": true
+        "customer_callable": true,
+        "runner_children": [
+          "runner_children/import_mnm_guarded.ps1",
+          "runner_children/set_variables_guarded.ps1",
+          "runner_children/set_fb_arguments_guarded.ps1",
+          "runner_children/compile_and_copy_result_bounded.ps1",
+          "runner_children/copy_convert_result_from_tree_handle.ps1"
+        ],
+        "execution": "flat_manifest_steps",
+        "capabilities": [
+          "run_kv_mvp_repair_existing_project"
+        ]
       },
       {
         "path": "workflows/export_mnm_project_copy_default_folder.ps1",
         "status": "published",
-        "customer_callable": true
+        "customer_callable": true,
+        "runner_children": [
+          "runner_children/export_mnm_browse_default_folder_guarded.ps1"
+        ],
+        "execution": "flat_manifest_steps",
+        "capabilities": [
+          "export_mnm_project_copy_default_folder"
+        ]
       },
       {
         "path": "workflows/configure_kv_expansion_units.ps1",
@@ -150,7 +291,11 @@
         "capabilities": [
           "configure_plc_expansion_units",
           "verify_plc_expansion_units_persistence"
-        ]
+        ],
+        "runner_children": [
+          "runner_children/configure_expansion_units_guarded.ps1"
+        ],
+        "execution": "flat_manifest_steps"
       },
       {
         "path": "workflows/configure_kv_ethercat_nodes.ps1",
@@ -159,7 +304,11 @@
         "capabilities": [
           "configure_ethercat_nodes_by_catalog_model",
           "verify_ethercat_node_model_persistence"
-        ]
+        ],
+        "runner_children": [
+          "runner_children/configure_ethercat_nodes_guarded.ps1"
+        ],
+        "execution": "flat_manifest_steps"
       },
       {
         "path": "workflows/set_kv_variables.ps1",
@@ -167,8 +316,13 @@
         "customer_callable": true,
         "capabilities": [
           "set_global_and_local_variables",
+          "snapshot_global_and_local_variables",
           "verify_variable_persistence"
-        ]
+        ],
+        "runner_children": [
+          "runner_children/set_variables_guarded.ps1"
+        ],
+        "execution": "flat_manifest_steps"
       },
       {
         "path": "workflows/set_kv_fb_arguments.ps1",
@@ -178,7 +332,12 @@
           "set_fb_arguments",
           "snapshot_fb_arguments",
           "verify_fb_argument_copyback"
-        ]
+        ],
+        "runner_children": [
+          "runner_children/set_fb_arguments_guarded.ps1",
+          "runner_children/set_variables_guarded.ps1"
+        ],
+        "execution": "flat_manifest_steps"
       },
       {
         "path": "workflows/import_kv_fb_module.ps1",
@@ -187,7 +346,11 @@
         "capabilities": [
           "import_kv_fb_module",
           "create_kv_function_block_from_mnm"
-        ]
+        ],
+        "runner_children": [
+          "runner_children/import_mnm_guarded.ps1"
+        ],
+        "execution": "flat_manifest_steps"
       },
       {
         "path": "workflows/export_kv_structure_definitions.ps1",
@@ -196,7 +359,11 @@
         "capabilities": [
           "export_user_structure_definitions",
           "verify_structure_member_types"
-        ]
+        ],
+        "runner_children": [
+          "runner_children/export_structure_definitions_guarded.ps1"
+        ],
+        "execution": "flat_manifest_steps"
       },
       {
         "path": "workflows/mutate_kv_structure_definitions.ps1",
@@ -211,7 +378,33 @@
           "delete_user_structure_definitions",
           "create_user_structure_folders",
           "verify_structure_mutation_persistence"
-        ]
+        ],
+        "execution": "flat_manifest_steps"
+      },
+      {
+        "path": "workflows/create_kv_project.ps1",
+        "status": "pending_validation",
+        "customer_callable": false,
+        "capabilities": [
+          "create_project"
+        ],
+        "runner_children": [
+          "runner_children/create_project_local_guarded.ps1"
+        ],
+        "execution": "flat_manifest_steps"
+      },
+      {
+        "path": "workflows/compile_kv_project.ps1",
+        "status": "pending_validation",
+        "customer_callable": false,
+        "capabilities": [
+          "compile_project"
+        ],
+        "runner_children": [
+          "runner_children/compile_and_copy_result_bounded.ps1",
+          "runner_children/copy_convert_result_from_tree_handle.ps1"
+        ],
+        "execution": "flat_manifest_steps"
       }
     ],
     "regression_harness": [
@@ -282,24 +475,30 @@
         "customer_callable": false,
         "ui_guard_required": true
       },
-    {
-      "path": "runner_children/configure_ethercat_nodes_guarded.ps1",
-      "status": "approved",
-      "customer_callable": false,
-      "ui_guard_required": true
-    },
-    {
-      "path": "runner_children/export_structure_definitions_guarded.ps1",
-      "status": "approved",
-      "customer_callable": false,
-      "ui_guard_required": true
-    },
-    {
-      "path": "runner_children/mutate_structure_definitions_guarded.ps1",
-      "status": "approved",
-      "customer_callable": false,
-      "ui_guard_required": true
-    }
+      {
+        "path": "runner_children/configure_ethercat_nodes_guarded.ps1",
+        "status": "approved",
+        "customer_callable": false,
+        "ui_guard_required": true
+      },
+      {
+        "path": "runner_children/export_structure_definitions_guarded.ps1",
+        "status": "approved",
+        "customer_callable": false,
+        "ui_guard_required": true
+      },
+      {
+        "path": "runner_children/mutate_structure_definitions_guarded.ps1",
+        "status": "approved",
+        "customer_callable": false,
+        "ui_guard_required": true
+      },
+      {
+        "path": "runner_children/invoke_kv_variable_menu_helper.ps1",
+        "status": "approved",
+        "customer_callable": false,
+        "ui_guard_required": true
+      }
     ],
     "runner_child_pending": [],
     "workflow_tool": [
@@ -336,13 +535,7 @@
         "customer_callable": false
       }
     ],
-    "probe_research": [
-      {
-        "path": "probes/probe_file_menu_coordinate.ps1",
-        "status": "research_only",
-        "customer_callable": false
-      }
-    ],
+    "probe_research": [],
     "gate": [
       {
         "path": "gates/assert_kv_mvp_agent_boundary.ps1",
@@ -353,6 +546,62 @@
         "path": "gates/assert_kv_mvp_ui_guard_usage.ps1",
         "status": "gate",
         "customer_callable": true
+      }
+    ],
+    "support_library": [
+      {
+        "path": "Resolve-KvStudioOperatorScript.ps1",
+        "status": "library",
+        "customer_callable": false
+      },
+      {
+        "path": "Import-KvStudioOperatorConfig.ps1",
+        "status": "library",
+        "customer_callable": false
+      },
+      {
+        "path": "kv_variable_definition_lib.ps1",
+        "status": "library",
+        "customer_callable": false
+      },
+      {
+        "path": "guards/kv_fb_snapshot.ps1",
+        "status": "library",
+        "customer_callable": false
+      },
+      {
+        "path": "workflow_tools/kv_step_evidence.ps1",
+        "status": "library",
+        "customer_callable": false
+      },
+      {
+        "path": "workflow_tools/kv_workflow_plan.ps1",
+        "status": "library",
+        "customer_callable": false
+      }
+    ],
+    "internal_non_ui_tool": [
+      {
+        "path": "assert_kv_variable_definitions.ps1",
+        "status": "internal",
+        "customer_callable": false
+      },
+      {
+        "path": "assert_kv_operation_checklist.ps1",
+        "status": "internal",
+        "customer_callable": false
+      },
+      {
+        "path": "assert_kvstudio_ui_safe.ps1",
+        "status": "internal",
+        "customer_callable": false
+      }
+    ],
+    "maintenance_tool": [
+      {
+        "path": "set_kv_admin_credential.ps1",
+        "status": "maintenance",
+        "customer_callable": false
       }
     ]
   }

@@ -14,7 +14,7 @@ param(
 )
 $ErrorActionPreference='Stop'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-$runLog=Join-Path $OutDir 'run.log'; $env:KV_WORKFLOW_RUN_LOG=$runLog
+$runLog=if($env:KV_WORKFLOW_RUN_LOG){$env:KV_WORKFLOW_RUN_LOG}else{Join-Path $OutDir 'run.log'}; $env:KV_WORKFLOW_RUN_LOG=$runLog
 function Log([string]$Type,[hashtable]$Data=@{}) { $o=[ordered]@{timestamp=(Get-Date).ToString('o');type=$Type}; foreach($k in $Data.Keys){$o[$k]=$Data[$k]}; (ConvertTo-Json $o -Compress)|Add-Content -LiteralPath $runLog -Encoding UTF8 }
 Add-Type -AssemblyName System.Windows.Forms
 $scriptRoot=Split-Path -Parent (Split-Path -Parent $PSCommandPath)

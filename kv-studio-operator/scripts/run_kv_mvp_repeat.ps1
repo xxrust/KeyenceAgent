@@ -1,5 +1,0 @@
-$resolver = Join-Path $PSScriptRoot 'Resolve-KvStudioOperatorScript.ps1'; . $resolver
-$root = Get-KvStudioOperatorScriptsRoot -StartPath $PSCommandPath
-$target = Resolve-KvStudioOperatorScriptPath -ScriptRoot $root -Name 'run_kv_mvp_repeat.ps1' -Classes @('regression_harness')
-& $target @args
-exit $LASTEXITCODE

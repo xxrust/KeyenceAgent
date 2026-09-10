@@ -1,5 +1,0 @@
-$resolver = Join-Path $PSScriptRoot 'Resolve-KvStudioOperatorScript.ps1'; . $resolver
-$root = Get-KvStudioOperatorScriptsRoot -StartPath $PSCommandPath
-$target = Resolve-KvStudioOperatorScriptPath -ScriptRoot $root -Name 'validate_kv_mvp_scaffold.ps1' -Classes @('customer_scaffold_tool')
-& $target @args
-exit $LASTEXITCODE

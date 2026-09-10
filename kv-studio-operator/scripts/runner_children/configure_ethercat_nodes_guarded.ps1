@@ -19,7 +19,7 @@ if ([string]::IsNullOrWhiteSpace($OutDir)) {
   $OutDir = Join-Path (Join-Path ([IO.Path]::GetTempPath()) 'kv-studio-operator') 'kv_network_config_runs'
 }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-$RunLogPath = Join-Path $OutDir 'run.log'
+$RunLogPath = if($env:KV_WORKFLOW_RUN_LOG){$env:KV_WORKFLOW_RUN_LOG}else{Join-Path $OutDir 'run.log'}
 Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes,System.Windows.Forms,System.Drawing
 $sharedUiGuard=Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'guards\kv_ui_guard.ps1'
 if(-not(Test-Path -LiteralPath $sharedUiGuard -PathType Leaf)){throw "KV_UI_GUARD_MISSING: $sharedUiGuard"}

@@ -33,7 +33,7 @@ function Stop-ScaffoldValidation([string]$ErrorCode, [string]$Message, [string[]
     message = $Message
     evidence = $Evidence
     remediation = @(
-      'Regenerate the scaffold with scripts/new_kv_mvp_scaffold.ps1, or repair the listed file.',
+      'Regenerate the scaffold with scripts/scaffold_tools/new_kv_mvp_scaffold.ps1, or repair the listed file.',
       'Do not run KV STUDIO until scaffold_validation.json reports ok=true.'
     )
   }

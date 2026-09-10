@@ -13,7 +13,7 @@ param(
 )
 $ErrorActionPreference='Stop'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-$runLog=Join-Path $OutDir 'run.log'; $env:KV_WORKFLOW_RUN_LOG=$runLog
+$runLog=if($env:KV_WORKFLOW_RUN_LOG){$env:KV_WORKFLOW_RUN_LOG}else{Join-Path $OutDir 'run.log'}; $env:KV_WORKFLOW_RUN_LOG=$runLog
 function Log([string]$Type,[hashtable]$Data=@{}) { $o=[ordered]@{timestamp=(Get-Date).ToString('o');type=$Type}; foreach($k in $Data.Keys){$o[$k]=$Data[$k]}; (ConvertTo-Json $o -Compress)|Add-Content -LiteralPath $runLog -Encoding UTF8 }
 function Fail([string]$Code,[string]$Message,[object[]]$Evidence=@()) { Log 'workflow_failed' @{error_code=$Code;message=$Message;evidence=$Evidence}; [ordered]@{ok=$false;error_code=$Code;message=$Message;evidence=@($Evidence)}|ConvertTo-Json -Depth 12|Set-Content -LiteralPath (Join-Path $OutDir 'failure.json') -Encoding UTF8; throw "$Code`: $Message" }
 Add-Type -AssemblyName System.Windows.Forms

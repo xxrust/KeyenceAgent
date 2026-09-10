@@ -1,9 +1,11 @@
 # Shared plan construction only. This library never sends desktop input.
 function New-KvWorkflowPlan {
-  param([string]$ScriptsRoot,[string]$Operation,[string]$ProjectPath,[string]$OutDir,[int]$TimeoutSeconds=120,[string]$ResultName='workflow_result.json')
+  param([string]$ScriptsRoot,[string]$Operation,[string]$ProjectPath,[string]$OutDir,[int]$TimeoutSeconds=120,[string]$ResultName='workflow_result.json',[switch]$NewProject)
   $OutDir=[IO.Path]::GetFullPath($OutDir)
   $ProjectPath=[IO.Path]::GetFullPath($ProjectPath)
-  if (-not (Test-Path -LiteralPath $ProjectPath -PathType Leaf)) { throw "KV_PROJECT_FILE_MISSING: $ProjectPath" }
+  if ($NewProject) {
+    if (Test-Path -LiteralPath $ProjectPath) { throw "KV_TARGET_PROJECT_ALREADY_EXISTS: $ProjectPath" }
+  } elseif (-not (Test-Path -LiteralPath $ProjectPath -PathType Leaf)) { throw "KV_PROJECT_FILE_MISSING: $ProjectPath" }
   New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
   $plan=[ordered]@{
     ok=$true;schema_version=2;operation=$Operation;project_path=$ProjectPath;project_name=[IO.Path]::GetFileNameWithoutExtension($ProjectPath)

@@ -1,270 +1,54 @@
 ---
 name: kv-studio-operator
-description: 通过已发布 workflow、scaffold tool 和 gate 控制 KEYENCE KV STUDIO 桌面软件时使用。适用于创建或修复 KV STUDIO 项目、导入/导出 MNM、编辑全局/局部变量、运行转换/编译、复制转换结果、复刻或修复现有 `.kpr` 项目。涉及 PLC 扩展单元、EtherNet/IP、EtherCAT 或其他项目配置时，先依据 `scripts/script_manifest.json` 判断是否已有客户态 workflow；没有客户态 workflow 时输出 `ROUTE_RESEARCH_REQUIRED`。
+description: 通过稳定 workflow 操作 KEYENCE KV STUDIO 桌面项目。用于项目创建、MNM 导入导出、FB 自变量与局部变量、数据类型、编译结果和单元/EtherCAT 配置；从能力清单选择接口，由脚本负责焦点、输入、验证和日志。
 ---
-
-# 基本认知
-KV STUDIO 是 KEYENCE 旗下的 PLC 编程软件，支持梯形图、功能块图、结构化文本等多种编程语言。用户通过它创建和管理 PLC 项目，编写控制逻辑，并将程序部署到 PLC 设备上。KV STUDIO 提供了丰富的功能，包括变量管理、在线监控、调试工具和项目配置选项，适用于各种工业自动化应用场景。
-但是该PLC并没有对外的脚本，虽然宣传说兼容ST语言，但结构上还有许多差别，比如变量不能定义在程序块中。
-所以为了创建一个完整的PLC项目，我们需要引入由多个原子操作构建的工作流，包含打开/创建项目，导入Ethercat配置，Ethernet配置，PLC模块配置，配置轴控模块，导入/导出MNM，编辑变量，编译程序等操作。
 
 # KV STUDIO 操作
 
-本 skill 用于让 agent 通过已发布脚本操作 KV STUDIO。agent 先读取 manifest 选择入口，再传入项目路径、脚手架路径、输出目录等参数；KV STUDIO 的窗口操作由 workflow 完成，agent 只读取同次运行产物并汇报结果。
+把 KV STUDIO 当作由 workflow 提供接口的编辑器。agent 准备目标、输入和预期结果，调用接口后读取本次结果；不要临时拼接键盘、窗口或剪贴板操作。
 
-## 快速入口
+## 选择接口
 
-客户态入口唯一来源是 `scripts\script_manifest.json`。先读取 manifest，再运行 `customer_callable=true` 的 `customer_workflow`、`customer_scaffold_tool`、`customer_non_ui_tool` 或 `gate`。
-
-```yaml
-quick_start:
-  SkillRoot: this_skill_directory
-  WorkRoot: <configured-work-root-or-temp-work-root>
-  Manifest: scripts\script_manifest.json
-  BuiltInSample: references\KVX样例程序_v100\KVX样例程序_v100.kpr
-  route_map:
-    new_project: customer_scaffold_tool -> customer_workflow
-    existing_project_repair: customer_non_ui_tool -> customer_scaffold_tool -> customer_workflow
-    export_mnm: customer_workflow capability export_mnm_project_copy_default_folder
-    non_ui_gate: manifest.classes.gate
-    project_configuration: manifest.classes.customer_workflow requires matching capability
-```
-
-## 运行日志与状态交接契约
-
-每次 `customer_workflow` 必须在接管 KV STUDIO 前创建同次运行的 `run.log`（JSONL）。日志是该运行的唯一审计入口，必须记录：workflow 开始/结束、每个阶段开始/结束/失败、目标窗口句柄与标题、耗时、预算、结果或稳定错误码。所有 guard 原子动作（键盘、鼠标、剪贴板、虚拟键等）也必须即时追加到同一个 `run.log`，不得只写独立的 timing JSON；独立 JSON 仅作为兼容副本。
-
-UI workflow 启动前必须完成并记录前置检查：项目文件存在、目标项目窗口唯一、窗口可前台接收输入、无残留模态框/待机界面、目标状态与 workflow 第一步匹配。前置检查失败时不得发送任何 UI 输入，应输出 `failure.json` 和 `run.log` 后停止。每个原子动作预算为 10 秒（`elapsed_ms < 10000`）；超时必须记录 `KV_UI_ATOMIC_STEP_TIMEOUT` 并停止。只有在统一日志写入成功且结果/失败证据齐全后，agent 才可汇报本次运行。
-
-默认使用快速模式：仅执行与当前动作直接相关的一次性前置检查，不展开项目树、不枚举控件/模块、不进行多轮焦点探针。模块存在性检查只允许一次按目标名称的定向查询，计入 `run.log` 的 `module_lookup.elapsed_ms`，预算为 1000ms；检测到异常、超时或状态不匹配时立即停止并保留证据。只有故障诊断或显式 audit 参数才允许额外检查。
-
-多实例规则：新建项目 workflow 只检查目标同名项目窗口；其他 KV STUDIO 实例（包括带未保存标记 `*` 的不同项目）不阻塞新建。目标同名项目已打开时返回稳定错误并要求改用已有项目 repair workflow。已有项目 repair、FB 导入和变量修改 workflow 必须绑定传入的目标项目，允许该目标窗口带未保存标记 `*`。
-
-把输入代码放入 `guards\kv_ui_guard.ps1` 并不等于原子动作已获批准。客户态 runner 只能调用 `scripts\script_manifest.json` 中 `ui_atomic_actions.approved` 列出的 API；`pending` 或未登记动作必须被 `assert_kv_mvp_ui_guard_usage.ps1` 拒绝。发布的 UI workflow 必须从 manifest 解析其 runner 依赖，并在调用 runner、接管 KV STUDIO 之前运行该门禁。新增复合按键、焦点恢复或剪贴板路线先保持 pending，经隔离验证和重复回归后才能提升为 approved；不得为了完成当前任务直接把新函数加入 approved。
-
-`runner_children`、`guards`、`probes` 是 workflow 内部实现或研发工具。客户态失败诊断读取同次 result/evidence；研发态操作需要用户明确授权。references 只提供状态、schema 和失败归因；执行入口仍由 manifest 决定。
-
-## 术语
-
-```yaml
-terms:
-  workflow: 已发布的编排脚本，负责打开/操作/收口 KV STUDIO
-  runner_child: workflow 调用的内部 UI 原子步骤
-  guard: runner_child 使用的输入与窗口状态保护库
-  gate: 不打开 KV STUDIO 的校验脚本
-  evidence: 本次运行写出的日志、截图、窗口状态、result/failure JSON
-  same_run_artifact: 与当前 workflow 同一次运行生成的产物
-  customer_callable: manifest 中允许客户态 agent 直接运行的标记
-  clean_end_state: workflow 结束后 KV STUDIO 回到主窗口或已关闭，且无遗留配置窗口/弹窗
-  customer_mode: 只运行 customer workflow、scaffold tool、non-UI tool、gate，并读取产物
-  customer_non_ui_tool: 客户态可运行的不打开 KV STUDIO 的准备、读取或过滤脚本
-  research_mode: 探索或修脚本的研发状态，需要用户明确授权
-  research_authorization: 用户明确要求进入 research_mode 并允许运行研发脚本
-  ROUTE_RESEARCH_REQUIRED: 当前客户态 workflow 无法继续，需要转研发态
-  customer_scaffold_tool: 客户态可运行的脚手架或预检脚本
-  customer_workflow: 客户态可运行的 KV STUDIO UI 编排脚本
-  runner_child_approved: workflow 内部可调用的已验证原子步骤
-  runner_child_pending: 等待验证的内部原子步骤
-  flat_execution_runner: workflow_tool/invoke_kv_flat_execution_plan.ps1，执行 execution_plan 中的步骤、超时、失败收集和 result 输出
-  probe_research: 研发态探针脚本
-  published: 客户态可直接依 manifest 运行
-  approved: workflow 或回归 harness 可调用
-  pending_validation: 等待验证证据
-  research_only: 研发态使用
-```
-
-## 客户态规则
-
-```yaml
-customer_mode_contract:
-  agent_actions:
-    - choose_entry_from_script_manifest
-    - edit_scaffold_files_before_KV_STUDIO_opens
-    - run_customer_workflow_scaffold_tool_non_ui_tool_or_gate
-    - inspect_same_run_result_and_evidence
-    - report_error_code_step_evidence_clean_state
-  ui_owner: customer_workflow
-  failure_transition: ROUTE_RESEARCH_REQUIRED
-```
-
-运行 customer_workflow 时，KV STUDIO 窗口控制权属于 workflow。agent 读取 workflow 写出的 result JSON、failure JSON、evidence 目录和 clean-state 检查结果来判断成败。
-
-## 新项目
-
-```yaml
-new_project_flow:
-  - create_scaffold: manifest.classes.customer_scaffold_tool capability new_kv_mvp_scaffold
-  - edit_primary_model: scaffold.model.json
-  - render_when_model_changed: manifest.classes.customer_non_ui_tool capability render_kv_mvp_scaffold_model
-  - validate_scaffold: manifest.classes.customer_scaffold_tool capability validate_kv_mvp_scaffold
-  - run_kvstudio: manifest.classes.customer_workflow capability run_kv_mvp_scaffold
-    - repeat_gate: manifest.classes.regression_harness capability run_kv_mvp_repeat
-internal_structure:
-  workflow:
-    - generate_new_project_execution_plan
-    - invoke_flat_execution_runner
-  flat_execution_runner:
-    - execute_plan_steps
-    - collect_failure
-    - write_result_json
-success:
-  - scaffold_validation.json.ok == true
-  - mvp_result.json.ok == true
-  - repeat_result.json.ok == true when repeat requested
-```
-
-正常编辑入口是 `scaffold.model.json`。生成后的 MNM/TSV 是 KV STUDIO adapter artifact；诊断旧脚手架时才直接编辑生成物。
-
-模型脚手架校验须证明生成产物及模块导入顺序与模型一致；通过不等于完整项目复刻。当前变量接口只回读名称/类型，设备绑定、非默认初值、保持属性、结构体成员和库依赖的完整重建尚未实现，不得省略这些需求后宣称复刻成功。细节见 `references/mvp-runner-contract.md`。
-
-## 现有项目修复
-
-```yaml
-existing_project_flow:
-  - create_or_update_workspace: manifest.classes.customer_non_ui_tool capability new_kv_existing_project_update_workspace
-  - verify_snapshot: manifest.classes.customer_non_ui_tool capability assert_kv_existing_project_snapshot
-  - plan_mnm_import: manifest.classes.customer_scaffold_tool capability assert_kv_mnm_import_plan
-  - edit_scaffold_from_verified_snapshot
-  - run_repair: manifest.classes.customer_workflow capability run_kv_mvp_repair_existing_project
-internal_structure:
-  workflow:
-    - generate_repair_existing_project_execution_plan
-    - invoke_flat_execution_runner
-  flat_execution_runner:
-    - execute_plan_steps
-    - collect_failure
-    - write_result_json
-success:
-  - repair_result.json.ok == true
-  - source_snapshot_gate.ok == true
-  - project_fingerprint_matches_current_gate
-```
-
-当前项目快照必须来自同一项目 hash 下的新导出 `.mnm`、`.csv`、`.lbl` 或 runner sidecar。项目目录 hash 变化后重新导出。
-
-## MNM 导出
-
-先从 manifest 解析 `customer_workflow` 中的 `export_mnm_project_copy_default_folder` 入口，再运行解析出的 path：
+唯一能力清单是 [scripts/script_manifest.json](scripts/script_manifest.json)。用只读查询获得实际路径、参数类型、必填参数和验证范围：
 
 ```powershell
-$ResolvedWorkflowPath = '<path resolved from manifest customer_workflow export_mnm_project_copy_default_folder>'
-powershell -NoProfile -ExecutionPolicy Bypass -File $ResolvedWorkflowPath `
-  -ProjectPath '<project.kpr>' `
-  -ExportDir '<out>\exported_mnm' `
-  -OutDir '<out>\export_mnm_project_copy' `
-  -WorkRoot '<out>\exported_mnm\_kv_export_workspace'
+powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\get_kv_capabilities.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\get_kv_capabilities.ps1 -Capability snapshot_fb_arguments
 ```
 
-```yaml
-success:
-  - export_mnm_project_copy_result.json.ok == true
-  - same_run_mnm_files under ExportDir
-  - postcheck_kvstudio_ui_safe.json.ok == true
-```
+运行查询返回的 `customer_callable=true` 入口。普通操作只需对应接口的输入，不需要构造 MVP 或复刻整个项目。需要多步时先准备完整计划；一个 workflow 内部通过同一 flat executor 调度子步骤。新建完整 FB 通常包含程序体导入、自变量写入、局部变量写入和编译；修改其中一项只调用对应接口。
 
-workflow 通过项目副本位置和默认导出目录控制 MNM 输出位置。下游 MNM 解析脚本只读取顶层导出 MNM，并忽略 `ExportDir\_kv_export_workspace`。
+`scaffold_tools` 与 `run_kv_mvp_*` 是可选的完整程序示例和回归工具，用于学习程序体、声明、实例、依赖与编译的关系。只有选用该示例模型时才阅读 [mvp-runner-contract.md](references/mvp-runner-contract.md)，不要把它当作所有项目编辑的前提。
 
-## 项目配置脚本状态
+查不到所需能力时报告 `ROUTE_RESEARCH_REQUIRED` 和缺失的接口。用户已经要求修复、测试或研发时，可以在该授权范围内修改并回归；陌生 UI 操作按用户要求立即停下求助，不穷举菜单或焦点路线。
 
-```yaml
-project_configuration_policy:
-  entry_source: scripts\script_manifest.json
-  customer_mode_condition: manifest.classes.customer_workflow contains requested capability
-  absent_customer_workflow_status: ROUTE_RESEARCH_REQUIRED
-  absent_customer_workflow_action: emit ROUTE_RESEARCH_REQUIRED with requested_capability
-  evidence_reference: references\capability-status.md
-```
+## 调用与验收
 
-```yaml
-ethercat_customer_api:
-  manifest_capability: configure_ethercat_nodes_by_catalog_model
-  input: nodes JSON with unique node_address and catalog_model
-  execution: one EtherCAT editor session, batch insert, one save, exact node/model readback
-  supported_boundary: any catalog_model that uniquely matches an item already present in the current KV STUDIO EtherCAT catalog
-  stable_failures: [KV_ETHERCAT_DEVICE_MODEL_NOT_FOUND, KV_ETHERCAT_DEVICE_MODEL_AMBIGUOUS, KV_ETHERCAT_NODE_ADDRESS_DUPLICATE]
-  retry_policy: saved same-address/same-model requests are idempotently skipped; different-model address collisions fail before UI input with KV_ETHERCAT_NODE_ADDRESS_CONFLICT
-```
+1. 明确目标项目和修改范围，准备 TSV、MNM 或配置 JSON。现有内容的修改以相关快照为依据；无需为一次自变量修改导出无关硬件。
+2. 使用 `powershell -STA -NoProfile -ExecutionPolicy Bypass -File <workflow>`。支持 `-PlanOnly` 的接口可先准备计划；执行前脚本统一检查入口、结果契约与参数。
+3. 查看本次 workflow 结果、步骤 receipt 和同一 `run.log`。结果为失败时停止后续 UI 动作，依据错误码和证据修复。
+4. 按实际验证范围报告。快照成功不代表写入成功，模块出现不代表程序体和声明完整，导入成功不代表编译成功。
 
-PLC 扩展单元、单元首地址、EtherCAT、EtherNet/IP 等配置能力以 manifest 中的客户态 workflow 为准。manifest 没有对应客户态 workflow 时，客户态结果为 `ROUTE_RESEARCH_REQUIRED`；能力状态见 `references\capability-status.md`。
+每次运行使用独立输出目录。执行器记录 run_id、输入和代码指纹、精确结果文件、耗时；缺失、过期、格式错误或非布尔成功值一律失败。复用目录的旧结果保存到 `_history`。项目内容验证由对应子步骤完成，receipt 的 hash 只证明证据归属，不替代语义校验。
 
-项目配置意图、EtherNet/IP 成员查询、EtherCAT ESI 状态和配置脚本成熟度见 `references\project-configuration.md`。
+workflow 的已验证执行计划就是前置操作清单；不必另写只含关键词的 CHECKLIST。显式提供的旧 scaffold checklist 仍按原契约检查。全部 UI 原子动作、操作和结果追加到同次 `run.log`，不能只留独立 timing JSON。
 
-## 内置样例项目
+## 桌面边界
 
-```powershell
-$SampleProjectPath = Join-Path $SkillRoot 'references\KVX样例程序_v100\KVX样例程序_v100.kpr'
-```
+- 保留已有窗口大小。绑定指定项目，允许目标标题带未保存标记 `*`；其他已打开项目不阻塞新建。相同目标有冲突时停止，不处理无关实例。
+- 原子操作严格小于 10 秒，目标模块一次定向查找小于 1 秒；软件启动/编译运算等待另计并记录。禁止超过五层的 UI 树展开、穷举控件或无故多轮焦点探测。
+- 对话框自动聚焦后按已验证路线连续完成输入，不在弹窗中恢复主窗口焦点。表格所在窗口存在不等于表格已获焦点。
+- 自变量表和局部变量表共享记忆状态；Ctrl+Tab 次数由当前表和焦点决定，不能写死。此细节封装在原子实现内，agent 不需要重新推导。
+- `runner_children`、`guards`、support libraries 是内部实现。新增输入动作先隔离验证，更新共享实现及真实 workflow，再做回归；不为通过当前任务加入未经验证的备用路线。
+- 系统数据类型 `(System)` 不创建、不修改。嵌套用户类型先创建被引用类型。表格末尾空白新增行不计为已写入成员。
 
-测试、示例和回归命令使用 `references\sample-project.md` 中的内置样例项目。会修改项目的 workflow 先复制样例到 disposable work root；只读 inventory 或结构解析可以直接读取样例目录。
+## 按任务阅读
 
-## 变量与门限
+- 编写 PLC 逻辑、MNM 和 FB 接口：使用 `keyence-plc-programmer`；KEYENCE 专有语法依据 Wiki 或导出证据。
+- 变量/结构体 schema、FB 表格状态及持久化范围：[variable-editor.md](references/variable-editor.md)。
+- 硬件、EtherCAT、EtherNet/IP 和 ESI 边界：[project-configuration.md](references/project-configuration.md)。
+- 复刻工程的资产清单：[project-replication.md](references/project-replication.md)；官方/用户 FB 区分：[fb-filter.md](references/fb-filter.md)。
+- 样例项目位置和副本规则：[sample-project.md](references/sample-project.md)。修改性测试使用测试工程或独立副本。
+- 维护脚本：[script-layout-checklist.md](references/script-layout-checklist.md) 与 [ui-guard-contract.md](references/ui-guard-contract.md)；验证标签含义：[capability-status.md](references/capability-status.md)。
 
-```yaml
-variable_files:
-  pairing: per_mnm_module
-  minimum_header: "scope\towner_program\tname\tdata_type\tdevice\tinitial_value\tcomment\tevidence\tstatus"
-  no_local_variables_marker:
-    scope: local
-    name: __NO_LOCAL_VARIABLES__
-    status: no_local_variables
-
-variable_grid_gate:
-  required_before_copy_or_paste:
-    - foreground_window == KvVariableForm
-    - local_program_combo.value == target_program
-    - variable_editor_uia_signature.stable_for_ms >= 900
-    - system_clipboard.openable_for_ms >= 500
-    - input_owner == scripts\guards\kv_ui_guard.ps1
-  success_artifacts:
-    - persisted_variable_rows
-    - close_reopen_copy_audit_when_AuditVariablePersistence
-    - same_run_result_json
-```
-
-无局部变量时使用唯一 marker 行；runner 识别 marker 行并跳过粘贴。用户在失败界面手动复制成功时，分类为脚本自有焦点/窗口状态/输入路径不匹配；修复在脚本自有路径内完成，并用全新项目副本至少两次 `-AuditVariablePersistence` 验证。
-
-## 官方/库 FB 过滤
-
-项目复刻时，官方/库 FB 属于依赖，用户 FB 属于源码。导出 MNM 后先过滤官方/库 FB；过滤命令、分类规则和报告文件见 `references\fb-filter.md`。
-
-## 1:1 项目复刻
-
-```yaml
-project_replication:
-  first_step: export_inventory
-  config_steps: require_customer_workflow_or_ROUTE_RESEARCH_REQUIRED
-  program_steps: fresh_MNM_export_then_official_FB_filter
-  details: references\project-replication.md
-```
-
-`project_inventory.json.clone_readiness.ready_for_full_1_to_1_import=false` 时，状态为 `ROUTE_RESEARCH_REQUIRED`；依缺失类别拆分 UI 突破任务。
-
-## 失败报告
-
-```yaml
-failure_report_required:
-  - workflow_or_gate
-  - current_step
-  - stable_error_code
-  - result_json_or_failure_json
-  - evidence_path
-  - clean_end_state
-  - next_action: customer_result_or_research_authorization_request
-```
-
-常见 gate code 保持英文，例如 `KV_CHECKLIST_MISSING`、`KV_SOURCE_SNAPSHOT_STALE`、`KV_MNM_SAME_NAME_IMPORT_REQUIRES_PREDELETE`、`KV_VARIABLE_PASTE_NOT_PERSISTED`。
-
-## 参考
-
-```yaml
-references:
-  script-layout-checklist.md: 理解 workflow/runner_children/guards/probes/gates 的目录分工
-  mvp-runner-contract.md: 解释 runner artifact/result schema
-  ui-guard-contract.md: 修改或诊断 guarded UI input
-  variable-editor.md: 修改变量 TSV schema 或诊断变量编辑器粘贴
-  capability-status.md: 查看客户态能力、内部脚本和待验证能力状态
-  sample-project.md: 查看内置 KVX 样例项目路径和使用规则
-  project-configuration.md: 查看网络/单元/EtherCAT/EtherNet-IP 配置细节
-  fb-filter.md: 查看官方/库 FB 过滤命令和分类规则
-  project-replication.md: 查看 1:1 复刻 inventory 与资产清单
-```
+仓库代码是维护源；本机安装链接到该源。输出目录只保存输入与运行证据，不从历史运行目录寻找或执行替代脚本。已退役实现放在仓库 archive 中，以文本保留，不再安装为 skill。

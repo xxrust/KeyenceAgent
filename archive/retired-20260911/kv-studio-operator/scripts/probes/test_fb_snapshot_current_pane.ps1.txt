@@ -1,0 +1,12 @@
+# Historical source only. Use the current operator manifest for execution.
+param([Parameter(Mandatory=$true)][string]$OutDir)
+$ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot '..\guards\kv_ui_guard.ps1')
+$env:KV_WORKFLOW_RUN_LOG=Join-Path $OutDir 'run.log'
+Initialize-KvUiGuard -OutDir $OutDir
+. (Join-Path $PSScriptRoot '..\guards\kv_fb_snapshot.ps1')
+$p=Get-Process Kvs
+$root=[Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
+$panes=@($root.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'_tabFBMacroParam')))|Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::Pane -and -not $_.Current.IsOffscreen})
+if($panes.Count -ne 1){throw 'Pane not unique'}
+Copy-KvFbArgumentPane $panes[0] $p.MainWindowHandle ([string]$p.MainWindowTitle.Split('[')[-1].TrimEnd(']')) $OutDir|ConvertTo-Json

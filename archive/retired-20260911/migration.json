@@ -1,0 +1,205 @@
+{
+  "retired_at": "2026-09-11",
+  "files": [
+    {
+      "previous": "kv-studio-operator/scripts/assert_kv_mnm_import_plan.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/assert_kv_mnm_import_plan.ps1.txt",
+      "replacement": "manifest role-directory entrypoint or ROUTE_RESEARCH_REQUIRED"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/assert_kv_mvp_agent_boundary.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/assert_kv_mvp_agent_boundary.ps1.txt",
+      "replacement": "manifest role-directory entrypoint or ROUTE_RESEARCH_REQUIRED"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/assert_kv_mvp_ui_guard_usage.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/assert_kv_mvp_ui_guard_usage.ps1.txt",
+      "replacement": "manifest role-directory entrypoint or ROUTE_RESEARCH_REQUIRED"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/new_kv_mvp_multi_mnm_scaffold.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/new_kv_mvp_multi_mnm_scaffold.ps1.txt",
+      "replacement": "manifest role-directory entrypoint or ROUTE_RESEARCH_REQUIRED"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/new_kv_mvp_scaffold.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/new_kv_mvp_scaffold.ps1.txt",
+      "replacement": "manifest role-directory entrypoint or ROUTE_RESEARCH_REQUIRED"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/run_kv_mvp_repair_existing_project.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/run_kv_mvp_repair_existing_project.ps1.txt",
+      "replacement": "manifest role-directory entrypoint or ROUTE_RESEARCH_REQUIRED"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/run_kv_mvp_repeat.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/run_kv_mvp_repeat.ps1.txt",
+      "replacement": "manifest role-directory entrypoint or ROUTE_RESEARCH_REQUIRED"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/run_kv_mvp_scaffold.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/run_kv_mvp_scaffold.ps1.txt",
+      "replacement": "manifest role-directory entrypoint or ROUTE_RESEARCH_REQUIRED"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/validate_kv_mvp_scaffold.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/validate_kv_mvp_scaffold.ps1.txt",
+      "replacement": "manifest role-directory entrypoint or ROUTE_RESEARCH_REQUIRED"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/Invoke-KvStudioOperatorWrapper.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/Invoke-KvStudioOperatorWrapper.ps1.txt",
+      "replacement": "manifest role-directory entrypoint or ROUTE_RESEARCH_REQUIRED"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/configure_kv_expansion_units.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/configure_kv_expansion_units.ps1.txt",
+      "replacement": "manifest role-directory entrypoint or ROUTE_RESEARCH_REQUIRED"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/configure_kv_network_from_config.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/configure_kv_network_from_config.ps1.txt",
+      "replacement": "manifest role-directory entrypoint or ROUTE_RESEARCH_REQUIRED"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/configure_kv_ethernet_ip_device.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/configure_kv_ethernet_ip_device.ps1.txt",
+      "replacement": "manifest role-directory entrypoint or ROUTE_RESEARCH_REQUIRED"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/configure_kv_unit_start_addresses.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/configure_kv_unit_start_addresses.ps1.txt",
+      "replacement": "manifest role-directory entrypoint or ROUTE_RESEARCH_REQUIRED"
+    },
+    {
+      "previous": "keyence-plc-programmer/scripts/kvtool.ps1",
+      "archive": "archive/retired-20260911/keyence-plc-programmer/scripts/kvtool.ps1.txt",
+      "replacement": "kv-studio-operator/scripts/script_manifest.json"
+    },
+    {
+      "previous": "keyence-plc-programmer/scripts/create_project_local.ps1",
+      "archive": "archive/retired-20260911/keyence-plc-programmer/scripts/create_project_local.ps1.txt",
+      "replacement": "kv-studio-operator/scripts/script_manifest.json"
+    },
+    {
+      "previous": "keyence-plc-programmer/scripts/import_mnm.ps1",
+      "archive": "archive/retired-20260911/keyence-plc-programmer/scripts/import_mnm.ps1.txt",
+      "replacement": "kv-studio-operator/scripts/script_manifest.json"
+    },
+    {
+      "previous": "keyence-plc-programmer/scripts/export_mnm.ps1",
+      "archive": "archive/retired-20260911/keyence-plc-programmer/scripts/export_mnm.ps1.txt",
+      "replacement": "kv-studio-operator/scripts/script_manifest.json"
+    },
+    {
+      "previous": "keyence-plc-programmer/scripts/convert_collect.ps1",
+      "archive": "archive/retired-20260911/keyence-plc-programmer/scripts/convert_collect.ps1.txt",
+      "replacement": "kv-studio-operator/scripts/script_manifest.json"
+    },
+    {
+      "previous": "keyence-plc-programmer/scripts/collect_visible_convert_errors.ps1",
+      "archive": "archive/retired-20260911/keyence-plc-programmer/scripts/collect_visible_convert_errors.ps1.txt",
+      "replacement": "kv-studio-operator/scripts/script_manifest.json"
+    },
+    {
+      "previous": "keyence-plc-programmer/scripts/roundtrip_mnm.ps1",
+      "archive": "archive/retired-20260911/keyence-plc-programmer/scripts/roundtrip_mnm.ps1.txt",
+      "replacement": "kv-studio-operator/scripts/script_manifest.json"
+    },
+    {
+      "previous": "keyence-plc-programmer/scripts/local_kvstudio_acceptance.ps1",
+      "archive": "archive/retired-20260911/keyence-plc-programmer/scripts/local_kvstudio_acceptance.ps1.txt",
+      "replacement": "kv-studio-operator/scripts/script_manifest.json"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/probes/test_fb_snapshot_current_pane.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/probes/test_fb_snapshot_current_pane.ps1.txt",
+      "replacement": "current guarded workflows and tests"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/probes/snapshot_sample_locals.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/probes/snapshot_sample_locals.ps1.txt",
+      "replacement": "current guarded workflows and tests"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/probes/select_all_snapshot_groups.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/probes/select_all_snapshot_groups.ps1.txt",
+      "replacement": "current guarded workflows and tests"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/probes/save_owned_regression.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/probes/save_owned_regression.ps1.txt",
+      "replacement": "current guarded workflows and tests"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/probes/regress_compile_collect.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/probes/regress_compile_collect.ps1.txt",
+      "replacement": "current guarded workflows and tests"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/probes/probe_sample_fb_menu.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/probes/probe_sample_fb_menu.ps1.txt",
+      "replacement": "current guarded workflows and tests"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/probes/probe_file_menu_coordinate.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/probes/probe_file_menu_coordinate.ps1.txt",
+      "replacement": "current guarded workflows and tests"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/probes/probe_fb_focus_transition.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/probes/probe_fb_focus_transition.ps1.txt",
+      "replacement": "current guarded workflows and tests"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/probes/probe_fb_focus_physical.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/probes/probe_fb_focus_physical.ps1.txt",
+      "replacement": "current guarded workflows and tests"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/probes/probe_fb_focus_owner.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/probes/probe_fb_focus_owner.ps1.txt",
+      "replacement": "current guarded workflows and tests"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/probes/probe_compile_error_copy.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/probes/probe_compile_error_copy.ps1.txt",
+      "replacement": "current guarded workflows and tests"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/probes/open_snapshot_copy.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/probes/open_snapshot_copy.ps1.txt",
+      "replacement": "current guarded workflows and tests"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/probes/inspect_structure_tree.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/probes/inspect_structure_tree.ps1.txt",
+      "replacement": "current guarded workflows and tests"
+    },
+    {
+      "previous": "kv-studio-operator/scripts/probes/copy_existing_fb_pane.ps1",
+      "archive": "archive/retired-20260911/kv-studio-operator/scripts/probes/copy_existing_fb_pane.ps1.txt",
+      "replacement": "current guarded workflows and tests"
+    },
+    {
+      "previous": "keyence-plc-programmer/references/kvstudio-toolkit-manifest.json",
+      "archive": "archive/retired-20260911/keyence-plc-programmer/references/kvstudio-toolkit-manifest.json.txt",
+      "replacement": "kv-studio-operator/scripts/script_manifest.json"
+    },
+    {
+      "previous": "keyence-plc-programmer/references/kvstudio-toolkit.md",
+      "archive": "archive/retired-20260911/keyence-plc-programmer/references/kvstudio-toolkit.md.txt",
+      "replacement": "kv-studio-operator/scripts/script_manifest.json"
+    },
+    {
+      "previous": "keyence-plc-programmer/references/kvstudio-script-status.md",
+      "archive": "archive/retired-20260911/keyence-plc-programmer/references/kvstudio-script-status.md.txt",
+      "replacement": "kv-studio-operator/scripts/script_manifest.json"
+    },
+    {
+      "previous": "keyence-plc-programmer/scripts/kvtool_create_project_args.txt",
+      "archive": "archive/retired-20260911/keyence-plc-programmer/scripts/kvtool_create_project_args.txt.txt",
+      "replacement": "kv-studio-operator/scripts/script_manifest.json"
+    }
+  ]
+}

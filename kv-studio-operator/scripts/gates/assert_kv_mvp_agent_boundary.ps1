@@ -109,7 +109,7 @@ $workflowPaths = @()
 $workflowToolPaths = @()
 if ($manifest) {
   $workflowPaths = @($manifest.classes.customer_workflow | ForEach-Object { [string]$_.path } | Where-Object { $_ })
-  $workflowToolPaths = @($manifest.classes.workflow_tool | ForEach-Object { [string]$_.path } | Where-Object { $_ })
+  $workflowToolPaths = @($manifest.classes.workflow_tool | ForEach-Object { [string]$_.path } | Where-Object { $_ }) + @($manifest.classes.support_library | Where-Object { $_.path -like 'workflow_tools/*' } | ForEach-Object { [string]$_.path })
 } else {
   $workflowPaths = @($ScriptNames | Where-Object { ([string]$_).Replace('\','/') -like 'workflows/*' })
   $workflowToolPaths = @($ScriptNames | Where-Object { ([string]$_).Replace('\','/') -like 'workflow_tools/*' })
@@ -132,6 +132,7 @@ $workflowToolUiForbiddenPatterns = @(
 
 $workflowToolPatternAllowlist = @{
   'workflow_tools/invoke_kv_flat_execution_plan.ps1' = @('StartProcessUiStep')
+  'workflow_tools/kv_workflow_plan.ps1' = @('StartProcessUiStep')
 }
 
 foreach ($name in $workflowPaths) {

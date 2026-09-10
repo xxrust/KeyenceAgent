@@ -125,9 +125,10 @@ function Read-KvDelimitedText([string]$Path) {
 }
 
 function Get-BoundKvsProcess([string]$ProjectNeedle) {
-  $visible = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })
+  $titlePattern='\['+[regex]::Escape($ProjectNeedle)+'(?:\s*\*)?\]$'
+  $visible = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -match $titlePattern })
   if ($visible.Count -ne 1) {
-    Fail-Guard 'KV_VARIABLE_BOUND_WINDOW_AMBIGUOUS' 'bind KV STUDIO window' "AllowBoundWindowWithoutForeground requires exactly one visible Kvs window; found $($visible.Count)." @()
+    Fail-Guard 'KV_VARIABLE_BOUND_WINDOW_AMBIGUOUS' 'bind KV STUDIO window' "Expected exactly one window for project $ProjectNeedle; found $($visible.Count)." @()
   }
   $candidate = $visible[0]
   $candidate.Refresh()
@@ -851,6 +852,7 @@ function Assert-NoKvsModalFast([int]$ProcessIdValue, [string]$Stage) {
 }
 
 function Convert-GlobalRows([string]$Path) {
+  if (-not $Path) { return '' }
   $text = Read-KvDelimitedText $Path
   $rows = $text | ConvertFrom-Csv -Delimiter "`t"
   $lines = foreach ($row in (Get-KvExecutableVariableRows -Rows @($rows) -Scope global)) {
@@ -950,6 +952,7 @@ function Assert-KvVariableDefinitionsBeforePaste([object[]]$Rows, [string]$Scope
 }
 
 function Convert-LocalRows([string]$Path) {
+  if (-not $Path) { return '' }
   $text = Read-KvDelimitedText $Path
   $rows = $text | ConvertFrom-Csv -Delimiter "`t"
   $lines = foreach ($row in (Get-KvExecutableVariableRows -Rows @($rows) -Scope local)) {
@@ -974,6 +977,7 @@ function Convert-LocalRows([string]$Path) {
 }
 
 function Get-DefinedVariableRows([string]$Path, [string]$Scope) {
+  if (-not $Path) { return @() }
   $text = [IO.File]::ReadAllText($Path, [Text.Encoding]::Default)
   @(Get-KvExecutableVariableRows -Rows @($text | ConvertFrom-Csv -Delimiter "`t") -Scope $Scope)
 }
@@ -1520,8 +1524,9 @@ try {
     [pscustomobject]@{ok=$true;read_only=$true;project_path=$ProjectPath;snapshots=$snapshots;all_columns_preserved=$true;unfiltered_completeness_verified=$false} | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $OutDir 'variable_snapshot_result.json') -Encoding UTF8
     return
   }
-  if (-not (Test-Path -LiteralPath $GlobalVariablesTsv)) { throw "GlobalVariablesTsv not found: $GlobalVariablesTsv" }
-  if (-not (Test-Path -LiteralPath $LocalVariablesTsv)) { throw "LocalVariablesTsv not found: $LocalVariablesTsv" }
+  if ($GlobalVariablesTsv -and -not (Test-Path -LiteralPath $GlobalVariablesTsv)) { throw "GlobalVariablesTsv not found: $GlobalVariablesTsv" }
+  if ($LocalVariablesTsv -and -not (Test-Path -LiteralPath $LocalVariablesTsv)) { throw "LocalVariablesTsv not found: $LocalVariablesTsv" }
+  if (-not ($GlobalVariablesTsv -or $LocalVariablesTsv)) { throw 'KV_VARIABLE_INPUT_REQUIRED' }
 
   # Build and reject malformed adapter payloads before resolving, focusing, or
   # otherwise interacting with a KV STUDIO window.
@@ -1545,7 +1550,7 @@ try {
 
   $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
   $projectRoot = Split-Path -Parent $ProjectPath
-  $process = if ($AllowBoundWindowWithoutForeground) { Get-BoundKvsProcess $projectNeedle } else { Get-VisibleKvsProcess }
+  $process = Get-BoundKvsProcess $projectNeedle
   if (-not $process) { throw 'No visible KV STUDIO process.' }
   $script:ProcessIdForVariables = $process.Id
   if ($AllowBoundWindowWithoutForeground) {

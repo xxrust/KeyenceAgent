@@ -29,9 +29,9 @@ $global:LASTEXITCODE = 0
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 function Log([string]$Message) {
-  $line = (Get-Date -Format s) + ' ' + $Message
-  [IO.File]::AppendAllText((Join-Path $OutDir 'run.log'), $line + [Environment]::NewLine, [Text.Encoding]::UTF8)
-  Write-Host $line
+  $path=if($env:KV_WORKFLOW_RUN_LOG){$env:KV_WORKFLOW_RUN_LOG}else{Join-Path $OutDir 'run.log'}
+  $line=@{timestamp=(Get-Date).ToString('o');run_id=$env:KV_WORKFLOW_RUN_ID;type='create_project_step';message=$Message} | ConvertTo-Json -Compress
+  [IO.File]::AppendAllText($path, $line + [Environment]::NewLine, [Text.Encoding]::UTF8)
 }
 
 function Get-DefaultAdminCredentialPath {
@@ -230,27 +230,23 @@ function Click-ByName([string]$Name, [int]$Seconds = 5) {
 
 function Dismiss-UnitConfigPromptNoByAltN([int]$Seconds = 8) {
   $titleNeedle = [string]::Concat([char[]]@(0x786E,0x8BA4,0x5355,0x5143,0x914D,0x7F6E,0x8BBE,0x5B9A))
-  $deadline = (Get-Date).AddSeconds($Seconds)
+  $condition=New-Object System.Windows.Automation.AndCondition(
+    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty,$titleNeedle)),
+    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty,[int]$script:CreateProcessId))
+  )
+  $deadline=(Get-Date).AddSeconds($Seconds)
+  $process=Get-KvStudioMainProcess 1
+  if (-not $process) { throw 'KV_CREATED_PROJECT_WINDOW_MISSING' }
+  $main=[System.Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
   do {
-    $root = [System.Windows.Automation.AutomationElement]::RootElement
-    $dialogs = $root.FindAll(
-      [System.Windows.Automation.TreeScope]::Subtree,
-      (New-Object System.Windows.Automation.AndCondition(
-        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Window)),
-        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ClassNameProperty,'#32770'))
-      ))
-    )
-    for ($i = 0; $i -lt $dialogs.Count; $i++) {
-      $dialog = $dialogs.Item($i)
-      $title = [string]$dialog.Current.Name
-      if (-not $title.Contains($titleNeedle)) { continue }
-      [KvWin32]::SetForegroundWindow([IntPtr]$dialog.Current.NativeWindowHandle) | Out-Null
-      Start-Sleep -Milliseconds 200
+    $dialog=$main.FindFirst([System.Windows.Automation.TreeScope]::Children,$condition)
+    if ($dialog) {
       Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd ([IntPtr]$dialog.Current.NativeWindowHandle) -Step 'dismiss unit configuration prompt Alt+N' -Keys '%n' -ExpectedTitleLike "*$titleNeedle*" -SuccessTitleLike 'KV STUDIO*' -Action 'Alt+N selects No in unit configuration prompt' -SleepMs 500
-      Log 'answered unit configuration prompt with Alt+N'
+      if ($main.FindFirst([System.Windows.Automation.TreeScope]::Children,$condition)) { throw 'KV_INITIAL_UNIT_PROMPT_NOT_DISMISSED' }
+      Log 'answered target unit configuration prompt with Alt+N'
       return $true
     }
-    Start-Sleep -Milliseconds 250
+    Start-Sleep -Milliseconds 100
   } while ((Get-Date) -lt $deadline)
   return $false
 }
@@ -274,7 +270,7 @@ function Get-KvStudioMainProcess {
   $deadline = (Get-Date).AddSeconds($Seconds)
   do {
     $process = Get-Process Kvs -ErrorAction SilentlyContinue |
-      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' } |
+      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and (-not $script:CreateProcessId -or $_.Id -eq $script:CreateProcessId) } |
       Sort-Object StartTime -Descending |
       Select-Object -First 1
     if ($process) { return $process }
@@ -431,7 +427,7 @@ function Wait-ProjectSaveSettled([string]$ProjectPath, [string]$ProjectName, [in
   $deadline = (Get-Date).AddSeconds($Seconds)
   do {
     $process = Get-Process Kvs -ErrorAction SilentlyContinue |
-      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' } |
+      Where-Object { $_.Id -eq $script:CreateProcessId -and $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' } |
       Select-Object -First 1
     $title = if ($process) { $process.MainWindowTitle } else { '' }
     $fileExists = Test-Path -LiteralPath $ProjectPath
@@ -470,10 +466,11 @@ try {
   if ($allKvs.Count -gt 0 -and $visibleKvs.Count -eq 0) {
     Log ("found Kvs process without main window after restart; starting a fresh visible instance. pids=" + (($allKvs | ForEach-Object { $_.Id }) -join ','))
   }
-  $process = $visibleKvs | Select-Object -First 1
-  if (-not $process) {
-    Start-Process -FilePath $KvsExe -WorkingDirectory (Split-Path -Parent $KvsExe) | Out-Null
-  }
+  # A separate instance leaves unrelated open projects (including unsaved ones)
+  # alone. Bind all subsequent main-window lookup to this launch.
+  $launched = Start-Process -FilePath $KvsExe -WorkingDirectory (Split-Path -Parent $KvsExe) -PassThru
+  $script:CreateProcessId = $launched.Id
+  Log ("created isolated KV STUDIO instance pid="+$script:CreateProcessId)
 
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
   do {
@@ -530,22 +527,15 @@ try {
   # errors.
   $adminHandled = Resolve-InitialAdminDialog -Credential $adminCredential -WaitSeconds 25
 
-  if (-not $fastPathReady) {
-    Start-Sleep -Seconds 2
-    if (-not (Dismiss-UnitConfigPromptNoByAltN 8)) { Log 'unit configuration prompt not present' }
-  }
+  if (-not (Dismiss-UnitConfigPromptNoByAltN 8)) { Log 'unit configuration prompt not present' }
 
   Start-Sleep -Seconds 2
-  $process = Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+  $process = Get-KvStudioMainProcess 1
   if ($process -and $process.MainWindowHandle -ne 0) {
     [KvWin32]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
-    if (-not $fastPathReady) {
-      Assert-KvStudioForeground 'Ctrl+S'
-      Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'save created project Ctrl+S' -Keys '^s' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+S saves created project' -SleepMs 300
-    }
-    if (-not (Wait-ProjectSaveSettled $projectPath $ProjectName 8)) {
-      Start-Sleep -Seconds 2
-    }
+    Assert-KvStudioForeground 'Ctrl+S'
+    Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'save created project Ctrl+S' -Keys '^s' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+S saves created project' -SleepMs 300
+    if (-not (Wait-ProjectSaveSettled $projectPath $ProjectName 8)) { throw 'KV_CREATED_PROJECT_SAVE_NOT_SETTLED' }
   }
 
   $found = $null
