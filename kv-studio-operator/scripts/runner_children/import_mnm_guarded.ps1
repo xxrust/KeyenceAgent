@@ -2121,6 +2121,11 @@ try{
       Log ($plainTextMissMessage+'; continuing because KV project persistence is not guaranteed plaintext. Use exported MNM and convert result as the acceptance gate.')
     }
   }
+  [ordered]@{
+    ok=$true; project_path=$ProjectPath; mnm_path=$MnmPath; expected_module_name=$ExpectedModuleName
+    save_requested=[bool]$SaveAfterImport
+    verification='import route completed; module placement and program content require their workflow acceptance steps'
+  } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $out 'import_result.json') -Encoding UTF8
   '0'|Set-Content -LiteralPath (Join-Path $out 'exit_code.txt') -Encoding ASCII
 }catch{
   Log ('ERR '+$_.Exception.ToString())

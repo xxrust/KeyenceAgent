@@ -50,6 +50,28 @@
     ],
     "pending": []
   },
+  "step_result_contracts": {
+    "gates/assert_kv_mvp_ui_guard_usage.ps1": {"files": ["ui_guard_usage_result.json"]},
+    "gates/assert_kv_mvp_agent_boundary.ps1": {"files": ["agent_boundary_contract.json"]},
+    "scaffold_tools/validate_kv_mvp_scaffold.ps1": {"files": ["scaffold_validation.json"]},
+    "scaffold_tools/assert_kv_mnm_import_plan.ps1": {"files": ["mnm_import_plan_gate.json"]},
+    "assert_kv_existing_project_snapshot.ps1": {"files": ["existing_project_snapshot_gate.json"]},
+    "runner_children/create_project_local_guarded.ps1": {"files": ["create_project_result.json"]},
+    "runner_children/import_mnm_guarded.ps1": {"files": ["import_result.json"]},
+    "runner_children/set_variables_guarded.ps1": {"files": ["set_variables_result.json", "variable_persistence_validation.json"], "variants": [{"switch": "-SnapshotOnly", "files": ["variable_snapshot_result.json"]}]},
+    "runner_children/set_fb_arguments_guarded.ps1": {"files": ["set_fb_arguments_result.json"], "variants": [{"switch": "-SnapshotOnly", "files": ["fb_snapshot_result.json"]}]},
+    "runner_children/compile_and_copy_result_bounded.ps1": {"files": ["result.json"]},
+    "runner_children/copy_convert_result_from_tree_handle.ps1": {"files": ["result.json"], "artifacts": ["compile_result_copied.txt"]},
+    "runner_children/export_mnm_browse_default_folder_guarded.ps1": {"files": ["browse_folder_export_result.json"]},
+    "runner_children/configure_expansion_units_guarded.ps1": {"files": ["result.json"]},
+    "runner_children/configure_ethercat_nodes_guarded.ps1": {"files": ["result.json"]},
+    "runner_children/export_structure_definitions_guarded.ps1": {"files": ["structure_definitions.json"]},
+    "runner_children/mutate_structure_definitions_guarded.ps1": {"files": ["result.json"]},
+    "workflow_tools/assert_kv_module_placement.ps1": {"files": ["module_placement_result.json"]},
+    "workflow_tools/new_kv_mvp_execution_plan.ps1": {"files": ["execution_plan_result.json"]},
+    "workflow_tools/new_kv_mnm_export_workspace.ps1": {"files": ["export_workspace_result.json"]},
+    "workflow_tools/collect_kv_mnm_export_workspace.ps1": {"files": ["export_mnm_project_copy_result.json"]}
+  },
   "classes": {
     "customer_scaffold_tool": [
       {

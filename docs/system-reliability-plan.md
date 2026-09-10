@@ -8,8 +8,9 @@ future workflow runs. This is system work, not another sample-replication task.
 
 - FB arguments had different read and write entry routes. Commit e54bb2b made
   them share state-aware declaration focus and added live persistence regression.
-- Installed skills are ordinary directory copies, not links to this repository.
-  Updating the repository therefore does not update the running installation.
+- At baseline installed skills were ordinary directory copies. They are now
+  verified junctions to this repository; originals are preserved in the work
+  root's `system-reliability/installation-backup` directory.
 - `script_manifest.json`, `capability-status.md`, and the programmer toolkit
   manifest separately advertise available operations.
 - Operator root scripts include both forwarding wrappers and independent legacy
@@ -59,3 +60,27 @@ files match the repository byte-for-byte.
 Do not mark historical tests as tests of new code, treat blank table rows as
 written content, or reduce required functionality to obtain a green result.
 Preserve unrelated worktree edits. No push is requested.
+
+## Progress and limits
+
+- Source links are installed and verified for all three KEYENCE skills.
+- Resolver now checks manifest membership and classes for absolute as well as
+  relative paths. The resolver regression accepts three valid path forms and
+  rejects wrong-class, outside-root, traversal, unlisted and missing routes.
+- The flat executor requires exact result filenames from the manifest. It
+  preserves prior result files in `_history/<run-id>` before a step and rejects
+  absent, malformed, stale, false or non-Boolean results. Process failure cannot
+  be overridden by an `exit_code.txt` containing zero. Windows arguments are
+  quoted, including empty strings, quotes and trailing backslashes.
+- Same-run receipts bind outputs to arguments, input file hashes and a hash of
+  the scripts tree (including shared libraries). This is provenance, not proof
+  that every child verifies every semantic field. MNM import currently reports
+  route completion explicitly; its placement/content acceptance still needs
+  to be made mandatory in published import workflows.
+- `tests/test_flat_execution_evidence.ps1` passes 16 no-UI cases, including
+  stale output reuse, a misleading helper result, process failure, timeout,
+  snapshot result variants and forbidden absolute routes. Evidence is under
+  `H:\kvOp\system-reliability\strict-executor\negative-tests-r2`.
+- Remaining: unify the five direct-child workflows, remove competing active
+  routes, simplify skills, organize history, and run published live regression.
+  The system-wide goal is not yet complete.

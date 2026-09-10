@@ -29,6 +29,7 @@ function Stop-GuardUsageCheck([string]$ErrorCode, [string]$Message, [object[]]$F
       'Do not run KV STUDIO while this check reports violations.'
     )
   }
+  if ($OutDir) { $payload | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $OutDir 'ui_guard_usage_result.json') -Encoding UTF8 }
   [Console]::Error.WriteLine('KV_UI_GUARD_STATIC_VIOLATION ' + (($payload | ConvertTo-Json -Depth 8 -Compress)))
   exit $ExitCode
 }
@@ -159,7 +160,7 @@ if ($findings.Count -gt 0) {
     -ExitCode 32
 }
 
-[pscustomobject]@{
+$result = [pscustomobject]@{
   ok = $true
   operation = 'assert KV MVP UI guard usage'
   scripts_root = $ScriptsRoot
@@ -167,4 +168,9 @@ if ($findings.Count -gt 0) {
   checked_scripts = $ScriptNames
   approved_atomic_actions = $approvedAtomicActions
   pending_atomic_actions = $pendingAtomicActions
-} | ConvertTo-Json -Depth 4
+}
+if ($OutDir) {
+  New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+  $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'ui_guard_usage_result.json') -Encoding UTF8
+}
+$result | ConvertTo-Json -Depth 4

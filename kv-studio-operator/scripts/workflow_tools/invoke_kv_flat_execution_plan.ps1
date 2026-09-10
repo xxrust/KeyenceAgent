@@ -10,16 +10,20 @@ $toolScriptDir = Split-Path -Parent $PSCommandPath
 $resolver = Join-Path (Split-Path -Parent $toolScriptDir) 'Resolve-KvStudioOperatorScript.ps1'
 if (-not (Test-Path -LiteralPath $resolver -PathType Leaf)) { throw "Script resolver not found: $resolver" }
 . $resolver
+. (Join-Path $toolScriptDir 'kv_step_evidence.ps1')
 $scriptRoot = Get-KvStudioOperatorScriptsRoot -StartPath $PSCommandPath
 $start = Get-Date
 $script:currentStep = 'init'
 $script:lastFailure = $null
 $script:flatSteps = [System.Collections.Generic.List[object]]::new()
 $script:unifiedRunLog = ''
+$script:runId = [guid]::NewGuid().ToString('N')
+$script:preparedSteps = @{}
+$script:codeFingerprint = $null
 
 function Write-WorkflowLog([string]$Type, [hashtable]$Data = @{}) {
   if (-not $script:unifiedRunLog) { return }
-  $entry = [ordered]@{timestamp=(Get-Date).ToString('o');type=$Type;step=$script:currentStep}
+  $entry = [ordered]@{timestamp=(Get-Date).ToString('o');run_id=$script:runId;type=$Type;step=$script:currentStep}
   foreach ($key in $Data.Keys) { $entry[$key]=$Data[$key] }
   [IO.File]::AppendAllText($script:unifiedRunLog,(($entry | ConvertTo-Json -Compress -Depth 8)+[Environment]::NewLine),[Text.Encoding]::UTF8)
 }
@@ -51,23 +55,6 @@ function Read-JsonFileIfPossible([string]$Path) {
   try { return (Get-Content -Raw -LiteralPath $Path -Encoding UTF8 | ConvertFrom-Json) } catch { return $null }
 }
 
-function Get-StepResultFile([string]$OutDir) {
-  if (-not $OutDir -or -not (Test-Path -LiteralPath $OutDir -PathType Container)) { return $null }
-  Get-ChildItem -LiteralPath $OutDir -File -Recurse -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -like '*result.json' -or $_.Name -like '*gate.json' } |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
-}
-
-function Clear-StaleStepArtifacts([string]$OutDir) {
-  if (-not $OutDir) { return }
-  New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-  foreach ($name in @('fail.txt','exit_code.txt','timeout_result.json','runner_child_stdout.txt','runner_child_stderr.txt','step_stdout.txt','step_stderr.txt')) {
-    $path = Join-Path $OutDir $name
-    if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
-  }
-}
-
 function Get-StepFailureSummary([object]$Step, [int]$ExitCode) {
   $outDir = [string]$Step.out_dir
   $summary = [ordered]@{
@@ -82,7 +69,8 @@ function Get-StepFailureSummary([object]$Step, [int]$ExitCode) {
     message = ''
   }
   if (-not $outDir -or -not (Test-Path -LiteralPath $outDir -PathType Container)) { return [pscustomobject]$summary }
-  $resultFile = Get-StepResultFile $outDir
+  $prepared = $script:preparedSteps[[string]$Step.name]
+  $resultFile = if ($prepared) { Get-Item -LiteralPath (Join-Path $outDir $prepared.contract.files[0]) -ErrorAction SilentlyContinue } else { $null }
   if ($resultFile) {
     $summary.child_result_path = $resultFile.FullName
     $summary.evidence += $resultFile.FullName
@@ -93,13 +81,6 @@ function Get-StepFailureSummary([object]$Step, [int]$ExitCode) {
       if ($child.message) { $summary.message = [string]$child.message }
       if ($child.evidence) { $summary.evidence += @($child.evidence | ForEach-Object { [string]$_ }) }
     }
-  }
-  $checkpoint = Get-ChildItem -LiteralPath $outDir -File -Filter '*failed.json' -Recurse -ErrorAction SilentlyContinue |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
-  if ($checkpoint) {
-    $summary.checkpoint_path = $checkpoint.FullName
-    $summary.evidence += $checkpoint.FullName
   }
   $failText = Join-Path $outDir 'fail.txt'
   if (Test-Path -LiteralPath $failText -PathType Leaf) {
@@ -125,16 +106,6 @@ function Get-StepFailureSummary([object]$Step, [int]$ExitCode) {
   [pscustomobject]$summary
 }
 
-function Test-StepResultOk([string]$OutDir) {
-  if (-not $OutDir -or -not (Test-Path -LiteralPath $OutDir -PathType Container)) { return $true }
-  if (Test-Path -LiteralPath (Join-Path $OutDir 'fail.txt') -PathType Leaf) { return $false }
-  $resultFile = Get-StepResultFile $OutDir
-  if (-not $resultFile) { return $true }
-  $child = Read-JsonFileIfPossible $resultFile.FullName
-  if ($null -eq $child -or $null -eq $child.ok) { return $true }
-  return ([bool]$child.ok)
-}
-
 function Stop-ProcessTree([int]$ProcessIdValue) {
   $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$ProcessIdValue" -ErrorAction SilentlyContinue)
   foreach ($child in $children) { Stop-ProcessTree ([int]$child.ProcessId) }
@@ -154,10 +125,10 @@ function Get-StepTimeoutSeconds([object]$Step) {
 function Invoke-FlatWorkflowStep([object]$Step) {
   Assert-TimeBudget "before $($Step.name)"
   $script:currentStep = [string]$Step.name
-  $classes = @($Step.classes | ForEach-Object { [string]$_ } | Where-Object { $_ })
-  $scriptPath = Resolve-KvStudioOperatorScriptPath -ScriptRoot $scriptRoot -Name ([string]$Step.script_name) -Classes $classes
+  $prepared = $script:preparedSteps[[string]$Step.name]
+  $scriptPath = $prepared.path
   $outDir = [string]$Step.out_dir
-  if ($outDir) { Clear-StaleStepArtifacts $outDir }
+  Move-KvPreviousStepEvidence $outDir $prepared.contract $script:runId
   $stdoutPath = if ($outDir) { Join-Path $outDir 'step_stdout.txt' } else { Join-Path ([IO.Path]::GetTempPath()) "$($Step.name)_stdout.txt" }
   $stderrPath = if ($outDir) { Join-Path $outDir 'step_stderr.txt' } else { Join-Path ([IO.Path]::GetTempPath()) "$($Step.name)_stderr.txt" }
   $arguments = @($Step.arguments | ForEach-Object { [string]$_ })
@@ -166,9 +137,14 @@ function Invoke-FlatWorkflowStep([object]$Step) {
   # on the same execution contract as the published workflow/harness entry
   # points; non-UI gates remain compatible with STA.
   $command = @('-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath) + $arguments
+  $commandLine = ($command | ForEach-Object { ConvertTo-KvProcessArgument ([string]$_) }) -join ' '
+  $inputs = @(Get-KvInputFingerprints $arguments)
   $stepStart = Get-Date
-  Write-WorkflowLog 'step_started' @{script=$scriptPath;out_dir=$outDir}
-  $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $command -NoNewWindow -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+  Write-WorkflowLog 'step_started' @{script=$scriptPath;out_dir=$outDir;input_fingerprints=$inputs;expected_results=$prepared.contract.files;code_sha256=$script:codeFingerprint.sha256}
+  $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $commandLine -NoNewWindow -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+  # Cache the handle before polling: .NET can otherwise lose ExitCode when the
+  # process exits before WaitForExit on Windows PowerShell.
+  $null = $process.Handle
   $stepTimeoutSeconds = Get-StepTimeoutSeconds $Step
   $deadline = (Get-Date).AddSeconds($stepTimeoutSeconds)
   $timedOut = $false
@@ -213,18 +189,29 @@ function Invoke-FlatWorkflowStep([object]$Step) {
     throw "Flat workflow step timed out: $($Step.name)"
   }
   $process.WaitForExit()
+  if ($null -eq $process.ExitCode) { throw 'KV_CHILD_EXIT_CODE_UNAVAILABLE' }
   $exit = [int]$process.ExitCode
   $childExitCodePath = if ($outDir) { Join-Path $outDir 'exit_code.txt' } else { '' }
   if ($childExitCodePath -and (Test-Path -LiteralPath $childExitCodePath -PathType Leaf)) {
     $childExitCodeText = ([IO.File]::ReadAllText($childExitCodePath, [Text.Encoding]::ASCII)).Trim()
-    if ($childExitCodeText -match '^-?\d+$') { $exit = [int]$childExitCodeText }
+    if ($exit -eq 0 -and $childExitCodeText -match '^-?\d+$' -and [int]$childExitCodeText -ne 0) { $exit = [int]$childExitCodeText }
   }
-  if ($exit -eq 0 -and -not (Test-StepResultOk $outDir)) { $exit = 1 }
+  $evidence = @()
+  $evidenceError = ''
+  if ($exit -eq 0) {
+    try { $evidence = @(Test-KvStepEvidence $outDir $prepared.contract $stepStart.ToUniversalTime()) }
+    catch { $exit=1; $evidenceError=$_.Exception.Message }
+  }
   if ($exit -eq 0 -and (Test-Path -LiteralPath $stderrPath -PathType Leaf) -and (Get-Item -LiteralPath $stderrPath).Length -gt 0) {
     $exit = 1
     if ($outDir) { 'Child step wrote to stderr; treating this as a failed guarded step.' | Set-Content -LiteralPath (Join-Path $outDir 'fail.txt') -Encoding UTF8 }
   }
   $elapsed = [math]::Round(((Get-Date) - $stepStart).TotalSeconds, 3)
+  [ordered]@{
+    run_id=$script:runId;step=$Step.name;ok=($exit -eq 0);exit_code=$exit;started_utc=$stepStart.ToUniversalTime().ToString('o')
+    script=$scriptPath;arguments=$arguments;inputs=$inputs;code_sha256=$script:codeFingerprint.sha256
+    artifacts=$evidence;evidence_error=$evidenceError;elapsed_seconds=$elapsed
+  } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $outDir 'step_receipt.json') -Encoding UTF8
   Write-WorkflowLog $(if ($exit -eq 0) {'step_succeeded'} else {'step_failed'}) @{exit_code=$exit;elapsed_seconds=$elapsed;out_dir=$outDir}
   $script:flatSteps.Add([pscustomobject]@{
     name = [string]$Step.name
@@ -235,9 +222,15 @@ function Invoke-FlatWorkflowStep([object]$Step) {
     stdout_path = $stdoutPath
     stderr_path = $stderrPath
     out_dir = $outDir
+    receipt_path = Join-Path $outDir 'step_receipt.json'
+    artifacts = $evidence
   })
   if ($exit -ne 0) {
     $script:lastFailure = Get-StepFailureSummary $Step $exit
+    if ($evidenceError) {
+      $script:lastFailure.message=$evidenceError
+      $script:lastFailure.error_code=($evidenceError -split ':',2)[0]
+    }
     throw "Flat workflow step failed: $($Step.name) exit_code=$exit"
   }
   Assert-TimeBudget "after $($Step.name)"
@@ -257,6 +250,10 @@ function Write-FlatWorkflowResult([object]$Plan, [string]$ResolvedPlanPath, [boo
   if (-not (Test-Path -LiteralPath $agentBoundaryPath -PathType Leaf)) { $agentBoundaryPath = '' }
   [ordered]@{
     ok = $Ok
+    run_id = $script:runId
+    code_fingerprint_path = Join-Path ([string]$Plan.run_root) 'code_fingerprint.json'
+    code_sha256 = if ($script:codeFingerprint) { $script:codeFingerprint.sha256 } else { '' }
+    execution_plan_sha256 = (Get-FileHash -LiteralPath $ResolvedPlanPath -Algorithm SHA256).Hash
     status = $Status
     message = $Message
     elapsed_seconds = Get-ElapsedSeconds
@@ -296,14 +293,37 @@ if (-not (Test-Path -LiteralPath $PlanPath -PathType Leaf)) { throw "Execution p
 $plan = $null
 try {
   $plan = Get-Content -Raw -LiteralPath $PlanPath -Encoding UTF8 | ConvertFrom-Json
-  if (-not $plan.ok) { throw "Execution plan is not ok: $PlanPath" }
+  if ($plan.ok -isnot [bool] -or -not $plan.ok) { throw "Execution plan is not ok: $PlanPath" }
+  if (-not $plan.run_root) { throw 'KV_PLAN_RUN_ROOT_REQUIRED' }
+  New-Item -ItemType Directory -Force -Path ([string]$plan.run_root) | Out-Null
   $script:unifiedRunLog = Join-Path ([string]$plan.run_root) 'run.log'
   $env:KV_WORKFLOW_RUN_LOG = $script:unifiedRunLog
+  $env:KV_WORKFLOW_RUN_ID = $script:runId
   Write-WorkflowLog 'workflow_started' @{plan_path=$PlanPath;project_path=$plan.project_path}
   if ($TimeoutSeconds -le 0) {
     if ($plan.timeout_seconds) { $TimeoutSeconds = [int]$plan.timeout_seconds } else { $TimeoutSeconds = 600 }
   }
 
+  $manifest = Get-KvStudioOperatorScriptManifest -ScriptRoot $scriptRoot
+  $allowedClasses = @('runner_child_approved','workflow_tool','gate','customer_scaffold_tool','customer_non_ui_tool')
+  $outputPaths = @{}
+  foreach ($step in @($plan.steps)) {
+    if (-not $step.name -or $script:preparedSteps.ContainsKey([string]$step.name)) { throw 'KV_PLAN_STEP_NAME_INVALID' }
+    $classes = @($step.classes | Where-Object { $_ -in $allowedClasses })
+    if ($classes.Count -eq 0 -or $classes.Count -ne @($step.classes).Count) { throw "KV_PLAN_STEP_CLASS_INVALID: $($step.name)" }
+    $path = Resolve-KvStudioOperatorScriptPath -ScriptRoot $scriptRoot -Name ([string]$step.script_name) -Classes $classes
+    if (-not $step.out_dir) { throw "KV_PLAN_STEP_OUT_DIR_REQUIRED: $($step.name)" }
+    $step.out_dir = [IO.Path]::GetFullPath([string]$step.out_dir)
+    if ($outputPaths.ContainsKey($step.out_dir)) { throw "KV_PLAN_STEP_OUT_DIR_DUPLICATE: $($step.out_dir)" }
+    $outputPaths[$step.out_dir]=$true
+    $relative = $path.Substring($scriptRoot.TrimEnd('\','/').Length+1).Replace('\','/')
+    $contract = Get-KvStepContract $manifest $relative @($step.arguments)
+    $script:preparedSteps[[string]$step.name]=@{path=$path;contract=$contract}
+  }
+  if ($script:preparedSteps.Count -eq 0) { throw 'KV_PLAN_STEPS_REQUIRED' }
+  $script:codeFingerprint = Get-KvCodeFingerprint $scriptRoot
+  $script:codeFingerprint | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path ([string]$plan.run_root) 'code_fingerprint.json') -Encoding UTF8
+  Write-WorkflowLog 'plan_validated' @{step_count=$script:preparedSteps.Count;code_sha256=$script:codeFingerprint.sha256}
   foreach ($step in @($plan.steps)) {
     Invoke-FlatWorkflowStep $step
   }
@@ -317,7 +337,10 @@ try {
     }
     $copyText = [IO.File]::ReadAllText($compileResultPath, [Text.Encoding]::UTF8)
     $okNeedle = (New-Cn @(0x8F6C,0x6362,0x7ED3,0x679C)) + ' OK'
-    if (-not $copyText.Contains($okNeedle)) {
+    $ngNeedle = (New-Cn @(0x8F6C,0x6362,0x7ED3,0x679C)) + ' NG'
+    $compileEvidence = @($script:flatSteps | ForEach-Object { $_.artifacts } | Where-Object { $_.path -eq $compileResultPath })
+    if ($compileEvidence.Count -ne 1 -or (Get-FileHash -LiteralPath $compileResultPath -Algorithm SHA256).Hash -ne $compileEvidence[0].sha256) { throw 'KV_COMPILE_RESULT_NOT_FROM_CURRENT_RUN' }
+    if (-not $copyText.Contains($okNeedle) -or $copyText.Contains($ngNeedle)) {
       throw 'Copied compile result does not contain the OK conversion result.'
     }
   }

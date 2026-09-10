@@ -27,7 +27,7 @@ function Get-KvStudioOperatorScriptManifest {
   if (-not $ScriptRoot) { $ScriptRoot = Get-KvStudioOperatorScriptsRoot }
   $path = Join-Path $ScriptRoot 'script_manifest.json'
   if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Script manifest is required: $path" }
-  Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+  Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
 }
 
 function Get-KvStudioOperatorManifestEntries {
@@ -57,13 +57,16 @@ function Resolve-KvStudioOperatorScriptPath {
   )
 
   if (-not $ScriptRoot) { $ScriptRoot = Get-KvStudioOperatorScriptsRoot }
-  if ([IO.Path]::IsPathRooted($Name)) {
-    $path = [IO.Path]::GetFullPath($Name)
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Script not found: $path" }
-    return $path
-  }
-
+  $ScriptRoot = [IO.Path]::GetFullPath($ScriptRoot).TrimEnd('\', '/')
+  $prefix = $ScriptRoot + [IO.Path]::DirectorySeparatorChar
   $normalized = $Name.Replace('\', '/')
+  if ([IO.Path]::IsPathRooted($Name) -or $normalized.Contains('/')) {
+    $candidate = if ([IO.Path]::IsPathRooted($Name)) { [IO.Path]::GetFullPath($Name) } else { [IO.Path]::GetFullPath((Join-Path $ScriptRoot $Name)) }
+    if (-not $candidate.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+      throw "KV_SCRIPT_OUTSIDE_ROOT: $Name"
+    }
+    $normalized = $candidate.Substring($prefix.Length).Replace('\', '/')
+  }
   $entries = @(Get-KvStudioOperatorManifestEntries -ScriptRoot $ScriptRoot -Classes $Classes)
   $matches = @($entries | Where-Object {
     $entryPath = ([string]$_.path).Replace('\', '/')
@@ -77,6 +80,7 @@ function Resolve-KvStudioOperatorScriptPath {
   }
 
   $path = [IO.Path]::GetFullPath((Join-Path $ScriptRoot ([string]$matches[0].path)))
+  if (-not $path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) { throw "KV_SCRIPT_OUTSIDE_ROOT: $path" }
   if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Declared script is missing: $path" }
   $path
 }
