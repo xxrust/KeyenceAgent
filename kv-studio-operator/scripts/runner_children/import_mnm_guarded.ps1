@@ -15,7 +15,6 @@
   [string]$ExpectedCategory = '',
   [string]$ChecklistPath = '',
   [switch]$VerboseUiDump,
-  [switch]$AuditImportWaits,
   [switch]$AuditProjectTextScan,
   [switch]$AuditUiNameScan,
   [Alias('AllowBoundWindowWithoutForeground')]
@@ -1189,9 +1188,12 @@ function AssertMnmChineseEncoding([string]$path){
   if($null -eq $headerModuleType){
     throw 'MNM module type validation failed: missing ;MODULE_TYPE:<n>.'
   }
-  $deviceOk = (($headerModuleType -eq 2 -and $headerDevice -eq 59) -or ($headerModuleType -eq 0 -and ($headerDevice -eq 63 -or $headerDevice -eq 59)))
+  $deviceOk = (($headerModuleType -eq 2 -and ($headerDevice -eq 60 -or $headerDevice -eq 59)) -or ($headerModuleType -eq 0 -and ($headerDevice -eq 60 -or $headerDevice -eq 63 -or $headerDevice -eq 59)))
   if(-not $deviceOk){
-    throw ('MNM device header validation failed: MODULE_TYPE='+$headerModuleType+' allows DEVICE:'+(if($headerModuleType -eq 2){'59'}elseif($headerModuleType -eq 0){'63 or 59'}else{'unsupported'})+', actual DEVICE:'+$headerDevice+'.')
+    $allowedDeviceText = 'unsupported'
+    if($headerModuleType -eq 2){ $allowedDeviceText = '60 or 59' }
+    elseif($headerModuleType -eq 0){ $allowedDeviceText = '60, 63, or 59' }
+    throw ('MNM device header validation failed: MODULE_TYPE='+$headerModuleType+' allows DEVICE:'+$allowedDeviceText+', actual DEVICE:'+$headerDevice+'.')
   }
   Log ('MNM encoding validation passed by '+$decodeName+': '+$path)
 }
@@ -2014,7 +2016,7 @@ try{
     if(-not (SetOpenDialogFile $MnmPath)){
       throw 'MNM file path target was not a verified mnemonic-read path edit or standard file-open dialog; refusing clipboard/Enter fallback'
     }
-    if($AuditImportWaits){ Start-Sleep -Seconds 8 } else { Start-Sleep -Milliseconds 800 }
+    Start-Sleep -Milliseconds 800
     Shot '02_after_file_open.png'
     if($VerboseUiDump){ DumpUi 'uia_after_file_open.json' }
     AssertNoMnmReadFailureDialog 'after_file_open'
@@ -2022,10 +2024,10 @@ try{
     DismissInstructionErrorDialogs 'after_file_open'
     $programKindConfirmed = ConfirmProgramKindDialog $ExpectedCategory
     if($programKindConfirmed){
-      if($AuditImportWaits){ Start-Sleep -Seconds 8 } else { Start-Sleep -Milliseconds 800 }
+      Start-Sleep -Milliseconds 800
       AssertNoMnmReadFailureDialog 'after_program_kind_confirm'
     }elseif(ConfirmAnyPostImportDialog){
-      if($AuditImportWaits){ Start-Sleep -Seconds 8 } else { Start-Sleep -Milliseconds 800 }
+      Start-Sleep -Milliseconds 800
       AssertNoMnmReadFailureDialog 'after_post_import_dialog'
     }
   }
@@ -2078,9 +2080,9 @@ try{
     Start-Sleep -Milliseconds 300
     [void](ForceKvStudioForeground ([IntPtr]$saveProcess.MainWindowHandle))
     AssertKvStudioForeground 'Ctrl+S after MNM import' $expectedProjectNeedle
-    Invoke-KvGuardedSendKeys -TargetHwnd $saveProcess.MainWindowHandle -Step 'save after MNM import Ctrl+S' -Keys '^s' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Ctrl+S saves project after MNM import' -SleepMs $(if($AuditImportWaits){8000}else{500})
+    Invoke-KvGuardedSendKeys -TargetHwnd $saveProcess.MainWindowHandle -Step 'save after MNM import Ctrl+S' -Keys '^s' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Ctrl+S saves project after MNM import' -SleepMs 500
     Log 'sent Ctrl+S'
-    if($AuditImportWaits){ Start-Sleep -Seconds 8 } else { Start-Sleep -Milliseconds 800 }
+    Start-Sleep -Milliseconds 800
     Shot '04_after_save.png'
     if($VerboseUiDump){ DumpUi 'uia_after_save.json' }
     AssertNoMnmReadFailureDialog 'after_save'
