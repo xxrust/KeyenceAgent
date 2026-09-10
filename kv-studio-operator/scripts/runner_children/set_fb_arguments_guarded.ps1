@@ -6,6 +6,7 @@ param(
   [string]$FbModuleName,
 
   [string]$ArgumentsTsv = '',
+  [string[]]$AllowedCustomDataTypes = @(),
   [switch]$SnapshotOnly,
 
   [string]$ChecklistPath = '',
@@ -102,30 +103,17 @@ function ConvertTo-SafeInt([double]$Value) {
 }
 
 function FindProjectModuleTreeItem([int]$ProcessIdValue, [string]$ModuleName) {
-  $root = [System.Windows.Automation.AutomationElement]::RootElement
-  $tree = $root.FindFirst(
-    [System.Windows.Automation.TreeScope]::Descendants,
-    (New-Object System.Windows.Automation.AndCondition(
-      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $ProcessIdValue)),
-      (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'ProjectTreeView'))
-    ))
-  )
-  if (-not $tree) { return $null }
-  $items = $tree.FindAll(
-    [System.Windows.Automation.TreeScope]::Descendants,
-    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::TreeItem))
-  )
-  for ($i = 0; $i -lt $items.Count; $i++) {
-    $item = $items.Item($i)
-    $name = [string]$item.Current.Name
-    if ($name -eq $ModuleName -or
-        $name -match ('^' + [regex]::Escape($ModuleName) + '\s+\[\d+\]$') -or
-        $name.StartsWith($ModuleName + ':', [System.StringComparison]::Ordinal) -or
-        $name.StartsWith($ModuleName + [char]0xFF1A, [System.StringComparison]::Ordinal)) {
-      return $item
-    }
+  $watch=[Diagnostics.Stopwatch]::StartNew()
+  $root=[Windows.Automation.AutomationElement]::FromHandle((Get-Process -Id $ProcessIdValue).MainWindowHandle)
+  $tree=Find-DescByAid $root 'ProjectTreeView'
+  $item=$null
+  if($tree){
+    $item=$tree.FindFirst([Windows.Automation.TreeScope]::Descendants,
+      (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::NameProperty,$ModuleName)))
   }
-  return $null
+  Write-KvUiGuardRunLog -Event 'module_lookup' -Data @{module=$ModuleName;elapsed_ms=$watch.ElapsedMilliseconds;found=($null -ne $item);direct_name_query=$true}
+  if($watch.ElapsedMilliseconds -ge 1000){throw 'KV_MODULE_LOOKUP_TIMEOUT'}
+  return $item
 }
 
 function Read-KvDelimitedText([string]$Path) {
@@ -514,7 +502,7 @@ function Convert-FbArgumentRowsToPasteText([string]$Path, [string]$ExpectedOwner
     if ($allowedKinds -notcontains $kind) {
       $errors.Add([pscustomobject]@{ code='KV_FB_ARGUMENT_KIND_INVALID'; argument_name=$name; argument_kind=$kind; message='argument_kind must be IN, OUT, or IN-OUT' })
     }
-    if (-not (Test-KvVariableDataType $dataType)) {
+    if (-not (Test-KvVariableDataType $dataType $AllowedCustomDataTypes)) {
       $errors.Add([pscustomobject]@{ code='KV_FB_ARGUMENT_DATA_TYPE_UNSUPPORTED'; argument_name=$name; data_type=$dataType; message='data_type is outside supported KEYENCE type grammar' })
     }
   }
@@ -570,6 +558,7 @@ function Get-ClipboardTextAfterCopy([string]$Sentinel, [int]$Seconds = 1) {
 }
 
 function Test-FbArgumentPasteVisible([IntPtr]$FormHwnd, [string]$ProjectNeedle, [object[]]$ExpectedRows, [string]$FbName, [string]$AttemptName) {
+  Assert-KvFbGridFocus $script:FbArgumentPane ([Windows.Automation.AutomationElement]::FocusedElement)
   $sentinel = '__KV_FB_ARGUMENT_COPY_SENTINEL__'
   Invoke-KvGuardedClipboardSetText -TargetHwnd $FormHwnd -Step "FB arguments copy sentinel $AttemptName $FbName" -Text $sentinel -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*"
   Invoke-KvGuardedSendKeys -TargetHwnd $FormHwnd -Step "FB arguments Ctrl+A verify $AttemptName $FbName" -Keys '^a' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action 'Ctrl+A selects embedded FB argument table for copy verification' -SleepMs 200
@@ -611,55 +600,8 @@ function Test-FbArgumentPasteVisible([IntPtr]$FormHwnd, [string]$ProjectNeedle, 
 }
 
 function Focus-FbArgumentGrid($Surface, [IntPtr]$MainHwnd, [string]$ProjectNeedle, [string]$Label, [switch]$InitialSurfaceFocus) {
-  $grid = Find-DescByAid $Surface '_grid'
-  if (-not $grid) {
-    $dump = Write-ElementDescendantDump $Surface 'fb_argument_grid_focus_failed.json'
-    Fail-Step 'KV_FB_ARGUMENT_GRID_MISSING' $Label 'Could not find the embedded FB argument grid before paste.' @($dump)
-  }
-  $rect = $grid.Current.BoundingRectangle
-  if (-not (Test-FiniteRect $rect) -or $rect.Width -lt 140 -or $rect.Height -lt 60) {
-    $dump = Write-ElementDescendantDump $Surface 'fb_argument_grid_invalid_bounds.json'
-    Fail-Step 'KV_FB_ARGUMENT_GRID_BOUNDS_INVALID' $Label 'Embedded FB argument grid has invalid bounds before paste.' @($dump)
-  }
-  if ($InitialSurfaceFocus) {
-    # The first focus transition follows asynchronous opening of the form.
-    # Subsequent rows are already on the same surface and skip this wait.
-    Start-Sleep -Milliseconds 250
-    [void](Invoke-KvUiGuardForceForeground -TargetHwnd $MainHwnd)
-    Assert-KvUiForegroundHwnd -ExpectedHwnd $MainHwnd -Step "$Label activate FB argument surface" -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -AllowSingleRecovery | Out-Null
-    Start-Sleep -Milliseconds 80
-  }
-  # KV STUDIO exposes the self-variable filter through Alt+L.  From that
-  # known focus owner, Shift+Tab lands on the upper-left self-variable grid
-  # cell.  This avoids clicking the name column, which opens a text editor and
-  # causes tab-delimited clipboard data to be concatenated into a variable
-  # name rather than parsed as a table.
-  # Use only KV's native focus chain. UIA SetFocus on this WinForms form can
-  # reset the control to focusHolderControl1, so it must not be used here.
-  $focusedGrid = $false
-  $focusTrace = @()
-  for ($attempt = 1; $attempt -le 3 -and -not $focusedGrid; $attempt++) {
-    Invoke-KvGuardedAltVk -TargetHwnd $MainHwnd -Step "$Label Alt+L filter focus attempt $attempt" -Vk 0x4C -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -SleepMs 180
-    $afterAlt = [System.Windows.Automation.AutomationElement]::FocusedElement
-    $filterFocused = $false
-    try { $filterFocused = ([int]$afterAlt.Current.ProcessId -eq [int]$grid.Current.ProcessId -and [string]$afterAlt.Current.AutomationId -eq '_usageFilterComboBox') } catch {}
-    if (-not $filterFocused) {
-      $focusTrace += [pscustomobject]@{ attempt = $attempt; stage = 'after_alt_l'; automation_id = try { [string]$afterAlt.Current.AutomationId } catch { '' }; name = try { [string]$afterAlt.Current.Name } catch { '' } }
-      Start-Sleep -Milliseconds 180
-      continue
-    }
-    Invoke-KvGuardedSendKeys -TargetHwnd $MainHwnd -Step "$Label Shift+Tab variable grid focus attempt $attempt" -Keys '+{TAB}' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action 'Shift+Tab moves from the FB self-variable filter to the upper-left native variable-grid cell' -SleepMs 180
-    $afterShift = [System.Windows.Automation.AutomationElement]::FocusedElement
-    try { $focusedGrid = ([int]$afterShift.Current.ProcessId -eq [int]$grid.Current.ProcessId -and [string]$afterShift.Current.AutomationId -eq '_grid') } catch { $focusedGrid = $false }
-    $focusTrace += [pscustomobject]@{ attempt = $attempt; stage = 'after_shift_tab'; automation_id = try { [string]$afterShift.Current.AutomationId } catch { '' }; name = try { [string]$afterShift.Current.Name } catch { '' }; grid_focused = $focusedGrid }
-    if (-not $focusedGrid) { Start-Sleep -Milliseconds 180 }
-  }
-  $focusTracePath = Join-Path $OutDir 'fb_argument_focus_route.json'
-  $focusTrace | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $focusTracePath -Encoding UTF8
-  if (-not $focusedGrid) {
-    $dump = Write-ElementDescendantDump $Surface 'fb_argument_grid_focus_after_alt_l_shift_tab_failed.json'
-    Fail-Step 'KV_FB_ARGUMENT_GRID_FOCUS_MISSING' $Label 'Alt+L then Shift+Tab did not reach the native FB argument grid.' @($focusTracePath, $dump)
-  }
+  $state=Focus-KvFbArgumentGrid $MainHwnd $ProjectNeedle
+  if(-not $state.pane.Equals($Surface)){throw 'KV_FB_GRID_OWNER_MISMATCH'}
 }
 
 function Resolve-FbArgumentOverwriteConfirmation($Modal, [IntPtr]$MainHwnd, [string]$ProjectNeedle, [string]$Stage) {
@@ -689,6 +631,7 @@ function Invoke-FbArgumentPasteAttempt($Form, [IntPtr]$MainHwnd, [string]$Projec
       Invoke-KvGuardedSendKeys -TargetHwnd $formHwnd -Step "FB arguments locate row $($RowOffset + 1) $FbName" -Keys ("{DOWN " + $RowOffset + "}") -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action 'Down moves from the upper-left variable-grid cell to the requested append row' -SleepMs 220
     }
   }
+  Assert-KvFbGridFocus $Form ([Windows.Automation.AutomationElement]::FocusedElement)
   Invoke-KvGuardedClipboardPaste -TargetHwnd $formHwnd -Step "FB arguments $AttemptName Ctrl+V $FbName" -Text $PasteText -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -SleepMs 220
   $modal = Find-KvsModal $process.Id
   if ($modal) {
@@ -731,126 +674,34 @@ try {
 
   $process = Get-VisibleKvsProcess $projectNeedle 10
   if (-not $process) { Fail-Step 'KV_PROJECT_PROCESS_NOT_FOUND' 'find target KV STUDIO project' "No visible KV STUDIO process matched project needle '$projectNeedle'. Refusing to operate another project window." @() }
-  if($SnapshotOnly){
-    . (Join-Path $operatorScriptRoot 'guards\kv_fb_snapshot.ps1')
-    Assert-KvFbNoPopup $process.MainWindowHandle
-    Assert-KvUiForegroundHwnd -ExpectedHwnd $process.MainWindowHandle -Step 'FB snapshot preflight' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -AllowSingleRecovery | Out-Null
-  } else {
-    Restore-KvForeground $process $projectNeedle 'set FB arguments start'
-  }
-  Assert-NoKvsModal $process.Id 'before FB argument route'
-
+  . (Join-Path $operatorScriptRoot 'guards\kv_fb_snapshot.ps1')
+  Assert-KvFbNoPopup $process.MainWindowHandle
   $item = FindProjectModuleTreeItem $process.Id $FbModuleName
-  if (-not $item) {
-    $dumpPath = Write-ProcessWindowDump $process.Id 'missing_fb_module_tree_item.json'
-    Fail-Step 'KV_FB_MODULE_TREE_ITEM_MISSING' 'select FB module' "Function-block tree item was not found: $FbModuleName" @($dumpPath)
-  }
-  if ($SnapshotOnly) {
-    . (Join-Path $operatorScriptRoot 'guards\kv_fb_snapshot.ps1')
-    for ($attempt=0; $attempt -lt 2; $attempt++) {
-      $selectionWatch=[Diagnostics.Stopwatch]::StartNew()
-      Assert-KvUiForegroundHwnd -ExpectedHwnd $process.MainWindowHandle -Step 'activate snapshot FB' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -AllowSingleRecovery | Out-Null
-      $item=FindProjectModuleTreeItem $process.Id $FbModuleName
-      if(-not $item){throw 'KV_FB_MODULE_TREE_ITEM_MISSING'}
-      $item.SetFocus()
-      $selection=$item.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern)
-      $selection.Select()
-      if(-not $selection.Current.IsSelected){throw 'KV_FB_TREE_SELECTION_FAILED'}
-      Write-KvUiGuardRunLog -Event 'fb_target_selected' -Data @{module=$FbModuleName;tree_name=$item.Current.Name;attempt=$attempt}
-      # Tree selection alone does not switch the active editor document.
-      Invoke-KvGuardedVkTap -TargetHwnd $process.MainWindowHandle -Step "activate FB $FbModuleName with Enter" -Vk 0x0D -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 200
-      Assert-NoKvsModal $process.Id 'after activating snapshot FB'
-      Assert-KvFbNoPopup $process.MainWindowHandle
-      $editor=Get-KvFbFocusAncestor '_ladderSplitContainer' $process.Id
-      if(-not $editor){throw 'KV_FB_ACTIVE_EDITOR_UNPROVEN'}
-      $pane=Select-KvFbArgumentPane $editor $process.Id
-      Complete-KvUiGuardAtomicAction -Stopwatch $selectionWatch -Step 'activate target FB argument pane' -Action 'verified tree selection, Enter and argument tab' -TargetHwnd $process.MainWindowHandle -ExpectedTitleLike "KV STUDIO*$projectNeedle*" | Out-Null
-      try {
-        $copied=Copy-KvFbArgumentPane $pane $process.MainWindowHandle $projectNeedle $OutDir
-        break
-      } catch {
-        if($attempt -ne 0 -or $_.Exception.Message -notmatch '^KV_FB_(FILTER_FOCUS_MISMATCH|GRID_FOCUS_LOST|GRID_OWNER_MISMATCH)$'){throw}
-        Write-KvUiGuardRunLog -Event 'fb_focus_recovery' -Data @{module=$FbModuleName;reason=$_.Exception.Message;attempt=1;vk=0x73}
-        # Only close the document whose editor was just activated and proven.
-        $focusedEditor=Get-KvFbFocusAncestor '_ladderSplitContainer' $process.Id
-        if(-not $focusedEditor -or -not $focusedEditor.Equals($editor)){throw 'KV_FB_RECOVERY_DOCUMENT_UNPROVEN'}
-        Invoke-KvGuardedCtrlChord -TargetHwnd $process.MainWindowHandle -Step "recover FB $FbModuleName Ctrl F4" -Vk 0x73 -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 200 -AllowModalAfter
-        Assert-NoKvsModal $process.Id 'after FB Ctrl+F4 recovery; never accept save prompts'
-        Assert-KvFbNoPopup $process.MainWindowHandle
-      }
-    }
-    $result=[pscustomobject]@{ok=$true;read_only=$true;project_path=$ProjectPath;module_name=$FbModuleName;raw_path=$copied.raw_path;row_count=$copied.row_count;focus_verified=$true;clipboard_fresh=$true;copy_elapsed_ms=$copied.elapsed_ms;recovery_count=$attempt;all_columns_preserved=$true;unfiltered_completeness_verified=$false}
-    Write-KvUiGuardRunLog -Event 'fb_snapshot_completed' -Data @{
-      ok=$result.ok; read_only=$result.read_only; project_path=$result.project_path
-      module_name=$result.module_name; raw_path=$result.raw_path; row_count=$result.row_count
-      focus_verified=$result.focus_verified; clipboard_fresh=$result.clipboard_fresh
-      copy_elapsed_ms=$result.copy_elapsed_ms; recovery_count=$result.recovery_count
-    }
+  if (-not $item) { Fail-Step 'KV_FB_MODULE_TREE_ITEM_MISSING' 'select FB module' "Function-block tree item was not found: $FbModuleName" @() }
+  Assert-KvUiForegroundHwnd -ExpectedHwnd $process.MainWindowHandle -Step 'FB declarations preflight' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -AllowSingleRecovery | Out-Null
+  Assert-NoKvsModal $process.Id 'before FB argument route'
+  $selectionWatch=[Diagnostics.Stopwatch]::StartNew()
+  $item.SetFocus()
+  $selection=$item.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern)
+  $selection.Select()
+  if(-not $selection.Current.IsSelected){throw 'KV_FB_TREE_SELECTION_FAILED'}
+  Write-KvUiGuardRunLog -Event 'fb_target_selected' -Data @{module=$FbModuleName;tree_name=$item.Current.Name}
+  Invoke-KvGuardedVkTap -TargetHwnd $process.MainWindowHandle -Step "activate FB $FbModuleName with Enter" -Vk 0x0D -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 200
+  Assert-KvFbNoPopup $process.MainWindowHandle
+  # The declaration pane need not exist until Alt+L has opened it.
+  $state=Focus-KvFbArgumentGrid $process.MainWindowHandle $projectNeedle
+  $form=$state.pane
+  $script:FbArgumentPane=$form
+  Complete-KvUiGuardAtomicAction -Stopwatch $selectionWatch -Step 'activate target FB argument pane' -Action 'selected FB Enter, Alt L and state-dependent Ctrl Tab' -TargetHwnd $process.MainWindowHandle -ExpectedTitleLike "KV STUDIO*$projectNeedle*" | Out-Null
+  if($SnapshotOnly){
+    $copied=Copy-KvFbArgumentPane $form $process.MainWindowHandle $projectNeedle $OutDir -AlreadyFocused
+    $result=[pscustomobject]@{ok=$true;read_only=$true;project_path=$ProjectPath;module_name=$FbModuleName;raw_path=$copied.raw_path;row_count=$copied.row_count;focus_verified=$true;clipboard_fresh=$true;copy_elapsed_ms=$copied.elapsed_ms;recovery_count=0;all_columns_preserved=$true;unfiltered_completeness_verified=$false}
+    Write-KvUiGuardRunLog -Event 'fb_snapshot_completed' -Data @{ok=$true;module=$FbModuleName;row_count=$copied.row_count;raw_path=$copied.raw_path}
     $result | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $OutDir 'fb_snapshot_result.json') -Encoding UTF8
     '0' | Set-Content (Join-Path $OutDir 'exit_code.txt') -Encoding ASCII
     return
   }
-  Bring-ProjectTreeItemIntoView $item $process.Id
-  $itemRectAfterScroll = $item.Current.BoundingRectangle
-  $screenBottom = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Bottom
-  if ($itemRectAfterScroll.Y -lt 0 -or ($itemRectAfterScroll.Y + $itemRectAfterScroll.Height) -gt ($screenBottom - 30)) {
-    $treeForArrow = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst(
-      [System.Windows.Automation.TreeScope]::Descendants,
-      (New-Object System.Windows.Automation.AndCondition(
-        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $process.Id)),
-        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'ProjectTreeView'))
-      ))
-    )
-    if (-not (Move-FocusToProjectTreeItemByArrows $treeForArrow $item ([IntPtr]$process.MainWindowHandle) $projectNeedle $FbModuleName)) {
-      $dumpPath = Write-ProcessWindowDump $process.Id 'fb_tree_arrow_navigation_failed.json'
-      Fail-Step 'KV_FB_MODULE_TREE_NAVIGATION_FAILED' 'navigate to FB module' "Could not reach FB module '$FbModuleName' using tree arrow navigation." @($dumpPath)
-    }
-    $item = FindProjectModuleTreeItem $process.Id $FbModuleName
-    if (-not $item) { Fail-Step 'KV_FB_MODULE_TREE_ITEM_MISSING' 'select FB module' "Function-block tree item disappeared while navigating: $FbModuleName" @() }
-  } else {
-    try { $item.SetFocus() } catch {}
-  }
-  # Re-read the virtualized row after navigation and invoke the context menu
-  # from the selected tree item.  The tree may expose logical coordinates
-  # larger than the physical desktop (DPI scaling); keyboard invocation avoids
-  # sending a click outside the desktop while still honoring the user's
-  # near-node + arrow navigation route.
-  $rect = $item.Current.BoundingRectangle
-  if ($rect.Y -lt 0 -or ($rect.Y + $rect.Height) -gt ($screenBottom + 200)) {
-    $dumpPath = Write-ProcessWindowDump $process.Id 'fb_tree_target_still_out_of_view.json'
-    Fail-Step 'KV_FB_MODULE_TREE_NAVIGATION_FAILED' 'navigate to FB module' "FB module '$FbModuleName' remained outside the reachable tree after arrow navigation." @($dumpPath)
-  }
-  try {
-    $selectPattern = $null
-    if ($item.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selectPattern)) { $selectPattern.Select() }
-  } catch {}
-  try { $item.SetFocus() } catch {}
-  Start-Sleep -Milliseconds 60
-  $rect = $item.Current.BoundingRectangle
-  if ($rect.Width -lt 10 -or $rect.Height -lt 10) { Fail-Step 'KV_FB_MODULE_TREE_ITEM_BOUNDS_INVALID' 'select FB module' "Function-block tree item has invalid bounds: $FbModuleName" @() }
-  if ($rect.Y -ge 0 -and $rect.Height -ge 10 -and $rect.Width -ge 10) {
-    $physical = Convert-UiaPointToPhysicalScreen $process.Id ($rect.X + [math]::Min(100, [math]::Max(12, $rect.Width / 2))) ($rect.Y + ($rect.Height / 2))
-    Invoke-KvGuardedMouseRightClick -TargetHwnd $process.MainWindowHandle -Step "FB module context menu $FbModuleName" -X $physical.x -Y $physical.y -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 250
-  } else {
-    Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step "FB module context menu $FbModuleName" -Keys '+{F10}' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -Action 'Shift+F10 opens the selected FB module context menu' -SleepMs 250
-  }
-
-  $fg = Get-KvForegroundSnapshot
-  $menuTarget = if ([string]$fg.class_name -eq '#32768') { [IntPtr]$fg.hwnd } else { $process.MainWindowHandle }
-  $menuTitle = if ([string]$fg.class_name -eq '#32768') { '*' } else { "KV STUDIO*$projectNeedle*" }
-  Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $menuTarget -Step "open FB argument table by Z $FbModuleName" -Keys 'z' -ExpectedTitleLike $menuTitle -SuccessTitleLike @('*自变量*','*变量*',"KV STUDIO*$projectNeedle*") -Action 'press Z on FB context menu to open self-variable table' -SleepMs 900
-  Start-Sleep -Milliseconds 150
-  Assert-NoKvsModal $process.Id 'after FB argument table open'
-
-  $form = Wait-FbArgumentSurface $process.Id 8
-  if (-not $form) {
-    $dumpPath = Write-ProcessWindowDump $process.Id 'missing_fb_argument_surface_after_z.json'
-    Fail-Step 'KV_FB_ARGUMENT_SURFACE_MISSING' 'open FB argument table' "Embedded function-block argument surface did not appear after right-click Z for $FbModuleName." @($dumpPath)
-  }
   $formDumpPath = ''
-  Assert-FbArgumentSurfaceTarget $form $process.Id ([IntPtr]$process.MainWindowHandle) $FbModuleName
-  # The surface is already stable after Wait-FbArgumentSurface; avoid an
-  # additional fixed delay before the fast row-write path.
 
   $attempts = [System.Collections.Generic.List[object]]::new()
   # KV's embedded WinForms grid accepts one tab-delimited row at a time. A
@@ -864,7 +715,7 @@ try {
     if ($rowIndex -gt 0) {
       Invoke-KvGuardedSendKeys -TargetHwnd ([IntPtr]$process.MainWindowHandle) -Step "FB arguments move to row $($rowIndex + 1) $FbModuleName" -Keys '{DOWN}' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -Action 'Down advances to the next native FB argument-grid row' -SleepMs 120
     }
-    $visible = Invoke-FbArgumentPasteAttempt $form ([IntPtr]$process.MainWindowHandle) $projectNeedle $attemptName ($rowTexts[$rowIndex] + "`r`n") $expectedSoFar $FbModuleName -FocusGridFirst:($rowIndex -eq 0) -RowOffset 0 -InitialSurfaceFocus:($rowIndex -eq 0)
+    $visible = Invoke-FbArgumentPasteAttempt $form ([IntPtr]$process.MainWindowHandle) $projectNeedle $attemptName ($rowTexts[$rowIndex] + "`r`n") $expectedSoFar $FbModuleName -RowOffset 0
     $attempts.Add($visible)
     if (-not $visible.ok) {
       $evidence = @($formDumpPath)
@@ -901,7 +752,7 @@ try {
     argument_names = @($pastePayload.rows | ForEach-Object { [string]$_.argument_name })
     atomic_action_timings_path = Join-Path $OutDir 'atomic_action_timings.json'
     atomic_action_timings = @(Get-KvUiGuardAtomicActionTimings)
-    route = 'project tree select FB -> guarded right click -> Z -> embedded FuncBlockParamVariableControl/_grid -> Alt+L filter focus -> Shift+Tab upper-left variable cell -> Ctrl+V -> copyback verify -> Ctrl+S'
+    route = 'select FB -> Enter -> Alt+L -> identify remembered table -> Ctrl+Tab once from locals or twice from argument filter -> argument grid -> row paste -> copyback verify -> Ctrl+S'
   } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'set_fb_arguments_result.json') -Encoding UTF8
   '0' | Set-Content -LiteralPath (Join-Path $OutDir 'exit_code.txt') -Encoding ASCII
   Log 'done set FB arguments'
@@ -909,8 +760,8 @@ try {
   Log ('ERROR ' + $_.Exception.ToString())
   $_.Exception.ToString() | Set-Content -LiteralPath (Join-Path $OutDir 'fail.txt') -Encoding UTF8
   $errorCode = if ($script:LastErrorCode) { $script:LastErrorCode } else { 'KV_FB_ARGUMENT_STEP_FAILED' }
+  if($_.Exception.Message -match '^(KV_[A-Z0-9_]+)$'){$errorCode=$Matches[1]}
   if($SnapshotOnly){
-    if($_.Exception.Message -match '^(KV_[A-Z0-9_]+)$'){$errorCode=$Matches[1]}
     @{ok=$false;error_code=$errorCode;message=$_.Exception.Message;module_name=$FbModuleName} | ConvertTo-Json | Set-Content (Join-Path $OutDir 'fb_snapshot_result.json') -Encoding UTF8
   }
   $currentStep = if ($script:LastErrorStep) { $script:LastErrorStep } else { 'set_fb_arguments' }
@@ -923,7 +774,7 @@ try {
     evidence = @($script:LastErrorEvidence + @((Join-Path $OutDir 'fail.txt')) | Where-Object { $_ })
     remediation = @(
       'Inspect same-run UIA dumps and modal_text files under this OutDir.',
-      'If right-click Z does not expose FuncBlockParamVariableControl/_grid, inspect the target project UIA dump before changing the route.',
+      'Inspect fb_declaration_route and fb_declaration_transition in run.log; unknown table or wrong grid must stop before paste.',
       'If KV reports paste data error, stop and repair arguments.tsv generation before any compile attempt.'
     )
   } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'set_fb_arguments_result.json') -Encoding UTF8

@@ -76,31 +76,42 @@ keeps for the next member is ignored when counting persisted members.
 - A missing FB type usually means the official FB was not imported or the project already has a conflicting FB name.
 - Do not solve missing variables by deleting logic unless the reference logic analysis proves the logic is unnecessary.
 
-## FB Argument Snapshot Focus
+## FB Argument Read/Write Focus
 
 The internal `runner_children/set_fb_arguments_guarded.ps1 -SnapshotOnly`
 returns a raw full-column TSV and `fb_snapshot_result.json`. It is not a new
 customer-callable entrypoint; use the manifest for published workflows.
 
-- Selecting an FB in the project tree does not prove it is the active editor.
-  The snapshot runner selects the exact FB, activates it with Enter, and resolves
-  the argument surface within the focused editor.
-- Both `_tabFBMacroParam` and `FuncBlockParamVariableControl` are observed UIA
-  representations. The latter exposes `_grid` and `_usageFilterComboBox`.
-- The measured route is Alt+L to the argument filter, then Shift+Tab to its grid.
-  Ctrl+Tab switched to the local-variable tab in the regression; it is not an
-  alternative focus route. A scrollbar alone also matches the ladder editor.
+- Reading and writing share `Focus-KvFbArgumentGrid`. Resolve the requested FB
+  with one name query scoped to ProjectTreeView (under 1 second), select it and
+  press Enter. Then Alt+L opens the last-used declaration table. Do not require
+  the argument pane to exist before Alt+L, and do not use a context-menu Z route.
+- Identify the current table from the focused control's ancestry (at most five
+  parent steps). Argument owners are `_tabFBMacroParam` or
+  `FuncBlockParamVariableControl`; local owners are `_tabLocal` or
+  `KvVariableLocalControl`. The focus control ID `_grid` alone cannot distinguish
+  these tables.
+- From the local table, Ctrl+Tab once reaches the argument grid. From the
+  argument filter, Ctrl+Tab twice goes through locals and returns to the argument
+  grid at its top-left. If Alt+L already leaves the argument grid focused, no
+  tab switch is needed. Verify each expected table transition; never send a
+  fixed number of Ctrl+Tab keys regardless of state.
 - Before Ctrl+A and Ctrl+C, prove foreground, focused grid identity, and ancestry
   under the argument surface. Require a changed clipboard sequence and valid
   argument rows. Never infer success from the presence of the pane alone.
-- On a proven focus failure, recovery may close the just-activated FB once with
-  Ctrl+F4 (VK_F4 = 0x73, not 0x34), reopen it and retry. Stop on any save/modal
-  prompt, unknown document ownership, or a second failure.
+- Stop on an unknown table, unexpected transition, or focus failure. The runner
+  does not retry alternative focus routes. Explicit recovery can close the
+  known active FB with Ctrl+F4 (VK_F4 = 0x73) and reopen it; a save/modal prompt
+  requires stopping, not accepting the prompt automatically.
+- Writes retain the established one-row TSV paste followed by Down. Verify the
+  argument-grid owner before paste, copy back names/directions/types, then save.
+  Snapshot counts exclude all-empty insertion rows; an empty table has zero
+  arguments. Snapshot success alone does not prove any arguments were written.
 - Snapshot success does not establish unfiltered completeness, structure-member
   definitions, variable persistence, or full project replication.
 
-`tests/test_fb_snapshot_live.ps1` in the repository verifies two exact-reference
-copies, rejection of wrong focus before clipboard input, and a third exact copy
-after closing and reopening the FB. It writes one JSONL `run.log` and checks
-every recorded atomic action is below 10 seconds. The close/reopen test verifies
-the recovery actions, not automatic detection of every possible stuck-editor state.
+`tests/test_fb_snapshot_live.ps1` verifies exact-reference copies from both
+remembered tables, rejection of argument-copy input while locals are active,
+and exact copying after closing and reopening the FB. It writes one JSONL
+`run.log`, requires every atomic action below 10 seconds and every module lookup
+below 1 second. This exercises explicit close/reopen, not automatic recovery.
