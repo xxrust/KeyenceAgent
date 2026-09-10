@@ -1,0 +1,61 @@
+# KV automation reliability work
+
+Objective: preserve verified operations as reusable interfaces, remove ambiguous
+entrypoints and duplicate implementations, and make a successful repair improve
+future workflow runs. This is system work, not another sample-replication task.
+
+## Evidence found on 2026-09-11
+
+- FB arguments had different read and write entry routes. Commit e54bb2b made
+  them share state-aware declaration focus and added live persistence regression.
+- Installed skills are ordinary directory copies, not links to this repository.
+  Updating the repository therefore does not update the running installation.
+- `script_manifest.json`, `capability-status.md`, and the programmer toolkit
+  manifest separately advertise available operations.
+- Operator root scripts include both forwarding wrappers and independent legacy
+  UI implementations. In particular, root and workflow expansion-unit scripts
+  have the same filename but different parameters and implementations.
+- Some published workflows invoke a child directly; others use the flat runner.
+  Logging, preflight, timeouts and success verification consequently differ.
+- The resolver accepts absolute script paths before checking manifest class.
+- An `approved` label is not bound to the implementation/dependency versions or
+  a reproducible semantic test. Historical success can outlive its tested route.
+- MVP examples dominate top-level guidance despite generic editing operations
+  having distinct, smaller input requirements.
+- Work-root research directories contain successive failures and successes with
+  similar names. They are searchable alongside current code without a lifecycle
+  index identifying the maintained route.
+
+Baseline inventory: 79 operator PowerShell files, 43 manifest entries, 36
+unclassified scripts, 10 duplicated leaf names, and 5 published workflows not
+using the flat executor. The installed operator also contains an untracked
+legacy EtherCAT implementation. The FB file byte difference is only line-ending
+normalization, not a functional code difference. The 31 installed sample-project
+files match the repository byte-for-byte.
+
+## Required outcomes and acceptance
+
+| Requirement | Completion evidence |
+| --- | --- |
+| One maintained source and installation | Installed code resolves to that source; configuration/sample assets are preserved; drift test passes |
+| One discoverable interface per operation | Machine-readable catalog; no competing active UI implementation or unexplained executable |
+| Generic, composable workflows | Project/FB/variable/structure/hardware operations do not require a synthetic MVP; plans resolve through one executor |
+| Repairs reach the caller | Live tests invoke the published interface and exercise state transitions that previously failed |
+| Unambiguous verification | Same-run target, inputs, code/dependency fingerprints, semantic readback and timings; failed/stale evidence cannot certify current code |
+| Simple fast execution | No exploratory retries; module lookup under 1s and UI atomic actions under 10s except documented software startup |
+| Clear skill guidance | Concise task-to-interface routing; programming model separated from UI mechanics; examples are examples |
+| Organized code and work products | Current code, tests, maintained references and archived research have distinct locations and an index; recoverable migration |
+| Regression prevention | Non-UI contract tests plus representative live tests; one documented promotion/release process checks the actual workflow |
+
+## Work stages
+
+1. Inventory current files, callers, installation drift, claims and evidence.
+2. Establish the source of truth and retire duplicate/obsolete routing.
+3. Unify workflow execution, result contracts and evidence/version tracking.
+4. Rewrite skill routing and organize work products without losing history.
+5. Run structural, negative and real UI regressions; fix observed failures;
+   commit each verified stage. Audit every outcome above before completion.
+
+Do not mark historical tests as tests of new code, treat blank table rows as
+written content, or reduce required functionality to obtain a green result.
+Preserve unrelated worktree edits. No push is requested.
