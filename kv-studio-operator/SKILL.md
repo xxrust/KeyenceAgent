@@ -38,6 +38,8 @@ UI workflow 启动前必须完成并记录前置检查：项目文件存在、�
 
 默认使用快速模式：仅执行与当前动作直接相关的一次性前置检查，不展开项目树、不枚举控件/模块、不进行多轮焦点探针。模块存在性检查只允许一次按目标名称的定向查询，计入 `run.log` 的 `module_lookup.elapsed_ms`，预算为 1000ms；检测到异常、超时或状态不匹配时立即停止并保留证据。只有故障诊断或显式 audit 参数才允许额外检查。
 
+多实例规则：新建项目 workflow 只检查目标同名项目窗口；其他 KV STUDIO 实例（包括带未保存标记 `*` 的不同项目）不阻塞新建。目标同名项目已打开时返回稳定错误并要求改用已有项目 repair workflow。已有项目 repair、FB 导入和变量修改 workflow 必须绑定传入的目标项目，允许该目标窗口带未保存标记 `*`。
+
 把输入代码放入 `guards\kv_ui_guard.ps1` 并不等于原子动作已获批准。客户态 runner 只能调用 `scripts\script_manifest.json` 中 `ui_atomic_actions.approved` 列出的 API；`pending` 或未登记动作必须被 `assert_kv_mvp_ui_guard_usage.ps1` 拒绝。发布的 UI workflow 必须从 manifest 解析其 runner 依赖，并在调用 runner、接管 KV STUDIO 之前运行该门禁。新增复合按键、焦点恢复或剪贴板路线先保持 pending，经隔离验证和重复回归后才能提升为 approved；不得为了完成当前任务直接把新函数加入 approved。
 
 `runner_children`、`guards`、`probes` 是 workflow 内部实现或研发工具。客户态失败诊断读取同次 result/evidence；研发态操作需要用户明确授权。references 只提供状态、schema 和失败归因；执行入口仍由 manifest 决定。

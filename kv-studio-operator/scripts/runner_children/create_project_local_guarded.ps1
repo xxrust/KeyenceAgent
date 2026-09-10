@@ -85,6 +85,8 @@ function Resolve-KvAdminCredential {
 function Get-CreateProjectErrorCode([string]$Message) {
   if ($Message -like '*KV admin credential*') { return 'KV_ADMIN_CREDENTIAL_MISSING' }
   if ($Message -like '*foreground window is not KV STUDIO*') { return 'KV_FOCUS_LOST' }
+  if ($Message -like '*KV_CREATE_PROJECT_TARGET_UNSAVED_OPEN*') { return 'KV_CREATE_PROJECT_TARGET_UNSAVED_OPEN' }
+  if ($Message -like '*KV_CREATE_PROJECT_TARGET_ALREADY_OPEN*') { return 'KV_CREATE_PROJECT_TARGET_ALREADY_OPEN' }
   if ($Message -like '*New project dialog did not open*') { return 'KV_CREATE_PROJECT_DIALOG_MISSING' }
   if ($Message -like '*Project file was not created*') { return 'KV_CREATE_PROJECT_FILE_MISSING' }
   return 'KV_CREATE_PROJECT_FAILED'
@@ -456,6 +458,15 @@ try {
   }
   $allKvs = @(Get-Process Kvs -ErrorAction SilentlyContinue)
   $visibleKvs = @($allKvs | Where-Object { $_.MainWindowHandle -ne 0 })
+  $targetProjectPath = Join-Path (Join-Path $ProjectRoot $ProjectName) ($ProjectName + '.kpr')
+  $targetProcesses = @($visibleKvs | Where-Object { $_.MainWindowTitle -like ('*' + $ProjectName + '*') })
+  if ($targetProcesses.Count -gt 0) {
+    $targetProcess = $targetProcesses | Select-Object -First 1
+    if ($targetProcess.MainWindowTitle -match '\*\]\s*$') {
+      throw "KV_CREATE_PROJECT_TARGET_UNSAVED_OPEN title=$($targetProcess.MainWindowTitle) pid=$($targetProcess.Id)"
+    }
+    throw "KV_CREATE_PROJECT_TARGET_ALREADY_OPEN title=$($targetProcess.MainWindowTitle) pid=$($targetProcess.Id) path=$targetProjectPath"
+  }
   if ($allKvs.Count -gt 0 -and $visibleKvs.Count -eq 0) {
     Log ("found Kvs process without main window after restart; starting a fresh visible instance. pids=" + (($allKvs | ForEach-Object { $_.Id }) -join ','))
   }
@@ -471,7 +482,7 @@ try {
   } while (($null -eq $process -or $process.MainWindowHandle -eq 0) -and (Get-Date) -lt $deadline)
   if (-not $process -or $process.MainWindowHandle -eq 0) { throw 'KV STUDIO main window not ready' }
   if ($process.MainWindowTitle -match '\*\]\s*$') {
-    throw "KV_CREATE_PROJECT_EXISTING_UNSAVED_PROJECT title=$($process.MainWindowTitle) pid=$($process.Id)"
+    Log "ignoring unsaved non-target KV STUDIO project title=$($process.MainWindowTitle) pid=$($process.Id)"
   }
   Restore-KvStudioForeground $process 'Ctrl+N'
 
