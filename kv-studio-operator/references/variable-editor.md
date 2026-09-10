@@ -78,9 +78,10 @@ keeps for the next member is ignored when counting persisted members.
 
 ## FB Argument Read/Write Focus
 
-The internal `runner_children/set_fb_arguments_guarded.ps1 -SnapshotOnly`
-returns a raw full-column TSV and `fb_snapshot_result.json`. It is not a new
-customer-callable entrypoint; use the manifest for published workflows.
+The published `workflows/set_kv_fb_arguments.ps1 -SnapshotOnly` uses the same
+child as writing. It returns a raw full-column TSV and `fb_snapshot_result.json`
+under `artifacts/fb_arguments`; `fb_declaration_workflow_result.json` binds that
+result to the current execution. Do not supply write inputs with SnapshotOnly.
 
 - Reading and writing share `Focus-KvFbArgumentGrid`. Resolve the requested FB
   with one name query scoped to ProjectTreeView (under 1 second), select it and

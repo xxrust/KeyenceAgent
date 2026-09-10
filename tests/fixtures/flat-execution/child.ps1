@@ -1,4 +1,4 @@
-param([string]$OutDir, [string]$Mode, [string]$Value = '', [string]$Empty = 'not-empty', [switch]$SnapshotOnly)
+param([string]$OutDir, [string]$Mode, [string]$Value = '', [string]$Empty = 'not-empty', [switch]$SnapshotOnly, [string[]]$Items=@())
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $resultPath = Join-Path $OutDir 'result.json'
@@ -13,6 +13,7 @@ switch ($Mode) {
   'quoting' {
     if ($Value -ne 'space "quote" $cash `literal \trailing\' -or $Empty -ne '') { throw "Wrong argument transport: [$Value] [$Empty]" }
   }
+  'typed' { if ($Items.Count -ne 2 -or $Items[0] -ne 'model, one' -or $Items[1] -ne 'model two' -or -not $SnapshotOnly) { throw 'Typed parameter transport failed' } }
 }
 @{ok=$true;value=$Value} | ConvertTo-Json | Set-Content -LiteralPath $resultPath -Encoding UTF8
 if ($Mode -eq 'stale') { (Get-Item -LiteralPath $resultPath).LastWriteTimeUtc = [datetime]'2000-01-01'; exit 0 }

@@ -138,6 +138,15 @@ function Invoke-FlatWorkflowStep([object]$Step) {
   # points; non-UI gates remain compatible with STA.
   $command = @('-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath) + $arguments
   $commandLine = ($command | ForEach-Object { ConvertTo-KvProcessArgument ([string]$_) }) -join ' '
+  if ($Step.parameters) {
+    # Typed JSON avoids flattening arrays or booleans into command-line strings.
+    $requestPath = Join-Path $outDir 'step_request.json'
+    @{script_path=$scriptPath;parameters=$Step.parameters} | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $requestPath -Encoding UTF8
+    $requestLiteral = "'" + $requestPath.Replace("'","''") + "'"
+    $invoke = '$ErrorActionPreference="Stop"; $ProgressPreference="SilentlyContinue"; try { $r=Get-Content -LiteralPath ' + $requestLiteral + ' -Raw -Encoding UTF8 | ConvertFrom-Json; $p=@{}; foreach($v in $r.parameters.PSObject.Properties){$p[$v.Name]=$v.Value}; & $r.script_path @p; if(-not $?){exit 1}; exit 0 } catch { [Console]::Error.WriteLine($_.Exception.ToString()); exit 1 }'
+    $commandLine = '-STA -NoProfile -ExecutionPolicy Bypass -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($invoke))
+    $arguments=@($Step.parameters.PSObject.Properties | ForEach-Object { $_.Value })
+  }
   $inputs = @(Get-KvInputFingerprints $arguments)
   $stepStart = Get-Date
   Write-WorkflowLog 'step_started' @{script=$scriptPath;out_dir=$outDir;input_fingerprints=$inputs;expected_results=$prepared.contract.files;code_sha256=$script:codeFingerprint.sha256}
@@ -209,7 +218,7 @@ function Invoke-FlatWorkflowStep([object]$Step) {
   $elapsed = [math]::Round(((Get-Date) - $stepStart).TotalSeconds, 3)
   [ordered]@{
     run_id=$script:runId;step=$Step.name;ok=($exit -eq 0);exit_code=$exit;started_utc=$stepStart.ToUniversalTime().ToString('o')
-    script=$scriptPath;arguments=$arguments;inputs=$inputs;code_sha256=$script:codeFingerprint.sha256
+    script=$scriptPath;arguments=$arguments;parameters=$Step.parameters;inputs=$inputs;code_sha256=$script:codeFingerprint.sha256
     artifacts=$evidence;evidence_error=$evidenceError;elapsed_seconds=$elapsed
   } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $outDir 'step_receipt.json') -Encoding UTF8
   Write-WorkflowLog $(if ($exit -eq 0) {'step_succeeded'} else {'step_failed'}) @{exit_code=$exit;elapsed_seconds=$elapsed;out_dir=$outDir}
@@ -317,7 +326,10 @@ try {
     if ($outputPaths.ContainsKey($step.out_dir)) { throw "KV_PLAN_STEP_OUT_DIR_DUPLICATE: $($step.out_dir)" }
     $outputPaths[$step.out_dir]=$true
     $relative = $path.Substring($scriptRoot.TrimEnd('\','/').Length+1).Replace('\','/')
-    $contract = Get-KvStepContract $manifest $relative @($step.arguments)
+    if ($step.parameters -and $step.arguments) { throw "KV_PLAN_STEP_ARGUMENTS_AMBIGUOUS: $($step.name)" }
+    $contractArguments=@($step.arguments)
+    if ($step.parameters) { $contractArguments=@($step.parameters.PSObject.Properties | Where-Object { $_.Value -eq $true } | ForEach-Object { '-'+$_.Name }) }
+    $contract = Get-KvStepContract $manifest $relative $contractArguments
     $script:preparedSteps[[string]$step.name]=@{path=$path;contract=$contract}
   }
   if ($script:preparedSteps.Count -eq 0) { throw 'KV_PLAN_STEPS_REQUIRED' }

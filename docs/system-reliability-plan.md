@@ -77,10 +77,20 @@ Preserve unrelated worktree edits. No push is requested.
   that every child verifies every semantic field. MNM import currently reports
   route completion explicitly; its placement/content acceptance still needs
   to be made mandatory in published import workflows.
-- `tests/test_flat_execution_evidence.ps1` passes 16 no-UI cases, including
+- `tests/test_flat_execution_evidence.ps1` passes 17 no-UI cases, including
   stale output reuse, a misleading helper result, process failure, timeout,
   snapshot result variants and forbidden absolute routes. Evidence is under
-  `H:\kvOp\system-reliability\strict-executor\negative-tests-r2`.
-- Remaining: unify the five direct-child workflows, remove competing active
-  routes, simplify skills, organize history, and run published live regression.
+  `H:\kvOp\system-reliability\strict-executor\typed-tests-r2`.
+- All five formerly direct-child workflows now construct flat plans. Parameters
+  can retain arrays and Boolean values; older argument-vector plans remain
+  supported. Five published plan tests and the atomic boundary test pass.
+- Published FB snapshot regression passes all four exact-reference copies,
+  both remembered-table branches, wrong-focus rejection and close/reopen.
+  Maximum atomic duration is 1513ms; maximum module lookup is 196ms. Evidence:
+  `H:\kvOp\system-reliability\published-fb-snapshot`.
+- Published structure export passes through the typed plan/executor in 4.135s
+  (child 2.619s). Evidence: `H:\kvOp\system-reliability\published-structure-snapshot`.
+  This does not certify the hardware/export mutation workflows as newly live-tested.
+- Remaining: remove competing active routes, simplify skills, organize history,
+  finish semantic acceptance and regression promotion checks.
   The system-wide goal is not yet complete.

@@ -69,7 +69,7 @@
     "runner_children/mutate_structure_definitions_guarded.ps1": {"files": ["result.json"]},
     "workflow_tools/assert_kv_module_placement.ps1": {"files": ["module_placement_result.json"]},
     "workflow_tools/new_kv_mvp_execution_plan.ps1": {"files": ["execution_plan_result.json"]},
-    "workflow_tools/new_kv_mnm_export_workspace.ps1": {"files": ["export_workspace_result.json"]},
+    "workflow_tools/new_kv_mnm_export_workspace.ps1": {"files": ["export_workspace_plan.json"]},
     "workflow_tools/collect_kv_mnm_export_workspace.ps1": {"files": ["export_mnm_project_copy_result.json"]}
   },
   "classes": {
@@ -176,6 +176,7 @@
         "customer_callable": true,
         "capabilities": [
           "set_fb_arguments",
+          "snapshot_fb_arguments",
           "verify_fb_argument_copyback"
         ]
       },

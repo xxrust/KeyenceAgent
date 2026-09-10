@@ -16,9 +16,13 @@ $expected=[IO.File]::ReadAllText($ReferencePath).Replace("`r`n","`n").TrimEnd("`
 $runs=@()
 function Run-Snapshot([string]$Name){
  $dest=Join-Path $OutDir $Name
- & powershell -STA -NoProfile -ExecutionPolicy Bypass -File (Join-Path $scripts 'runner_children\set_fb_arguments_guarded.ps1') -ProjectPath $ProjectPath -FbModuleName $FbModuleName -SnapshotOnly -OutDir $dest -ChecklistPath $ChecklistPath
+ & powershell -STA -NoProfile -ExecutionPolicy Bypass -File (Join-Path $scripts 'workflows\set_kv_fb_arguments.ps1') -ProjectPath $ProjectPath -FbModuleName $FbModuleName -SnapshotOnly -OutDir $dest -ChecklistPath $ChecklistPath
  if($LASTEXITCODE -ne 0){throw "Snapshot runner failed: $Name"}
- $result=Get-Content (Join-Path $dest 'fb_snapshot_result.json') -Raw -Encoding UTF8|ConvertFrom-Json
+ $workflow=Get-Content (Join-Path $dest 'fb_declaration_workflow_result.json') -Raw -Encoding UTF8|ConvertFrom-Json
+ if (-not $workflow.ok) { throw "Published workflow failed: $Name" }
+ $result=Get-Content (Join-Path $dest 'artifacts\fb_arguments\fb_snapshot_result.json') -Raw -Encoding UTF8|ConvertFrom-Json
+ # Fold the complete published run into this regression's common audit stream.
+ Get-Content (Join-Path $dest 'run.log') -Encoding UTF8 | Add-Content -LiteralPath $env:KV_WORKFLOW_RUN_LOG -Encoding UTF8
  $actual=[IO.File]::ReadAllText($result.raw_path).Replace("`r`n","`n").TrimEnd("`r","`n")
  if(-not $result.ok -or -not $result.focus_verified -or -not $result.clipboard_fresh -or $actual -cne $expected){throw "Snapshot did not match reference: $Name"}
  Write-KvUiGuardRunLog -Event 'snapshot_reference_match' -Data @{run=$Name;rows=$result.row_count;exact_match=$true}

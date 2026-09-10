@@ -9,6 +9,7 @@ param(
   [string]$OutDir,
 
   [string]$WorkRoot = '',
+  [string]$RunRoot = '',
   [switch]$AllowWorkRootOutsideExportDir
 )
 
@@ -31,7 +32,10 @@ try {
   $sourceDir = [IO.Path]::GetFullPath((Split-Path -Parent $ProjectPath))
   $projectFileName = Split-Path -Leaf $ProjectPath
   $projectDirName = Split-Path -Leaf $sourceDir
-  $runRoot = Join-Path $WorkRoot ('run_' + (Get-Date -Format 'yyyyMMdd_HHmmss_ffff'))
+  if (-not $RunRoot) { $RunRoot = Join-Path $WorkRoot ('run_' + (Get-Date -Format 'yyyyMMdd_HHmmss_ffff')) }
+  $RunRoot = [IO.Path]::GetFullPath($RunRoot)
+  if (-not $RunRoot.StartsWith(($WorkRoot.TrimEnd('\')+'\'), [StringComparison]::OrdinalIgnoreCase)) { throw 'Export RunRoot must be inside WorkRoot' }
+  if (Test-Path -LiteralPath (Join-Path $RunRoot 'project')) { throw 'Export RunRoot already contains a project; use a new run directory' }
   $projectCopyParent = Join-Path $runRoot 'project'
   $coreOutDir = Join-Path $runRoot 'ui_export'
   New-Item -ItemType Directory -Force -Path $projectCopyParent, $coreOutDir | Out-Null

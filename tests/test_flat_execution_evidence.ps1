@@ -31,6 +31,10 @@ function Run-Case([string]$Name,[string]$Mode,[string]$ExpectedCode='', [switch]
     steps=@(@{name='fixture';kind='runner_child';script_name='child.ps1';classes=@('runner_child_approved');out_dir=$stepOut;arguments=$argsList;timeout_seconds=$(if($Mode -eq 'timeout'){1}else{10})})
   }
   if ($Mode -eq 'unregistered') { $plan.steps[0].script_name=Join-Path $source 'workflow_tools/kv_step_evidence.ps1' }
+  if ($Mode -eq 'typed') {
+    $plan.steps[0].Remove('arguments')
+    $plan.steps[0].parameters=@{OutDir=$stepOut;Mode='typed';Items=@('model, one','model two');SnapshotOnly=$true}
+  }
   $planPath=Join-Path $runRoot 'plan.json'
   $plan | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $planPath -Encoding UTF8
   & powershell -NoProfile -ExecutionPolicy Bypass -File $executor -PlanPath $planPath
@@ -48,6 +52,7 @@ function Run-Case([string]$Name,[string]$Mode,[string]$ExpectedCode='', [switch]
 }
 Run-Case 'quoted values' 'quoting'
 Run-Case 'snapshot' 'pass' -Snapshot
+Run-Case 'typed arrays' 'typed'
 Run-Case 'reuse' 'pass'
 Run-Case 'reuse' 'missing' 'KV_STEP_RESULT_MISSING'
 if (@(Get-ChildItem -LiteralPath (Join-Path $OutDir 'reuse/child output/_history') -Filter result.json -Recurse).Count -ne 1) { throw 'Previous result was not preserved' }

@@ -39,11 +39,16 @@ $approvedChildren = @($manifest.classes.runner_child_approved | ForEach-Object {
 if ($approvedChildren -notcontains ([string]$workflowEntry[0].runner_children[0]).Replace('\','/')) {
   throw 'Structure workflow dependency is not an approved runner child.'
 }
-$workflowText = Get-Content -Raw -Encoding UTF8 (Join-Path $sourceScripts $workflowRelative)
-$gateIndex = $workflowText.IndexOf('assert_kv_mvp_ui_guard_usage.ps1')
-$runnerIndex = $workflowText.LastIndexOf('& $child')
-if ($gateIndex -lt 0 -or $runnerIndex -lt 0 -or $gateIndex -ge $runnerIndex) {
-  throw 'Structure workflow does not execute the UI atomic-action gate before its runner child.'
+$projectFixture = Join-Path $OutDir 'fixture.kpr'
+$mutationFixture = Join-Path $OutDir 'mutation.json'
+New-Item -ItemType File -Path $projectFixture -Force | Out-Null
+@{operations=@()} | ConvertTo-Json | Set-Content -LiteralPath $mutationFixture -Encoding UTF8
+$planOut=Join-Path $OutDir 'published_plan'
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $sourceScripts $workflowRelative) -ProjectPath $projectFixture -PlanPath $mutationFixture -OutDir $planOut -PlanOnly
+if ($LASTEXITCODE -ne 0) { throw 'Published structure workflow could not prepare its plan' }
+$plan=Get-Content -Raw -Encoding UTF8 (Join-Path $planOut 'execution_plan.json') | ConvertFrom-Json
+if ($plan.steps.Count -ne 3 -or $plan.steps[0].script_name -ne 'gates/assert_kv_mvp_ui_guard_usage.ps1' -or $plan.steps[2].script_name -ne $workflowEntry[0].runner_children[0]) {
+  throw 'Published structure plan does not place the guard gate before its declared child'
 }
 
 [pscustomobject]@{

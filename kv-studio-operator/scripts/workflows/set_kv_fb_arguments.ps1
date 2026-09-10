@@ -1,13 +1,14 @@
 param(
   [Parameter(Mandatory=$true)][string]$ProjectPath,
   [Parameter(Mandatory=$true)][string]$FbModuleName,
-  [Parameter(Mandatory=$true)][string]$ArgumentsTsv,
+  [string]$ArgumentsTsv = '',
   [Parameter(Mandatory=$true)][string]$OutDir,
   [string]$ChecklistPath = '',
   [string]$LocalVariablesTsv = '',
   [string[]]$AllowedCustomDataTypes = @(),
   [int]$TimeoutSeconds = 120,
-  [switch]$PlanOnly
+  [switch]$PlanOnly,
+  [switch]$SnapshotOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,6 +16,8 @@ $scriptRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 . (Join-Path $scriptRoot 'Resolve-KvStudioOperatorScript.ps1')
 $runner = Resolve-KvStudioOperatorScriptPath -ScriptRoot $scriptRoot -Name 'invoke_kv_flat_execution_plan.ps1' -Classes @('workflow_tool')
 $OutDir = [IO.Path]::GetFullPath($OutDir)
+if (-not $SnapshotOnly -and -not $ArgumentsTsv) { throw 'KV_FB_ARGUMENTS_TSV_REQUIRED' }
+if ($SnapshotOnly -and ($ArgumentsTsv -or $LocalVariablesTsv)) { throw 'KV_FB_SNAPSHOT_WRITE_INPUT_CONFLICT' }
 foreach ($path in @($ProjectPath, $ArgumentsTsv, $LocalVariablesTsv) | Where-Object { $_ }) {
   if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Input file not found: $path" }
 }
@@ -27,6 +30,7 @@ foreach ($gate in @('ui_guard_usage', 'agent_boundary')) {
 }
 $argOut = Join-Path $artifacts 'fb_arguments'
 $steps.Add(@{name='set_fb_arguments';kind='runner_child';script_name='set_fb_arguments_guarded.ps1';classes=@('runner_child_approved');out_dir=$argOut;arguments=@('-ProjectPath',$ProjectPath,'-FbModuleName',$FbModuleName,'-ArgumentsTsv',$ArgumentsTsv,'-ChecklistPath',$ChecklistPath,'-OutDir',$argOut)})
+if ($SnapshotOnly) { $steps[$steps.Count-1].arguments += '-SnapshotOnly' }
 if ($AllowedCustomDataTypes.Count) { $steps[$steps.Count-1].arguments += @('-AllowedCustomDataTypes',($AllowedCustomDataTypes -join ',')) }
 if ($LocalVariablesTsv) {
   $localOut = Join-Path $artifacts 'local_variables'

@@ -1,7 +1,7 @@
 param(
   [Parameter(Mandatory=$true)]
   [string]$PlanPath,
-
+  [string]$OutDir = '',
   [switch]$AllowOverwrite
 )
 
@@ -27,6 +27,7 @@ try {
   $PlanPath = [IO.Path]::GetFullPath($PlanPath)
   if (-not (Test-Path -LiteralPath $PlanPath -PathType Leaf)) { throw "PlanPath not found: $PlanPath" }
   $plan = Get-Content -Raw -LiteralPath $PlanPath -Encoding UTF8 | ConvertFrom-Json
+  if ($OutDir) { $plan.out_dir=[IO.Path]::GetFullPath($OutDir) }
   if (-not $plan.ok) { throw "Export workspace plan is not ok: $PlanPath" }
 
   if (-not (Test-Path -LiteralPath ([string]$plan.core_result_path) -PathType Leaf)) { throw "Core result missing: $($plan.core_result_path)" }
