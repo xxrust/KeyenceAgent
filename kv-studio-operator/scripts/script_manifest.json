@@ -154,6 +154,11 @@
         "result.json"
       ]
     },
+    "runner_children/set_fb_program_body_guarded.ps1": {
+      "files": [
+        "program_body_result.json"
+      ]
+    },
     "workflow_tools/assert_kv_module_placement.ps1": {
       "files": [
         "module_placement_result.json"
@@ -382,6 +387,18 @@
         "execution": "flat_manifest_steps"
       },
       {
+        "path": "workflows/set_kv_fb_program_body.ps1",
+        "status": "published",
+        "customer_callable": true,
+        "capabilities": [
+          "set_fb_program_body"
+        ],
+        "runner_children": [
+          "runner_children/set_fb_program_body_guarded.ps1"
+        ],
+        "execution": "flat_manifest_steps"
+      },
+      {
         "path": "workflows/create_kv_project.ps1",
         "status": "pending_validation",
         "customer_callable": false,
@@ -489,6 +506,12 @@
       },
       {
         "path": "runner_children/mutate_structure_definitions_guarded.ps1",
+        "status": "approved",
+        "customer_callable": false,
+        "ui_guard_required": true
+      },
+      {
+        "path": "runner_children/set_fb_program_body_guarded.ps1",
         "status": "approved",
         "customer_callable": false,
         "ui_guard_required": true

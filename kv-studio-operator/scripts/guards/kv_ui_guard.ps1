@@ -243,7 +243,11 @@ function Stop-KvUiGuard {
 function Get-KvUiGuardForegroundErrorCode {
   param($Snapshot, [IntPtr]$ExpectedHwnd)
   if (-not $Snapshot) { return 'KV_FOCUS_LOST' }
-  if ($Snapshot.hwnd -eq $ExpectedHwnd.ToInt64()) { return '' }
+  if ($Snapshot.hwnd -eq $ExpectedHwnd.ToInt64()) {
+    # HWND equality is not sufficient when a caller also supplied a title
+    # contract; never return an empty error code on a title mismatch.
+    return 'KV_TARGET_WINDOW_TITLE_MISMATCH'
+  }
   if ([string]$Snapshot.process_name -match '^(powershell|pwsh|WindowsTerminal|cmd|conhost)$') { return 'KV_FOCUS_LOST_TERMINAL' }
   if ([string]$Snapshot.class_name -eq '#32770') { return 'KV_MODAL_PRESENT' }
   if ([string]$Snapshot.title -like 'KV STUDIO*') { return 'KV_TARGET_WINDOW_NOT_FOREGROUND' }
