@@ -12,3 +12,4 @@ $fg=Get-KvForegroundSnapshot;if($fg.class_name -ne '#32770' -or $fg.process_id -
 
 
 
+
