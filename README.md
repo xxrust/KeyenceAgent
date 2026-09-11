@@ -20,15 +20,18 @@ KeyenceAgent 是面向 KEYENCE KV STUDIO 的 Codex skill 套件。它把 KEYENCE
 | `keyence-plc-programmer` | 设计和修复 PLC 程序、MNM、变量、用户 FB 与项目复刻方案。 |
 | `kv-studio-operator` | 通过已发布 workflow、scaffold tool 和 Gate 操作 KV STUDIO。 |
 
-## 当前能力边界
+## 当前能力边界与验证状态
 
 | 能力 | 状态 |
 | --- | --- |
 | 新建 KV-X310 项目、导入 MNM、写入变量、转换并复制结果 | 已发布客户态 workflow |
 | 多 MNM、用户功能块、功能块自变量、已有项目修复 | 已发布或受 Gate 约束 |
 | MNM 导出和项目 inventory | 已发布入口 |
-| EtherCAT、EtherNet/IP、扩展单元、单元首地址 | `ROUTE_RESEARCH_REQUIRED` |
-| EtherCAT ESI 注册 | `KV_ETHERCAT_ESI_REGISTRATION_UNSTABLE` |
+| 扩展单元插入 | 已发布接口；计划/契约已测，整理后真实 UI 回归待补 |
+| EtherCAT 节点配置 | 已发布接口；计划/契约已测，整理后真实 UI 回归待补 |
+| 单元首地址独立修改 | 尚无公开 workflow（`ROUTE_RESEARCH_REQUIRED`） |
+| EtherNet/IP 设备配置 | 尚无公开 workflow（成员查询工具不等于配置） |
+| EtherCAT ESI 注册 | `KV_ETHERCAT_ESI_REGISTRATION_UNSTABLE`，研究中 |
 
 客户态入口只来自 [`kv-studio-operator/scripts/script_manifest.json`](kv-studio-operator/scripts/script_manifest.json) 中 `customer_callable=true` 的条目。`runner_children`、`workflow_tools`、`guards`、`probes` 和根级 `configure_kv_*.ps1` 属于内部实现或研究路线。
 
@@ -141,7 +144,15 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -File .\scripts\test_keyence_agent.ps1
 ```
 
-该检查把开发联接、agent boundary Gate、UI guard Gate 和 `git diff --check` 汇总到同次运行的 `result.json`。PLC 项目成功仍以同次运行的 `mvp_result.json`、转换结果文本和 clean-state 证据为准。
+该检查把开发联接、agent boundary Gate、UI guard Gate 和 `git diff --check` 汇总到同次运行的 `result.json`。PLC 项目成功仍以同次运行的结果、转换文本和 clean-state 证据为准。当前已确认的回归证据与缺口见 [项目状态 Wiki](docs/wiki/project-status.md)。
+
+## 文档与证据
+
+- [项目状态与核对清单](docs/wiki/project-status.md)
+- [接口与验收细则](docs/wiki/operator-details.md)
+- [可视化架构图](docs/wiki/index.html)
+- [Harness 总览图](docs/images/keyenceagent-harness-overview.png)
+- [修复闭环图](docs/images/kv-repair-loop.png)
 
 ## 文档
 

@@ -1514,7 +1514,11 @@ try {
     foreach ($snapshotModule in $moduleNames) {
       $form = Select-VariableTabByAid $form '_tabPageLocal' 'local snapshot'
       $form = Clear-SnapshotFilters $form
-      $text = Copy-LocalVariableGridTextByTabRoute $form $snapshotModule "local snapshot $snapshotModule"
+      # An executable module may legitimately have no local declarations.
+      # Preserve an empty TSV snapshot instead of treating the absence of rows
+      # as a focus/copy failure.  Non-empty tables still require the same
+      # clipboard and semantic checks as before.
+      $text = Copy-LocalVariableGridTextByTabRoute $form $snapshotModule "local snapshot $snapshotModule" -AllowEmpty
       if($snapshotModule.IndexOfAny([IO.Path]::GetInvalidFileNameChars()) -ge 0){throw 'KV_SNAPSHOT_INVALID_MODULE_FILE_NAME'}
       $path = Join-Path $OutDir ('local_'+$snapshotModule+'_raw.tsv')
       [IO.File]::WriteAllText($path,$text,[Text.Encoding]::UTF8)

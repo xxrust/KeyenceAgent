@@ -20,6 +20,8 @@ $script:unifiedRunLog = ''
 $script:runId = [guid]::NewGuid().ToString('N')
 $script:preparedSteps = @{}
 $script:codeFingerprint = $null
+$script:uiMutex = $null
+$script:uiMutexHeld = $false
 
 function Write-WorkflowLog([string]$Type, [hashtable]$Data = @{}) {
   if (-not $script:unifiedRunLog) { return }
@@ -309,6 +311,17 @@ try {
   $env:KV_WORKFLOW_RUN_LOG = $script:unifiedRunLog
   $env:KV_WORKFLOW_RUN_ID = $script:runId
   Write-WorkflowLog 'workflow_started' @{plan_path=$PlanPath;project_path=$plan.project_path}
+  # KV STUDIO is a single interactive desktop resource.  Serialize every
+  # flat workflow process before any runner child can touch the UI.  A named
+  # mutex is process-wide, so concurrent agents fail immediately instead of
+  # interleaving focus and clipboard operations.
+  $script:uiMutex = New-Object System.Threading.Mutex($false, 'Local\KeyenceAgent.KvStudio.UI')
+  if (-not $script:uiMutex.WaitOne(0)) {
+    Write-WorkflowLog 'workflow_rejected' @{error_code='KV_UI_WORKFLOW_BUSY';message='Another KV STUDIO workflow currently owns the desktop mutex.'}
+    throw 'KV_UI_WORKFLOW_BUSY: another KV STUDIO workflow is already running.'
+  }
+  $script:uiMutexHeld = $true
+  Write-WorkflowLog 'ui_mutex_acquired' @{mutex='Local\\KeyenceAgent.KvStudio.UI'}
   if ($TimeoutSeconds -le 0) {
     if ($plan.timeout_seconds) { $TimeoutSeconds = [int]$plan.timeout_seconds } else { $TimeoutSeconds = 600 }
   }
@@ -367,4 +380,10 @@ try {
     Write-FlatWorkflowResult $plan $PlanPath $false 'fail' $_.Exception.ToString()
   }
   exit 1
+} finally {
+  if ($script:uiMutexHeld -and $script:uiMutex) {
+    try { $script:uiMutex.ReleaseMutex() } catch {}
+    $script:uiMutexHeld = $false
+    try { $script:uiMutex.Dispose() } catch {}
+  }
 }
