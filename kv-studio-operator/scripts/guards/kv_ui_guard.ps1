@@ -419,6 +419,14 @@ function Invoke-KvGuardedSendKeysAllowTargetClose {
   Stop-KvUiGuard -ErrorCode $code -Step $Step -Message "Target-close action did not reach expected successor foreground. Actual foreground title='$($after.title)' process='$($after.process_name)'." -Evidence @($beforePath, $failurePath)
 }
 
+function Invoke-KvGuardedSendKeysAllowTargetCloseToWindow {
+  param([Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,[Parameter(Mandatory=$true)][IntPtr]$SuccessHwnd,[Parameter(Mandatory=$true)][string]$Step,[Parameter(Mandatory=$true)][string]$Keys,[string]$ExpectedTitleLike='',[int]$SleepMs=300)
+  $watch=[Diagnostics.Stopwatch]::StartNew();$before=Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
+  [System.Windows.Forms.SendKeys]::SendWait($Keys);Start-Sleep -Milliseconds $SleepMs;$after=Get-KvForegroundSnapshot
+  if(-not [KvSharedUiGuardWin32]::IsWindow($TargetHwnd) -and $after.hwnd -eq $SuccessHwnd.ToInt64()){Write-KvUiGuardRunLog -Event 'target_closed_to_success_window' -Data @{step=$Step;target_hwnd=$TargetHwnd.ToInt64();success_hwnd=$SuccessHwnd.ToInt64();foreground=$after};Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'send keys allowing target close to success window' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike|Out-Null;return}
+  throw 'KV_TARGET_CLOSE_SUCCESS_WINDOW_NOT_REACHED'
+}
+
 function Invoke-KvGuardedClipboardPaste {
   param(
     [Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,
