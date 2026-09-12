@@ -247,7 +247,7 @@
                                                  }
                                              ],
                     "customer_workflow":  [
-                                              {
+                                               {
                                                   "path":  "workflows/run_kv_mvp_scaffold.ps1",
                                                   "status":  "published",
                                                   "customer_callable":  true,
@@ -432,6 +432,18 @@
                                                    "path":  "harnesses/run_kv_mvp_repeat.ps1",
                                                    "status":  "published",
                                                    "customer_callable":  true
+                                               },
+                                               {
+                                                   "path":  "workflows/run_kv_kvx_sample_regression.ps1",
+                                                   "status":  "pending_validation",
+                                                   "customer_callable":  true,
+                                                   "capabilities":  [
+                                                                        "replicate_kvx_sample_project",
+                                                                        "run_serial_readonly_regression",
+                                                                        "record_stage_evidence"
+                                                                    ],
+                                                   "execution":  "serial_fixed_stage_workflow",
+                                                   "notes":  "Copies the complete KVX sample directory. Required stages are structure snapshot, variable snapshot and compile; FB snapshot is optional and explicitly unproven until module placement is revalidated."
                                                }
                                            ],
                     "runner_child_approved":  [
