@@ -21,7 +21,76 @@
 <section><h2>9. 错误与停止策略</h2><table><tr><th>错误码</th><th>含义</th><th>系统行为</th></tr><tr><td class="mono">KV_UI_WORKFLOW_BUSY</td><td>KV STUDIO 桌面锁被占用</td><td>不启动 runner，不发送输入</td></tr><tr><td class="mono">KV_TARGET_WINDOW_NOT_FOREGROUND</td><td>目标 HWND 未前台</td><td>最多一次恢复，失败停止</td></tr><tr><td class="mono">KV_MODAL_PRESENT</td><td>存在未处理模态窗</td><td>转入对话框专用路线或停止</td></tr><tr><td class="mono">KV_MODULE_LOOKUP_TIMEOUT</td><td>模块定向查找超过 1 秒</td><td>停止，不穷举树</td></tr><tr><td class="mono">KV_FB_ARGUMENT_STEP_FAILED</td><td>FB 自变量 runner 失败</td><td>停止后续步骤，读取同次证据</td></tr><tr><td class="mono">KV_PROGRAM_BODY_INVALID_MNEMONIC</td><td>插入非法助记符产生错误窗</td><td>记录错误文本，错误窗回车，编辑列表 Alt+F4</td></tr></table></section>
 <section><h2>10. 证据与结果契约</h2><p>每次正式调用必须使用独立输出目录，至少包含：</p><div class="grid"><div class="card"><strong>计划</strong><span class="mono">execution_plan.json</span><br><span class="mono">code_fingerprint.json</span></div><div class="card"><strong>日志</strong><span class="mono">run.log</span><br>workflow、锁、步骤、原子动作、错误和结果</div><div class="card"><strong>步骤证据</strong><span class="mono">step_receipt.json</span><br><span class="mono">stdout/stderr</span><br>截图或快照</div><div class="card"><strong>结果</strong><span class="mono">*_result.json</span><br>ok、error_code、输入、语义验收</div></div><p class="note">Receipt hash 只证明证据属于本次运行，不替代变量、模块、程序体或编译结果的语义校验。失败后不能从旧运行目录寻找替代脚本或结果。</p></section>
 <section><h2>11. 当前验证结论</h2><p class="good">静态 UI Guard 使用门禁：通过。</p><p class="good">Agent 边界门禁：通过。</p><p class="warn">FB 自变量正式 workflow：最近一次在输入预处理阶段失败，未进入 UI。</p><p class="warn">程序体正式 workflow：曾有临时 one-shot 成功证据，但正式入口尚未完成可靠回归。</p><p class="bad">不能把当前 published 状态理解为已证明可用。</p><p class="mono">最后提交：5514185，2026-09-12T01:54:39+08:00</p></section>
-<section><h2>12. 审阅顺序</h2><p class="mono">scripts/script_manifest.json → workflows/*.ps1 → workflow_tools/invoke_kv_flat_execution_plan.ps1 → runner_children/*.ps1 → guards/kv_ui_guard.ps1 → 本次 run.log/result.json</p><p>审阅时先看入口是否 customer_callable，再看 plan 是否 flat、是否有互斥锁和门禁，最后看 runner 的每个原子动作是否有前后置条件和语义证据。</p></section>
+<section><h2>12. 源码摘录：script_manifest.json</h2><p><span class="mono">scripts/script_manifest.json</span> 是运行时授权和结果契约表。以下摘录是当前文件真实内容的核心结构：</p><pre><code>{
+  "schema_version": 2,
+  "layout_policy": "role_directories",
+  "ui_atomic_actions": {
+    "approved": [
+      "Assert-KvUiForegroundHwnd",
+      "Invoke-KvGuardedSendKeys",
+      "Invoke-KvGuardedCtrlChord",
+      "Invoke-KvGuardedClipboardPaste"
+    ],
+    "pending": []
+  },
+  "step_result_contracts": {
+    "runner_children/set_variables_guarded.ps1": {
+      "files": ["set_variables_result.json", "variable_persistence_validation.json"],
+      "variants": [{"switch":"-SnapshotOnly","files":["variable_snapshot_result.json"]}]
+    }
+  },
+  "classes": {
+    "customer_workflow": [{"path":"workflows/set_kv_variables.ps1","status":"published","customer_callable":true}],
+    "runner_child_approved": [{"path":"runner_children/set_variables_guarded.ps1","status":"approved","ui_guard_required":true}]
+  }
+}</code></pre><p class="note">Executor 根据 classes 解析路径和角色；静态 gate 根据 ui_atomic_actions 检查 Guard 调用；结果验收根据 step_result_contracts 检查当前运行文件。</p></section>
+<section><h2>13. 源码摘录：Flat Executor</h2><p>文件：<span class="mono">scripts/workflow_tools/invoke_kv_flat_execution_plan.ps1</span>。核心代码如下：</p><pre><code>$plan = Get-Content -Raw -LiteralPath $PlanPath -Encoding UTF8 | ConvertFrom-Json
+if ($plan.ok -isnot [bool] -or -not $plan.ok) { throw "Execution plan is not ok" }
+$script:uiMutex = New-Object System.Threading.Mutex($false, 'Local\KeyenceAgent.KvStudio.UI')
+if (-not $script:uiMutex.WaitOne(0)) {
+  Write-WorkflowLog 'workflow_rejected' @{ error_code='KV_UI_WORKFLOW_BUSY' }
+  throw 'KV_UI_WORKFLOW_BUSY'
+}
+foreach ($step in @($plan.steps)) {
+  $path = Resolve-KvStudioOperatorScriptPath -ScriptRoot $scriptRoot `
+    -Name ([string]$step.script_name) -Classes @($step.classes)
+  Invoke-FlatWorkflowStep $step
+}
+Write-FlatWorkflowResult $plan $PlanPath $true 'pass' ''</code></pre><p>这段代码说明：计划先验证，再加桌面互斥锁；每个 step 通过 resolver 解析，按数组顺序执行；失败在 <span class="mono">Invoke-FlatWorkflowStep</span> 处短路，最后聚合 workflow_result.json。</p></section>
+<section><h2>14. 源码摘录：UI Guard</h2><p>文件：<span class="mono">scripts/guards/kv_ui_guard.ps1</span>。普通键盘动作的核心实现：</p><pre><code>function Invoke-KvGuardedSendKeys {
+  param([IntPtr]$TargetHwnd,[string]$Step,[string]$Keys,[string]$ExpectedTitleLike='')
+  $watch = [Diagnostics.Stopwatch]::StartNew()
+  $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd `
+    -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
+  Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Before $before
+  [System.Windows.Forms.SendKeys]::SendWait($Keys)
+  $after = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd `
+    -Step "$Step postcondition" -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
+  Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Before $before -After $after
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step `
+    -Action 'SendKeys' -TargetHwnd $TargetHwnd
+}</code></pre><p>Guard 不负责判断 PLC 内容是否正确；它只保证输入前后目标窗口、前台状态、检查点和耗时边界。</p></section>
+<section><h2>15. 源码摘录：Runner Child</h2><p>文件：<span class="mono">scripts/runner_children/set_fb_arguments_guarded.ps1</span>。它在 Guard 之上实现业务步骤：</p><pre><code>. $sharedUiGuard
+Initialize-KvUiGuard -OutDir $OutDir -CheckpointSubdir 'fb_arg_ui'
+$process = Get-VisibleKvsProcess $ProjectNeedle
+$target = FindProjectModuleTreeItem $process.Id $FbModuleName
+Move-FocusToProjectTreeItemByArrows $tree $target $process.MainWindowHandle ...
+Invoke-KvGuardedAltVk -TargetHwnd $mainHwnd -Step 'open variable editor' -Vk 0x4C
+Invoke-KvGuardedClipboardPaste -TargetHwnd $gridHwnd -Step 'paste FB arguments' -Text $tsv
+Write-Result -Ok $true -Code '' -Message 'FB arguments saved' ...</code></pre><p>Runner child 的边界是“一个业务步骤”，不是公开 API。它负责模块定位、表格状态、粘贴和业务回读，但所有系统级输入仍必须调用 Guard。</p></section>
+<section><h2>16. 源码摘录：Workflow</h2><p>文件：<span class="mono">scripts/workflows/set_kv_fb_arguments.ps1</span>。Workflow 只准备 plan：</p><pre><code>$steps = [System.Collections.Generic.List[object]]::new()
+$steps.Add(@{ name='assert_ui_guard_usage'; kind='gate'; ... })
+$steps.Add(@{ name='assert_agent_boundary'; kind='gate'; ... })
+$steps.Add(@{ name='set_fb_arguments'; kind='runner_child';
+  script_name='set_fb_arguments_guarded.ps1';
+  arguments=@('-ProjectPath',$ProjectPath,'-FbModuleName',$FbModuleName,
+              '-ArgumentsTsv',$ArgumentsTsv,'-OutDir',$argOut) })
+$plan = @{ ok=$true; operation='set_kv_fb_arguments'; steps=$steps.ToArray();
+  result_path=(Join-Path $OutDir 'fb_declaration_workflow_result.json') }
+$plan | ConvertTo-Json -Depth 12 | Set-Content $planPath -Encoding UTF8
+& powershell -NoProfile -ExecutionPolicy Bypass -File $runner -PlanPath $planPath</code></pre><p>Workflow 不直接调用 SendKeys 或剪贴板；它声明 gate、runner child、参数和输出目录，然后交给 Flat Executor。</p></section>
+<section><h2>17. 源码到证据的关系</h2><svg viewBox="0 0 1080 230" role="img" aria-label="源码与证据关系"><defs><marker id="d" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#506679"/></marker></defs><g font-family="Segoe UI,Microsoft YaHei" font-size="13"><g fill="#f8fbfd" stroke="#809bb0"><rect x="20" y="70" width="150" height="50" rx="4"/><rect x="230" y="70" width="170" height="50" rx="4"/><rect x="460" y="70" width="170" height="50" rx="4"/><rect x="690" y="70" width="170" height="50" rx="4"/><rect x="920" y="70" width="140" height="50" rx="4"/></g><g fill="#172a3a" text-anchor="middle"><text x="95" y="99">输入文件</text><text x="315" y="91">Workflow</text><text x="315" y="109">execution_plan</text><text x="545" y="91">Flat Executor</text><text x="545" y="109">mutex + steps</text><text x="775" y="91">Runner + Guard</text><text x="775" y="109">UI checkpoints</text><text x="990" y="91">结果</text><text x="990" y="109">JSON + log</text></g><g stroke="#506679" marker-end="url(#d)"><path d="M170 95H225"/><path d="M400 95H455"/><path d="M630 95H685"/><path d="M860 95H915"/></g><g fill="#536573" text-anchor="middle"><text x="315" y="165">参数校验</text><text x="545" y="165">角色/契约校验</text><text x="775" y="165">前台/焦点/输入</text><text x="990" y="165">语义验收</text></g></g></svg><p>审阅时应沿此链路检查：输入是否正确、plan 是否授权、executor 是否串行、runner 是否只用 approved Guard、结果是否来自当前运行。</p></section>
+<section><h2>18. 审阅顺序</h2><p class="mono">scripts/script_manifest.json → workflows/*.ps1 → workflow_tools/invoke_kv_flat_execution_plan.ps1 → runner_children/*.ps1 → guards/kv_ui_guard.ps1 → 本次 run.log/result.json</p><p>这条顺序能区分 API 设计、调度安全、UI 输入实现和业务语义验收，避免把“脚本存在”或“静态门禁通过”误判为功能成功。</p></section>
 </main></body></html>
 
 
