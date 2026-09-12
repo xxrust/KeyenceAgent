@@ -482,7 +482,32 @@ function Assert-FbArgumentFormForeground($Form, [string]$Step) {
 
 function Convert-FbArgumentRowsToPasteText([string]$Path, [string]$ExpectedOwner) {
   $text = Read-KvDelimitedText $Path
-  $rows = @($text | ConvertFrom-Csv -Delimiter "`t" | Where-Object { $_.status -ne 'display_name' -and $_.argument_name })
+  $lines = @($text -split "\r?\n" | Where-Object { $_ -ne '' })
+  if ($lines.Count -eq 0) {
+    Fail-Step 'KV_FB_ARGUMENTS_EMPTY' 'preflight FB arguments' "No rows in $Path" @($Path)
+  }
+  # Snapshots copied from KV STUDIO are deliberately headerless and contain
+  # the 15 visible grid columns. Customer-authored TSVs use the canonical
+  # 18-column header. Detect the two formats before ConvertFrom-Csv so a
+  # value such as False can never be interpreted as a duplicate header.
+  $canonicalHeaders = @('owner_program','argument_name','argument_kind','constant','data_type','default_value','retain','hidden','comment1','comment2','comment3','comment4','comment5','comment6','comment7','comment8','evidence','status')
+  $snapshotHeaders = @('argument_name','argument_kind','constant','data_type','default_value','retain','hidden','comment1','comment2','comment3','comment4','comment5','comment6','comment7','comment8')
+  $firstCells = $lines[0].Split("`t", [System.StringSplitOptions]::None)
+  $hasCanonicalHeader = @($firstCells | Where-Object { $_ -eq 'argument_name' }).Count -gt 0
+  if ($hasCanonicalHeader) {
+    $rows = @($text | ConvertFrom-Csv -Delimiter "`t" | Where-Object { $_.status -ne 'display_name' -and $_.argument_name })
+  } else {
+    $rows = foreach ($line in $lines) {
+      $cells = $line.Split("`t", [System.StringSplitOptions]::None)
+      $row = [ordered]@{ owner_program = $ExpectedOwner }
+      for ($column = 0; $column -lt $snapshotHeaders.Count; $column++) {
+        $row[$snapshotHeaders[$column]] = if ($column -lt $cells.Count) { [string]$cells[$column] } else { '' }
+      }
+      $row['evidence'] = 'snapshot'
+      $row['status'] = 'defined'
+      [pscustomobject]$row
+    }
+  }
   if ($rows.Count -eq 0) { Fail-Step 'KV_FB_ARGUMENTS_EMPTY' 'preflight FB arguments' "No executable FB argument rows in $Path" @($Path) }
   $errors = [System.Collections.Generic.List[object]]::new()
   $allowedKinds = @('IN','OUT','IN-OUT')
