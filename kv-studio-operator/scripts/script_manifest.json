@@ -50,7 +50,10 @@
                                                "Invoke-KvGuardedShiftTab",
                                                "Invoke-KvGuardedVkTap",
                                                "Invoke-KvGuardedVkTapCallerOracle",
-                                               "Invoke-KvGuardedSendKeysAllowTargetCloseToWindow"
+                                               "Invoke-KvGuardedSendKeysAllowTargetCloseToWindow",
+                                               "Invoke-KvGuardedModalFocusSequence",
+                                               "Invoke-KvGuardedModalErrorDismissal",
+                                               "Invoke-KvGuardedOpenSaveAsModal"
                                            ],
                               "pending":  [
 
@@ -181,7 +184,17 @@
                                                                                              "files":  [
                                                                                                            "export_mnm_project_copy_result.json"
                                                                                                        ]
-                                                                                         }
+                                                                                         },
+                                  "workflows/save_kv_project_as.ps1":  {
+                                                                           "files":  [
+                                                                                         "save_as_workflow_result.json"
+                                                                                     ]
+                                                                       },
+                                  "runner_children/save_as_project_guarded.ps1":  {
+                                                                                      "files":  [
+                                                                                                    "save_as_result.json"
+                                                                                                ]
+                                                                                  }
                               },
     "classes":  {
                     "customer_scaffold_tool":  [
@@ -247,7 +260,16 @@
                                                  }
                                              ],
                     "customer_workflow":  [
-                                               {
+                                              {
+                                                  "path":  "workflows/save_kv_project_as.ps1",
+                                                  "status":  "published",
+                                                  "customer_callable":  true,
+                                                  "capabilities":  [
+                                                                       "save_project_as_unique_copy"
+                                                                   ],
+                                                  "execution":  "flat_manifest_steps"
+                                              },
+                                              {
                                                   "path":  "workflows/run_kv_mvp_scaffold.ps1",
                                                   "status":  "published",
                                                   "customer_callable":  true,
@@ -536,6 +558,13 @@
                                                       "status":  "approved",
                                                       "customer_callable":  false,
                                                       "ui_guard_required":  true
+                                                  },
+                                                  {
+                                                      "path":  "runner_children/save_as_project_guarded.ps1",
+                                                      "status":  "approved",
+                                                      "customer_callable":  false,
+                                                      "ui_guard_required":  true,
+                                                      "notes":  "Validated Alt+F,A Save As flow. Modal focus sequence is fixed and does not perform modal lookup or foreground recovery."
                                                   }
                                               ],
                     "runner_child_pending":  [

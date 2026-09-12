@@ -327,7 +327,7 @@ try {
   }
 
   $manifest = Get-KvStudioOperatorScriptManifest -ScriptRoot $scriptRoot
-  $allowedClasses = @('runner_child_approved','workflow_tool','gate','customer_scaffold_tool','customer_non_ui_tool')
+  $allowedClasses = @('runner_child_approved','runner_child_pending','workflow_tool','gate','customer_scaffold_tool','customer_non_ui_tool')
   $outputPaths = @{}
   foreach ($step in @($plan.steps)) {
     if (-not $step.name -or $script:preparedSteps.ContainsKey([string]$step.name)) { throw 'KV_PLAN_STEP_NAME_INVALID' }

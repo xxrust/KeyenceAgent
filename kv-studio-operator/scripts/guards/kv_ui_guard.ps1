@@ -460,6 +460,88 @@ function Invoke-KvGuardedClipboardSetText {
   Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'clipboard set text' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
 }
 
+function Invoke-KvGuardedModalFocusSequence {
+  <#
+    Execute a previously verified in-process modal sequence after the caller
+    has opened the modal and its first edit control owns focus.  KV STUDIO's
+    Save As window is a child modal whose foreground HWND remains the main
+    window, so this action deliberately does not assert or restore the
+    foreground window between fields and does not inspect the modal tree.
+  #>
+  param(
+    [Parameter(Mandatory=$true)][string]$Step,
+    [Parameter(Mandatory=$true)][string]$ProjectName,
+    [Parameter(Mandatory=$true)][string]$Directory,
+    [string]$Comment = ''
+  )
+  $watch = [Diagnostics.Stopwatch]::StartNew()
+  Add-Type -AssemblyName System.Windows.Forms
+  Write-KvUiGuardRunLog -Event 'modal_focus_sequence_begin' -Data @{ step = $Step; sequence = 'paste_name,Alt+P,paste_path,Alt+C,paste_comment,Tab,Enter'; comment_present = (-not [string]::IsNullOrEmpty($Comment)) }
+  [Windows.Forms.Clipboard]::SetText($ProjectName)
+  [Windows.Forms.SendKeys]::SendWait('^v')
+  Write-KvUiGuardRunLog -Event 'modal_focus_sequence_action' -Data @{ step = $Step; action = 'paste project name'; text_length = $ProjectName.Length }
+  [Windows.Forms.SendKeys]::SendWait('%p')
+  [Windows.Forms.Clipboard]::SetText($Directory)
+  [Windows.Forms.SendKeys]::SendWait('^v')
+  Write-KvUiGuardRunLog -Event 'modal_focus_sequence_action' -Data @{ step = $Step; action = 'Alt+P then paste destination directory'; text_length = $Directory.Length }
+  if (-not [string]::IsNullOrEmpty($Comment)) {
+    [Windows.Forms.SendKeys]::SendWait('%c')
+    [Windows.Forms.Clipboard]::SetText($Comment)
+    [Windows.Forms.SendKeys]::SendWait('^v')
+    Write-KvUiGuardRunLog -Event 'modal_focus_sequence_action' -Data @{ step = $Step; action = 'Alt+C then paste comment'; text_length = $Comment.Length }
+  }
+  [Windows.Forms.SendKeys]::SendWait('{TAB}')
+  [Windows.Forms.SendKeys]::SendWait('{ENTER}')
+  Start-Sleep -Milliseconds 800
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'modal focused Save As sequence without foreground recovery' | Out-Null
+}
+
+function Invoke-KvGuardedOpenSaveAsModal {
+  <#
+    Open KV STUDIO's in-process Save As modal.  The foreground HWND remains
+    KV STUDIO but its child edit control owns keyboard focus after A.  A
+    generic postcondition recovery at that point corrupts the focus chain,
+    so this function has one preflight only and performs no modal lookup or
+    post-action foreground assertion.
+  #>
+  param(
+    [Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,
+    [Parameter(Mandatory=$true)][string]$Step,
+    [string]$ExpectedTitleLike = 'KV STUDIO*'
+  )
+  $watch = [Diagnostics.Stopwatch]::StartNew()
+  $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step "$Step preflight" -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
+  Write-KvUiGuardRunLog -Event 'save_as_modal_open_begin' -Data @{ step = $Step; target_hwnd = $TargetHwnd.ToInt64(); foreground = $before; sequence = 'Alt+F,A'; post_action_focus_recovery = $false; modal_lookup = $false }
+  [KvSharedUiGuardWin32]::keybd_event(0x12, 0, 0, 0)
+  Start-Sleep -Milliseconds 35
+  [KvSharedUiGuardWin32]::keybd_event(0x46, 0, 0, 0)
+  Start-Sleep -Milliseconds 35
+  [KvSharedUiGuardWin32]::keybd_event(0x46, 0, 2, 0)
+  Start-Sleep -Milliseconds 35
+  [KvSharedUiGuardWin32]::keybd_event(0x12, 0, 2, 0)
+  Start-Sleep -Milliseconds 120
+  [KvSharedUiGuardWin32]::keybd_event(0x41, 0, 0, 0)
+  Start-Sleep -Milliseconds 35
+  [KvSharedUiGuardWin32]::keybd_event(0x41, 0, 2, 0)
+  Start-Sleep -Milliseconds 250
+  Write-KvUiGuardRunLog -Event 'save_as_modal_open_complete' -Data @{ step = $Step; sequence = 'Alt+F,A'; post_action_focus_recovery = $false; modal_lookup = $false }
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'open Save As with Alt+F,A without post-action focus recovery' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
+}
+
+function Invoke-KvGuardedModalErrorDismissal {
+  param([Parameter(Mandatory=$true)][string]$Step)
+  $watch = [Diagnostics.Stopwatch]::StartNew()
+  Add-Type -AssemblyName System.Windows.Forms
+  # This is intentionally a direct continuation of the modal focus chain.
+  # The caller invokes it only after its post-submit file check failed.
+  [Windows.Forms.SendKeys]::SendWait('{ENTER}')
+  Start-Sleep -Milliseconds 150
+  [Windows.Forms.SendKeys]::SendWait('%{F4}')
+  Start-Sleep -Milliseconds 200
+  Write-KvUiGuardRunLog -Event 'modal_error_dismissed' -Data @{ step = $Step; sequence = 'Enter,Alt+F4'; focus_recovery = $false; modal_lookup = $false }
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'dismiss modal error then close Save As without foreground recovery' | Out-Null
+}
+
 function Invoke-KvGuardedMouseClick {
   param(
     [Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,
