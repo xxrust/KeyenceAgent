@@ -71,18 +71,6 @@ function Get-ProjectFile([string]$Directory) {
   return $files[0].FullName
 }
 
-function Rename-ReplicaProjectIdentity([string]$Directory, [string]$NewName) {
-  $oldProject = Get-ProjectFile $Directory
-  $oldBase = [IO.Path]::GetFileNameWithoutExtension($oldProject)
-  $newProject = Join-Path $Directory ($NewName + '.kpr')
-  Move-Item -LiteralPath $oldProject -Destination $newProject -Force
-  foreach ($file in @(Get-ChildItem -LiteralPath $Directory -File | Where-Object { $_.BaseName -eq $oldBase })) {
-    $target = Join-Path $Directory ($NewName + $_.Extension)
-    if ($file.FullName -ne $newProject) { Move-Item -LiteralPath $file.FullName -Destination $target -Force }
-  }
-  return $newProject
-}
-
 function Get-FileInventory([string]$Directory) {
   @(Get-ChildItem -LiteralPath $Directory -Recurse -File | Sort-Object FullName | ForEach-Object {
     $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
@@ -165,8 +153,7 @@ New-Item -ItemType Directory -Force -Path $replica | Out-Null
 $replicaDirectory = Join-Path $replica (Split-Path -Leaf $source)
 New-Item -ItemType Directory -Force -Path $replicaDirectory | Out-Null
 Get-ChildItem -LiteralPath $source -Force | Copy-Item -Destination $replicaDirectory -Recurse -Force
-$replicaName = 'KVX样例程序_v100_REG_' + $script:RunId.Substring(0,8)
-$replicaProject = Rename-ReplicaProjectIdentity $replicaDirectory $replicaName
+$replicaProject = Get-ProjectFile $replicaDirectory
 $sourceInventory = Get-FileInventory $source
 $replicaInventory = Get-FileInventory $replicaDirectory
 Write-JsonFile (Join-Path $script:RunRoot 'sample_replica_manifest.json') ([ordered]@{ok=$true;run_id=$script:RunId;source_directory=$source;replica_directory=$replicaDirectory;source_project=$sourceProject;replica_project=$replicaProject;file_count=$sourceInventory.Count;source_files=$sourceInventory;replica_files=$replicaInventory})

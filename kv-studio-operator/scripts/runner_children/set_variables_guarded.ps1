@@ -124,7 +124,18 @@ function Read-KvDelimitedText([string]$Path) {
   }
 }
 
-function Get-BoundKvsProcess([string]$ProjectNeedle) {
+function Get-BoundKvsProcess([string]$ProjectNeedle,[string]$ProjectPath='') {
+  if($ProjectPath){
+    $fullPath=[IO.Path]::GetFullPath($ProjectPath)
+    $pathMatches=@(Get-CimInstance Win32_Process -Filter "Name='Kvs.exe'" -ErrorAction SilentlyContinue | Where-Object {$_.CommandLine -and $_.CommandLine.IndexOf($fullPath,[StringComparison]::OrdinalIgnoreCase) -ge 0} | ForEach-Object {Get-Process -Id ([int]$_.ProcessId) -ErrorAction SilentlyContinue} | Where-Object {$_.MainWindowHandle -ne 0})
+    if($pathMatches.Count -eq 1){
+      $candidate=$pathMatches[0];$candidate.Refresh()
+      if(-not $candidate.Responding){Fail-Guard 'KV_VARIABLE_BOUND_WINDOW_MISMATCH' 'bind KV STUDIO window' "The path-bound Kvs window is not responsive. pid=$($candidate.Id) path=$ProjectPath" @()}
+      Log "bound Kvs window by exact project command line pid=$($candidate.Id) hwnd=$($candidate.MainWindowHandle) title=$($candidate.MainWindowTitle)"
+      return $candidate
+    }
+    if($pathMatches.Count -gt 1){Fail-Guard 'KV_VARIABLE_BOUND_WINDOW_AMBIGUOUS' 'bind KV STUDIO window' "Expected one Kvs process for project path $ProjectPath; found $($pathMatches.Count)." @()}
+  }
   $titlePattern='\['+[regex]::Escape($ProjectNeedle)+'(?:\s*\*)?\]$'
   $visible = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -match $titlePattern })
   if ($visible.Count -ne 1) {
@@ -1496,7 +1507,7 @@ try {
   if (-not (Test-Path -LiteralPath $ProjectPath)) { throw "ProjectPath not found: $ProjectPath" }
   if ($SnapshotOnly) {
     $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
-    $process = Get-BoundKvsProcess $projectNeedle
+    $process = Get-BoundKvsProcess $projectNeedle $ProjectPath
     if (-not $process) { throw 'KV_PROJECT_PROCESS_NOT_FOUND' }
     $script:ProcessIdForVariables = $process.Id
     Assert-NoDirectInputFast $process.Id 'before variable snapshot'
@@ -1554,7 +1565,7 @@ try {
 
   $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
   $projectRoot = Split-Path -Parent $ProjectPath
-  $process = Get-BoundKvsProcess $projectNeedle
+  $process = Get-BoundKvsProcess $projectNeedle $ProjectPath
   if (-not $process) { throw 'No visible KV STUDIO process.' }
   $script:ProcessIdForVariables = $process.Id
   if ($AllowBoundWindowWithoutForeground) {

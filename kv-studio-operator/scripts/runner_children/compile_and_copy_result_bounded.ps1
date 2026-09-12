@@ -302,14 +302,18 @@ function Find-ResultArea {
 
 try {
   $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
-  $process = Get-Process Kvs -ErrorAction Stop |
-    Where-Object {
-      $_.MainWindowHandle -ne 0 -and
-      $_.MainWindowTitle -like 'KV STUDIO*' -and
-      $_.MainWindowTitle -like "*$projectNeedle*"
-    } |
-    Sort-Object StartTime -Descending |
-    Select-Object -First 1
+  $pathMatches=@(Get-CimInstance Win32_Process -Filter "Name='Kvs.exe'" -ErrorAction SilentlyContinue | Where-Object {$_.CommandLine -and $_.CommandLine.IndexOf([IO.Path]::GetFullPath($ProjectPath),[StringComparison]::OrdinalIgnoreCase) -ge 0} | ForEach-Object {Get-Process -Id ([int]$_.ProcessId) -ErrorAction SilentlyContinue} | Where-Object {$_.MainWindowHandle -ne 0})
+  if($pathMatches.Count -eq 1){$process=$pathMatches[0]}
+  else {
+    $process = Get-Process Kvs -ErrorAction Stop |
+      Where-Object {
+        $_.MainWindowHandle -ne 0 -and
+        $_.MainWindowTitle -like 'KV STUDIO*' -and
+        $_.MainWindowTitle -like "*$projectNeedle*"
+      } |
+      Sort-Object StartTime -Descending |
+      Select-Object -First 1
+  }
   if (-not $process) { throw "No visible Kvs process matched target project '$projectNeedle'. Refusing to operate another project window." }
 
   Assert-NoBlockingPopup $process.Id

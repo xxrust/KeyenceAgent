@@ -32,7 +32,13 @@ function ClipboardFullGrid([int]$X,[int]$Y,[string]$Name){
   if($sw.ElapsedMilliseconds -ge 10000){throw "KV_UI_ATOMIC_STEP_TIMEOUT: copy full structure grid $Name"}
   return @($text -split "`r?`n" | Where-Object {$_ -and $_.Trim()})
 }
-function FindWindow([string]$Needle){
+function FindWindow([string]$Needle,[string]$ProjectPath=''){
+  $pathMatches=@()
+  if($ProjectPath){
+    $fullPath=[IO.Path]::GetFullPath($ProjectPath)
+    $pathMatches=@(Get-CimInstance Win32_Process -Filter "Name='Kvs.exe'" -ErrorAction SilentlyContinue | Where-Object {$_.CommandLine -and $_.CommandLine.IndexOf($fullPath,[StringComparison]::OrdinalIgnoreCase) -ge 0} | ForEach-Object {Get-Process -Id ([int]$_.ProcessId) -ErrorAction SilentlyContinue} | Where-Object {$_.MainWindowHandle -ne 0})
+  }
+  if($pathMatches.Count -gt 0){if($pathMatches.Count -ne 1){throw "KV_PROJECT_PATH_WINDOW_AMBIGUOUS: expected one KVS process for $ProjectPath, got $($pathMatches.Count)"};return $pathMatches[0]}
   $ps=@(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$Needle*"})
   if($ps.Count -eq 0){$ps=@(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like '*KVX*'})}
   if($ps.Count -ne 1){throw "KV_PROJECT_WINDOW_AMBIGUOUS: expected one KVS window for $Needle, got $($ps.Count)"}; return $ps[0]
@@ -109,7 +115,7 @@ function ExtractOne($Tree,$ProcessIdValue,[string]$Name){
   Log 'structure_copyback_validated' @{name=$Name;member_count=$members.Count;nonempty_types=@($members|Where-Object {$_.data_type}|Measure-Object).Count}
   return [ordered]@{name=$Name;member_count=$members.Count;members=$members;source='KV STUDIO structure editor';columns=@('name','data_type','comment_1','comment_2')}
 }
-$needle=[IO.Path]::GetFileNameWithoutExtension($ProjectPath);$p=FindWindow $needle;$script:MainHwnd=[IntPtr]$p.MainWindowHandle;$root=[Windows.Automation.AutomationElement]::RootElement;Assert-KvUiForegroundHwnd -ExpectedHwnd $script:MainHwnd -Step 'structure extraction preflight' -ExpectedTitleLike $script:ExpectedTitle -AllowSingleRecovery|Out-Null;$tree=$root.FindFirst([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.AndCondition((New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ProcessIdProperty,$p.Id)),(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'ProjectTreeView')))));if(-not $tree){throw 'KV_PROJECT_TREE_MISSING'}
+$needle=[IO.Path]::GetFileNameWithoutExtension($ProjectPath);$p=FindWindow $needle $ProjectPath;$script:MainHwnd=[IntPtr]$p.MainWindowHandle;$root=[Windows.Automation.AutomationElement]::RootElement;Assert-KvUiForegroundHwnd -ExpectedHwnd $script:MainHwnd -Step 'structure extraction preflight' -ExpectedTitleLike $script:ExpectedTitle -AllowSingleRecovery|Out-Null;$tree=$root.FindFirst([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.AndCondition((New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ProcessIdProperty,$p.Id)),(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'ProjectTreeView')))));if(-not $tree){throw 'KV_PROJECT_TREE_MISSING'}
 if($StructureName.Count -eq 0){$StructureName=@(GetUserDataTypeNames $tree);Log 'user_data_types_discovered' @{count=$StructureName.Count;names=$StructureName}}
 $defs=@(); foreach($name in $StructureName){$sw=[Diagnostics.Stopwatch]::StartNew();try{$defs+=ExtractOne $tree $p.Id $name;Log 'structure_extracted' @{name=$name;elapsed_ms=$sw.ElapsedMilliseconds}}catch{Log 'structure_extract_failed' @{name=$name;error=$_.Exception.Message};throw}}
 $result=[ordered]@{ok=$true;project_path=$ProjectPath;structure_count=$defs.Count;structures=$defs;generated_at=(Get-Date).ToString('o')};$result|ConvertTo-Json -Depth 12|Set-Content -LiteralPath (Join-Path $OutDir 'structure_definitions.json') -Encoding UTF8;Log 'workflow_finished' @{ok=$true;structure_count=$defs.Count}

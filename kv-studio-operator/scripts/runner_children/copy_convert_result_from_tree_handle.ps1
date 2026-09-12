@@ -1,6 +1,7 @@
 ﻿param(
   [Parameter(Mandatory=$true)]
   [string]$ProjectNeedle,
+  [string]$ProjectPath = '',
   [Parameter(Mandatory=$true)]
   [string]$OutDir,
   [string]$ChecklistPath = '',
@@ -193,8 +194,9 @@ function Copy-ResultTreeThroughMenu {
 $conversionFailed = $false
 $currentResult = $null
 try {
-  $processes = @(Get-Process Kvs -ErrorAction Stop |
-    Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectNeedle*" })
+  $processes=@()
+  if($ProjectPath){$fullPath=[IO.Path]::GetFullPath($ProjectPath);$processes=@(Get-CimInstance Win32_Process -Filter "Name='Kvs.exe'" -ErrorAction SilentlyContinue | Where-Object {$_.CommandLine -and $_.CommandLine.IndexOf($fullPath,[StringComparison]::OrdinalIgnoreCase) -ge 0} | ForEach-Object {Get-Process -Id ([int]$_.ProcessId) -ErrorAction SilentlyContinue} | Where-Object {$_.MainWindowHandle -ne 0})}
+  if($processes.Count -eq 0){$processes = @(Get-Process Kvs -ErrorAction Stop | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectNeedle*" })}
   if ($processes.Count -eq 0) {
     throw "No visible Kvs process found for project needle $ProjectNeedle."
   }
