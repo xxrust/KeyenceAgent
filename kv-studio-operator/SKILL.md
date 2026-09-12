@@ -29,6 +29,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\get_kv_
 3. 查看本次 workflow 结果、步骤 receipt 和同一 `run.log`。结果为失败时停止后续 UI 动作，依据错误码和证据修复。
 4. 按实际验证范围报告。快照成功不代表写入成功，模块出现不代表程序体和声明完整，导入成功不代表编译成功。
 
+### 异常归因门禁
+
+永远不要先怀疑 KV STUDIO 自身的稳定性。出现 ASSERT、异常退出、无响应或结果与预期不一致时，首先停止后续 UI 输入，并审查 agent 侧的调度与证据链：是否发生重复 workflow/重复 `ProjectSaveAs`、跨进程并发输入、错误的 PID/HWND 绑定、前台焦点恢复、遗留菜单/弹窗、路径或状态污染。必须核对本次 workflow result、step receipt、runner result、同一次 `run.log` 以及截图/文件证据；只有在这些因素均被证据排除后，才可以把问题记录为外部软件问题，且不得直接宣称 KV STUDIO 不稳定。
+
+ASSERT 或异常窗体出现后，不再发送键盘、鼠标或剪贴板输入，不重新调度同一 workflow。保留异常截图、`run.log`、workflow/runner 结果和错误文本；关闭异常窗体由人工确认，通常只执行其默认确认动作，不点击 Log、Backup 或其他会改变现场的按钮。重复操作历史（尤其连续 `ProjectSaveAs`）必须作为 agent 调度问题优先调查。
+
 每次运行使用独立输出目录。执行器记录 run_id、输入和代码指纹、精确结果文件、耗时；缺失、过期、格式错误或非布尔成功值一律失败。复用目录的旧结果保存到 `_history`。项目内容验证由对应子步骤完成，receipt 的 hash 只证明证据归属，不替代语义校验。
 
 所有通过 flat executor 的桌面 workflow 都必须先取得机器级 `Local\\KeyenceAgent.KvStudio.UI` 互斥锁；锁被其他 agent/进程占用时立即返回 `KV_UI_WORKFLOW_BUSY`，不得进入 runner 或发送键盘、鼠标、剪贴板输入。`-PlanOnly` 只生成计划，不占用桌面锁。
