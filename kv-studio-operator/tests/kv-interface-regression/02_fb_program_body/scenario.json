@@ -1,0 +1,7 @@
+{
+  "name": "02_fb_program_body",
+  "enabled": true,
+  "workflow": "scripts/workflows/set_kv_fb_program_body.ps1",
+  "result_file": "workflow\\program_body_workflow_result.json",
+  "arguments": ["-ProjectPath", "${project}", "-FbModuleName", "FB_Cylinder", "-MnmPath", "${fixture_dir}\\FB_Cylinder.mnm", "-OutDir", "${out}\\workflow", "-TimeoutSeconds", "120"]
+}

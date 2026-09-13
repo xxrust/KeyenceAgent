@@ -1,0 +1,7 @@
+{
+  "name": "08_save_as",
+  "enabled": true,
+  "workflow": "scripts/workflows/save_kv_project_as.ps1",
+  "result_file": "workflow\\save_as_workflow_result.json",
+  "arguments": ["-SourceProjectPath", "${project}", "-DestinationDirectory", "${out}\\saved", "-DestinationProjectName", "KVX_SaveAs_Test", "-Comment", "interface regression", "-OutDir", "${out}\\workflow", "-TimeoutSeconds", "30"]
+}

@@ -1,0 +1,7 @@
+{
+  "name": "06_expansion_units",
+  "enabled": true,
+  "workflow": "scripts/workflows/configure_kv_expansion_units.ps1",
+  "result_file": "workflow\\workflow_result.json",
+  "arguments": ["-ProjectPath", "${project}", "-Models", "KV-B16X", "-OutDir", "${out}\\workflow", "-PerModuleBudgetSeconds", "10", "-TimeoutSeconds", "120"]
+}

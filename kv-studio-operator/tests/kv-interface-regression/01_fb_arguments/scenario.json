@@ -1,0 +1,7 @@
+{
+  "name": "01_fb_arguments",
+  "enabled": true,
+  "workflow": "scripts/workflows/set_kv_fb_arguments.ps1",
+  "result_file": "workflow\\fb_declaration_workflow_result.json",
+  "arguments": ["-ProjectPath", "${project}", "-FbModuleName", "FB_Cylinder", "-ArgumentsTsv", "${fixture_dir}\\fb_arguments.tsv", "-OutDir", "${out}\\workflow", "-TimeoutSeconds", "120"]
+}

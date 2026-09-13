@@ -1,0 +1,7 @@
+{
+  "name": "03_variables_snapshot",
+  "enabled": true,
+  "workflow": "scripts/workflows/set_kv_variables.ps1",
+  "result_file": "workflow\\variable_workflow_result.json",
+  "arguments": ["-ProjectPath", "${project}", "-OutDir", "${out}\\workflow", "-SnapshotOnly", "-TimeoutSeconds", "120"]
+}

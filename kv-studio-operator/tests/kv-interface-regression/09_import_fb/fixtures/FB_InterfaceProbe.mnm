@@ -1,0 +1,9 @@
+DEVICE:59
+;MODULE:FB_InterfaceProbe
+;MODULE_TYPE:2
+LD InFlag
+OUT OutFlag
+LD InOutFlag
+OUT InOutFlag
+END
+ENDH

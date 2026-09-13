@@ -1,0 +1,7 @@
+{
+  "name": "10_export_mnm",
+  "enabled": true,
+  "workflow": "scripts/workflows/export_mnm_project_copy_default_folder.ps1",
+  "result_file": "workflow\\workflow_result.json",
+  "arguments": ["-ProjectPath", "${project}", "-ExportDir", "${out}\\export", "-OutDir", "${out}\\workflow", "-TimeoutSeconds", "120"]
+}

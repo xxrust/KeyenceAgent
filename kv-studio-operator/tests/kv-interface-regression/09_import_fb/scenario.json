@@ -1,0 +1,7 @@
+{
+  "name": "09_import_fb",
+  "enabled": true,
+  "workflow": "scripts/workflows/import_kv_fb_module.ps1",
+  "result_file": "workflow\\fb_import_result.json",
+  "arguments": ["-ProjectPath", "${project}", "-MnmPath", "${fixture_dir}\\FB_InterfaceProbe.mnm", "-ExpectedModuleName", "FB_InterfaceProbe", "-OutDir", "${out}\\workflow", "-TimeoutSeconds", "120"]
+}

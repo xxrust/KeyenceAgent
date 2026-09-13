@@ -1,0 +1,7 @@
+{
+  "name": "04_structures_snapshot",
+  "enabled": true,
+  "workflow": "scripts/workflows/export_kv_structure_definitions.ps1",
+  "result_file": "workflow\\workflow_result.json",
+  "arguments": ["-ProjectPath", "${project}", "-OutDir", "${out}\\workflow", "-TimeoutSeconds", "120"]
+}
