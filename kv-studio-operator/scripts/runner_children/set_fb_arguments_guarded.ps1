@@ -71,15 +71,6 @@ function Get-VisibleKvsProcess([string]$ProjectNeedle, [int]$WaitSeconds = 10) {
   return $null
 }
 
-function Restore-KvForeground([System.Diagnostics.Process]$Process, [string]$ProjectNeedle, [string]$Step) {
-  for ($i = 1; $i -le 10; $i++) {
-    [void](Invoke-KvUiGuardForceForeground -TargetHwnd ([IntPtr]$Process.MainWindowHandle))
-    $snapshot = Get-KvForegroundSnapshot
-    if ($snapshot.title -like 'KV STUDIO*' -and $snapshot.title -like "*$ProjectNeedle*" -and -not [KvSharedUiGuardWin32]::IsIconic($Process.MainWindowHandle)) { return }
-  }
-  Fail-Step 'KV_FOCUS_LOST' $Step "KV STUDIO target project is not foreground after 10 attempts. title=$($snapshot.title)" @()
-}
-
 function Find-DescByAid($RootElement, [string]$AutomationId) {
   $RootElement.FindFirst(
     [System.Windows.Automation.TreeScope]::Descendants,
@@ -110,8 +101,18 @@ function FindProjectModuleTreeItem([int]$ProcessIdValue, [string]$ModuleName) {
   if($tree){
     $item=$tree.FindFirst([Windows.Automation.TreeScope]::Descendants,
       (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::NameProperty,$ModuleName)))
+    if(-not $item){
+      # KV STUDIO displays reusable FBs with a localized description suffix,
+      # for example `FB_Cylinder:...`; bind the stable module-name prefix.
+      $treeItems=$tree.FindAll([Windows.Automation.TreeScope]::Descendants,
+        (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::TreeItem)))
+      for($i=0;$i -lt $treeItems.Count;$i++){
+        $name=[string]$treeItems.Item($i).Current.Name
+        if($name -eq $ModuleName -or $name.StartsWith($ModuleName+':',[StringComparison]::Ordinal) -or $name.StartsWith($ModuleName+' [',[StringComparison]::Ordinal) -or $name.StartsWith($ModuleName+[char]0xFF1A,[StringComparison]::Ordinal)){$item=$treeItems.Item($i);break}
+      }
+    }
   }
-  Write-KvUiGuardRunLog -Event 'module_lookup' -Data @{module=$ModuleName;elapsed_ms=$watch.ElapsedMilliseconds;found=($null -ne $item);direct_name_query=$true}
+  Write-KvUiGuardRunLog -Event 'module_lookup' -Data @{module=$ModuleName;elapsed_ms=$watch.ElapsedMilliseconds;found=($null -ne $item);prefix_name_query=($null -ne $item -and [string]$item.Current.Name -ne $ModuleName)}
   if($watch.ElapsedMilliseconds -ge 1000){throw 'KV_MODULE_LOOKUP_TIMEOUT'}
   return $item
 }
@@ -465,21 +466,6 @@ function Wait-FbArgumentForm([int]$ProcessIdValue, [string]$ModuleName, [int]$Se
   return $null
 }
 
-function Assert-FbArgumentFormForeground($Form, [string]$Step) {
-  if (-not $Form) { Fail-Step 'KV_FB_ARGUMENT_FORM_MISSING' $Step 'Function-block argument form is missing.' @() }
-  $targetHwnd = [IntPtr]$Form.Current.NativeWindowHandle
-  if ($targetHwnd -eq [IntPtr]::Zero) { Fail-Step 'KV_FB_ARGUMENT_FORM_MISSING' $Step 'Function-block argument form has no native HWND.' @() }
-  if ([KvSharedUiGuardWin32]::IsIconic($targetHwnd)) {
-    [KvSharedUiGuardWin32]::ShowWindow($targetHwnd, 9) | Out-Null
-  }
-  [KvSharedUiGuardWin32]::SetForegroundWindow($targetHwnd) | Out-Null
-  Start-Sleep -Milliseconds 160
-  $snapshot = Get-KvForegroundSnapshot
-  if ($snapshot.hwnd -ne $targetHwnd.ToInt64()) {
-    Fail-Step 'KV_FOCUS_LOST' $Step "Function-block argument form is not foreground. title=$($snapshot.title) process=$($snapshot.process_name)" @()
-  }
-}
-
 function Convert-FbArgumentRowsToPasteText([string]$Path, [string]$ExpectedOwner) {
   $text = Read-KvDelimitedText $Path
   $lines = @($text -split "\r?\n" | Where-Object { $_ -ne '' })
@@ -629,6 +615,41 @@ function Focus-FbArgumentGrid($Surface, [IntPtr]$MainHwnd, [string]$ProjectNeedl
   if(-not $state.pane.Equals($Surface)){throw 'KV_FB_GRID_OWNER_MISMATCH'}
 }
 
+function Get-CurrentFbArgumentRows([IntPtr]$FormHwnd, [string]$ProjectNeedle, [string]$FbName, [string]$AttemptName) {
+  Assert-KvFbGridFocus $script:FbArgumentPane ([Windows.Automation.AutomationElement]::FocusedElement)
+  $sentinel = '__KV_FB_ARGUMENT_EXISTING_SENTINEL__'
+  Invoke-KvGuardedClipboardSetText -TargetHwnd $FormHwnd -Step "FB arguments existing-row sentinel $AttemptName $FbName" -Text $sentinel -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*"
+  Invoke-KvGuardedSendKeys -TargetHwnd $FormHwnd -Step "FB arguments existing-row Ctrl+A $AttemptName $FbName" -Keys '^a' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action 'Ctrl+A selects the current FB argument table to determine whether it is empty' -SleepMs 120
+  Invoke-KvGuardedSendKeys -TargetHwnd $FormHwnd -Step "FB arguments existing-row Ctrl+C $AttemptName $FbName" -Keys '^c' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action 'Ctrl+C reads the current FB argument table before the clear-or-paste branch' -SleepMs 220
+  $copied = Get-ClipboardTextAfterCopy $sentinel 1
+  $rows = @($copied -split "\r?\n" | Where-Object {
+    $cells = $_.Split("`t", [System.StringSplitOptions]::None)
+    $cells.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace([string]$cells[0])
+  })
+  Write-KvUiGuardRunLog -Event 'fb_argument_existing_rows' -Data @{module=$FbName;attempt=$AttemptName;row_count=$rows.Count;empty=($rows.Count -eq 0)}
+  return [pscustomobject]@{ rows=$rows; row_count=$rows.Count; raw=$copied }
+}
+
+function Clear-FbArgumentGridIfNeeded([IntPtr]$FormHwnd, [string]$ProjectNeedle, [string]$FbName) {
+  $current = Get-CurrentFbArgumentRows $FormHwnd $ProjectNeedle $FbName 'before_clear'
+  if ($current.row_count -eq 0) {
+    Write-KvUiGuardRunLog -Event 'fb_argument_clear_skipped' -Data @{module=$FbName;reason='empty_argument_table'}
+    return [pscustomobject]@{cleared=$false;existing_row_count=0}
+  }
+
+  # Shift+Delete opens a KV STUDIO confirmation whose default is No. Keep the
+  # modal foreground and answer it in place; never recover the main window.
+  Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $FormHwnd -Step "FB arguments open clear confirmation $FbName" -Keys '+{DELETE}' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -SuccessTitleLike @('KV STUDIO*') -Action 'Shift+Delete opens the existing FB argument deletion confirmation without foreground recovery' -SleepMs 300
+  $modal = Get-KvForegroundSnapshot
+  if ($modal.process_id -ne $process.Id -or $modal.class_name -ne '#32770') { Fail-Step 'KV_FB_ARGUMENT_DELETE_CONFIRMATION_MISSING' 'clear existing FB arguments' "Expected KV STUDIO delete confirmation for $FbName to remain foreground." @() }
+  $modalHwnd = [IntPtr]$modal.hwnd
+  Write-KvUiGuardRunLog -Event 'fb_argument_delete_confirmation_foreground' -Data @{module=$FbName;hwnd=$modal.hwnd;default_button='no';policy='Alt+Y on modal; no main-window refocus'}
+  Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $modalHwnd -Step "FB arguments confirm clear Alt+Y $FbName" -Keys '%y' -ExpectedTitleLike 'KV STUDIO*' -SuccessTitleLike @("KV STUDIO*$ProjectNeedle*") -Action 'Alt+Y confirms deletion while the KV STUDIO confirmation modal owns focus' -SleepMs 450
+  Assert-KvUiForegroundHwnd -ExpectedHwnd $FormHwnd -Step "FB arguments clear completed $FbName" -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -AllowSingleRecovery | Out-Null
+  Write-KvUiGuardRunLog -Event 'fb_argument_table_cleared' -Data @{module=$FbName;deleted_row_count=$current.row_count}
+  return [pscustomobject]@{cleared=$true;existing_row_count=$current.row_count}
+}
+
 function Resolve-FbArgumentOverwriteConfirmation($Modal, [IntPtr]$MainHwnd, [string]$ProjectNeedle, [string]$Stage) {
   $overwriteButton = Find-DescByAid $Modal '_buttonOverwrite'
   if (-not $overwriteButton) {
@@ -728,33 +749,12 @@ try {
   }
   $formDumpPath = ''
 
-  $attempts = [System.Collections.Generic.List[object]]::new()
-  # KV's embedded WinForms grid accepts one tab-delimited row at a time. A
-  # multi-row clipboard payload is treated as inline text (and can corrupt the
-  # first name), so paste each row, advancing with Down after every verified
-  # copyback. This also makes IN/OUT/IN-OUT direction errors observable per row.
-  $rowTexts = @($pastePayload.text -split "\r?\n" | Where-Object { $_ })
-  for ($rowIndex = 0; $rowIndex -lt $pastePayload.rows.Count; $rowIndex++) {
-    $expectedSoFar = @($pastePayload.rows[0..$rowIndex])
-    $attemptName = 'embedded_grid_row_{0:D2}_{1}' -f ($rowIndex + 1), ([string]$pastePayload.rows[$rowIndex].argument_name)
-    if ($rowIndex -gt 0) {
-      Invoke-KvGuardedSendKeys -TargetHwnd ([IntPtr]$process.MainWindowHandle) -Step "FB arguments move to row $($rowIndex + 1) $FbModuleName" -Keys '{DOWN}' -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -Action 'Down advances to the next native FB argument-grid row' -SleepMs 120
-    }
-    $visible = Invoke-FbArgumentPasteAttempt $form ([IntPtr]$process.MainWindowHandle) $projectNeedle $attemptName ($rowTexts[$rowIndex] + "`r`n") $expectedSoFar $FbModuleName -RowOffset 0
-    $attempts.Add($visible)
-    if (-not $visible.ok) {
-      $evidence = @($formDumpPath)
-      foreach ($attempt in @($attempts)) { if ($attempt.copy_path) { $evidence += [string]$attempt.copy_path } }
-      Fail-Step 'KV_FB_ARGUMENT_PASTE_NOT_VISIBLE' 'verify FB argument paste' "FB argument paste was not visible in copyback after row $($rowIndex + 1). missing=$($visible.missing -join ','); mismatch=$($visible.mismatch -join ',')" $evidence
-    }
-  }
-  # One semantic copyback proves the complete table and avoids three
-  # five-second clipboard polling cycles during ordinary (non-conflicting)
-  # writes. If an overwrite dialog reset focus, re-enter the documented grid
-  # route once before this final verification.
-  if (@($attempts | Where-Object { $_.needs_refocus }).Count -gt 0) {
-    Focus-FbArgumentGrid $form ([IntPtr]$process.MainWindowHandle) $projectNeedle 'FB arguments final verification' | Out-Null
-  }
+  $clear = Clear-FbArgumentGridIfNeeded ([IntPtr]$process.MainWindowHandle) $projectNeedle $FbModuleName
+  Assert-KvFbGridFocus $form ([Windows.Automation.AutomationElement]::FocusedElement)
+  # The native grid accepts the complete tab-delimited table in one paste once
+  # existing rows have been removed. This is the established non-empty and
+  # empty-table route; do not fall back to per-row overwrite prompts.
+  Invoke-KvGuardedClipboardPaste -TargetHwnd ([IntPtr]$process.MainWindowHandle) -Step "FB arguments paste complete table $FbModuleName" -Text $pastePayload.text -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 400
   $visible = Test-FbArgumentPasteVisible ([IntPtr]$process.MainWindowHandle) $projectNeedle $pastePayload.rows $FbModuleName 'all_rows_final'
   if (-not $visible.ok) {
     $evidence = @($formDumpPath, $visible.copy_path)
@@ -773,11 +773,11 @@ try {
     paste_tsv = $pastePath
     uia_before_paste = $formDumpPath
     copyback_path = $visible.copy_path
-    paste_attempts = @($attempts)
+    clear_existing = $clear
     argument_names = @($pastePayload.rows | ForEach-Object { [string]$_.argument_name })
     atomic_action_timings_path = Join-Path $OutDir 'atomic_action_timings.json'
     atomic_action_timings = @(Get-KvUiGuardAtomicActionTimings)
-    route = 'select FB -> Enter -> Alt+L -> identify remembered table -> Ctrl+Tab once from locals or twice from argument filter -> argument grid -> row paste -> copyback verify -> Ctrl+S'
+    route = 'select FB -> Enter -> Alt+L -> identify remembered table -> Ctrl+Tab once from locals or twice from argument filter -> argument grid -> Ctrl+A/C probe -> if non-empty Shift+Delete -> Alt+Y on delete modal -> paste complete table -> copyback verify -> Ctrl+S'
   } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'set_fb_arguments_result.json') -Encoding UTF8
   '0' | Set-Content -LiteralPath (Join-Path $OutDir 'exit_code.txt') -Encoding ASCII
   Log 'done set FB arguments'

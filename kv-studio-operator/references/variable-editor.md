@@ -104,8 +104,13 @@ result to the current execution. Do not supply write inputs with SnapshotOnly.
   does not retry alternative focus routes. Explicit recovery can close the
   known active FB with Ctrl+F4 (VK_F4 = 0x73) and reopen it; a save/modal prompt
   requires stopping, not accepting the prompt automatically.
-- Writes retain the established one-row TSV paste followed by Down. Verify the
-  argument-grid owner before paste, copy back names/directions/types, then save.
+- Writes first copy the current argument grid to choose the deterministic branch.
+  If it has persisted rows, use `Ctrl+A`, `Shift+Delete`, and answer the
+  foreground KV STUDIO confirmation with `Alt+Y`; never recover the main window
+  while that modal owns focus. If the copied table is empty, skip deletion.
+  Then paste the complete tab-delimited TSV in one operation, copy back names,
+  directions, and types, and save. The old one-row paste followed by `Down` is
+  retained only in historical evidence and is not a general update route.
   Snapshot counts exclude all-empty insertion rows; an empty table has zero
   arguments. Snapshot success alone does not prove any arguments were written.
 - Snapshot success does not establish unfiltered completeness, structure-member

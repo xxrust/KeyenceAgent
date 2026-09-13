@@ -34,6 +34,7 @@ $script:KvUiGuardRunLogPath = ''
 $script:KvUiGuardSeq = 0
 $script:KvUiGuardAtomicActionBudgetMs = 10000
 $script:KvUiGuardAtomicActions = [System.Collections.Generic.List[object]]::new()
+$script:KvUiGuardInputSessionStarted = $false
 
 function Initialize-KvUiGuard {
   param(
@@ -53,6 +54,7 @@ function Initialize-KvUiGuard {
   $header = [ordered]@{ timestamp = (Get-Date).ToString('o'); type = 'guard_initialized'; out_dir = $script:KvUiGuardOutDir }
   [IO.File]::AppendAllText($script:KvUiGuardRunLogPath, (($header | ConvertTo-Json -Compress) + [Environment]::NewLine), [Text.Encoding]::UTF8)
   $script:KvUiGuardAtomicActions = [System.Collections.Generic.List[object]]::new()
+  $script:KvUiGuardInputSessionStarted = $false
 }
 
 function Write-KvUiGuardRunLog {
@@ -312,10 +314,17 @@ function Assert-KvUiForegroundHwnd {
 
   $before = Get-KvForegroundSnapshot
   if ($before.hwnd -eq $ExpectedHwnd.ToInt64() -and ((-not $ExpectedTitleLike) -or $before.title -like $ExpectedTitleLike)) {
+    if (-not $script:KvUiGuardInputSessionStarted) {
+      $script:KvUiGuardInputSessionStarted = $true
+      Write-KvUiGuardRunLog -Event 'ui_input_session_started' -Data @{ hwnd=$ExpectedHwnd.ToInt64(); title=$before.title; activation='already_foreground'; policy='no later foreground recovery during this runner session' }
+    }
     return $before
   }
 
-  if ($AllowSingleRecovery) {
+  # A KV workflow receives exactly one foreground activation opportunity: at
+  # the beginning of its input session. Later recovery can steal focus from
+  # an in-process dialog or embedded editor, so it is prohibited.
+  if ($AllowSingleRecovery -and -not $script:KvUiGuardInputSessionStarted) {
     $recoveryPath = Write-KvUiGuardCheckpoint -Step $Step -Status 'recovery_before' -Action 'restore foreground once' -Expected @{ hwnd = $ExpectedHwnd.ToInt64(); title_like = $ExpectedTitleLike } -Before $before -ErrorCode (Get-KvUiGuardForegroundErrorCode $before $ExpectedHwnd) -Message 'Foreground did not match target; attempting one controlled recovery.'
     if ([KvSharedUiGuardWin32]::IsIconic($ExpectedHwnd)) {
       [KvSharedUiGuardWin32]::ShowWindow($ExpectedHwnd, 9) | Out-Null
@@ -325,6 +334,8 @@ function Assert-KvUiForegroundHwnd {
     Start-Sleep -Milliseconds 180
     $afterRecovery = Get-KvForegroundSnapshot
     if ($afterRecovery.hwnd -eq $ExpectedHwnd.ToInt64() -and ((-not $ExpectedTitleLike) -or $afterRecovery.title -like $ExpectedTitleLike)) {
+      $script:KvUiGuardInputSessionStarted = $true
+      Write-KvUiGuardRunLog -Event 'ui_input_session_started' -Data @{ hwnd=$ExpectedHwnd.ToInt64(); title=$afterRecovery.title; activation='single_initial_recovery'; policy='no later foreground recovery during this runner session' }
       Write-KvUiGuardCheckpoint -Step $Step -Status 'recovery_after' -Action 'restore foreground once' -Expected @{ hwnd = $ExpectedHwnd.ToInt64(); title_like = $ExpectedTitleLike } -Before $before -After $afterRecovery -Message 'Foreground recovery succeeded.' -Evidence @($recoveryPath) | Out-Null
       return $afterRecovery
     }
@@ -340,6 +351,8 @@ function Assert-KvUiForegroundHwnd {
       Start-Sleep -Milliseconds 220
       $afterBlockerRecovery = Get-KvForegroundSnapshot
       if ($afterBlockerRecovery.hwnd -eq $ExpectedHwnd.ToInt64() -and ((-not $ExpectedTitleLike) -or $afterBlockerRecovery.title -like $ExpectedTitleLike)) {
+        $script:KvUiGuardInputSessionStarted = $true
+        Write-KvUiGuardRunLog -Event 'ui_input_session_started' -Data @{ hwnd=$ExpectedHwnd.ToInt64(); title=$afterBlockerRecovery.title; activation='single_initial_recovery_after_blocker'; policy='no later foreground recovery during this runner session' }
         Write-KvUiGuardCheckpoint -Step $Step -Status 'recovery_after' -Action 'minimize known blocker and restore target' -Expected @{ hwnd = $ExpectedHwnd.ToInt64(); title_like = $ExpectedTitleLike } -Before $afterRecovery -After $afterBlockerRecovery -Message 'Foreground recovery succeeded after minimizing known blocker.' -Evidence @($recoveryPath, $blockerPath) | Out-Null
         return $afterBlockerRecovery
       }
@@ -351,8 +364,9 @@ function Assert-KvUiForegroundHwnd {
   }
 
   $code = Get-KvUiGuardForegroundErrorCode $before $ExpectedHwnd
-  $path = Write-KvUiGuardCheckpoint -Step $Step -Status 'failed' -Action 'assert foreground hwnd' -Expected @{ hwnd = $ExpectedHwnd.ToInt64(); title_like = $ExpectedTitleLike } -Before $before -ErrorCode $code -Message 'Foreground did not match target; input was not sent.'
-  Stop-KvUiGuard -ErrorCode $code -Step $Step -Message "Foreground did not match target. Actual foreground title='$($before.title)' process='$($before.process_name)'." -Evidence @($path)
+  $message = if ($script:KvUiGuardInputSessionStarted) { 'Foreground did not match target after the input session started; recovery is forbidden to preserve dialog/editor focus, and input was not sent.' } else { 'Foreground did not match target; input was not sent.' }
+  $path = Write-KvUiGuardCheckpoint -Step $Step -Status 'failed' -Action 'assert foreground hwnd' -Expected @{ hwnd = $ExpectedHwnd.ToInt64(); title_like = $ExpectedTitleLike; input_session_started = $script:KvUiGuardInputSessionStarted } -Before $before -ErrorCode $code -Message $message
+  Stop-KvUiGuard -ErrorCode $code -Step $Step -Message "$message Actual foreground title='$($before.title)' process='$($before.process_name)'." -Evidence @($path)
 }
 
 function Invoke-KvGuardedSendKeys {
