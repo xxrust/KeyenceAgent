@@ -8,6 +8,8 @@ Run one scenario against the real desktop application:
 powershell -STA -NoProfile -ExecutionPolicy Bypass -File .\run-workflow-test.ps1 -ScenarioPath .\05_compile\scenario.json
 ```
 
+For double-click use, open the scenario directory and double-click `run.bat`. The root `run-all.bat` runs all enabled scenarios serially. Both BAT entry points pause after completion so a human can read the result. For unattended command-line use, pass `-NoPause`; additional arguments such as `-PlanOnly` are forwarded to the PowerShell runner.
+
 Run all enabled scenarios serially:
 
 ```powershell
