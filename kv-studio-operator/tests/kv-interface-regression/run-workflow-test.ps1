@@ -33,7 +33,11 @@ function Wait-KvsProcess([string]$ProjectNeedle, [int]$Seconds = 20) {
 }
 function Expand-Arguments([object[]]$Values, [string]$ProjectPath, [string]$ProjectDirectory, [string]$RunDirectory, [string]$FixtureDirectory) {
   $out = [System.Collections.Generic.List[string]]::new()
-  foreach ($value in @($Values)) { $out.Add((Expand-TestValue ([string]$value) $ProjectPath $ProjectDirectory $RunDirectory $FixtureDirectory)) }
+  foreach ($value in @($Values)) {
+    if ($value -is [array]) {
+      foreach ($nested in @($value)) { $out.Add((Expand-TestValue ([string]$nested) $ProjectPath $ProjectDirectory $RunDirectory $FixtureDirectory)) }
+    } else { $out.Add((Expand-TestValue ([string]$value) $ProjectPath $ProjectDirectory $RunDirectory $FixtureDirectory)) }
+  }
   return $out.ToArray()
 }
 $sampleProjects = @(Get-ChildItem -LiteralPath (Join-Path $skillRoot 'references') -Recurse -Filter '*.kpr' -File | Where-Object { $_.BaseName -like '*v100*' })
