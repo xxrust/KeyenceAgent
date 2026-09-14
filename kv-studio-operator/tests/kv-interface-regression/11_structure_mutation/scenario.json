@@ -3,6 +3,6 @@
   "enabled": false,
   "reason": "Destructive structure create/update/delete route is opt-in; review fixture before enabling.",
   "workflow": "scripts/workflows/mutate_kv_structure_definitions.ps1",
-  "result_file": "workflow_result.json",
+  "result_file": "workflow\\workflow_result.json",
   "arguments": ["-ProjectPath", "${project}", "-PlanPath", "${fixture_dir}\\structure_plan.json", "-OutDir", "${out}\\workflow", "-TimeoutSeconds", "600"]
 }
