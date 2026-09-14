@@ -1,0 +1,7 @@
+{
+  "name": "12_structure_targets",
+  "enabled": true,
+  "workflow": "scripts/workflows/export_kv_structure_definitions.ps1",
+  "result_file": "workflow\\workflow_result.json",
+  "arguments": ["-ProjectPath", "${project}", "-StructureName", "strAxis,strCylinderCtrl", "-OutDir", "${out}\\workflow", "-TimeoutSeconds", "120"]
+}
