@@ -48,7 +48,7 @@ KeyenceAgent 是面向 KEYENCE KV STUDIO 的 Codex skill 套件。它把 KEYENCE
 仓库放在独立目录，安装脚本把三个 skill 复制到 Codex skills 目录。
 
 ```powershell
-git clone https://github.com/xxrust/KeyenceAgent.git `
+git clone --branch main https://github.com/xxrust/KeyenceAgent.git `
   "$env:USERPROFILE\KeyenceAgent"
 
 cd "$env:USERPROFILE\KeyenceAgent"

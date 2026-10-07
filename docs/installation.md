@@ -53,7 +53,7 @@ Test-Path (Join-Path $wiki 'scripts\wiki_query.py')
 ## 普通用户安装
 
 ```powershell
-git clone https://github.com/xxrust/KeyenceAgent.git `
+git clone --branch main https://github.com/xxrust/KeyenceAgent.git `
   "$env:USERPROFILE\KeyenceAgent"
 
 cd "$env:USERPROFILE\KeyenceAgent"

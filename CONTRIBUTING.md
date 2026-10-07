@@ -23,7 +23,7 @@ C:\Users\<user>\.codex\skills\     Codex 发现入口
 ## 首次建立开发入口
 
 ```powershell
-git clone https://github.com/xxrust/KeyenceAgent.git "$env:USERPROFILE\KeyenceAgent"
+git clone --branch main https://github.com/xxrust/KeyenceAgent.git "$env:USERPROFILE\KeyenceAgent"
 cd "$env:USERPROFILE\KeyenceAgent"
 
 powershell -NoProfile -ExecutionPolicy Bypass `

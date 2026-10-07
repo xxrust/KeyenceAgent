@@ -5,7 +5,7 @@
 ## 1. 安装
 
 ```powershell
-git clone https://github.com/xxrust/KeyenceAgent.git `
+git clone --branch main https://github.com/xxrust/KeyenceAgent.git `
   "$env:USERPROFILE\KeyenceAgent"
 cd "$env:USERPROFILE\KeyenceAgent"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\setup_keyence_agent.ps1
