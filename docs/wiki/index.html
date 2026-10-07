@@ -625,12 +625,12 @@ footer {
     <div class="wf-step s2">
       <span class="wf-num s2" style="background:var(--accent-2)">2</span>
       <h4>生成程序资产</h4>
-      <p>编程技能生成 ST 程序体 + 变量声明，打包为 MNM 文件（CP936 编码）</p>
+      <p>编程技能生成 ST 程序体 MNM，以及分开的 FB 自变量、局部变量和全局变量 TSV</p>
     </div>
     <div class="wf-step s3">
       <span class="wf-num" style="background:var(--accent-3)">3</span>
       <h4>创建项目 &amp; 导入</h4>
-      <p>操作技能创建 KV-X310 项目，导入 MNM，设置全局变量，导入 FB 模块</p>
+      <p>操作技能创建项目，导入 MNM，写入 FB 自变量和局部变量，再设置全局变量；需要调用时创建实例并绑定实参</p>
     </div>
     <div class="wf-step s4">
       <span class="wf-num" style="background:#7c5800">4</span>
@@ -822,11 +822,20 @@ powershell -STA -NoProfile -ExecutionPolicy Bypass -File \
   -ProjectPath "C:\KvAgentWork\MyProject" \
   -MnmPath    "C:\KvAgentWork\output\main_program.mnm"
 
-# 设置全局变量
+# 写入 FB 自变量（IN / OUT / IN-OUT）
+powershell -STA -NoProfile -ExecutionPolicy Bypass -File \
+  kv-studio-operator\scripts\workflows\set_kv_fb_arguments.ps1 \
+  -ProjectPath  "C:\KvAgentWork\MyProject" \
+  -FbModuleName "FB_PositionCheck" \
+  -ArgumentsTsv "C:\KvAgentWork\output\arguments.tsv"
+
+# 写入局部变量和全局变量
 powershell -STA -NoProfile -ExecutionPolicy Bypass -File \
   kv-studio-operator\scripts\workflows\set_kv_variables.ps1 \
-  -ProjectPath    "C:\KvAgentWork\MyProject" \
-  -VariablesTsv   "C:\KvAgentWork\output\global_vars.tsv"
+  -ProjectPath        "C:\KvAgentWork\MyProject" \
+  -LocalProgramName   "FB_PositionCheck" \
+  -LocalVariablesTsv  "C:\KvAgentWork\output\locals.tsv" \
+  -GlobalVariablesTsv "C:\KvAgentWork\output\global_vars.tsv"
 
 # 导出语义项目快照（只读，不修改项目）
 powershell -STA -NoProfile -ExecutionPolicy Bypass -File \
