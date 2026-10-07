@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="600" viewBox="0 0 860 600" role="img" aria-label="Harness执行链示意">
+  <defs>
+    <style>
+      text { font-family: "Microsoft YaHei","PingFang SC",sans-serif; }
+      .ht  { font-size:16px; font-weight:700; fill:#1a2635; }
+      .hl  { font-size:13px; font-weight:600; fill:#1a2635; }
+      .hs  { font-size:11px; fill:#5a7080; }
+      .hw  { font-size:12px; fill:#fff; }
+      .hm  { font-size:11px; fill:rgba(255,255,255,.8); }
+      .hc  { font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#b0c8e0; }
+      .ev  { font-size:11px; font-family:"Consolas","Courier New",monospace; fill:#5a7080; }
+    </style>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#3a6080"/>
+    </marker>
+    <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000018"/></filter>
+  </defs>
+
+  <!-- Title -->
+  <text class="ht" x="430" y="28" text-anchor="middle">Harness 执行链 — 从 Agent 调用到 KV STUDIO 操作</text>
+
+  <!-- ── Left column: call chain (steps 1-5) ─────────────────── -->
+
+  <!-- Step 1: Agent call -->
+  <rect fill="#e8f4e8" stroke="#2a8a55" stroke-width="2" x="40" y="54" width="220" height="72" rx="10" filter="url(#sh)"/>
+  <text class="hl" x="150" y="78" text-anchor="middle" fill="#1a4a28">① Agent 调用</text>
+  <text class="hs" x="150" y="97" text-anchor="middle">powershell -STA -File</text>
+  <text class="hs" x="150" y="113" text-anchor="middle">workflows/import_kv_module.ps1</text>
+
+  <path d="M150 126 L150 150" stroke="#3a6080" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+
+  <!-- Step 2: Boundary gate -->
+  <rect fill="#fff7ed" stroke="#d97706" stroke-width="2" x="40" y="154" width="220" height="72" rx="10" filter="url(#sh)"/>
+  <text class="hl" x="150" y="178" text-anchor="middle">② Agent 边界门</text>
+  <text class="hs" x="150" y="197" text-anchor="middle">检查调用方是否有权</text>
+  <text class="hs" x="150" y="213" text-anchor="middle">拒绝内部脚本直接调用</text>
+
+  <path d="M150 226 L150 250" stroke="#3a6080" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+
+  <!-- Step 3: Flat executor -->
+  <rect fill="#eaf4ee" stroke="#2a6e4a" stroke-width="2" x="40" y="254" width="220" height="72" rx="10" filter="url(#sh)"/>
+  <text class="hl" x="150" y="278" text-anchor="middle">③ 平面执行器</text>
+  <text class="hs" x="150" y="297" text-anchor="middle">读取 execution_plan.json</text>
+  <text class="hs" x="150" y="313" text-anchor="middle">逐步驱动 runner child</text>
+
+  <path d="M150 326 L150 350" stroke="#3a6080" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+
+  <!-- Step 4: Runner child -->
+  <rect fill="#f2ecfb" stroke="#5a3a8a" stroke-width="2" x="40" y="354" width="220" height="72" rx="10" filter="url(#sh)"/>
+  <text class="hl" x="150" y="378" text-anchor="middle">④ Runner Child</text>
+  <text class="hs" x="150" y="397" text-anchor="middle">底层 UI 工作进程</text>
+  <text class="hs" x="150" y="413" text-anchor="middle">产出 result.json</text>
+
+  <path d="M150 426 L150 450" stroke="#3a6080" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+
+  <!-- Step 5: UI Guard -->
+  <rect fill="#1a2635" stroke="#0e1f30" stroke-width="2" x="40" y="454" width="220" height="80" rx="10" filter="url(#sh)"/>
+  <text class="hw" x="150" y="478" text-anchor="middle" font-weight="700">⑤ UI 防护层</text>
+  <text class="hm" x="150" y="496" text-anchor="middle">kv_ui_guard.ps1</text>
+  <text class="hm" x="150" y="512" text-anchor="middle">互斥锁 · 18 个已审批原子动作</text>
+  <text class="hc" x="150" y="528" text-anchor="middle">Invoke-KvGuardedMouseClick</text>
+
+  <path d="M150 534 L150 554" stroke="#3a6080" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+
+  <!-- Step 6: KV STUDIO -->
+  <rect fill="#5a3a8a" stroke="#3a1a6a" stroke-width="2" x="40" y="557" width="220" height="30" rx="10" filter="url(#sh)"/>
+  <text class="hw" x="150" y="577" text-anchor="middle" font-weight="700">⑥ KV STUDIO (Kvs.exe)</text>
+
+  <!-- ── Right column: evidence output ──────────────────────── -->
+  <rect fill="#fffbf2" stroke="#d97706" stroke-width="2" x="310" y="54" width="510" height="300" rx="12" filter="url(#sh)"/>
+  <text x="565" y="82" text-anchor="middle" font-size="13" font-weight="700" fill="#7c4a00">📋 每步产出可验证的证据文件</text>
+  <line x1="320" y1="92" x2="810" y2="92" stroke="#fde68a" stroke-width="1"/>
+
+  <text class="ev" x="330" y="116">work_root/run-20261007-143200/</text>
+  <text class="ev" x="348" y="136">  execution_plan.json       ← 本次完整执行计划</text>
+  <text class="ev" x="348" y="156">  run.log                   ← 全流程时序日志</text>
+  <text class="ev" x="348" y="176">  step_01_create/</text>
+  <text class="ev" x="366" y="196">    receipt.json            ← 步骤收据（含时间戳）</text>
+  <text class="ev" x="366" y="216">    create_project_result.json</text>
+  <text class="ev" x="348" y="236">  step_02_import/</text>
+  <text class="ev" x="366" y="256">    receipt.json</text>
+  <text class="ev" x="366" y="276">    import_result.json      ← ok: true / false</text>
+  <text class="ev" x="348" y="296">  step_03_variables/</text>
+  <text class="ev" x="366" y="316">    set_variables_result.json</text>
+  <text class="ev" x="348" y="336">  snapshot/overview.md      ← 语义项目快照</text>
+
+  <!-- Mutex note -->
+  <rect fill="#fef2f2" stroke="#c0392b" stroke-width="1.5" x="310" y="370" width="510" height="44" rx="8"/>
+  <text font-size="12" font-weight="600" fill="#7f1d1d" x="565" y="390" text-anchor="middle">🔒 并发保护</text>
+  <text font-size="11" fill="#7f1d1d" x="565" y="408" text-anchor="middle">同一时刻只允许一个工作流持有 UI 互斥锁，多余的请求立即返回 KV_UI_WORKFLOW_BUSY</text>
+
+  <!-- Rule note -->
+  <text class="hs" x="565" y="440" text-anchor="middle" font-size="11">Agent 只能调用顶层入口（customer_callable: true），不能跨层直接调用 runner child 或 guards</text>
+
+  <!-- Connector: step 3 -> evidence box -->
+  <path d="M260 290 Q285 290 310 200" stroke="#d97706" stroke-width="1.2" stroke-dasharray="5,4" fill="none"/>
+  <text font-size="10" fill="#d97706" x="272" y="260" text-anchor="middle">产出</text>
+</svg>

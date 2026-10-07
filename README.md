@@ -79,6 +79,22 @@ AI Agent 自动完成：
 工程师检查结果，KV STUDIO 里已经有了完整的程序。
 ```
 
+### Harness 执行链
+
+每次调用工作流，都经过严格的六层执行链。Agent 只能进入最顶层的 `customer_callable` 入口，内部各层对外完全不可见，所有 UI 操作通过互斥锁串行化：
+
+<p align="center">
+  <img src="docs/images/kv-harness.svg" alt="Harness 执行链" width="820"/>
+</p>
+
+### 快照：让 AI 看到项目全貌
+
+调用 `export_kv_project_text_snapshot` 工作流，将散落在 KV STUDIO 各处的信息统一导出为结构化语义快照。下图来自一个真实项目（KVX样例程序，含多品牌伺服电机库、ModbusTCP、工站程序）：
+
+<p align="center">
+  <img src="docs/images/kv-snapshot-demo.svg" alt="快照结构演示" width="860"/>
+</p>
+
 ---
 
 ## 快速开始
