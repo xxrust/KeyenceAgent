@@ -1,280 +1,221 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="920" height="640" viewBox="0 0 920 640" role="img" aria-label="KeyenceAgent快照内容展示">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="700" viewBox="0 0 960 700" role="img" aria-label="KeyenceAgent快照内容展示">
   <defs>
     <style>
-      text { font-family: "Microsoft YaHei","PingFang SC",sans-serif; }
-      .title  { font-size:16px; font-weight:700; fill:#1a2635; }
-      .sec    { font-size:13px; font-weight:700; fill:#fff; }
-      .label  { font-size:12px; font-weight:600; fill:#1a2635; }
-      .sub    { font-size:11px; fill:#5a7080; }
-      .code   { font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#1a2635; }
-      .codeW  { font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#c8d8e8; }
-      .cmt    { font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#7baed4; }
-      .tag-in { font-size:9px; font-weight:700; fill:#fff; }
-      .ok     { font-size:10px; fill:#166534; }
+      text { font-family: "Microsoft YaHei","PingFang SC","Segoe UI",sans-serif; }
+      .ttl { font-size:15px; font-weight:700; fill:#1a2635; }
+      .sub { font-size:11px; fill:#5a7080; }
+      .hdr { font-size:13px; font-weight:700; fill:#fff; }
+      .col { font-size:10px; font-weight:600; fill:#5a7080; }
+      .cod { font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#1a2635; }
+      .cW  { font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#c8d8e8; }
+      .cmt { font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#7baed4; }
+      .cmt2{ font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#a8c8a8; }
+      .tag { font-size:9px;  font-weight:700; fill:#fff; }
+      .ok  { font-size:10px; fill:#166534; }
+      .adr { font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#b45309; }
     </style>
     <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000018"/></filter>
   </defs>
 
   <!-- ── Title ── -->
-  <text class="title" x="460" y="26" text-anchor="middle">快照里能看到什么？—— FB_Cylinder 气缸控制功能块完整内容</text>
-  <text class="sub"   x="460" y="44" text-anchor="middle">AI 读取快照后，拿到的不是文件列表，而是真实的变量名、类型、注释、设备地址和梯形图程序体</text>
+  <text class="ttl" x="480" y="24" text-anchor="middle">快照里能看到什么？—— FB_Cylinder 气缸控制功能块完整内容</text>
+  <text class="sub" x="480" y="42" text-anchor="middle">AI 读取快照后得到的不是文件列表，而是真实的变量名、类型、注释、设备地址和梯形图程序体</text>
 
-  <!-- ═══════════════════════════════════
-       LEFT COLUMN — FB interface (arguments)
-  ════════════════════════════════════════ -->
-  <!-- Header bar -->
-  <rect fill="#1a5fa0" x="16" y="58" width="280" height="26" rx="6"/>
-  <text class="sec" x="156" y="76" text-anchor="middle">① 自变量（接口）arguments.tsv</text>
+  <!-- ══════════════════════════════════════════════════════════
+       ROW 1 LEFT — Arguments (460px wide)
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect fill="#1a5fa0" x="12" y="54" width="454" height="24" rx="6"/>
+  <text class="hdr" x="239" y="71" text-anchor="middle">① 自变量（接口）arguments.tsv</text>
 
-  <rect fill="#f0f7ff" stroke="#7baed4" stroke-width="1" x="16" y="84" width="280" height="230" rx="6" filter="url(#sh)"/>
+  <rect fill="#f0f7ff" stroke="#7baed4" stroke-width="1" x="12" y="78" width="454" height="242" rx="6" filter="url(#sh)"/>
 
-  <!-- Column headers -->
-  <text class="sub" x="24" y="100" font-weight="600">变量名</text>
-  <text class="sub" x="148" y="100" font-weight="600">方向</text>
-  <text class="sub" x="188" y="100" font-weight="600">类型</text>
-  <text class="sub" x="240" y="100" font-weight="600">注释</text>
-  <line x1="20" y1="104" x2="292" y2="104" stroke="#c8d8f0" stroke-width="1"/>
+  <!-- col headers -->
+  <text class="col" x="20" y="94">变量名</text>
+  <text class="col" x="178" y="94">方向</text>
+  <text class="col" x="240" y="94">类型</text>
+  <text class="col" x="350" y="94">注释</text>
+  <line x1="16" y1="98" x2="462" y2="98" stroke="#c8d8f0" stroke-width="1"/>
 
-  <!-- IN-OUT vars -->
-  <rect fill="#1a5fa0" x="148" y="110" width="30" height="12" rx="3"/>
-  <text class="tag-in" x="163" y="120" text-anchor="middle">IN-OUT</text>
-  <text class="code" x="24" y="120">CylinderCtrl</text>
-  <text class="code" x="188" y="120">strCylinder</text>
-  <text class="sub" x="240" y="120">控制</text>
+  <!-- row helper macro: each row is 16px tall, baseline at y+12 -->
+  <!-- IN-OUT rows -->
+  <rect fill="#1a5fa0" x="178" y="104" width="44" height="13" rx="3"/>
+  <text class="tag" x="200" y="114" text-anchor="middle">IN-OUT</text>
+  <text class="cod" x="20" y="114">CylinderCtrl</text>
+  <text class="cod" x="240" y="114">strCylinderCtrl</text>
+  <text class="sub" x="350" y="114">控制</text>
 
-  <rect fill="#1a5fa0" x="148" y="124" width="30" height="12" rx="3"/>
-  <text class="tag-in" x="163" y="134" text-anchor="middle">IN-OUT</text>
-  <text class="code" x="24" y="134">CylinderParam</text>
-  <text class="code" x="188" y="134">strCylinder</text>
-  <text class="sub" x="240" y="134">参数</text>
+  <rect fill="#1a5fa0" x="178" y="120" width="44" height="13" rx="3"/>
+  <text class="tag" x="200" y="130" text-anchor="middle">IN-OUT</text>
+  <text class="cod" x="20" y="130">CylinderParam</text>
+  <text class="cod" x="240" y="130">strCylinderParam</text>
+  <text class="sub" x="350" y="130">参数</text>
 
-  <rect fill="#1a5fa0" x="148" y="138" width="30" height="12" rx="3"/>
-  <text class="tag-in" x="163" y="148" text-anchor="middle">IN-OUT</text>
-  <text class="code" x="24" y="148">CylinderStatus</text>
-  <text class="code" x="188" y="148">strCylinder</text>
-  <text class="sub" x="240" y="148">状态</text>
+  <rect fill="#1a5fa0" x="178" y="136" width="44" height="13" rx="3"/>
+  <text class="tag" x="200" y="146" text-anchor="middle">IN-OUT</text>
+  <text class="cod" x="20" y="146">CylinderStatus</text>
+  <text class="cod" x="240" y="146">strCylinderStatus</text>
+  <text class="sub" x="350" y="146">状态</text>
 
-  <line x1="20" y1="154" x2="292" y2="154" stroke="#e0eaf8" stroke-width="1"/>
+  <line x1="16" y1="152" x2="462" y2="152" stroke="#dce8f8" stroke-width="1"/>
 
-  <!-- IN vars -->
-  <rect fill="#2a6e4a" x="148" y="158" width="18" height="12" rx="3"/>
-  <text class="tag-in" x="157" y="168" text-anchor="middle">IN</text>
-  <text class="code" x="24" y="168">MachineStatus</text>
-  <text class="code" x="188" y="168">strMachine</text>
-  <text class="sub" x="240" y="168">设备状态</text>
+  <!-- IN rows -->
+  <rect fill="#2a6e4a" x="178" y="156" width="24" height="13" rx="3"/>
+  <text class="tag" x="190" y="166" text-anchor="middle">IN</text>
+  <text class="cod" x="20" y="166">MachineStatus</text>
+  <text class="cod" x="240" y="166">strMachineStatus</text>
+  <text class="sub" x="350" y="166">设备状态</text>
 
-  <rect fill="#2a6e4a" x="148" y="172" width="18" height="12" rx="3"/>
-  <text class="tag-in" x="157" y="182" text-anchor="middle">IN</text>
-  <text class="code" x="24" y="182">InHomeSensor</text>
-  <text class="code" x="188" y="182">BOOL</text>
-  <text class="sub" x="240" y="182">原位传感器1</text>
+  <rect fill="#2a6e4a" x="178" y="172" width="24" height="13" rx="3"/>
+  <text class="tag" x="190" y="182" text-anchor="middle">IN</text>
+  <text class="cod" x="20" y="182">InHomeSensorMaster</text>
+  <text class="cod" x="240" y="182">BOOL</text>
+  <text class="sub" x="350" y="182">原位传感器1</text>
 
-  <rect fill="#2a6e4a" x="148" y="186" width="18" height="12" rx="3"/>
-  <text class="tag-in" x="157" y="196" text-anchor="middle">IN</text>
-  <text class="code" x="24" y="196">InWorkSensor</text>
-  <text class="code" x="188" y="196">BOOL</text>
-  <text class="sub" x="240" y="196">动位传感器1</text>
+  <rect fill="#2a6e4a" x="178" y="188" width="24" height="13" rx="3"/>
+  <text class="tag" x="190" y="198" text-anchor="middle">IN</text>
+  <text class="cod" x="20" y="198">InWorkSensorMaster</text>
+  <text class="cod" x="240" y="198">BOOL</text>
+  <text class="sub" x="350" y="198">动位传感器1</text>
 
-  <rect fill="#2a6e4a" x="148" y="200" width="18" height="12" rx="3"/>
-  <text class="tag-in" x="157" y="210" text-anchor="middle">IN</text>
-  <text class="code" x="24" y="210">Reset</text>
-  <text class="code" x="188" y="210">BOOL</text>
-  <text class="sub" x="240" y="210">复位</text>
+  <rect fill="#2a6e4a" x="178" y="204" width="24" height="13" rx="3"/>
+  <text class="tag" x="190" y="214" text-anchor="middle">IN</text>
+  <text class="cod" x="20" y="214">Reset</text>
+  <text class="cod" x="240" y="214">BOOL</text>
+  <text class="sub" x="350" y="214">复位</text>
 
-  <line x1="20" y1="216" x2="292" y2="216" stroke="#e0eaf8" stroke-width="1"/>
+  <line x1="16" y1="220" x2="462" y2="220" stroke="#dce8f8" stroke-width="1"/>
 
-  <!-- OUT vars -->
-  <rect fill="#7c3a00" x="148" y="220" width="22" height="12" rx="3"/>
-  <text class="tag-in" x="159" y="230" text-anchor="middle">OUT</text>
-  <text class="code" x="24" y="230">OutToWork</text>
-  <text class="code" x="188" y="230">BOOL</text>
-  <text class="sub" x="240" y="230">输出去工作位</text>
+  <!-- OUT rows -->
+  <rect fill="#7c3a00" x="178" y="224" width="30" height="13" rx="3"/>
+  <text class="tag" x="193" y="234" text-anchor="middle">OUT</text>
+  <text class="cod" x="20" y="234">OutToWork</text>
+  <text class="cod" x="240" y="234">BOOL</text>
+  <text class="sub" x="350" y="234">输出去工作位</text>
 
-  <rect fill="#7c3a00" x="148" y="234" width="22" height="12" rx="3"/>
-  <text class="tag-in" x="159" y="244" text-anchor="middle">OUT</text>
-  <text class="code" x="24" y="244">OutToHome</text>
-  <text class="code" x="188" y="244">BOOL</text>
-  <text class="sub" x="240" y="244">输出回原点位</text>
+  <rect fill="#7c3a00" x="178" y="240" width="30" height="13" rx="3"/>
+  <text class="tag" x="193" y="250" text-anchor="middle">OUT</text>
+  <text class="cod" x="20" y="250">OutToHome</text>
+  <text class="cod" x="240" y="250">BOOL</text>
+  <text class="sub" x="350" y="250">输出回原点位</text>
 
-  <rect fill="#7c3a00" x="148" y="248" width="22" height="12" rx="3"/>
-  <text class="tag-in" x="159" y="258" text-anchor="middle">OUT</text>
-  <text class="code" x="24" y="258">Error</text>
-  <text class="code" x="188" y="258">BOOL</text>
-  <text class="sub" x="240" y="258">错误</text>
+  <rect fill="#7c3a00" x="178" y="256" width="30" height="13" rx="3"/>
+  <text class="tag" x="193" y="266" text-anchor="middle">OUT</text>
+  <text class="cod" x="20" y="266">Error</text>
+  <text class="cod" x="240" y="266">BOOL</text>
+  <text class="sub" x="350" y="266">错误</text>
 
-  <rect fill="#7c3a00" x="148" y="262" width="22" height="12" rx="3"/>
-  <text class="tag-in" x="159" y="272" text-anchor="middle">OUT</text>
-  <text class="code" x="24" y="272">ErrorID</text>
-  <text class="code" x="188" y="272">UINT</text>
-  <text class="sub" x="240" y="272">错误代码</text>
-  <text class="ok" x="24" y="304">✅ 13个接口变量 完整提取</text>
+  <rect fill="#7c3a00" x="178" y="272" width="30" height="13" rx="3"/>
+  <text class="tag" x="193" y="282" text-anchor="middle">OUT</text>
+  <text class="cod" x="20" y="282">ErrorID</text>
+  <text class="cod" x="240" y="282">UINT</text>
+  <text class="sub" x="350" y="282">错误代码</text>
 
-  <!-- ═══════════════════════════════════
-       MIDDLE-LEFT — Locals
-  ════════════════════════════════════════ -->
-  <rect fill="#5a3a8a" x="16" y="328" width="280" height="26" rx="6"/>
-  <text class="sec" x="156" y="346" text-anchor="middle">② 局部变量（内部状态）locals.tsv</text>
+  <text class="ok" x="20" y="308">✅  13 个接口变量全部提取，方向 / 类型 / 注释完整</text>
 
-  <rect fill="#f8f4ff" stroke="#c8b8f8" stroke-width="1" x="16" y="354" width="280" height="170" rx="6" filter="url(#sh)"/>
+  <!-- ══════════════════════════════════════════════════════════
+       ROW 1 RIGHT — Program body (460px wide)
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect fill="#1a2635" x="494" y="54" width="454" height="24" rx="6"/>
+  <text class="hdr" x="721" y="71" text-anchor="middle">② 程序体 body.mnm（梯形图文本格式）</text>
 
-  <text class="sub"  x="24" y="370" font-weight="600">变量名</text>
-  <text class="sub"  x="168" y="370" font-weight="600">类型</text>
-  <text class="sub"  x="216" y="370" font-weight="600">注释</text>
-  <line x1="20" y1="374" x2="292" y2="374" stroke="#d8c8f8" stroke-width="1"/>
+  <rect fill="#1a2635" stroke="#2a3a50" stroke-width="1" x="494" y="78" width="454" height="242" rx="6" filter="url(#sh)"/>
 
-  <text class="code" x="24" y="388">bTimeOut</text>
-  <text class="code" x="168" y="388">BOOL</text>
-  <text class="sub"  x="216" y="388">动作超时报警定时器</text>
+  <text font-size="10" font-weight="600" fill="#7baed4" x="504" y="96">;MODULE: FB_Cylinder    ;MODULE_TYPE: 2    DEVICE: 60</text>
+  <line x1="498" y1="101" x2="944" y2="101" stroke="rgba(255,255,255,.1)" stroke-width="1"/>
 
-  <text class="code" x="24" y="402">bTimeHome</text>
-  <text class="code" x="168" y="402">BOOL</text>
-  <text class="sub"  x="216" y="402">回原位防抖动定时器</text>
+  <text class="cmt" x="504" y="116">;─── 手动 / 自动上升沿触发 ─────────────────────────</text>
+  <text class="cW"  x="504" y="130">LDP   CylinderCtrl.bExeToWorkManual</text>
+  <text class="cmt2" x="700" y="130">; 手动去工作位触发</text>
+  <text class="cW"  x="504" y="144">OUT   bManlWorkUp</text>
+  <text class="cW"  x="504" y="158">LDP   CylinderCtrl.bExeToWorkAuto</text>
+  <text class="cmt2" x="700" y="158">; 自动去工作位触发</text>
+  <text class="cW"  x="504" y="172">OUT   bAutoWorkUp</text>
+  <text class="cW"  x="504" y="186">LDP   CylinderCtrl.bExeToHomeManual</text>
+  <text class="cW"  x="504" y="200">OUT   bManlHomeUp</text>
 
-  <text class="code" x="24" y="416">bTimeWork</text>
-  <text class="code" x="168" y="416">BOOL</text>
-  <text class="sub"  x="216" y="416">工作位防抖动定时器</text>
+  <text class="cmt" x="504" y="218">;─── 自复位（脉冲消除）───────────────────────────────</text>
+  <text class="cW"  x="504" y="232">LD    CylinderCtrl.bExeToWorkManual</text>
+  <text class="cW"  x="504" y="246">ANB   bManlWorkUp</text>
+  <text class="cW"  x="504" y="260">RES   CylinderCtrl.bExeToWorkManual</text>
 
-  <text class="code" x="24" y="430">bFault1</text>
-  <text class="code" x="168" y="430">BOOL</text>
-  <text class="sub"  x="216" y="430">回原点位置超时</text>
+  <text class="cmt" x="504" y="278">;─── 传感器屏蔽 / 设备状态判断 ──────────────────────</text>
+  <text class="cW"  x="504" y="292">LDB   CylinderParam.bSensorType</text>
+  <text class="cW"  x="504" y="306">OUT   bSrDisHome2</text>
 
-  <text class="code" x="24" y="444">bFault2</text>
-  <text class="code" x="168" y="444">BOOL</text>
-  <text class="sub"  x="216" y="444">回工作位置超时</text>
+  <text font-size="10" fill="#7baed4" x="504" y="308">✅  基恩士专有指令原文保留：LDP / ANB / RES / LDB / CON</text>
 
-  <text class="code" x="24" y="458">bOutHome</text>
-  <text class="code" x="168" y="458">BOOL</text>
-  <text class="sub"  x="216" y="458">M_气缸输出信号_原位</text>
+  <!-- ══════════════════════════════════════════════════════════
+       ROW 2 LEFT — Locals (460px wide)
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect fill="#5a3a8a" x="12" y="336" width="454" height="24" rx="6"/>
+  <text class="hdr" x="239" y="353" text-anchor="middle">③ 局部变量（内部状态）locals.tsv</text>
 
-  <text class="code" x="24" y="472">bOutWork</text>
-  <text class="code" x="168" y="472">BOOL</text>
-  <text class="sub"  x="216" y="472">M_气缸输出信号_到位</text>
+  <rect fill="#f8f4ff" stroke="#c8b8f8" stroke-width="1" x="12" y="360" width="454" height="230" rx="6" filter="url(#sh)"/>
 
-  <text class="code" x="24" y="486">duHomeDebounce</text>
-  <text class="code" x="168" y="486">UDINT</text>
-  <text class="sub"  x="216" y="486">原位防抖动时间(0.01s)</text>
+  <text class="col" x="20" y="376">变量名</text>
+  <text class="col" x="200" y="376">类型</text>
+  <text class="col" x="280" y="376">注释</text>
+  <line x1="16" y1="380" x2="462" y2="380" stroke="#d8c8f8" stroke-width="1"/>
 
-  <text class="ok"   x="24" y="512">✅ 15个局部变量 完整提取</text>
+  <text class="cod" x="20" y="395">bTimeOut</text>     <text class="cod" x="200" y="395">BOOL</text>  <text class="sub" x="280" y="395">动作超时报警定时器</text>
+  <text class="cod" x="20" y="411">bTimeHome</text>    <text class="cod" x="200" y="411">BOOL</text>  <text class="sub" x="280" y="411">回原位防抖动定时器</text>
+  <text class="cod" x="20" y="427">bTimeWork</text>    <text class="cod" x="200" y="427">BOOL</text>  <text class="sub" x="280" y="427">工作位防抖动定时器</text>
+  <text class="cod" x="20" y="443">bTimeNA</text>      <text class="cod" x="200" y="443">BOOL</text>  <text class="sub" x="280" y="443">两个传感器都没有信号延时</text>
+  <text class="cod" x="20" y="459">bFault1</text>      <text class="cod" x="200" y="459">BOOL</text>  <text class="sub" x="280" y="459">回原点位置超时</text>
+  <text class="cod" x="20" y="475">bFault2</text>      <text class="cod" x="200" y="475">BOOL</text>  <text class="sub" x="280" y="475">回工作位置超时</text>
+  <text class="cod" x="20" y="491">bFault3</text>      <text class="cod" x="200" y="491">BOOL</text>  <text class="sub" x="280" y="491">两个传感器都有信号</text>
+  <text class="cod" x="20" y="507">bOutHome</text>     <text class="cod" x="200" y="507">BOOL</text>  <text class="sub" x="280" y="507">M_气缸输出信号_原位</text>
+  <text class="cod" x="20" y="523">bOutWork</text>     <text class="cod" x="200" y="523">BOOL</text>  <text class="sub" x="280" y="523">M_气缸输出信号_到位</text>
+  <text class="cod" x="20" y="539">duHomeDebounce</text><text class="cod" x="200" y="539">UDINT</text> <text class="sub" x="280" y="539">原位防抖动时间（0.01s）</text>
 
-  <!-- ═══════════════════════════════════
-       MIDDLE-RIGHT — Program body
-  ════════════════════════════════════════ -->
-  <rect fill="#1a2635" x="312" y="58" width="310" height="26" rx="6"/>
-  <text class="sec" x="467" y="76" text-anchor="middle">③ 程序体 body.mnm（梯形图文本格式）</text>
+  <text class="ok" x="20" y="578">✅  15 个局部变量，内部状态对 AI 完全透明，修改时不会命名冲突</text>
 
-  <rect fill="#1a2635" stroke="#2a3a50" stroke-width="1" x="312" y="84" width="310" height="370" rx="6" filter="url(#sh)"/>
+  <!-- ══════════════════════════════════════════════════════════
+       ROW 2 RIGHT — Global variables (460px wide)
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect fill="#7c5800" x="494" y="336" width="454" height="24" rx="6"/>
+  <text class="hdr" x="721" y="353" text-anchor="middle">④ 全局变量 + 基恩士设备地址映射 variables.tsv</text>
 
-  <text font-size="10" font-weight="600" fill="#7baed4" x="320" y="102">;MODULE: FB_Cylinder   ;MODULE_TYPE: 2</text>
-  <line x1="316" y1="107" x2="618" y2="107" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+  <rect fill="#fffbf0" stroke="#fde68a" stroke-width="1" x="494" y="360" width="454" height="230" rx="6" filter="url(#sh)"/>
 
-  <text class="cmt"  x="320" y="122">;── 手动/自动上升沿触发 ──────────</text>
-  <text class="codeW" x="320" y="138">LDP   CylinderCtrl.bExeToWorkManual</text>
-  <text class="codeW" x="320" y="152">OUT   bManlWorkUp</text>
-  <text class="codeW" x="320" y="166">LDP   CylinderCtrl.bExeToWorkAuto</text>
-  <text class="codeW" x="320" y="180">OUT   bAutoWorkUp</text>
-  <text class="codeW" x="320" y="194">LDP   CylinderCtrl.bExeToHomeManual</text>
-  <text class="codeW" x="320" y="208">OUT   bManlHomeUp</text>
+  <text class="col" x="502" y="376">变量名</text>
+  <text class="col" x="700" y="376">设备地址</text>
+  <text class="col" x="780" y="376">注释</text>
+  <line x1="498" y1="380" x2="944" y2="380" stroke="#fde68a" stroke-width="1"/>
 
-  <text class="cmt"  x="320" y="228">;── 自复位（脉冲消除） ───────────</text>
-  <text class="codeW" x="320" y="244">LD    CylinderCtrl.bExeToWorkManual</text>
-  <text class="codeW" x="320" y="258">ANB   bManlWorkUp</text>
-  <text class="codeW" x="320" y="272">RES   CylinderCtrl.bExeToWorkManual</text>
+  <text class="cod" x="502" y="395">_CurrentDateTime</text>  <text class="adr" x="700" y="395">CM700</text>   <text class="sub" x="780" y="395">日期时间数组[0..5]</text>
+  <text class="cod" x="502" y="411">_AlwaysOn</text>          <text class="adr" x="700" y="411">CR2002</text>  <text class="sub" x="780" y="411">始终 ON</text>
+  <text class="cod" x="502" y="427">_AlwaysOff</text>         <text class="adr" x="700" y="427">CR2003</text>  <text class="sub" x="780" y="427">始终 OFF</text>
+  <text class="cod" x="502" y="443">_Clock10ms</text>         <text class="adr" x="700" y="443">CR2004</text>  <text class="sub" x="780" y="443">10ms 时钟脉冲 duty50%</text>
+  <text class="cod" x="502" y="459">_Clock100ms</text>        <text class="adr" x="700" y="459">CR2005</text>  <text class="sub" x="780" y="459">100ms 时钟脉冲</text>
+  <text class="cod" x="502" y="475">_Clock1s</text>           <text class="adr" x="700" y="475">CR2006</text>  <text class="sub" x="780" y="475">1s 时钟脉冲</text>
+  <text class="cod" x="502" y="491">_FirstScanOn</text>       <text class="adr" x="700" y="491">CR2008</text>  <text class="sub" x="780" y="491">初次扫描 ON</text>
+  <text class="cod" x="502" y="507">_FreeRunCounter1ms</text> <text class="adr" x="700" y="507">CM1030</text>  <text class="sub" x="780" y="507">自由运行计数器 (1ms)</text>
+  <text class="cod" x="502" y="523">_FreeRunCounter1us</text> <text class="adr" x="700" y="523">CM1034</text>  <text class="sub" x="780" y="523">自由运行计数器 (1μs)</text>
+  <text class="cod" x="502" y="539">_ErrorCtrl</text>         <text class="adr" x="700" y="539">CM1050</text>  <text class="sub" x="780" y="539">错误控制结构体</text>
 
-  <text class="cmt"  x="320" y="292">;── 传感器屏蔽参数 ──────────────</text>
-  <text class="codeW" x="320" y="308">LDB   CylinderParam.bSensorType</text>
-  <text class="codeW" x="320" y="322">OUT   bSrDisHome2</text>
-  <text class="codeW" x="320" y="336">CON</text>
-  <text class="codeW" x="320" y="350">OUT   bSrDisWork2</text>
+  <text class="ok" fill="#7c5800" x="502" y="578">✅  变量名 ↔ 基恩士寄存器地址一一对应，AI 写程序时无需手翻手册</text>
 
-  <text class="cmt"  x="320" y="370">;── 设备状态判断 ────────────────</text>
-  <text class="codeW" x="320" y="386">LDB   MachineStatus.bAuto</text>
-  <text class="codeW" x="320" y="400">ANDNB bFault1</text>
-  <text class="codeW" x="320" y="414">ANDNB bFault2</text>
-  <text class="codeW" x="320" y="428">OUT   CylinderStatus.bReady</text>
+  <!-- ══════════════════════════════════════════════════════════
+       BOTTOM summary bar
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect fill="#0e3d6b" x="12" y="600" width="936" height="84" rx="10" filter="url(#sh)"/>
+  <text font-size="13" font-weight="700" fill="#fff" x="480" y="622" text-anchor="middle">快照 = 整个项目的结构化语义镜像 — 四维度同时可见</text>
+  <line x1="24" y1="630" x2="936" y2="630" stroke="rgba(255,255,255,.15)" stroke-width="1"/>
 
-  <text class="ok"   font-size="10" fill="#7baed4" x="320" y="446">✅ 基恩士梯形图指令原文保留（LDP / ANB / RES / LDB）</text>
+  <text font-size="11" fill="#7baed4"         x="126" y="648" text-anchor="middle">📐 FB 接口</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="126" y="663" text-anchor="middle">方向 / 类型 / 注释齐全</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="126" y="676" text-anchor="middle">AI 知道如何正确调用</text>
 
-  <!-- ═══════════════════════════════════
-       RIGHT — Global variables
-  ════════════════════════════════════════ -->
-  <rect fill="#7c5800" x="638" y="58" width="266" height="26" rx="6"/>
-  <text class="sec" x="771" y="76" text-anchor="middle">④ 全局变量 + 设备地址映射</text>
+  <text font-size="11" fill="#c8d8e8"          x="354" y="648" text-anchor="middle">📜 梯形图程序体</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="354" y="663" text-anchor="middle">基恩士专有指令原文</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="354" y="676" text-anchor="middle">可直接读懂逻辑并修改</text>
 
-  <rect fill="#fffbf0" stroke="#fde68a" stroke-width="1" x="638" y="84" width="266" height="370" rx="6" filter="url(#sh)"/>
+  <text font-size="11" fill="#c8b8f8"          x="606" y="648" text-anchor="middle">🧠 局部变量</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="606" y="663" text-anchor="middle">内部状态全部透明</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="606" y="676" text-anchor="middle">改代码不会命名冲突</text>
 
-  <text class="sub"  x="646" y="100" font-weight="600">变量名</text>
-  <text class="sub"  x="790" y="100" font-weight="600">设备地址</text>
-  <line x1="642" y1="104" x2="900" y2="104" stroke="#fde68a" stroke-width="1"/>
-
-  <!-- System vars with device addresses -->
-  <text class="code" x="646" y="118">_CurrentDateTime</text>
-  <text class="code" fill="#b45309" x="790" y="118">CM700</text>
-  <text class="sub"  x="646" y="130">日期时间数组[0..5]</text>
-
-  <text class="code" x="646" y="146">_AlwaysOn</text>
-  <text class="code" fill="#b45309" x="790" y="146">CR2002</text>
-  <text class="sub"  x="646" y="158">始终ON</text>
-
-  <text class="code" x="646" y="174">_Clock10ms</text>
-  <text class="code" fill="#b45309" x="790" y="174">CR2004</text>
-  <text class="sub"  x="646" y="186">10ms时钟脉冲(duty50%)</text>
-
-  <text class="code" x="646" y="202">_Clock100ms</text>
-  <text class="code" fill="#b45309" x="790" y="202">CR2005</text>
-  <text class="sub"  x="646" y="214">100ms时钟脉冲</text>
-
-  <text class="code" x="646" y="230">_Clock1s</text>
-  <text class="code" fill="#b45309" x="790" y="230">CR2006</text>
-  <text class="sub"  x="646" y="242">1s时钟脉冲</text>
-
-  <text class="code" x="646" y="258">_FirstScanOn</text>
-  <text class="code" fill="#b45309" x="790" y="258">CR2008</text>
-  <text class="sub"  x="646" y="270">初次扫描ON</text>
-
-  <text class="code" x="646" y="286">_FreeRunCounter1ms</text>
-  <text class="code" fill="#b45309" x="790" y="286">CM1030</text>
-  <text class="sub"  x="646" y="298">自由运行计数器(1ms)</text>
-
-  <text class="code" x="646" y="314">_FreeRunCounter1us</text>
-  <text class="code" fill="#b45309" x="790" y="314">CM1034</text>
-  <text class="sub"  x="646" y="326">自由运行计数器(1μs)</text>
-
-  <text class="code" x="646" y="342">_ErrorCtrl</text>
-  <text class="code" fill="#b45309" x="790" y="342">CM1050</text>
-  <text class="sub"  x="646" y="354">错误控制结构体</text>
-
-  <text class="code" x="646" y="370">_ProgramInfo</text>
-  <text class="code" fill="#b45309" x="790" y="370">CM1000</text>
-  <text class="sub"  x="646" y="382">程序信息</text>
-
-  <line x1="642" y1="390" x2="900" y2="390" stroke="#fde68a" stroke-width="1"/>
-  <text class="ok"   fill="#7c5800" x="646" y="406">✅ 变量名 ↔ 基恩士设备地址 一一对应</text>
-  <text class="sub"  x="646" y="420">AI 写程序时可直接引用 CR2004</text>
-  <text class="sub"  x="646" y="434">无需人工查手册</text>
-  <text class="ok"   fill="#7c5800" x="646" y="450">✅ 用户自定义变量也在其中</text>
-  <text class="sub"  x="646" y="464">含类型、初值、注释全部保留</text>
-
-  <!-- ═══════════════════════════════════
-       BOTTOM — Summary bar
-  ════════════════════════════════════════ -->
-  <rect fill="#0e3d6b" x="16" y="536" width="888" height="82" rx="10" filter="url(#sh)"/>
-  <text font-size="13" font-weight="700" fill="#fff" x="460" y="558" text-anchor="middle">快照 = 整个项目的结构化语义镜像</text>
-  <line x1="30" y1="566" x2="890" y2="566" stroke="rgba(255,255,255,.15)" stroke-width="1"/>
-
-  <!-- 4 pillars -->
-  <text font-size="11" fill="#7baed4" x="120" y="582" text-anchor="middle">📐 FB 接口</text>
-  <text font-size="10" fill="rgba(255,255,255,.7)" x="120" y="598" text-anchor="middle">自变量方向/类型/注释</text>
-  <text font-size="10" fill="rgba(255,255,255,.7)" x="120" y="610" text-anchor="middle">AI 知道怎么调用它</text>
-
-  <text font-size="11" fill="#c8b8f8" x="310" y="582" text-anchor="middle">🧠 局部变量</text>
-  <text font-size="10" fill="rgba(255,255,255,.7)" x="310" y="598" text-anchor="middle">内部状态全部可见</text>
-  <text font-size="10" fill="rgba(255,255,255,.7)" x="310" y="610" text-anchor="middle">修改时不会命名冲突</text>
-
-  <text font-size="11" fill="#c8d8e8" x="530" y="582" text-anchor="middle">📜 梯形图程序体</text>
-  <text font-size="10" fill="rgba(255,255,255,.7)" x="530" y="598" text-anchor="middle">基恩士专有指令原文</text>
-  <text font-size="10" fill="rgba(255,255,255,.7)" x="530" y="610" text-anchor="middle">可直接分析逻辑与修改</text>
-
-  <text font-size="11" fill="#fde68a" x="760" y="582" text-anchor="middle">🗺️ 全局变量+设备地址</text>
-  <text font-size="10" fill="rgba(255,255,255,.7)" x="760" y="598" text-anchor="middle">CR2004=10ms时钟 一目了然</text>
-  <text font-size="10" fill="rgba(255,255,255,.7)" x="760" y="610" text-anchor="middle">无需手翻基恩士手册</text>
+  <text font-size="11" fill="#fde68a"          x="834" y="648" text-anchor="middle">🗺️ 全局变量+设备地址</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="834" y="663" text-anchor="middle">CR2004 = 10ms 时钟</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="834" y="676" text-anchor="middle">无需手翻基恩士手册</text>
 </svg>
