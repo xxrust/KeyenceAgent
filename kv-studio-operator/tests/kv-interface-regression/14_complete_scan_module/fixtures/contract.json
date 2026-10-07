@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "module_name": "QA_ScanLatch",
+  "category": "scan",
+  "parent_path": [
+    "每次扫描执行型模块"
+  ],
+  "body_path": "QA_ScanLatch.mnm",
+  "locals_path": "locals.tsv",
+  "evidence_paths": [
+    "wiki_evidence.md"
+  ]
+}

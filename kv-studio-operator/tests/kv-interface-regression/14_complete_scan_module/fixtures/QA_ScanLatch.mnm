@@ -1,0 +1,10 @@
+DEVICE:63
+;MODULE:QA_ScanLatch
+;MODULE_TYPE:0
+LD Enable
+ANB Reset
+OUT Permit
+LD Permit
+OUT Active
+END
+ENDH

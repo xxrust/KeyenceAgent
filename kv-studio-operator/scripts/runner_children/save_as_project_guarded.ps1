@@ -63,6 +63,11 @@ $process=Find-ProcessByPath $source;$main=[IntPtr]$process.MainWindowHandle
 try{
   if($InspectOnly){[ordered]@{ok=$true;inspect_only=$true;source=$source;pid=$process.Id}|ConvertTo-Json|Set-Content (Join-Path $OutDir 'save_as_result.json') -Encoding UTF8;exit 0}
   Invoke-KvGuardedOpenSaveAsModal -TargetHwnd $main -Step 'open save as modal' -ExpectedTitleLike 'KV STUDIO*'
+  [ordered]@{
+    foreground=Get-KvForegroundSnapshot
+    focused_element=Get-KvFocusedElementSnapshot
+    descendants=@(Get-Descendants $main)
+  } | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $OutDir 'save_as_modal_snapshot.json') -Encoding UTF8
   Invoke-KvGuardedModalFocusSequence -Step 'save as focused input sequence' -ProjectName $destName -Directory $destDir -Comment $Comment
   # KV STUDIO creates a project directory named after the project and places
   # the .kpr inside it: <destination directory>\<project name>\<project name>.kpr.

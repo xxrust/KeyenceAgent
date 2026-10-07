@@ -1,0 +1,11 @@
+{
+  "name": "19_compile_error",
+  "enabled": true,
+  "expected_outcome": "compile_error",
+  "expected_compile_result": "fixtures/expected_compile_result.txt",
+  "project_mode": "fixture_copy",
+  "source_project": "fixtures/ColdNumericST/ColdNumericST.kpr",
+  "workflow": "scripts/workflows/compile_kv_project.ps1",
+  "result_file": "workflow/workflow_result.json",
+  "arguments": ["-ProjectPath", "${project}", "-OutDir", "${out}/workflow", "-TimeoutSeconds", "120"]
+}

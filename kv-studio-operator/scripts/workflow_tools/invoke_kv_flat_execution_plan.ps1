@@ -11,6 +11,7 @@ $resolver = Join-Path (Split-Path -Parent $toolScriptDir) 'Resolve-KvStudioOpera
 if (-not (Test-Path -LiteralPath $resolver -PathType Leaf)) { throw "Script resolver not found: $resolver" }
 . $resolver
 . (Join-Path $toolScriptDir 'kv_step_evidence.ps1')
+. (Join-Path $toolScriptDir 'kv_plan_preflight.ps1')
 $scriptRoot = Get-KvStudioOperatorScriptsRoot -StartPath $PSCommandPath
 $start = Get-Date
 $script:currentStep = 'init'
@@ -22,6 +23,8 @@ $script:preparedSteps = @{}
 $script:codeFingerprint = $null
 $script:uiMutex = $null
 $script:uiMutexHeld = $false
+$script:planInputFingerprints = @()
+$script:validatedPlanHash = ''
 
 function Write-WorkflowLog([string]$Type, [hashtable]$Data = @{}) {
   if (-not $script:unifiedRunLog) { return }
@@ -126,6 +129,9 @@ function Get-StepTimeoutSeconds([object]$Step) {
 
 function Invoke-FlatWorkflowStep([object]$Step) {
   Assert-TimeBudget "before $($Step.name)"
+  if ((Get-FileHash -LiteralPath $PlanPath -Algorithm SHA256).Hash -ne $script:validatedPlanHash) { throw 'KV_VALIDATED_PLAN_CHANGED' }
+  Assert-KvPlanInputsUnchanged $script:planInputFingerprints
+  Assert-KvCodeUnchanged $scriptRoot $script:codeFingerprint
   $script:currentStep = [string]$Step.name
   $prepared = $script:preparedSteps[[string]$Step.name]
   $scriptPath = $prepared.path
@@ -149,7 +155,7 @@ function Invoke-FlatWorkflowStep([object]$Step) {
     $commandLine = '-STA -NoProfile -ExecutionPolicy Bypass -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($invoke))
     $arguments=@($Step.parameters.PSObject.Properties | ForEach-Object { $_.Value })
   }
-  $inputs = @(Get-KvInputFingerprints $arguments)
+  $inputs = @($prepared.inputs)
   $stepStart = Get-Date
   Write-WorkflowLog 'step_started' @{script=$scriptPath;out_dir=$outDir;input_fingerprints=$inputs;expected_results=$prepared.contract.files;code_sha256=$script:codeFingerprint.sha256}
   $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $commandLine -NoNewWindow -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
@@ -303,6 +309,7 @@ if (-not (Test-Path -LiteralPath $PlanPath -PathType Leaf)) { throw "Execution p
 
 $plan = $null
 try {
+  $initialPlanHash=(Get-FileHash -LiteralPath $PlanPath -Algorithm SHA256).Hash
   $plan = Get-Content -Raw -LiteralPath $PlanPath -Encoding UTF8 | ConvertFrom-Json
   if ($plan.ok -isnot [bool] -or -not $plan.ok) { throw "Execution plan is not ok: $PlanPath" }
   if (-not $plan.run_root) { throw 'KV_PLAN_RUN_ROOT_REQUIRED' }
@@ -311,6 +318,12 @@ try {
   $env:KV_WORKFLOW_RUN_LOG = $script:unifiedRunLog
   $env:KV_WORKFLOW_RUN_ID = $script:runId
   Write-WorkflowLog 'workflow_started' @{plan_path=$PlanPath;project_path=$plan.project_path}
+  $preflight=Test-KvExecutionPlanPreflight -Plan $plan -ScriptsRoot $scriptRoot
+  $script:preparedSteps=$preflight.prepared_steps
+  $script:planInputFingerprints=@($preflight.inputs)
+  $script:validatedPlanHash=(Get-FileHash -LiteralPath $PlanPath -Algorithm SHA256).Hash
+  if ($script:validatedPlanHash -ne $initialPlanHash) { throw 'KV_VALIDATED_PLAN_CHANGED' }
+  @{ok=$true;status='planned';execution_plan_sha256=$script:validatedPlanHash;inputs=$script:planInputFingerprints} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path ([string]$plan.run_root) 'plan_preflight_result.json') -Encoding UTF8
   # KV STUDIO is a single interactive desktop resource.  Serialize every
   # flat workflow process before any runner child can touch the UI.  A named
   # mutex is process-wide, so concurrent agents fail immediately instead of
@@ -326,34 +339,15 @@ try {
     if ($plan.timeout_seconds) { $TimeoutSeconds = [int]$plan.timeout_seconds } else { $TimeoutSeconds = 600 }
   }
 
-  $manifest = Get-KvStudioOperatorScriptManifest -ScriptRoot $scriptRoot
-  $allowedClasses = @('runner_child_approved','runner_child_pending','workflow_tool','gate','customer_scaffold_tool','customer_non_ui_tool')
-  $outputPaths = @{}
-  foreach ($step in @($plan.steps)) {
-    if (-not $step.name -or $script:preparedSteps.ContainsKey([string]$step.name)) { throw 'KV_PLAN_STEP_NAME_INVALID' }
-    $classes = @($step.classes | Where-Object { $_ -in $allowedClasses })
-    if ($classes.Count -eq 0 -or $classes.Count -ne @($step.classes).Count) { throw "KV_PLAN_STEP_CLASS_INVALID: $($step.name)" }
-    $path = Resolve-KvStudioOperatorScriptPath -ScriptRoot $scriptRoot -Name ([string]$step.script_name) -Classes $classes
-    if (-not $step.out_dir) { throw "KV_PLAN_STEP_OUT_DIR_REQUIRED: $($step.name)" }
-    $step.out_dir = [IO.Path]::GetFullPath([string]$step.out_dir)
-    if ($outputPaths.ContainsKey($step.out_dir)) { throw "KV_PLAN_STEP_OUT_DIR_DUPLICATE: $($step.out_dir)" }
-    $outputPaths[$step.out_dir]=$true
-    $relative = $path.Substring($scriptRoot.TrimEnd('\','/').Length+1).Replace('\','/')
-    if ($step.parameters -and $step.arguments) { throw "KV_PLAN_STEP_ARGUMENTS_AMBIGUOUS: $($step.name)" }
-    $contractArguments=@($step.arguments)
-    if ($step.parameters) { $contractArguments=@($step.parameters.PSObject.Properties | Where-Object { $_.Value -eq $true } | ForEach-Object { '-'+$_.Name }) }
-    $contract = Get-KvStepContract $manifest $relative $contractArguments
-    $script:preparedSteps[[string]$step.name]=@{path=$path;contract=$contract}
-  }
-  if ($script:preparedSteps.Count -eq 0) { throw 'KV_PLAN_STEPS_REQUIRED' }
   $script:codeFingerprint = Get-KvCodeFingerprint $scriptRoot
   $script:codeFingerprint | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path ([string]$plan.run_root) 'code_fingerprint.json') -Encoding UTF8
   Write-WorkflowLog 'plan_validated' @{step_count=$script:preparedSteps.Count;code_sha256=$script:codeFingerprint.sha256}
   $env:KV_WORKFLOW_VALIDATED_PLAN=$PlanPath
-  $env:KV_WORKFLOW_PLAN_SHA256=(Get-FileHash -LiteralPath $PlanPath -Algorithm SHA256).Hash
+  $env:KV_WORKFLOW_PLAN_SHA256=$script:validatedPlanHash
   foreach ($step in @($plan.steps)) {
     Invoke-FlatWorkflowStep $step
   }
+  Assert-KvCodeUnchanged $scriptRoot $script:codeFingerprint
 
   $compileAcceptanceRequired = $true
   if ($null -ne $plan.require_compile_result) { $compileAcceptanceRequired = [bool]$plan.require_compile_result }

@@ -115,6 +115,19 @@ foreach ($name in $ScriptNames) {
       }
     }
   }
+  $callerTokens=$null;$callerErrors=$null
+  $callerAst=[Management.Automation.Language.Parser]::ParseFile($path,[ref]$callerTokens,[ref]$callerErrors)
+  foreach($command in @($callerAst.FindAll({param($node) $node -is [Management.Automation.Language.CommandAst] -and $node.GetCommandName() -eq 'Invoke-KvGuardedSendKeys'},$true))) {
+    $parts=@($command.CommandElements)
+    for($part=1;$part -lt $parts.Count;$part++) {
+      if($parts[$part] -isnot [Management.Automation.Language.CommandParameterAst] -or $parts[$part].ParameterName -ne 'Keys'){continue}
+      $argument=$parts[$part].Argument
+      if(-not $argument -and $part+1 -lt $parts.Count){$argument=$parts[$part+1]}
+      if($argument -is [Management.Automation.Language.StringConstantExpressionAst] -and $argument.Value -ieq '^n') {
+        $findings += [pscustomobject]@{file=$path;line=$command.Extent.StartLineNumber;pattern='WrongNewProjectTransition';text='Ctrl+N opens a modal; use the approved modal-aware chord and verify the owned New Project dialog before entering data.'}
+      }
+    }
+  }
 }
 
 $guardPath = [IO.Path]::GetFullPath((Join-Path $ScriptsRoot 'guards\kv_ui_guard.ps1'))

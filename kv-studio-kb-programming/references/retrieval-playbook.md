@@ -18,6 +18,18 @@ Use this file when the first Wiki V2 query is weak, noisy, or ambiguous.
 - `ST data type`
 - exact token plus context, such as `TON timer`, `MOV ST`, `END ST`
 
+For numeric ST, a concrete conversion such as `REAL_TO_LREAL` may be documented
+under the generic `*_TO_**` conversion entry. Read that entry's supported source
+and destination types before using the concrete spelling. For loop syntax,
+`END_FOR` with source type `chm` distinguishes ST `FOR/END_FOR` from older
+Script `FOR/NEXT` results. Do not treat a missing exact-name hit as proof that
+the language lacks the operation.
+
+MNM/ST import restrictions vary by KV STUDIO generation. Keep the manual's
+version and CPU context when comparing KVS11 with current X-series documents;
+an export description is not import evidence. Operator's maintained ST route
+records the actual tested version/encoding and desktop acceptance.
+
 ### Ladder and instruction behavior
 
 - exact instruction name first: `END`, `ENDH`, `OUT`, `SET`, `RST`

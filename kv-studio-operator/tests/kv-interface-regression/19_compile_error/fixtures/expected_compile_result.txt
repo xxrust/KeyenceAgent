@@ -1,0 +1,9 @@
+转换结果 NG (错误数量:4  警告数量:4)
+  ColdScaleCaller(行:00001)(ST行: 0007)[错误 1318]:"Sum => ScaledSum": 指定了不存在的带名称自变量。
+  ColdScaleCallerSaved(行:00001)(ST行: 0007)[错误 1318]:"Sum => ScaledSum": 指定了不存在的带名称自变量。
+  FB_ColdScaleFour(行:00001)(ST行: 0002)[错误 1232]:"Sum": 发现非法的字符串。
+  FB_ColdScaleFour(行:00001)(ST行: 0010)[错误 1232]:"Sum": 发现非法的字符串。
+  ColdSampleStats(行:00003)[警告33]:可以省略ENDH命令。若明确记载，向程序读取PLC或读取存储卡时将会自动删除。
+  ColdScaleCaller(行:00003)[警告33]:可以省略ENDH命令。若明确记载，向程序读取PLC或读取存储卡时将会自动删除。
+  ColdScaleCallerSaved(行:00003)[警告33]:可以省略ENDH命令。若明确记载，向程序读取PLC或读取存储卡时将会自动删除。
+  FB_ColdScaleFour(行:00003)[警告33]:可以省略ENDH命令。若明确记载，向程序读取PLC或读取存储卡时将会自动删除。

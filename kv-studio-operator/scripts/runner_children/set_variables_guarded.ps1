@@ -234,6 +234,26 @@ function Convert-SafeFileName([string]$Value) {
   return $safe
 }
 
+function New-BoundedEvidencePath([string]$Prefix, [string]$Label, [string]$Suffix = '.json') {
+  $safe = Convert-SafeFileName $Label
+  $maxFullPathLength = 240
+  $availableLabelLength = $maxFullPathLength - $OutDir.Length - 1 - $Prefix.Length - $Suffix.Length
+  if ($availableLabelLength -lt 10) {
+    throw "KV_EVIDENCE_PATH_TOO_LONG: output directory leaves no safe filename budget: $OutDir"
+  }
+  if ($safe.Length -gt $availableLabelLength) {
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+      $hash = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Label))).Replace('-', '').ToLowerInvariant()).Substring(0, 8)
+    } finally {
+      $sha.Dispose()
+    }
+    $stemLength = $availableLabelLength - $hash.Length - 1
+    $safe = $safe.Substring(0, $stemLength).Trim('_') + '_' + $hash
+  }
+  return (Join-Path $OutDir ($Prefix + $safe + $Suffix))
+}
+
 function New-StepCheckpointPath([string]$Step, [string]$Status) {
   $prefix = ('{0:D3}_' -f $script:CheckpointSeq)
   $suffix = '_' + (Convert-SafeFileName $Status) + '.json'
@@ -325,28 +345,12 @@ function Set-CapsLockState([bool]$Enabled, [IntPtr]$TargetHwnd, [string]$Expecte
 }
 
 function Restore-KvForeground([System.Diagnostics.Process]$Process, [string]$ProjectNeedle, [string]$Action) {
-  for ($i = 1; $i -le 10; $i++) {
-    # KV STUDIO may recreate its top-level window when an MNM/common dialog
-    # closes. Refresh the Process object so MainWindowHandle is not a stale
-    # handle from before the import step.
-    try { $Process.Refresh() } catch {}
-    if ($Process.MainWindowHandle -eq [IntPtr]::Zero) {
-      $replacement = Get-Process Kvs -ErrorAction SilentlyContinue |
-        Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like "*$ProjectNeedle*" } |
-        Select-Object -First 1
-      if ($replacement) { $Process = $replacement }
-    }
-    # Reuse the shared guard's thread-input foreground handoff. A bare
-    # SetForegroundWindow can be denied after the MNM common dialog closes,
-    # leaving the process window valid but no longer foreground.
-    Invoke-KvUiGuardForceForeground -TargetHwnd $Process.MainWindowHandle | Out-Null
-    $fg = Get-ForegroundTitle
-    Log "foreground ${Action}: try=$i title=$($fg.Title)"
-    if ($fg.Title -like 'KV STUDIO*' -and $fg.Title -like "*$ProjectNeedle*" -and -not [KvSetVarWin32]::IsIconic($Process.MainWindowHandle)) {
-      return
-    }
-  }
-  throw "KV STUDIO not foreground for ${Action}."
+  $Process.Refresh()
+  if($Process.HasExited -or $Process.MainWindowHandle -eq [IntPtr]::Zero){throw 'KV_VARIABLE_BOUND_WINDOW_MISSING'}
+  # Re-activating an already foreground editor sends Alt and leaves menu mode
+  # armed for the following runner's Enter. Preserve focus after dialog close.
+  $fg=Assert-KvUiForegroundHwnd -ExpectedHwnd $Process.MainWindowHandle -Step $Action -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -AllowSingleRecovery
+  Log "verified foreground ${Action}: pid=$($Process.Id) title=$($fg.title)"
 }
 
 function Get-Root {
@@ -731,12 +735,36 @@ function Invoke-GuardedVariableCtrlChord($Form, [string]$Step, [byte]$Vk, [strin
   return $formAfter
 }
 
-function Invoke-GuardedVariablePaste($Form, [string]$Step, [string]$Text, [string]$Description, [int]$SleepMs = 800) {
+function Invoke-GuardedVariablePaste($Form, [string]$Step, [string]$Text, [string]$Description, [int]$SleepMs = 800, [switch]$AllowOverwrite) {
   if ([string]::IsNullOrWhiteSpace($Text)) {
     Fail-Guard 'KV_VARIABLE_CHECKPOINT_FAILED' $Step 'Paste text is empty; guarded paste refused before touching clipboard.' @()
   }
   Wait-ClipboardAvailable "$Step before clipboard paste" | Out-Null
-  Invoke-KvGuardedClipboardPaste -TargetHwnd ([IntPtr]$Form.Current.NativeWindowHandle) -Step $Step -Text $Text -ExpectedTitleLike '*变量编辑*' -SleepMs $SleepMs
+  if ($AllowOverwrite) {
+    $formHwnd=[IntPtr]$Form.Current.NativeWindowHandle
+    Invoke-KvGuardedClipboardSetText -TargetHwnd $formHwnd -Step "$Step payload" -Text $Text -ExpectedTitleLike '*变量编辑*'
+    Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $formHwnd -Step $Step -Keys '^v' -ExpectedTitleLike '*变量编辑*' -SuccessTitleLike @('KV STUDIO') -Action 'explicit global replacement paste' -SleepMs $SleepMs
+    $foreground=Get-KvForegroundSnapshot
+    if ($foreground.hwnd -ne $formHwnd.ToInt64()) {
+      if ($foreground.process_id -ne $script:ProcessIdForVariables) { throw 'KV_VARIABLE_REPLACE_MODAL_PROCESS_MISMATCH' }
+      $dialog=[Windows.Automation.AutomationElement]::FromHandle([IntPtr]$foreground.hwnd)
+      if ($dialog.Current.AutomationId -cne 'PasteConfirmationForm') { throw 'KV_VARIABLE_REPLACE_UNEXPECTED_MODAL' }
+      $buttons=$dialog.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'_buttonOverwriteAll')))
+      if ($buttons.Count -ne 1 -or $buttons[0].Current.ProcessId -ne $script:ProcessIdForVariables -or $buttons[0].Current.ControlType -ne [Windows.Automation.ControlType]::Button -or -not $buttons[0].Current.IsEnabled) { throw 'KV_VARIABLE_REPLACE_BUTTON_MISMATCH' }
+      Get-KvsModalEvidence $dialog "$Step explicit replacement" | Out-Null
+      Assert-KvUiForegroundHwnd -ExpectedHwnd ([IntPtr]$foreground.hwnd) -Step "$Step confirm explicit overwrite" -ExpectedTitleLike 'KV STUDIO' | Out-Null
+      $invoke=$null
+      if (-not $buttons[0].TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$invoke)) { throw 'KV_VARIABLE_REPLACE_BUTTON_NOT_INVOKABLE' }
+      $overwriteWatch=[Diagnostics.Stopwatch]::StartNew()
+      $invoke.Invoke()
+      Start-Sleep -Milliseconds 250
+      Assert-KvUiForegroundHwnd -ExpectedHwnd $formHwnd -Step "$Step replacement returned to editor" -ExpectedTitleLike '*变量编辑*' | Out-Null
+      Complete-KvUiGuardAtomicAction -Stopwatch $overwriteWatch -Step "$Step bound overwrite confirmation" -Action 'InvokePattern on verified overwrite button and exact editor return' -TargetHwnd ([IntPtr]$foreground.hwnd) -ExpectedTitleLike 'KV STUDIO' | Out-Null
+      Log 'explicit global Replace confirmed on bound PasteConfirmationForm; no focus recovery'
+    }
+  } else {
+    Invoke-KvGuardedClipboardPaste -TargetHwnd ([IntPtr]$Form.Current.NativeWindowHandle) -Step $Step -Text $Text -ExpectedTitleLike '*变量编辑*' -SleepMs $SleepMs
+  }
   Assert-NoKvsModal $script:ProcessIdForVariables "$Step paste result"
   return (Wait-VariableForm $script:ProcessIdForVariables 6)
 }
@@ -756,7 +784,10 @@ function Invoke-GuardedKvMainKeyAction([System.Diagnostics.Process]$Process, [st
 
 function Ensure-VariableEditorOpen([System.Diagnostics.Process]$Process, [string]$ProjectNeedle) {
   $form = Get-VariableForm $Process.Id
-  if ($form) { return $form }
+  if ($form) {
+    Assert-KvUiForegroundHwnd -ExpectedHwnd ([IntPtr]$form.Current.NativeWindowHandle) -Step 'reuse bound variable editor' -ExpectedTitleLike '*变量编辑*' -AllowSingleRecovery | Out-Null
+    return $form
+  }
   try {
     Restore-KvForeground $Process $ProjectNeedle 'open variable editor'
   } catch {
@@ -840,6 +871,9 @@ function Get-KvsModalEvidence($Window, [string]$Stage) {
 }
 
 function Get-KvsModalErrorCode([string]$Text) {
+  if ($Text -like '*向剪贴板复制失败*') {
+    return 'KV_CLIPBOARD_COPY_FAILED'
+  }
   if ($Text -like '*粘贴数据中存在错误*' -or $Text -like '*粘贴数据中存在无效数据*' -or $Text -like '*已跳过部分数据粘贴*') {
     return 'KV_VARIABLE_PASTE_DATA_ERROR'
   }
@@ -1146,8 +1180,7 @@ function Wait-ClipboardAvailable([string]$Label, [int]$Seconds = 4) {
     if ($probe.ok) {
       if (-not $stableSince) { $stableSince = Get-Date }
       if (((Get-Date) - $stableSince).TotalMilliseconds -ge 500) {
-        $safe = ($Label -replace '[^A-Za-z0-9_.-]+', '_')
-        $path = Join-Path $OutDir ("clipboard_available_$safe.json")
+        $path = New-BoundedEvidencePath 'clipboard_available_' $Label
         [pscustomobject]@{
           label = $Label
           available = $true
@@ -1161,8 +1194,7 @@ function Wait-ClipboardAvailable([string]$Label, [int]$Seconds = 4) {
     }
   } while ((Get-Date) -lt $deadline)
 
-  $safe = ($Label -replace '[^A-Za-z0-9_.-]+', '_')
-  $path = Join-Path $OutDir ("clipboard_unavailable_$safe.json")
+  $path = New-BoundedEvidencePath 'clipboard_unavailable_' $Label
   [pscustomobject]@{
     label = $Label
     available = $false
@@ -1238,8 +1270,7 @@ function Wait-VariableFormUiStable($Form, [string]$Label, [int]$Seconds = 4) {
     if ($same) {
       if (-not $stableSince) { $stableSince = Get-Date }
       if (((Get-Date) - $stableSince).TotalMilliseconds -ge 900) {
-        $safe = ($Label -replace '[^A-Za-z0-9_.-]+', '_')
-        $path = Join-Path $OutDir ("ui_stable_$safe.json")
+        $path = New-BoundedEvidencePath 'ui_stable_' $Label
         [pscustomobject]@{
           label = $Label
           stable = $true
@@ -1254,8 +1285,7 @@ function Wait-VariableFormUiStable($Form, [string]$Label, [int]$Seconds = 4) {
     $last = $sig
   } while ((Get-Date) -lt $deadline)
 
-  $safe = ($Label -replace '[^A-Za-z0-9_.-]+', '_')
-  $path = Join-Path $OutDir ("ui_stable_timeout_$safe.json")
+  $path = New-BoundedEvidencePath 'ui_stable_timeout_' $Label
   [pscustomobject]@{
     label = $Label
     stable = $false
@@ -1390,7 +1420,7 @@ function Paste-GlobalVariablesByFirstNameTab($Form, [string]$Text) {
     Log 'sent guarded PgDn to move to last global variable row for append paste'
   }
 
-  $formNow = Invoke-GuardedVariablePaste $formNow 'global variables Ctrl+V' $Text 'Ctrl+V global variables from first name cell' 300
+  $formNow = Invoke-GuardedVariablePaste $formNow 'global variables Ctrl+V' $Text 'Ctrl+V global variables from first name cell' 300 -AllowOverwrite:(-not $AppendGlobalVariables)
   Log "pasted global variables text length=$($Text.Length) append=$($AppendGlobalVariables.IsPresent)"
 }
 
@@ -1448,6 +1478,12 @@ function Save-Shot([string]$Name) {
 }
 
 function Save-Project([System.Diagnostics.Process]$Process, [string]$ProjectNeedle) {
+  $form=Get-VariableForm $Process.Id
+  if($form){
+    Invoke-KvGuardedSendKeys -TargetHwnd ([IntPtr]$form.Current.NativeWindowHandle) -Step 'save variables in current editor' -Keys '^s' -ExpectedTitleLike '*变量编辑*' -Action 'Ctrl+S from the verified variable editor' -SleepMs 300
+    Log 'sent Ctrl+S in variable editor; main project save follows editor close'
+    return
+  }
   Invoke-GuardedKvMainKeyAction $Process $ProjectNeedle 'save project after variables' '^s' 'Ctrl+S after variable paste' 300
   Log 'sent Ctrl+S after variable paste'
 }
@@ -1568,7 +1604,10 @@ try {
   $process = Get-BoundKvsProcess $projectNeedle $ProjectPath
   if (-not $process) { throw 'No visible KV STUDIO process.' }
   $script:ProcessIdForVariables = $process.Id
-  if ($AllowBoundWindowWithoutForeground) {
+  $existingEditor=Get-VariableForm $process.Id
+  if ($existingEditor) {
+    Assert-KvUiForegroundHwnd -ExpectedHwnd ([IntPtr]$existingEditor.Current.NativeWindowHandle) -Step 'set variables existing editor start' -ExpectedTitleLike '*变量编辑*' -AllowSingleRecovery | Out-Null
+  } elseif ($AllowBoundWindowWithoutForeground) {
     Log 'skipped startup system-foreground requirement under explicit unique PID-bound mode'
   } else {
     Restore-KvForeground $process $projectNeedle 'set variables start'
@@ -1686,6 +1725,10 @@ try {
   $requiredNames = @($definedGlobalNames + $definedLocalNames | Where-Object { $_ } | Select-Object -Unique)
   $validation = [pscustomobject]@{
     Ok = $true
+    ProjectPath = $ProjectPath
+    LocalProgramName = $LocalProgramName
+    LocalVariablesTsv = $LocalVariablesTsv
+    GlobalVariablesTsv = $GlobalVariablesTsv
     VerifiedFields = @('name','data_type')
     UnverifiedFields = @('initial_value','device','retain','constant','comment','group_name')
     Basis = if ($AuditPersistence) { 'variable editor route completed without modal; local executable names were verified by closing/reopening the variable editor, selecting the same program, copying the local grid text, and matching expected names' } else { 'fast variable editor route completed without modal; variable correctness is completed by the later compile gate unless audit flags are enabled' }
@@ -1714,6 +1757,9 @@ try {
     Ok = $true
     ProjectPath = $ProjectPath
     ProjectRoot = $projectRoot
+    LocalProgramName = $LocalProgramName
+    LocalVariablesTsv = $LocalVariablesTsv
+    GlobalVariablesTsv = $GlobalVariablesTsv
     RequiredNames = $requiredNames
     VariableDefinitionCheckOk = $true
     GlobalVariableFileScanOk = $globalFileScan.Ok

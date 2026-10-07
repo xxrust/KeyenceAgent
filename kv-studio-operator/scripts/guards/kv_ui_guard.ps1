@@ -579,6 +579,74 @@ function Invoke-KvGuardedMouseClick {
   Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'mouse left click' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
 }
 
+function Invoke-KvGuardedTreeItemDrag {
+  param([Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,[Parameter(Mandatory=$true)]$Source,[Parameter(Mandatory=$true)]$Destination,[string]$ExpectedTitleLike='')
+  Add-Type -AssemblyName System.Windows.Forms
+  if([int][Windows.Forms.Control]::ModifierKeys -ne 0){throw 'KV_TREE_DRAG_MODIFIER_PRESSED'}
+  $step='move project tree item to exact parent'
+  $watch=[Diagnostics.Stopwatch]::StartNew()
+  $before=Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
+  $target=[Windows.Automation.AutomationElement]::FromHandle($TargetHwnd)
+  $treeId='';$tree=$null
+  $sourceId=$Source.GetRuntimeId() -join ','
+  if($sourceId -eq ($Destination.GetRuntimeId() -join ',')){throw 'KV_TREE_DRAG_SAME_TARGET'}
+  foreach($item in @($Source,$Destination)){
+    if($item.Current.ProcessId -ne $target.Current.ProcessId -or $item.Current.ControlType -ne [Windows.Automation.ControlType]::TreeItem -or $item.Current.IsOffscreen -or -not $item.Current.IsEnabled){throw 'KV_TREE_DRAG_TARGET_INVALID'}
+    $parent=$item
+    for($depth=0;$parent -and $depth -le 5;$depth++){
+      if($item -eq $Destination -and ($parent.GetRuntimeId() -join ',') -eq $sourceId){throw 'KV_TREE_DRAG_DESCENDANT_TARGET'}
+      if($parent.Current.AutomationId -eq 'ProjectTreeView'){break}
+      $parent=[Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($parent)
+    }
+    if(-not $parent -or $parent.Current.AutomationId -ne 'ProjectTreeView'){throw 'KV_TREE_DRAG_TARGET_INVALID'}
+    $currentTreeId=$parent.GetRuntimeId() -join ','
+    if($treeId -and $treeId -ne $currentTreeId){throw 'KV_TREE_DRAG_DIFFERENT_TREE'}
+    $treeId=$currentTreeId;$tree=$parent
+    $bound=$false
+    for($depth=0;$parent -and $depth -le 8;$depth++){
+      if([long]$parent.Current.NativeWindowHandle -eq $TargetHwnd.ToInt64()){$bound=$true;break}
+      $parent=[Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($parent)
+    }
+    if(-not $bound){throw 'KV_TREE_DRAG_WINDOW_MISMATCH'}
+  }
+  $a=$Source.Current.BoundingRectangle;$b=$Destination.Current.BoundingRectangle
+  foreach($rect in @($a,$b)){
+    foreach($value in @($rect.Left,$rect.Top,$rect.Width,$rect.Height)){
+      if([double]::IsNaN($value) -or [double]::IsInfinity($value)){throw 'KV_TREE_DRAG_RECT_INVALID'}
+    }
+  }
+  if($a.Width -lt 4 -or $a.Height -lt 4 -or $b.Width -lt 4 -or $b.Height -lt 4){throw 'KV_TREE_DRAG_RECT_INVALID'}
+  $sx=[int]($a.Left+$a.Width/2);$sy=[int]($a.Top+$a.Height/2)
+  $dx=[int]($b.Left+$b.Width/2);$dy=[int]($b.Top+$b.Height/2)
+  foreach($rect in @($tree.Current.BoundingRectangle,$target.Current.BoundingRectangle)){
+    if(-not $rect.Contains([double]$sx,[double]$sy) -or -not $rect.Contains([double]$dx,[double]$dy)){throw 'KV_TREE_DRAG_POINT_OUTSIDE_TREE'}
+  }
+  $expected=@{hwnd=$TargetHwnd.ToInt64();source=$Source.Current.Name;destination=$Destination.Current.Name;source_xy=@($sx,$sy);destination_xy=@($dx,$dy)}
+  $checkpoint=Write-KvUiGuardCheckpoint -Step $step -Status before -Action 'drag exact project tree item' -Expected $expected -Before $before -Message 'Both targets belong to the bound project tree.'
+  if(-not [KvSharedUiGuardWin32]::SetCursorPos($sx,$sy)){throw 'KV_TREE_DRAG_CURSOR_FAILED'}
+  $buttonDown=$false
+  try {
+    if([KvSharedUiGuardWin32]::GetForegroundWindow() -ne $TargetHwnd){throw 'KV_TREE_DRAG_FOCUS_LOST'}
+    if([int][Windows.Forms.Control]::ModifierKeys -ne 0){throw 'KV_TREE_DRAG_MODIFIER_PRESSED'}
+    [KvSharedUiGuardWin32]::mouse_event(0x0002,0,0,0,0)
+    $buttonDown=$true
+    Start-Sleep -Milliseconds 100
+    for($i=1;$i -le 8;$i++){
+      if([KvSharedUiGuardWin32]::GetForegroundWindow() -ne $TargetHwnd){throw 'KV_TREE_DRAG_FOCUS_LOST'}
+      if([int][Windows.Forms.Control]::ModifierKeys -ne 0){throw 'KV_TREE_DRAG_MODIFIER_PRESSED'}
+      if(-not [KvSharedUiGuardWin32]::SetCursorPos([int]($sx+($dx-$sx)*$i/8),[int]($sy+($dy-$sy)*$i/8))){throw 'KV_TREE_DRAG_CURSOR_FAILED'}
+      Start-Sleep -Milliseconds 50
+    }
+    Start-Sleep -Milliseconds 250
+    if([KvSharedUiGuardWin32]::GetForegroundWindow() -ne $TargetHwnd){throw 'KV_TREE_DRAG_FOCUS_LOST'}
+    if([int][Windows.Forms.Control]::ModifierKeys -ne 0){throw 'KV_TREE_DRAG_MODIFIER_PRESSED'}
+  } finally { if($buttonDown){[KvSharedUiGuardWin32]::mouse_event(0x0004,0,0,0,0)} }
+  Start-Sleep -Milliseconds 250
+  $after=Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step "$step postcondition" -ExpectedTitleLike $ExpectedTitleLike
+  Write-KvUiGuardCheckpoint -Step $step -Status after -Action 'drag exact project tree item' -Expected $expected -Before $before -After $after -Evidence @($checkpoint) -Message 'Input complete; caller must verify exact parent.'|Out-Null
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $step -Action 'drag exact project tree item' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike|Out-Null
+}
+
 function Invoke-KvGuardedMouseClickAllowProcessSuccessor {
   param(
     [Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,

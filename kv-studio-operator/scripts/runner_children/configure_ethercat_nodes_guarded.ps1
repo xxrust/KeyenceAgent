@@ -280,7 +280,12 @@ function Set-ForegroundWindowByHwnd {
 }
 
 function Send-EnterToElement {
-  param([Windows.Automation.AutomationElement]$Element)
+  param(
+    [Windows.Automation.AutomationElement]$Element,
+    [IntPtr]$TargetHwnd = [IntPtr]::Zero,
+    [string]$ExpectedTitleLike = '',
+    [string[]]$SuccessTitleLike = @()
+  )
   $pattern = $null
   if ($Element.TryGetCurrentPattern([Windows.Automation.ScrollItemPattern]::Pattern, [ref]$pattern)) {
     try { $pattern.ScrollIntoView() } catch {}
@@ -291,7 +296,14 @@ function Send-EnterToElement {
   }
   $Element.SetFocus()
   Start-Sleep -Milliseconds 150
-  Invoke-KvGuardedSendKeys -TargetHwnd ([IntPtr](Get-KvsProcess).MainWindowHandle) -Step "open project tree item $($Element.Current.Name)" -Keys '{ENTER}' -ExpectedTitleLike 'KV STUDIO*' -Action 'Enter opens selected project tree item' -SleepMs 900
+  if ($TargetHwnd -eq [IntPtr]::Zero) { $TargetHwnd = [IntPtr](Get-KvsProcess).MainWindowHandle }
+  if (-not $ExpectedTitleLike) { $ExpectedTitleLike = 'KV STUDIO*' }
+  $step = "open project tree item $($Element.Current.Name)"
+  if (@($SuccessTitleLike).Count -gt 0) {
+    Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $TargetHwnd -Step $step -Keys '{ENTER}' -ExpectedTitleLike $ExpectedTitleLike -SuccessTitleLike $SuccessTitleLike -Action 'Enter opens selected project tree item' -SleepMs 900
+  } else {
+    Invoke-KvGuardedSendKeys -TargetHwnd $TargetHwnd -Step $step -Keys '{ENTER}' -ExpectedTitleLike $ExpectedTitleLike -Action 'Enter opens selected project tree item' -SleepMs 900
+  }
 }
 
 function Wait-WindowTitleLike {
@@ -364,7 +376,7 @@ function Open-EtherCatSetting {
   if (-not $node) { throw 'EtherCAT node was not found under unit configuration.' }
   $process = Get-KvsProcess
   Set-ForegroundWindowByHwnd -Hwnd $process.MainWindowHandle
-  Send-EnterToElement -Element $node
+  Send-EnterToElement -Element $node -TargetHwnd ([IntPtr]$process.MainWindowHandle) -ExpectedTitleLike 'KV STUDIO*' -SuccessTitleLike @('*EtherCAT*','KV STUDIO*')
   $prompt = Wait-WindowTitleLike -TitleParts @($NameEtherCat) -TimeoutMs 6000
   if (-not $prompt) { throw 'EtherCAT prompt/setting window did not appear.' }
   $promptElement = Get-StableElementFromHwnd -Hwnd $prompt.hwnd
@@ -769,7 +781,7 @@ function Select-EtherCatDeviceByPath {
   $leaf = Find-DeviceTreeItem -WindowElement $windowElement -Name $leafName -Leaf
   if (-not $leaf) { throw "EtherCAT device leaf not found: $leafName" }
   $beforeScreenshot = Save-Screenshot '01_before_device_enter.png'
-  Send-EnterToElement -Element $leaf
+  Send-EnterToElement -Element $leaf -TargetHwnd ([IntPtr]$windowRow.hwnd) -ExpectedTitleLike '*EtherCAT*'
   Start-Sleep -Milliseconds 900
   $afterScreenshot = Save-Screenshot '02_after_device_enter.png'
   [pscustomobject]@{

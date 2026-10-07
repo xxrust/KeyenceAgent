@@ -1,0 +1,6 @@
+scope	owner_program	name	data_type	status	evidence
+local	QA_STNumericScan	sampleValues	ARRAY[0..3] OF REAL	declared	wiki_evidence.md
+local	QA_STNumericScan	preciseValues	ARRAY[0..3] OF LREAL	declared	wiki_evidence.md
+local	QA_STNumericScan	sampleIndex	INT	declared	wiki_evidence.md
+local	QA_STNumericScan	sampleMean	REAL	declared	wiki_evidence.md
+local	QA_STNumericScan	weightedSum	LREAL	declared	wiki_evidence.md

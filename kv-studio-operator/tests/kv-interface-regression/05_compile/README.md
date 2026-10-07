@@ -10,17 +10,20 @@
 
 ## 当前状态
 
-`scenario.json` 设置 `enabled=false`，因为 manifest 中该 workflow 仍为 `pending_validation`。因此根目录 `run-all.bat` 默认不会执行本场景，不能把“全套测试完成”解释为编译已通过。
+`scenario.json` is enabled after live validation. The compile workflow is published in `script_manifest.json`, and `run-all.bat` includes this scenario.
 
 ## 执行方法
 
-需要单独运行时，在确认接受该 pending 场景后双击本目录 `run.bat`，或运行 `run.bat -NoPause`。调用链为公共 runner -> `compile_kv_project.ps1` -> flat executor -> `compile_and_copy_result_bounded.ps1` -> `copy_convert_result_from_tree_handle.ps1`。`-PlanOnly` 不编译。
+需要单独运行时双击本目录 `run.bat`。调用链为公共 runner -> `compile_kv_project.ps1` -> flat executor -> `compile_and_copy_result_bounded.ps1` -> `copy_convert_result_from_tree_handle.ps1`。`-PlanOnly` 不编译。
 
 ## 通过标准
 
 真实测试必须满足：`test_result.json` 为 `ok=true,status=pass`；`workflow/workflow_result.json` 为 `ok=true`，并记录 `compile_acceptance_required=true`、`compile_result_contains_ok=true`、`compile_result_contains_ng=false`；`workflow/artifacts/compile/result.json` 和 `workflow/artifacts/compile_result/result.json` 均为成功；`workflow/artifacts/compile_result/compile_result_copied.txt` 来自本次 receipt 所记录的哈希；统一日志包含编译和复制两个步骤。
 
 只看到结果树、只完成 Ctrl+F9，或读取到历史结果都不算通过。
+
+本项验证编译成功。预期编译失败和完整错误诊断提取由
+[19_compile_error](../19_compile_error/README.md) 独立验证；其中测试通过不改变原 workflow 的失败结果。
 
 ## 日志与结果
 

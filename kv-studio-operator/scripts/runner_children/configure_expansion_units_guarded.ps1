@@ -44,6 +44,7 @@ public static class KvExpansionGuardedWin32 {
 }
 
 $UnitEditorNeedle = -join (@(0x5355,0x5143,0x7F16,0x8F91,0x5668) | ForEach-Object {[char]$_})
+$UnitConfigurationNeedle = -join (@(0x5355,0x5143,0x914D,0x7F6E) | ForEach-Object {[char]$_})
 $CpuPattern = '^\[0\]\s+KV-'
 $projectLeaf = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
 $unitSetPath = Join-Path (Split-Path -Parent ([IO.Path]::GetFullPath($ProjectPath))) 'UnitSet.ue2'
@@ -61,9 +62,26 @@ function Normalize-Models {
 }
 
 function Write-Result($Value) { $Value | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $OutDir 'result.json') -Encoding UTF8 }
+function Get-PersistedModelMatches([string[]]$RequestedModels) {
+  if(-not (Test-Path -LiteralPath $unitSetPath -PathType Leaf)){return @()}
+  $bytes=[IO.File]::ReadAllBytes($unitSetPath)
+  $views=@(
+    [Text.Encoding]::GetEncoding(28591).GetString($bytes),
+    [Text.Encoding]::Unicode.GetString($bytes),
+    [Text.Encoding]::BigEndianUnicode.GetString($bytes)
+  )
+  $matches=@()
+  foreach($model in $RequestedModels) {
+    $pattern='(?i)(?<![A-Z0-9_-])'+[regex]::Escape($model)+'\*?(?![A-Z0-9_-])'
+    foreach($view in $views) {
+      $match=[regex]::Match($view,$pattern)
+      if($match.Success){$matches += $match.Value;break}
+    }
+  }
+  return @($matches | Sort-Object -Unique)
+}
 function Test-ModelPersisted([string]$Model) {
-  if(-not (Test-Path -LiteralPath $unitSetPath -PathType Leaf)){return $false}
-  $matches=@(rg -a -o -N ('(?i)'+[regex]::Escape($Model)+'\*?') $unitSetPath 2>$null | Sort-Object -Unique)
+  $matches=@(Get-PersistedModelMatches -RequestedModels @($Model))
   return ($matches -match ('^'+[regex]::Escape($Model)+'\*?$')).Count -gt 0
 }
 function Get-Scale {
@@ -104,11 +122,21 @@ function Open-UnitEditor([System.Diagnostics.Process]$Process) {
   $existing=Find-UnitEditor $Process.Id;if($existing -ne [IntPtr]::Zero){return $existing}
   $main=[Windows.Automation.AutomationElement]::FromHandle([IntPtr]$Process.MainWindowHandle)
   $items=$main.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::TreeItem)))
+  $unitConfiguration=$null;for($i=0;$i-lt$items.Count;$i++){if($items.Item($i).Current.Name -eq $UnitConfigurationNeedle){$unitConfiguration=$items.Item($i);break}}
+  if(-not $unitConfiguration){throw 'KV_UNIT_CONFIGURATION_TREE_ITEM_NOT_FOUND'}
+  $expand=$null
+  if($unitConfiguration.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern,[ref]$expand) -and $expand.Current.ExpandCollapseState -ne [Windows.Automation.ExpandCollapseState]::Expanded){$expand.Expand();Start-Sleep -Milliseconds 250}
+  $items=$main.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::TreeItem)))
   $cpu=$null;for($i=0;$i-lt$items.Count;$i++){if($items.Item($i).Current.Name -match $CpuPattern){$cpu=$items.Item($i);break}}
   if(-not $cpu){throw 'KV_CPU_TREE_ITEM_NOT_FOUND'}
-  if(-not(Invoke-KvUiGuardForceForeground -TargetHwnd ([IntPtr]$Process.MainWindowHandle))){throw 'KV_MAIN_FOREGROUND_RESTORE_FAILED'}
-  $sel=$null;if($cpu.TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern,[ref]$sel)){$sel.Select()};$cpu.SetFocus()
-  Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd ([IntPtr]$Process.MainWindowHandle) -Step 'open unit editor from CPU tree item' -Keys '{ENTER}' -ExpectedTitleLike 'KV STUDIO*' -SuccessTitleLike @('*'+$UnitEditorNeedle+'*') -Action 'open unit editor' -SleepMs 650
+  $scroll=$null;if($cpu.TryGetCurrentPattern([Windows.Automation.ScrollItemPattern]::Pattern,[ref]$scroll)){try{$scroll.ScrollIntoView()}catch{}}
+  $select=$null;if($cpu.TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern,[ref]$select)){try{$select.Select()}catch{}}
+  $rect=$cpu.Current.BoundingRectangle
+  if($cpu.Current.IsOffscreen -or [double]::IsInfinity($rect.X) -or $rect.Width -le 10 -or $rect.Height -le 10){throw 'KV_CPU_TREE_ITEM_BOUNDS_INVALID'}
+  $x=[int][math]::Round($rect.X+($rect.Width/2));$y=[int][math]::Round($rect.Y+($rect.Height/2))
+  Invoke-KvGuardedMouseClickAllowProcessSuccessor -TargetHwnd ([IntPtr]$Process.MainWindowHandle) -Step 'activate CPU unit configuration click 1' -X $x -Y $y -SuccessProcessId $Process.Id -SleepMs 60
+  Invoke-KvGuardedMouseClickAllowProcessSuccessor -TargetHwnd ([IntPtr]$Process.MainWindowHandle) -Step 'activate CPU unit configuration click 2' -X $x -Y $y -SuccessProcessId $Process.Id -SleepMs 180
+  Log 'guarded_tree_item_double_click' @{ step='open unit editor'; item_name=$cpu.Current.Name; x=$x; y=$y; process_id=$Process.Id }
   $deadline=(Get-Date).AddSeconds(5);do{$e=Find-UnitEditor $Process.Id;if($e-ne[IntPtr]::Zero){Log 'step_succeeded' @{ step='open unit editor'; editor_hwnd=$e.ToInt64() }; return $e};Start-Sleep -Milliseconds 60}while((Get-Date)-lt$deadline);Log 'step_failed' @{ step='open unit editor'; error_code='KV_UNIT_EDITOR_OPEN_TIMEOUT' }; throw 'KV_UNIT_EDITOR_OPEN_TIMEOUT'
 }
 function Set-FlatCatalog([IntPtr]$Editor) {
@@ -196,11 +224,10 @@ try {
     if($msg -match '地址中有错误|继电器|DM'){throw "KV_UNIT_ADDRESS_CONFLICT: $msg"}
     Start-Sleep -Milliseconds 80
   } while((Get-Date)-lt$modalDeadline)
-  $modelPattern='(?i)'+(($Models|ForEach-Object {[regex]::Escape($_)}) -join '|')+'\*?'
-  $deadline=(Get-Date).AddSeconds(8);do{Start-Sleep -Milliseconds 100;$matchCount=@(rg -a -o -N $modelPattern $unitSetPath | Sort-Object -Unique).Count}while($matchCount -lt $Models.Count -and (Get-Date)-lt$deadline)
-  $persisted=@(rg -a -o -N ('(?i)'+(($Models|ForEach-Object {[regex]::Escape($_)}) -join '|')+'\*?') $unitSetPath | Sort-Object -Unique)
+  $deadline=(Get-Date).AddSeconds(8);do{Start-Sleep -Milliseconds 100;$matchCount=@(Get-PersistedModelMatches -RequestedModels $Models).Count}while($matchCount -lt $Models.Count -and (Get-Date)-lt$deadline)
+  $persisted=@(Get-PersistedModelMatches -RequestedModels $Models)
   foreach($model in $Models){if(-not($persisted -match ('^'+[regex]::Escape($model)+'\*?$'))){throw "KV_UNITSET_PERSISTENCE_FAILED:$model"}}
-  if(-not(Invoke-KvUiGuardForceForeground -TargetHwnd ([IntPtr]$process.MainWindowHandle))){throw 'KV_MAIN_FOREGROUND_RESTORE_FAILED_AFTER_COMMIT'}
+  Assert-KvUiForegroundHwnd -ExpectedHwnd ([IntPtr]$process.MainWindowHandle) -Step 'verify main foreground after unit configuration commit' -ExpectedTitleLike 'KV STUDIO*' | Out-Null
   Invoke-KvGuardedSendKeys -TargetHwnd ([IntPtr]$process.MainWindowHandle) -Step 'save project after unit configuration' -Keys '^s' -ExpectedTitleLike 'KV STUDIO*' -Action 'save committed unit layout' -SleepMs 500
   $result=[ordered]@{ok=$true;project_path=[IO.Path]::GetFullPath($ProjectPath);models=$Models;actions=$actions;unitset_path=$unitSetPath;unitset_length_before=$beforeLength;unitset_length_after=(Get-Item $unitSetPath).Length;persisted_models=$persisted;clean_end_state=(Get-KvForegroundSnapshot)}
   Write-Result $result; $result | ConvertTo-Json -Depth 12

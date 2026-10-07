@@ -1,0 +1,10 @@
+DEVICE:59
+;MODULE:FB_QAStation
+;MODULE_TYPE:2
+LD Enable
+ANB Reset
+OUT Permit
+LD Permit
+OUT Ready
+END
+ENDH

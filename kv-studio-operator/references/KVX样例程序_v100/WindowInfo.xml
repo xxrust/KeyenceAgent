@@ -2,7 +2,28 @@
 <WindowInfo xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
   <GlobalVariable>
     <GroupFilters>
+      <Name>(System)</Name>
       <Name>(Default)</Name>
+      <Name>ABC</Name>
+      <Name>Axis</Name>
+      <Name>Cylinder</Name>
+      <Name>gStn</Name>
+      <Name>HMI</Name>
+      <Name>IO</Name>
+      <Name>Machine</Name>
+      <Name>ST00</Name>
+      <Name>ST01</Name>
+      <Name>ST02</Name>
+      <Name>ST03</Name>
+      <Name>ST04</Name>
+      <Name>ST05</Name>
+      <Name>ST06</Name>
+      <Name>Vacuum</Name>
+      <Name>常数</Name>
+      <Name>手自动</Name>
+      <Name>气缸演示</Name>
+      <Name>真空演示</Name>
+      <Name>轴演示</Name>
     </GroupFilters>
   </GlobalVariable>
   <Motion>

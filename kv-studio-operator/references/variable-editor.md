@@ -2,7 +2,42 @@
 
 Use this reference when MNM import causes missing variables or when reproducing a reference program.
 
-## Required Inventory
+## Input TSV Schema
+
+Use UTF-8 files with a header and literal tabs. Name/type writes use these columns:
+
+```tsv
+scope	owner_program	name	data_type	status	evidence
+local	ModuleName	SampleIndex	INT	declared	wiki.json
+```
+
+For globals use `scope=global` and leave `owner_program` empty. For locals the
+owner must exactly match the module. FB instances are local variables whose
+`data_type` is the existing FB name; declare that type through
+`AllowedCustomDataTypes` (or `allowed_custom_data_types` in an ST contract).
+The whitelist does not create the type.
+
+FB arguments use a separate schema:
+
+```tsv
+owner_program	argument_name	argument_kind	data_type	status	evidence
+FB_Module	Enable	IN	BOOL	declared	wiki.json
+FB_Module	Samples	IN-OUT	ARRAY[0..7] OF REAL	declared	wiki.json
+FB_Module	Average	OUT	LREAL	declared	wiki.json
+```
+
+Directions are `IN`, `OUT`, `IN-OUT`. Numeric ST accepts supported scalar types
+and one-dimensional arrays; the BOOL complete-module contract has narrower type
+rules. For complete ST workflows leave initial values, device mappings, comments
+and other unverified properties empty. Argument `constant`, `retain` and `hidden`
+may be empty or `False`; `default_value` must be empty. Put initialization in ST
+when needed. Name/type persistence does not verify those omitted properties.
+
+Run the public variable workflow with `-PlanOnly` for standalone declarations,
+or the complete module workflow for its combined declaration/ownership gate.
+Internal validators are implementation details, not separate customer entrypoints.
+
+## Inventory
 
 Build a variable inventory before editing MNM:
 

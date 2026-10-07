@@ -1,0 +1,8 @@
+{
+  "name": "17_st_numeric_scan",
+  "enabled": true,
+  "open_project": true,
+  "workflow": "scripts/workflows/create_kv_st_module.ps1",
+  "result_file": "workflow\\workflow_result.json",
+  "arguments": ["-ProjectPath", "${project}", "-ContractPath", "${fixture_dir}\\contract.json", "-OutDir", "${out}\\workflow", "-TimeoutSeconds", "300"]
+}

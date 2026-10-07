@@ -45,6 +45,7 @@
                                                "Invoke-KvGuardedMouseClick",
                                                "Invoke-KvGuardedMouseClickAllowProcessSuccessor",
                                                "Invoke-KvGuardedMouseRightClick",
+                                               "Invoke-KvGuardedTreeItemDrag",
                                                "Invoke-KvGuardedSendKeys",
                                                "Invoke-KvGuardedSendKeysAllowTargetClose",
                                                "Invoke-KvGuardedShiftTab",
@@ -56,7 +57,6 @@
                                                "Invoke-KvGuardedOpenSaveAsModal"
                                            ],
                               "pending":  [
-
                                           ]
                           },
     "step_result_contracts":  {
@@ -90,6 +90,11 @@
                                                                                                          "create_project_result.json"
                                                                                                      ]
                                                                                        },
+                                  "gates/assert_kv_complete_module.ps1": {"files":["module_preflight_result.json"]},
+                                  "gates/assert_kv_module_import.ps1": {"files":["module_import_preflight_result.json"]},
+                                  "gates/assert_kv_st_module.ps1": {"files":["st_module_preflight_result.json"]},
+                                  "workflow_tools/assert_kv_st_module_result.ps1": {"files":["st_module_result.json"]},
+                                  "workflow_tools/assert_kv_complete_module_result.ps1": {"files":["complete_module_result.json"]},
                                   "runner_children/import_mnm_guarded.ps1":  {
                                                                                  "files":  [
                                                                                                "import_result.json"
@@ -109,6 +114,16 @@
                                                                                                      }
                                                                                                  ]
                                                                                 },
+                                  "runner_children/snapshot_global_variables_all_groups_guarded.ps1":  {
+                                                                                                      "files":  [
+                                                                                                                    "global_variables_all_groups_result.json",
+                                                                                                                    "variable_snapshot_result.json"
+                                                                                                                ],
+                                                                                                      "artifacts":  [
+                                                                                                                     "global_variables_raw.tsv",
+                                                                                                                     "global_variables_all_groups.tsv"
+                                                                                                                 ]
+                                                                                                  },
                                   "runner_children/set_fb_arguments_guarded.ps1":  {
                                                                                        "files":  [
                                                                                                      "set_fb_arguments_result.json"
@@ -180,12 +195,17 @@
                                                                                                        "export_workspace_plan.json"
                                                                                                    ]
                                                                                      },
-                                  "workflow_tools/collect_kv_mnm_export_workspace.ps1":  {
-                                                                                             "files":  [
-                                                                                                           "export_mnm_project_copy_result.json"
-                                                                                                       ]
-                                                                                         },
-                                  "workflows/save_kv_project_as.ps1":  {
+                                   "workflow_tools/collect_kv_mnm_export_workspace.ps1":  {
+                                                                                              "files":  [
+                                                                                                            "export_mnm_project_copy_result.json"
+                                                                                                        ]
+                                                                                          },
+                                   "workflow_tools/materialize_kv_project_snapshot.ps1":  {
+                                                                                              "files":  [
+                                                                                                            "materialization_result.json"
+                                                                                                        ]
+                                                                                          },
+                                   "workflows/save_kv_project_as.ps1":  {
                                                                            "files":  [
                                                                                          "save_as_workflow_result.json"
                                                                                      ]
@@ -228,17 +248,38 @@
                                                  {
                                                      "path":  "new_kv_existing_project_update_workspace.ps1",
                                                      "status":  "published",
-                                                     "customer_callable":  true
+                                                     "customer_callable":  true,
+                                                     "capabilities":  [
+                                                                          "initialize_existing_project_workspace",
+                                                                          "legacy_source_snapshot_workspace"
+                                                                      ]
                                                  },
                                                  {
                                                      "path":  "assert_kv_existing_project_snapshot.ps1",
                                                      "status":  "published",
-                                                     "customer_callable":  true
+                                                     "customer_callable":  true,
+                                                     "capabilities":  [
+                                                                          "validate_existing_project_snapshot",
+                                                                          "validate_semantic_project_snapshot",
+                                                                          "source_snapshot_schema_v1_v2"
+                                                                      ]
                                                  },
                                                  {
                                                      "path":  "export_kv_project_inventory.ps1",
                                                      "status":  "published",
                                                      "customer_callable":  true
+                                                 },
+                                                 {
+                                                     "path":  "export_kv_project_text_snapshot.ps1",
+                                                     "status":  "published",
+                                                     "customer_callable":  true,
+                                                     "capabilities":  [
+                                                                          "read_only_project_text_snapshot",
+                                                                          "source_snapshot_manifest",
+                                                                          "semantic_project_tree",
+                                                                          "entity_restore_plan",
+                                                                          "version_control_text_index"
+                                                                      ]
                                                  },
                                                  {
                                                      "path":  "filter_kv_mnm_user_sources.ps1",
@@ -355,6 +396,18 @@
                                                   "execution":  "flat_manifest_steps"
                                               },
                                               {
+                                                  "path":  "workflows/snapshot_kv_global_variables_all_groups.ps1",
+                                                  "status":  "published",
+                                                  "customer_callable":  true,
+                                                  "capabilities":  [
+                                                                       "snapshot_all_global_variable_groups"
+                                                                   ],
+                                                  "runner_children":  [
+                                                                          "runner_children/snapshot_global_variables_all_groups_guarded.ps1"
+                                                                      ],
+                                                  "execution":  "flat_manifest_steps"
+                                              },
+                                              {
                                                   "path":  "workflows/set_kv_fb_arguments.ps1",
                                                   "status":  "published",
                                                   "customer_callable":  true,
@@ -396,6 +449,19 @@
                                                   "execution":  "flat_manifest_steps"
                                               },
                                               {
+                                                  "path":  "workflows/export_kv_project_text_snapshot.ps1",
+                                                  "status":  "published",
+                                                  "customer_callable":  true,
+                                                  "capabilities":  [
+                                                                       "read_only_project_text_snapshot",
+                                                                       "compose_inventory_mnm_variables_structures",
+                                                                       "semantic_project_tree",
+                                                                       "entity_restore_plan",
+                                                                       "version_control_text_index"
+                                                                   ],
+                                                  "execution":  "composed_read_only_routes"
+                                              },
+                                              {
                                                   "path":  "workflows/mutate_kv_structure_definitions.ps1",
                                                   "status":  "published",
                                                   "customer_callable":  true,
@@ -425,8 +491,9 @@
                                               },
                                               {
                                                   "path":  "workflows/create_kv_project.ps1",
-                                                  "status":  "pending_validation",
-                                                  "customer_callable":  false,
+                                                  "status":  "published",
+                                                  "customer_callable":  true,
+                                                  "verification": {"scope":"new blank project; exact saved path, actual CPU from saved XML, isolated process identity; regression contract 16_create_project", "reference":"tests/kv-interface-regression/16_create_project/README.md"},
                                                   "capabilities":  [
                                                                        "create_project"
                                                                    ],
@@ -436,9 +503,44 @@
                                                   "execution":  "flat_manifest_steps"
                                               },
                                               {
+                                                  "path": "workflows/create_kv_st_module.ps1",
+                                                  "status": "published",
+                                                  "customer_callable": true,
+                                                  "capabilities": ["create_complete_st_scan_module", "create_complete_st_fb"],
+                                                  "runner_children": ["runner_children/import_mnm_guarded.ps1", "runner_children/set_variables_guarded.ps1", "runner_children/set_fb_arguments_guarded.ps1", "runner_children/compile_and_copy_result_bounded.ps1", "runner_children/copy_convert_result_from_tree_handle.ps1", "runner_children/export_mnm_browse_default_folder_guarded.ps1"],
+                                                  "execution": "flat_manifest_steps",
+                                                  "verification": {"scope":"KV-X520 domain ST, complete numerical declarations, saved exact source, actual compile", "reference":"references/st-programs.md"}
+                                              },
+                                              {
+                                                  "path": "workflows/export_kv_project_mnm.ps1",
+                                                  "status": "published",
+                                                  "customer_callable": true,
+                                                  "capabilities": ["export_current_project_mnm"],
+                                                  "runner_children": ["runner_children/export_mnm_browse_default_folder_guarded.ps1"],
+                                                  "execution": "flat_manifest_steps"
+                                              },
+                                              {
+                                                  "path": "workflows/import_kv_module.ps1",
+                                                  "status": "published",
+                                                  "customer_callable": true,
+                                                  "capabilities": ["import_scan_module", "import_st_module", "import_user_fb_module"],
+                                                  "runner_children": ["runner_children/import_mnm_guarded.ps1"],
+                                                  "execution": "flat_manifest_steps",
+                                                  "verification": {"scope":"create-only MNM envelope and saved category; ST body, declarations and compilation require separate verification", "reference":"references/st-programs.md"}
+                                              },
+                                              {
+                                                  "path": "workflows/create_kv_complete_module.ps1",
+                                                  "status": "published",
+                                                  "customer_callable": true,
+                                                  "capabilities": ["create_complete_scan_module", "create_complete_fb"],
+                                                  "runner_children": ["runner_children/import_mnm_guarded.ps1", "runner_children/set_variables_guarded.ps1", "runner_children/set_fb_arguments_guarded.ps1", "runner_children/compile_and_copy_result_bounded.ps1", "runner_children/copy_convert_result_from_tree_handle.ps1", "runner_children/export_mnm_browse_default_folder_guarded.ps1"],
+                                                  "execution": "flat_manifest_steps",
+                                                  "verification": {"scope":"BOOL ladder complete-module contract; full tree path, declaration readback, exported body, compile", "reference":"references/complete-module.md"}
+                                              },
+                                              {
                                                   "path":  "workflows/compile_kv_project.ps1",
-                                                  "status":  "pending_validation",
-                                                  "customer_callable":  false,
+                                                  "status":  "published",
+                                                  "customer_callable":  true,
                                                   "capabilities":  [
                                                                        "compile_project"
                                                                    ],
@@ -495,6 +597,12 @@
                                                   },
                                                   {
                                                       "path":  "runner_children/set_variables_guarded.ps1",
+                                                      "status":  "approved",
+                                                      "customer_callable":  false,
+                                                      "ui_guard_required":  true
+                                                  },
+                                                  {
+                                                      "path":  "runner_children/snapshot_global_variables_all_groups_guarded.ps1",
                                                       "status":  "approved",
                                                       "customer_callable":  false,
                                                       "ui_guard_required":  true
@@ -571,6 +679,8 @@
 
                                              ],
                     "workflow_tool":  [
+                                          {"path":"workflow_tools/assert_kv_st_module_result.ps1","status":"internal","customer_callable":false},
+                                          {"path":"workflow_tools/assert_kv_complete_module_result.ps1","status":"approved","customer_callable":false},
                                           {
                                               "path":  "workflow_tools/new_kv_mvp_execution_plan.ps1",
                                               "status":  "approved",
@@ -595,6 +705,11 @@
                                               "path":  "workflow_tools/collect_kv_mnm_export_workspace.ps1",
                                               "status":  "approved",
                                               "customer_callable":  false
+                                          },
+                                          {
+                                              "path":  "workflow_tools/materialize_kv_project_snapshot.ps1",
+                                              "status":  "approved",
+                                              "customer_callable":  false
                                           }
                                       ],
                     "guard_library":  [
@@ -608,6 +723,9 @@
 
                                        ],
                     "gate":  [
+                                 {"path":"gates/assert_kv_complete_module.ps1","status":"gate","customer_callable":true,"capabilities":["validate_complete_module"]},
+                                 {"path":"gates/assert_kv_module_import.ps1","status":"gate","customer_callable":true,"capabilities":["validate_module_import"]},
+                                 {"path":"gates/assert_kv_st_module.ps1","status":"gate","customer_callable":true,"capabilities":["validate_st_module"]},
                                  {
                                      "path":  "gates/assert_kv_mvp_agent_boundary.ps1",
                                      "status":  "gate",
@@ -620,6 +738,7 @@
                                  }
                              ],
                     "support_library":  [
+                                            {"path":"kv_project_process_binding.ps1","status":"library","customer_callable":false},
                                             {
                                                 "path":  "Resolve-KvStudioOperatorScript.ps1",
                                                 "status":  "library",
@@ -644,6 +763,21 @@
                                                 "path":  "workflow_tools/kv_step_evidence.ps1",
                                                 "status":  "library",
                                                 "customer_callable":  false
+                                            },
+                                            {
+                                                "path": "workflow_tools/kv_st_module_contract.ps1",
+                                                "status": "internal",
+                                                "customer_callable": false
+                                            },
+                                            {
+                                                "path": "workflow_tools/kv_complete_module_contract.ps1",
+                                                "status": "library",
+                                                "customer_callable": false
+                                            },
+                                            {
+                                                "path": "workflow_tools/kv_plan_preflight.ps1",
+                                                "status": "library",
+                                                "customer_callable": false
                                             },
                                             {
                                                 "path":  "workflow_tools/kv_workflow_plan.ps1",

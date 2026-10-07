@@ -57,3 +57,5 @@ manifest_rule:
 ```
 
 Customer-facing documentation and workflow composition use the role-directory path recorded in manifest. Root-level scripts that are not listed in manifest are unclassified. Classify them in manifest, add evidence, and define a role before using them as customer-mode entrypoints.
+
+共享 guard 或执行器的契约变更后，必须通过能力查询的 `regression_scenarios` 找到受影响公开入口，复跑对应的真实 UI 回归，再更新能力证据。历史成功不能证明当前依赖组合仍然可用。尤其应区分真正新建空白工程与样例复制、另存为；若缺少对应测试，先补齐验收用例。对话框切换须声明预期目标并验证 HWND、PID 和控件，不得以抢回主窗口绕过后置条件。

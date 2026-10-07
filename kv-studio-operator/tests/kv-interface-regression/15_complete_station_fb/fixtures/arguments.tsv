@@ -1,0 +1,4 @@
+owner_program	argument_name	argument_kind	constant	data_type	default_value	retain	hidden	comment1	comment2	comment3	comment4	comment5	comment6	comment7	comment8	evidence	status
+FB_QAStation	Enable	IN	False	BOOL		False	False									wiki_evidence.md	declared
+FB_QAStation	Reset	IN	False	BOOL		False	False									wiki_evidence.md	declared
+FB_QAStation	Ready	OUT	False	BOOL		False	False									wiki_evidence.md	declared

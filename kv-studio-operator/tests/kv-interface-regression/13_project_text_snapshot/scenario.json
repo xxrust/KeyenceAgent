@@ -1,0 +1,8 @@
+{
+  "name": "13_project_text_snapshot",
+  "enabled": true,
+  "open_project": false,
+  "workflow": "scripts/workflows/export_kv_project_text_snapshot.ps1",
+  "result_file": "workflow\\workflow_result.json",
+  "arguments": ["-ProjectPath", "${project}", "-OutDir", "${out}\\workflow", "-TimeoutSeconds", "900"]
+}

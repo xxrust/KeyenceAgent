@@ -1,0 +1,7 @@
+owner_program	argument_name	argument_kind	data_type	status	evidence
+FB_QA_STStats	Enable	IN	BOOL	declared	wiki_evidence.md
+FB_QA_STStats	Gain	IN	LREAL	declared	wiki_evidence.md
+FB_QA_STStats	Samples	IN-OUT	ARRAY[0..3] OF REAL	declared	wiki_evidence.md
+FB_QA_STStats	Sum	OUT	LREAL	declared	wiki_evidence.md
+FB_QA_STStats	Mean	OUT	REAL	declared	wiki_evidence.md
+FB_QA_STStats	Valid	OUT	BOOL	declared	wiki_evidence.md

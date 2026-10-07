@@ -1,122 +1,921 @@
-﻿<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KV STUDIO Operator - System Audit</title>
-<style>
-:root{font-family:Segoe UI,Microsoft YaHei,sans-serif;color:#182530;background:#f3f6f8}*{box-sizing:border-box}body{margin:0}header{background:#13232e;color:#fff;padding:30px 6vw}header h1{margin:0 0 8px;font-size:28px}main{max-width:1280px;margin:22px auto;padding:0 20px}section{background:#fff;border:1px solid #d8e0e6;border-radius:6px;margin:16px 0;padding:20px}h2{font-size:19px;margin:0 0 14px}h3{font-size:15px;margin:20px 0 8px}p{font-size:13px;line-height:1.7;margin:8px 0}.note{color:#536573}.mono{font-family:Consolas,monospace;font-size:12px;word-break:break-all}.good{color:#087f5b;font-weight:700}.warn{color:#a25d00;font-weight:700}.bad{color:#b42318;font-weight:700}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid #e2e8ed;padding:9px;text-align:left;vertical-align:top}th{background:#edf2f5}.flow{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.node{border:1px solid #9db1c0;background:#f8fbfd;border-radius:4px;padding:10px 12px}.arrow{color:#647584;font-size:19px}.pill{display:inline-block;border:1px solid #c7d2da;border-radius:3px;padding:3px 7px;margin:2px;font-size:12px;background:#fafcfd}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.card{border:1px solid #dce4e9;border-radius:4px;padding:14px}.card strong{display:block;margin-bottom:7px}.legend span{margin-right:16px;font-size:12px}
-</style></head>
-<body><header><h1>KV STUDIO Operator 系统审计</h1><div>架构、目录、公开接口、原子动作、调度、守卫、证据与验证状态</div></header><main>
-<section><h2>1. 审计范围</h2><p>本页描述 <span class="mono">H:\KeyenceAgent\kv-studio-operator</span> 当前代码的整套运行方式。依据是 <span class="mono">scripts/script_manifest.json</span>、实际目录、flat executor、UI guard 和已产生的运行证据。</p><p class="legend"><span class="good">绿色：有直接证据</span><span class="warn">黄色：已发布但真实回归不完整</span><span class="bad">红色：明确失败或未验证</span></p></section>
-<section><h2>2. 总体架构</h2><svg viewBox="0 0 1100 180" role="img" aria-label="工作流架构图"><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#51687a"/></marker></defs><g font-family="Segoe UI,Microsoft YaHei" font-size="15" text-anchor="middle"><g fill="#f8fbfd" stroke="#809bb0"><rect x="20" y="55" width="105" height="52" rx="5"/><rect x="170" y="55" width="125" height="52" rx="5"/><rect x="340" y="55" width="125" height="52" rx="5"/><rect x="510" y="55" width="125" height="52" rx="5"/><rect x="680" y="55" width="125" height="52" rx="5"/><rect x="850" y="55" width="125" height="52" rx="5"/></g><g fill="#172a3a"><text x="72" y="85">Agent</text><text x="232" y="78">Manifest</text><text x="232" y="96">Resolver</text><text x="402" y="78">Workflow</text><text x="402" y="96">Plan</text><text x="572" y="78">Flat</text><text x="572" y="96">Executor</text><text x="742" y="78">Runner</text><text x="742" y="96">Child</text><text x="912" y="78">UI Guard</text><text x="912" y="96">→ KV STUDIO</text></g><g stroke="#51687a" marker-end="url(#a)"><path d="M125 81H166"/><path d="M295 81H336"/><path d="M465 81H506"/><path d="M635 81H676"/><path d="M805 81H846"/></g><g fill="#51687a" font-size="12"><text x="232" y="142">入口、角色和结果契约</text><text x="572" y="142">锁、计划、串行步骤、receipt</text><text x="830" y="142">前台、HWND、输入、检查点</text></g></g></svg><p>Agent 不拼接键盘、窗口或剪贴板动作。Workflow 只编排输入和步骤；Runner child 负责具体 UI 路线；所有进程级输入必须经过 Guard。</p></section>
-<section><h2>2.1 script_manifest.json：运行时授权表，不是说明文件</h2><p>manifest 的根字段是 <span class="mono">schema_version</span>、<span class="mono">layout_policy</span>、<span class="mono">customer_entry_policy</span>、<span class="mono">ui_atomic_actions</span>、<span class="mono">step_result_contracts</span> 和 <span class="mono">classes</span>。它同时定义“谁可以被 Agent 调用”“内部脚本能被谁调用”“每步必须产生哪些结果文件”。</p><table><tr><th>字段</th><th>源码含义</th><th>执行器如何使用</th></tr><tr><td class="mono">customer_entry_policy.allowed_classes</td><td>允许客户态入口的类：customer_workflow、harness、scaffold tool、non-UI tool、gate</td><td>resolver 拒绝 internal class 被直接当作 Agent API</td></tr><tr><td class="mono">classes.customer_workflow</td><td>workflow 路径、published/pending 状态、customer_callable、runner children、capabilities</td><td>能力查询与 workflow 入口选择</td></tr><tr><td class="mono">classes.runner_child_approved</td><td>允许被 workflow 调度的 UI 子脚本</td><td>flat executor 仅接受 allowed classes</td></tr><tr><td class="mono">ui_atomic_actions.approved</td><td>Guard 中允许出现的全局输入函数名</td><td>静态 gate 发现未分类 action 即失败</td></tr><tr><td class="mono">step_result_contracts</td><td>每个脚本必须写的 JSON/artifact，支持 switch variant</td><td>Get-KvStepContract 绑定本步骤验收文件</td></tr></table><p class="note">示例：<span class="mono">runner_children/set_variables_guarded.ps1</span> 默认必须写 set_variables_result.json 与 variable_persistence_validation.json；带 <span class="mono">-SnapshotOnly</span> 则必须写 variable_snapshot_result.json。</p></section>
-<section><h2>3. 目录与职责</h2><table><tr><th>目录</th><th>职责</th><th>允许调用者</th><th>是否直接面向 Agent</th></tr><tr><td class="mono">scripts/workflows</td><td>客户入口；生成 plan，调用 flat executor</td><td>Agent</td><td>是，需 manifest customer_callable</td></tr><tr><td class="mono">scripts/runner_children</td><td>UI/KV STUDIO 原子步骤组</td><td>Workflow、Harness</td><td>否</td></tr><tr><td class="mono">scripts/guards</td><td>前台、HWND、键盘、鼠标、剪贴板保护</td><td>Runner child</td><td>否</td></tr><tr><td class="mono">scripts/workflow_tools</td><td>计划、flat 执行、证据、结果收集</td><td>Workflow、Executor</td><td>否</td></tr><tr><td class="mono">scripts/gates</td><td>静态 Guard 使用、Agent 边界检查</td><td>Workflow preflight</td><td>是，但仅作门禁</td></tr><tr><td class="mono">scripts/scaffold_tools</td><td>样例项目脚手架和计划验证</td><td>Agent/回归</td><td>部分</td></tr><tr><td class="mono">scripts/probes</td><td>未知 UI 路线研究</td><td>Research mode</td><td>否</td></tr></table></section>
-<section><h2>4. Workflow 生命周期</h2><table><tr><th>阶段</th><th>系统动作</th><th>输出/停止条件</th></tr><tr><td>参数预检</td><td>检查项目、MNM、TSV、JSON 路径和必填参数</td><td>失败则不启动 UI</td></tr><tr><td>生成执行计划</td><td>列出顺序步骤、runner、输出目录、结果契约</td><td><span class="mono">execution_plan.json</span></td></tr><tr><td>静态门禁</td><td>检查 Guard 使用、approved action、Agent 边界</td><td>失败则不进入 KV STUDIO</td></tr><tr><td>互斥锁</td><td>取得 <span class="mono">Local\KeyenceAgent.KvStudio.UI</span></td><td>占用时返回 <span class="mono">KV_UI_WORKFLOW_BUSY</span></td></tr><tr><td>串行执行</td><td>按 plan 顺序调用 runner child，禁止并行 UI 操作</td><td>任一步失败立即停止后续步骤</td></tr><tr><td>结果验收</td><td>检查结果 JSON、receipt hash、当前运行日志和语义快照</td><td>不以文件存在代替成功</td></tr></table></section>
-<section><h2>4.1 Flat Executor：执行计划的唯一 UI 调度器</h2><p>源码：<span class="mono">scripts/workflow_tools/invoke_kv_flat_execution_plan.ps1</span>。它不是业务操作脚本；它是计划解释器和可靠性边界。Workflow 只写 plan，Executor 才依次启动 gate、workflow tool 或 runner child。</p><svg viewBox="0 0 1100 245" role="img" aria-label="Flat executor 时序图"><defs><marker id="b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#506679"/></marker></defs><g font-family="Segoe UI,Microsoft YaHei" font-size="13"><g stroke="#9aabb9" stroke-dasharray="4 4"><path d="M130 35V220"/><path d="M390 35V220"/><path d="M660 35V220"/><path d="M930 35V220"/></g><g fill="#172a3a" text-anchor="middle"><text x="130" y="22">Workflow</text><text x="390" y="22">Flat Executor</text><text x="660" y="22">Gate / Runner</text><text x="930" y="22">KV STUDIO</text></g><g stroke="#506679" marker-end="url(#b)"><path d="M135 55H385"/><path d="M395 90H655"/><path d="M665 125H925"/><path d="M925 155H665"/><path d="M655 187H395"/><path d="M385 213H135"/></g><g fill="#172a3a"><text x="205" y="50">execution_plan.json</text><text x="455" y="85">validate manifest + contracts</text><text x="705" y="120">guarded atomic inputs</text><text x="724" y="150">foreground / modal / result</text><text x="455" y="182">receipt + artifact hashes</text><text x="195" y="208">workflow_result.json + run.log</text></g></g></svg><table><tr><th>源码步骤</th><th>具体行为</th><th>工程意义</th></tr><tr><td>读取 plan</td><td>要求 <span class="mono">plan.ok=true</span>、run_root、唯一 step.name、唯一 out_dir</td><td>拒绝模糊或复用输出目录的执行</td></tr><tr><td>解析 manifest</td><td>只允许 runner_child_approved、workflow_tool、gate 等类</td><td>禁止 workflow 任意执行路径</td></tr><tr><td>取得 mutex</td><td>WaitOne(0) 获取 Local\KeyenceAgent.KvStudio.UI</td><td>不同 agent/process 不能并发操作同一桌面</td></tr><tr><td>指纹</td><td>写 code_fingerprint.json、输入 SHA-256</td><td>证据可追溯到当前代码与当前输入</td></tr><tr><td>Invoke-FlatWorkflowStep</td><td>启动单步，写 step_started / step_succeeded / step_failed</td><td>失败短路，禁止后续 UI 动作</td></tr><tr><td>最终验收</td><td>按 contract 读取结果；需要编译时还校验当前 run 的 OK/NG 文本</td><td>阻止旧文件或假阳性结果</td></tr></table></section>
-<section><h2>5. UI Guard 原子动作</h2><div class="grid"><div class="card"><strong>前台与窗口</strong><span class="pill">Assert-KvUiForegroundHwnd</span><span class="pill">Invoke-KvUiGuardForceForeground</span><p class="note">输入前绑定目标 HWND/PID；最多一次受控前台恢复；失败不发送输入。</p></div><div class="card"><strong>键盘与快捷键</strong><span class="pill">Invoke-KvGuardedSendKeys</span><span class="pill">Invoke-KvGuardedCtrlChord</span><span class="pill">Invoke-KvGuardedAltVk</span><span class="pill">Invoke-KvGuardedVkTap</span><span class="pill">Invoke-KvGuardedShiftTab</span><p class="note">记录 before/after，单个动作预算小于 10 秒。</p></div><div class="card"><strong>剪贴板与输入</strong><span class="pill">Invoke-KvGuardedClipboardPaste</span><span class="pill">Invoke-KvGuardedClipboardSetText</span><p class="note">剪贴板设置、Ctrl+V、目标焦点和结果写入同一 run.log。</p></div><div class="card"><strong>鼠标与菜单</strong><span class="pill">Invoke-KvGuardedMouseClick</span><span class="pill">Invoke-KvGuardedMouseRightClick</span><span class="pill">Invoke-KvGuardedMouseClickAllowProcessSuccessor</span><p class="note">用于树节点和菜单，禁止无目的深层遍历。</p></div><div class="card"><strong>模态关闭</strong><span class="pill">Invoke-KvGuardedSendKeysAllowTargetClose</span><span class="pill">Invoke-KvGuardedSendKeysAllowTargetCloseToWindow</span><p class="note">用于已定义的弹窗关闭和后继窗口转移。</p></div></div></section>
-<section><h2>5.3 源码责任矩阵</h2><table><tr><th>文件</th><th>核心函数/字段</th><th>责任</th><th>不负责什么</th></tr><tr><td class="mono">guards/kv_ui_guard.ps1</td><td>Assert-KvUiForegroundHwnd、Invoke-KvGuarded*、Write-KvUiGuardCheckpoint</td><td>窗口绑定、前台证明、输入封装、检查点、耗时</td><td>不判断 PLC 变量语义</td></tr><tr><td class="mono">workflow_tools/invoke_kv_flat_execution_plan.ps1</td><td>plan 读取、manifest contract、mutex、Invoke-FlatWorkflowStep、Write-FlatWorkflowResult</td><td>统一串行调度、失败短路、结果聚合</td><td>不选择业务 UI 路线</td></tr><tr><td class="mono">runner_children/*.ps1</td><td>业务步骤函数与 UIA/Guard 调用</td><td>把输入模型变为 KV STUDIO 操作并验证</td><td>不应被 Agent 直接调用</td></tr><tr><td class="mono">workflows/*.ps1</td><td>参数、步骤列表、execution_plan.json</td><td>公开 API 边界和组合</td><td>不应重复实现 UI 输入</td></tr><tr><td class="mono">script_manifest.json</td><td>classes、ui_atomic_actions、step_result_contracts</td><td>授权、发现、脚本角色和结果文件契约</td><td>不保存运行时项目状态</td></tr></table></section><section><h2>5.3 源码责任矩阵</h2><table><tr><th>文件</th><th>源码入口</th><th>责任</th><th>明确不负责</th></tr><tr><td class="mono">guards/kv_ui_guard.ps1</td><td>Assert-KvUiForegroundHwnd、Invoke-KvGuarded*、Write-KvUiGuardCheckpoint、Complete-KvUiGuardAtomicAction</td><td>HWND/PID 绑定、前台证明、输入封装、检查点、原子计时</td><td>不判断变量/PLC 业务语义</td></tr><tr><td class="mono">workflow_tools/invoke_kv_flat_execution_plan.ps1</td><td>读取 plan、manifest resolve、mutex、Invoke-FlatWorkflowStep、Write-FlatWorkflowResult</td><td>计划校验、串行调度、失败短路、证据聚合</td><td>不选择业务 UI 路线</td></tr><tr><td class="mono">runner_children/*.ps1</td><td>业务函数 + UIA + Guard action</td><td>把模型输入变为 KV STUDIO 操作并写语义结果</td><td>不应由 Agent 直接运行</td></tr><tr><td class="mono">workflows/*.ps1</td><td>参数解析、步骤对象、execution_plan.json</td><td>客户 API 边界和组合</td><td>不重复实现键盘/剪贴板</td></tr><tr><td class="mono">script_manifest.json</td><td>classes、ui_atomic_actions、step_result_contracts</td><td>角色授权、能力发现、动作白名单、结果文件契约</td><td>不保存项目运行状态</td></tr></table></section>
-+<section><h2>5.4 设计审查要点</h2><ul><li>发布状态不等于真实验证通过：必须查看同次 run.log、receipt 和语义结果。</li><li>静态门禁只证明调用边界，不能证明焦点、粘贴、变量或程序体正确。</li><li>UIA 找到窗口不等于控件获得焦点；Guard 只保护前台，业务 runner 仍需证明表格状态。</li><li>所有 workflow 必须 flat；客户 workflow 不应递归调用客户 workflow。</li><li>每个新的全局输入动作必须先进入 Guard、manifest approved，再进入真实 workflow 回归。</li></ul></section><section><h2>6. Manifest 与能力状态</h2><p>Manifest 是唯一公开能力清单。当前客户态 workflow：</p><table><tr><th>入口</th><th>功能边界</th><th>状态</th></tr><tr><td class="mono">run_kv_mvp_scaffold.ps1</td><td>新建样例、MNM、变量、FB、编译</td><td>published</td></tr><tr><td class="mono">run_kv_mvp_repair_existing_project.ps1</td><td>现有项目修复流水线</td><td>published</td></tr><tr><td class="mono">set_kv_variables.ps1</td><td>全局/局部变量写入、快照、持久化</td><td>published</td></tr><tr><td class="mono">set_kv_fb_arguments.ps1</td><td>FB IN/OUT/IN-OUT 自变量、快照、回读</td><td class="warn">published；最近正式回归在预处理失败</td></tr><tr><td class="mono">set_kv_fb_program_body.ps1</td><td>FB/扫描模块程序体编辑列表插入</td><td class="warn">published；正式回归未完成</td></tr><tr><td class="mono">import_kv_fb_module.ps1</td><td>FB MNM 导入</td><td>published</td></tr><tr><td class="mono">mutate_kv_structure_definitions.ps1</td><td>数据类型/文件夹增删改</td><td>published</td></tr><tr><td class="mono">export_kv_structure_definitions.ps1</td><td>数据类型导出与成员校验</td><td>published</td></tr><tr><td class="mono">configure_kv_expansion_units.ps1</td><td>PLC 扩展单元配置</td><td>published</td></tr><tr><td class="mono">configure_kv_ethercat_nodes.ps1</td><td>EtherCAT 节点配置与持久化</td><td>published</td></tr><tr><td class="mono">export_mnm_project_copy_default_folder.ps1</td><td>项目副本 MNM 导出</td><td>published</td></tr><tr><td class="mono">create_kv_project.ps1 / compile_kv_project.ps1</td><td>项目创建/编译</td><td class="warn">pending_validation，非客户态</td></tr></table></section>
-<section><h2>7. 变量、FB 与数据类型工作流</h2><table><tr><th>对象</th><th>原子路径</th><th>输入</th><th>验收</th></tr><tr><td>全局变量</td><td>菜单定位 → 全局表格 → TSV 粘贴 → 保存</td><td>变量定义 TSV</td><td>回读名称、类型、值和持久化</td></tr><tr><td>FB 自变量</td><td>定位 FB → 自变量表 → TSV 粘贴 → 冲突替换</td><td>名称、IN/OUT/IN-OUT、类型等</td><td>回读方向和类型</td></tr><tr><td>FB/程序局部变量</td><td>定位 owner program → 局部表格 → TSV 粘贴</td><td>局部变量 TSV</td><td>回读 owner、名称和类型</td></tr><tr><td>数据类型</td><td>数据类型树 → 结构体表格 → 增删改操作</td><td>结构体成员 TSV/操作 JSON</td><td>末尾空行不计成员；System 不修改</td></tr></table><p class="note">自变量表和局部变量表共享焦点状态，Ctrl+Tab 路由必须封装在原子实现中，不应由 Agent 猜测。</p></section>
-<section><h2>8. MNM 与程序体边界</h2><p>MNM 是模块级导入/导出载体；程序体编辑列表是原位修改接口。两者不能混为同一验收：</p><div class="flow"><div class="node">MNM import</div><div class="arrow">≠</div><div class="node">程序体原位写入</div><div class="arrow">≠</div><div class="node">变量/FB 表格写入</div></div><p>程序体原位 workflow 的设计目标是 FB 和每次扫描执行型模块共用同一入口：定位模块、删除旧体、Ctrl+D、粘贴、Tab 一次、插入、关闭弹窗、保存。当前“设计目标”已实现为代码入口，但尚未完成 FB 与扫描模块两条正式真实回归。</p></section>
-<section><h2>9. 错误与停止策略</h2><table><tr><th>错误码</th><th>含义</th><th>系统行为</th></tr><tr><td class="mono">KV_UI_WORKFLOW_BUSY</td><td>KV STUDIO 桌面锁被占用</td><td>不启动 runner，不发送输入</td></tr><tr><td class="mono">KV_TARGET_WINDOW_NOT_FOREGROUND</td><td>目标 HWND 未前台</td><td>最多一次恢复，失败停止</td></tr><tr><td class="mono">KV_MODAL_PRESENT</td><td>存在未处理模态窗</td><td>转入对话框专用路线或停止</td></tr><tr><td class="mono">KV_MODULE_LOOKUP_TIMEOUT</td><td>模块定向查找超过 1 秒</td><td>停止，不穷举树</td></tr><tr><td class="mono">KV_FB_ARGUMENT_STEP_FAILED</td><td>FB 自变量 runner 失败</td><td>停止后续步骤，读取同次证据</td></tr><tr><td class="mono">KV_PROGRAM_BODY_INVALID_MNEMONIC</td><td>插入非法助记符产生错误窗</td><td>记录错误文本，错误窗回车，编辑列表 Alt+F4</td></tr></table></section>
-<section><h2>10. 证据与结果契约</h2><p>每次正式调用必须使用独立输出目录，至少包含：</p><div class="grid"><div class="card"><strong>计划</strong><span class="mono">execution_plan.json</span><br><span class="mono">code_fingerprint.json</span></div><div class="card"><strong>日志</strong><span class="mono">run.log</span><br>workflow、锁、步骤、原子动作、错误和结果</div><div class="card"><strong>步骤证据</strong><span class="mono">step_receipt.json</span><br><span class="mono">stdout/stderr</span><br>截图或快照</div><div class="card"><strong>结果</strong><span class="mono">*_result.json</span><br>ok、error_code、输入、语义验收</div></div><p class="note">Receipt hash 只证明证据属于本次运行，不替代变量、模块、程序体或编译结果的语义校验。失败后不能从旧运行目录寻找替代脚本或结果。</p></section>
-<section><h2>11. 当前验证结论</h2><p class="good">静态 UI Guard 使用门禁：通过。</p><p class="good">Agent 边界门禁：通过。</p><p class="warn">FB 自变量正式 workflow：最近一次在输入预处理阶段失败，未进入 UI。</p><p class="warn">程序体正式 workflow：曾有临时 one-shot 成功证据，但正式入口尚未完成可靠回归。</p><p class="bad">不能把当前 published 状态理解为已证明可用。</p><p class="mono">最后提交：5514185，2026-09-12T01:54:39+08:00</p></section>
-<section><h2>12. 源码摘录：script_manifest.json</h2><p><span class="mono">scripts/script_manifest.json</span> 是运行时授权和结果契约表。以下摘录是当前文件真实内容的核心结构：</p><pre><code>{
-  "schema_version": 2,
-  "layout_policy": "role_directories",
-  "ui_atomic_actions": {
-    "approved": [
-      "Assert-KvUiForegroundHwnd",
-      "Invoke-KvGuardedSendKeys",
-      "Invoke-KvGuardedCtrlChord",
-      "Invoke-KvGuardedClipboardPaste"
-    ],
-    "pending": []
-  },
-  "step_result_contracts": {
-    "runner_children/set_variables_guarded.ps1": {
-      "files": ["set_variables_result.json", "variable_persistence_validation.json"],
-      "variants": [{"switch":"-SnapshotOnly","files":["variable_snapshot_result.json"]}]
-    }
-  },
-  "classes": {
-    "customer_workflow": [{"path":"workflows/set_kv_variables.ps1","status":"published","customer_callable":true}],
-    "runner_child_approved": [{"path":"runner_children/set_variables_guarded.ps1","status":"approved","ui_guard_required":true}]
-  }
-}</code></pre><p class="note">Executor 根据 classes 解析路径和角色；静态 gate 根据 ui_atomic_actions 检查 Guard 调用；结果验收根据 step_result_contracts 检查当前运行文件。</p></section>
-<section><h2>13. 源码摘录：Flat Executor</h2><p>文件：<span class="mono">scripts/workflow_tools/invoke_kv_flat_execution_plan.ps1</span>。核心代码如下：</p><pre><code>$plan = Get-Content -Raw -LiteralPath $PlanPath -Encoding UTF8 | ConvertFrom-Json
-if ($plan.ok -isnot [bool] -or -not $plan.ok) { throw "Execution plan is not ok" }
-$script:uiMutex = New-Object System.Threading.Mutex($false, 'Local\KeyenceAgent.KvStudio.UI')
-if (-not $script:uiMutex.WaitOne(0)) {
-  Write-WorkflowLog 'workflow_rejected' @{ error_code='KV_UI_WORKFLOW_BUSY' }
-  throw 'KV_UI_WORKFLOW_BUSY'
-}
-foreach ($step in @($plan.steps)) {
-  $path = Resolve-KvStudioOperatorScriptPath -ScriptRoot $scriptRoot `
-    -Name ([string]$step.script_name) -Classes @($step.classes)
-  Invoke-FlatWorkflowStep $step
-}
-Write-FlatWorkflowResult $plan $PlanPath $true 'pass' ''</code></pre><p>这段代码说明：计划先验证，再加桌面互斥锁；每个 step 通过 resolver 解析，按数组顺序执行；失败在 <span class="mono">Invoke-FlatWorkflowStep</span> 处短路，最后聚合 workflow_result.json。</p></section>
-<section><h2>14. 源码摘录：UI Guard</h2><p>文件：<span class="mono">scripts/guards/kv_ui_guard.ps1</span>。普通键盘动作的核心实现：</p><pre><code>function Invoke-KvGuardedSendKeys {
-  param([IntPtr]$TargetHwnd,[string]$Step,[string]$Keys,[string]$ExpectedTitleLike='')
-  $watch = [Diagnostics.Stopwatch]::StartNew()
-  $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd `
-    -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
-  Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Before $before
-  [System.Windows.Forms.SendKeys]::SendWait($Keys)
-  $after = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd `
-    -Step "$Step postcondition" -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
-  Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Before $before -After $after
-  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step `
-    -Action 'SendKeys' -TargetHwnd $TargetHwnd
-}</code></pre><p>Guard 不负责判断 PLC 内容是否正确；它只保证输入前后目标窗口、前台状态、检查点和耗时边界。</p></section>
-<section><h2>15. 源码摘录：Runner Child</h2><p>文件：<span class="mono">scripts/runner_children/set_fb_arguments_guarded.ps1</span>。它在 Guard 之上实现业务步骤：</p><pre><code>. $sharedUiGuard
-Initialize-KvUiGuard -OutDir $OutDir -CheckpointSubdir 'fb_arg_ui'
-$process = Get-VisibleKvsProcess $ProjectNeedle
-$target = FindProjectModuleTreeItem $process.Id $FbModuleName
-Move-FocusToProjectTreeItemByArrows $tree $target $process.MainWindowHandle ...
-Invoke-KvGuardedAltVk -TargetHwnd $mainHwnd -Step 'open variable editor' -Vk 0x4C
-Invoke-KvGuardedClipboardPaste -TargetHwnd $gridHwnd -Step 'paste FB arguments' -Text $tsv
-Write-Result -Ok $true -Code '' -Message 'FB arguments saved' ...</code></pre><p>Runner child 的边界是“一个业务步骤”，不是公开 API。它负责模块定位、表格状态、粘贴和业务回读，但所有系统级输入仍必须调用 Guard。</p></section>
-<section><h2>16. 源码摘录：Workflow</h2><p>文件：<span class="mono">scripts/workflows/set_kv_fb_arguments.ps1</span>。Workflow 只准备 plan：</p><pre><code>$steps = [System.Collections.Generic.List[object]]::new()
-$steps.Add(@{ name='assert_ui_guard_usage'; kind='gate'; ... })
-$steps.Add(@{ name='assert_agent_boundary'; kind='gate'; ... })
-$steps.Add(@{ name='set_fb_arguments'; kind='runner_child';
-  script_name='set_fb_arguments_guarded.ps1';
-  arguments=@('-ProjectPath',$ProjectPath,'-FbModuleName',$FbModuleName,
-              '-ArgumentsTsv',$ArgumentsTsv,'-OutDir',$argOut) })
-$plan = @{ ok=$true; operation='set_kv_fb_arguments'; steps=$steps.ToArray();
-  result_path=(Join-Path $OutDir 'fb_declaration_workflow_result.json') }
-$plan | ConvertTo-Json -Depth 12 | Set-Content $planPath -Encoding UTF8
-& powershell -NoProfile -ExecutionPolicy Bypass -File $runner -PlanPath $planPath</code></pre><p>Workflow 不直接调用 SendKeys 或剪贴板；它声明 gate、runner child、参数和输出目录，然后交给 Flat Executor。</p></section>
-<section><h2>17. 源码到证据的关系</h2><svg viewBox="0 0 1080 230" role="img" aria-label="源码与证据关系"><defs><marker id="d" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#506679"/></marker></defs><g font-family="Segoe UI,Microsoft YaHei" font-size="13"><g fill="#f8fbfd" stroke="#809bb0"><rect x="20" y="70" width="150" height="50" rx="4"/><rect x="230" y="70" width="170" height="50" rx="4"/><rect x="460" y="70" width="170" height="50" rx="4"/><rect x="690" y="70" width="170" height="50" rx="4"/><rect x="920" y="70" width="140" height="50" rx="4"/></g><g fill="#172a3a" text-anchor="middle"><text x="95" y="99">输入文件</text><text x="315" y="91">Workflow</text><text x="315" y="109">execution_plan</text><text x="545" y="91">Flat Executor</text><text x="545" y="109">mutex + steps</text><text x="775" y="91">Runner + Guard</text><text x="775" y="109">UI checkpoints</text><text x="990" y="91">结果</text><text x="990" y="109">JSON + log</text></g><g stroke="#506679" marker-end="url(#d)"><path d="M170 95H225"/><path d="M400 95H455"/><path d="M630 95H685"/><path d="M860 95H915"/></g><g fill="#536573" text-anchor="middle"><text x="315" y="165">参数校验</text><text x="545" y="165">角色/契约校验</text><text x="775" y="165">前台/焦点/输入</text><text x="990" y="165">语义验收</text></g></g></svg><p>审阅时应沿此链路检查：输入是否正确、plan 是否授权、executor 是否串行、runner 是否只用 approved Guard、结果是否来自当前运行。</p></section>
-<section><h2>18. 审阅顺序</h2><p class="mono">scripts/script_manifest.json → workflows/*.ps1 → workflow_tools/invoke_kv_flat_execution_plan.ps1 → runner_children/*.ps1 → guards/kv_ui_guard.ps1 → 本次 run.log/result.json</p><p>这条顺序能区分 API 设计、调度安全、UI 输入实现和业务语义验收，避免把“脚本存在”或“静态门禁通过”误判为功能成功。</p></section>
-<section><h2>19. 每个 Manifest Workflow 的完整流程图</h2><p>下列 13 个条目逐一对应 <span class="mono">classes.customer_workflow</span>。绿色框是输入/文件，蓝色框是 workflow/executor，灰色框是 runner，红框是失败短路。每幅图都遵守同一个执行约束：gate 和 runner 由 flat executor 串行调度，runner 的 UI 输入必须经过 Guard。</p>
-<h3>19.1 run_kv_mvp_scaffold.ps1</h3><p class="mono">输入：ScaffoldRoot*，OutRoot，ProjectName，CpuModel，凭据/配置，Checklist，Timeout，变量审计。能力：run_kv_mvp_scaffold。</p><svg viewBox="0 0 1180 190"><defs><marker id="w1" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8z" fill="#526b7d"/></marker></defs><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#eef9f2" stroke="#6f9d7c"><rect x="15" y="50" width="135" height="55" rx="4"/><rect x="1020" y="50" width="145" height="55" rx="4"/></g><g fill="#edf5fb" stroke="#6f91aa"><rect x="185" y="50" width="135" height="55" rx="4"/><rect x="355" y="50" width="135" height="55" rx="4"/></g><g fill="#f5f6f7" stroke="#8d9aa4"><rect x="525" y="20" width="145" height="45" rx="4"/><rect x="525" y="75" width="145" height="45" rx="4"/><rect x="705" y="20" width="145" height="45" rx="4"/><rect x="705" y="75" width="145" height="45" rx="4"/><rect x="885" y="50" width="100" height="55" rx="4"/></g><text x="82" y="74">ScaffoldRoot</text><text x="82" y="92">CPU/凭据/变量</text><text x="252" y="74">生成新项目 plan</text><text x="252" y="92">校验脚手架</text><text x="422" y="82">Flat Executor</text><text x="597" y="47">create project</text><text x="597" y="102">import MNM</text><text x="777" y="47">variables + FB args</text><text x="777" y="102">compile</text><text x="935" y="82">copy result</text><text x="1092" y="74">workflow result</text><text x="1092" y="92">receipts + run.log</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M150 78H180"/><path d="M320 78H350"/><path d="M490 78H520"/><path d="M670 43H700"/><path d="M670 98H700"/><path d="M850 78H880"/><path d="M985 78H1015"/></g></g></svg>
-<h3>19.2 run_kv_mvp_repair_existing_project.ps1</h3><p class="mono">输入：ProjectPath*，ScaffoldRoot*，SourceSnapshotManifest，DeleteExistingModulesBeforeImport 等。能力：修复已有项目。</p><svg viewBox="0 0 1180 150"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#eef9f2" stroke="#6f9d7c"><rect x="15" y="45" width="150" height="55" rx="4"/><rect x="1010" y="45" width="155" height="55" rx="4"/></g><g fill="#edf5fb" stroke="#6f91aa"><rect x="200" y="45" width="145" height="55" rx="4"/><rect x="380" y="45" width="140" height="55" rx="4"/></g><g fill="#f5f6f7" stroke="#8d9aa4"><rect x="555" y="45" width="125" height="55" rx="4"/><rect x="715" y="45" width="125" height="55" rx="4"/><rect x="875" y="45" width="100" height="55" rx="4"/></g><text x="90" y="68">Project + Scaffold</text><text x="90" y="86">snapshot/delete policy</text><text x="272" y="68">repair plan</text><text x="272" y="86">冲突预检</text><text x="450" y="76">Flat Executor</text><text x="617" y="68">import / variables</text><text x="617" y="86">FB arguments</text><text x="777" y="76">compile</text><text x="925" y="76">copy result</text><text x="1087" y="68">result + receipt</text><text x="1087" y="86">run.log</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M165 72H195"/><path d="M345 72H375"/><path d="M520 72H550"/><path d="M680 72H710"/><path d="M840 72H870"/><path d="M975 72H1005"/></g></g></svg>
-<h3>19.3 export_mnm_project_copy_default_folder.ps1</h3><p class="mono">ProjectPath* + ExportDir* → 建副本工作区 → 在副本中 UI 导出 → 收集 MNM。结果：export_workspace_plan.json、browse_folder_export_result.json、export_mnm_project_copy_result.json。</p><svg viewBox="0 0 1100 125"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#eef9f2" stroke="#6f9d7c"><rect x="15" y="35" width="145" height="50" rx="4"/><rect x="925" y="35" width="160" height="50" rx="4"/></g><g fill="#edf5fb" stroke="#6f91aa"><rect x="195" y="35" width="145" height="50" rx="4"/></g><g fill="#f5f6f7" stroke="#8d9aa4"><rect x="375" y="35" width="155" height="50" rx="4"/><rect x="565" y="35" width="145" height="50" rx="4"/><rect x="745" y="35" width="145" height="50" rx="4"/></g><text x="87" y="64">Project + ExportDir</text><text x="267" y="64">Flat Executor</text><text x="452" y="57">new export</text><text x="452" y="73">workspace</text><text x="637" y="57">guarded MNM</text><text x="637" y="73">folder export</text><text x="817" y="64">collect workspace</text><text x="1005" y="57">MNM files</text><text x="1005" y="73">result + log</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M160 60H190"/><path d="M340 60H370"/><path d="M530 60H560"/><path d="M710 60H740"/><path d="M890 60H920"/></g></g></svg>
-<h3>19.4 configure_kv_expansion_units.ps1</h3><p class="mono">ProjectPath* + Models[]* + PerModuleBudgetSeconds(默认10) → configure_expansion_units_guarded → 按型号插入、首地址/持久化核验 → result.json。</p><svg viewBox="0 0 1000 115"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#eef9f2" stroke="#6f9d7c"><rect x="15" y="30" width="150" height="50" rx="4"/><rect x="835" y="30" width="150" height="50" rx="4"/></g><g fill="#edf5fb" stroke="#6f91aa"><rect x="200" y="30" width="145" height="50" rx="4"/></g><g fill="#f5f6f7" stroke="#8d9aa4"><rect x="380" y="30" width="180" height="50" rx="4"/><rect x="595" y="30" width="205" height="50" rx="4"/></g><text x="90" y="60">Project + Models[]</text><text x="272" y="60">Flat Executor</text><text x="470" y="53">catalog model lookup</text><text x="470" y="69">+ guarded insert</text><text x="697" y="53">per-module &lt;10s</text><text x="697" y="69">persistence verify</text><text x="910" y="60">result.json</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M165 55H195"/><path d="M345 55H375"/><path d="M560 55H590"/><path d="M800 55H830"/></g></g></svg>
-<h3>19.5 configure_kv_ethercat_nodes.ps1</h3><p class="mono">ProjectPath* + NodesConfigPath* → 配置 JSON 预检 → configure_ethercat_nodes_guarded → catalog 定向查找/节点插入/地址持久化 → result.json。</p><svg viewBox="0 0 1000 115"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#eef9f2" stroke="#6f9d7c"><rect x="15" y="30" width="170" height="50" rx="4"/><rect x="835" y="30" width="150" height="50" rx="4"/></g><g fill="#edf5fb" stroke="#6f91aa"><rect x="220" y="30" width="145" height="50" rx="4"/></g><g fill="#f5f6f7" stroke="#8d9aa4"><rect x="400" y="30" width="180" height="50" rx="4"/><rect x="615" y="30" width="185" height="50" rx="4"/></g><text x="100" y="53">Project + nodes.json</text><text x="100" y="69">ProjectName</text><text x="292" y="60">Flat Executor</text><text x="490" y="53">catalog model lookup</text><text x="490" y="69">insert node</text><text x="707" y="53">model + node number</text><text x="707" y="69">persistence verify</text><text x="910" y="60">result.json</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M185 55H215"/><path d="M365 55H395"/><path d="M580 55H610"/><path d="M800 55H830"/></g></g></svg>
-<h3>19.6 set_kv_variables.ps1</h3><p class="mono">ProjectPath*；写入分支使用 GlobalVariablesTsv/LocalVariablesTsv，快照分支使用 SnapshotOnly + SnapshotModules。结果：variable_workflow_result.json；runner contract 随分支变化。</p><svg viewBox="0 0 1130 180"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#eef9f2" stroke="#6f9d7c"><rect x="15" y="62" width="155" height="55" rx="4"/><rect x="950" y="62" width="165" height="55" rx="4"/></g><g fill="#edf5fb" stroke="#6f91aa"><rect x="205" y="62" width="150" height="55" rx="4"/></g><g fill="#f5f6f7" stroke="#8d9aa4"><rect x="400" y="20" width="185" height="55" rx="4"/><rect x="400" y="105" width="185" height="55" rx="4"/><rect x="630" y="62" width="145" height="55" rx="4"/><rect x="820" y="62" width="95" height="55" rx="4"/></g><text x="92" y="84">Project + TSV</text><text x="92" y="102">或 SnapshotOnly</text><text x="280" y="84">input conflict check</text><text x="280" y="102">Flat Executor</text><text x="492" y="43">写入：全局/局部表</text><text x="492" y="61">TSV + save</text><text x="492" y="128">快照：目标模块</text><text x="492" y="146">copyback</text><text x="702" y="84">persistence /</text><text x="702" y="102">snapshot verify</text><text x="867" y="92">Guard</text><text x="1032" y="84">result + artifacts</text><text x="1032" y="102">run.log</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M170 89H200"/><path d="M355 89H395"/><path d="M585 48H625"/><path d="M585 132H625"/><path d="M775 89H815"/><path d="M915 89H945"/></g></g></svg>
-<h3>19.7 set_kv_fb_arguments.ps1</h3><p class="mono">ProjectPath* + FbModuleName*；ArgumentsTsv 写自变量，SnapshotOnly 回读，自带 LocalVariablesTsv 时追加 set_variables_guarded。结果：fb_declaration_workflow_result.json。</p><svg viewBox="0 0 1130 180"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#eef9f2" stroke="#6f9d7c"><rect x="15" y="62" width="170" height="55" rx="4"/><rect x="955" y="62" width="160" height="55" rx="4"/></g><g fill="#edf5fb" stroke="#6f91aa"><rect x="220" y="62" width="145" height="55" rx="4"/></g><g fill="#f5f6f7" stroke="#8d9aa4"><rect x="405" y="20" width="190" height="55" rx="4"/><rect x="405" y="105" width="190" height="55" rx="4"/><rect x="635" y="62" width="145" height="55" rx="4"/><rect x="820" y="62" width="100" height="55" rx="4"/></g><text x="100" y="84">FB + arguments TSV</text><text x="100" y="102">local TSV / snapshot</text><text x="292" y="92">Flat Executor</text><text x="500" y="43">set_fb_arguments</text><text x="500" y="61">表状态 + copyback</text><text x="500" y="128">optional local vars</text><text x="500" y="146">set_variables</text><text x="707" y="84">冲突替换</text><text x="707" y="102">保存/回读</text><text x="870" y="92">Guard</text><text x="1035" y="84">result / snapshot</text><text x="1035" y="102">run.log</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M185 89H215"/><path d="M365 89H400"/><path d="M595 48H630"/><path d="M595 132H630"/><path d="M780 89H815"/><path d="M920 89H950"/></g></g></svg>
-<h3>19.8 import_kv_fb_module.ps1</h3><p class="mono">ProjectPath* + MnmPath* + ExpectedModuleName；预检 MODULE_TYPE=2；可先删同名模块。runner：import_mnm_guarded；随后 assert_kv_module_placement。</p><svg viewBox="0 0 1120 125"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#eef9f2" stroke="#6f9d7c"><rect x="15" y="35" width="155" height="50" rx="4"/><rect x="945" y="35" width="160" height="50" rx="4"/></g><g fill="#edf5fb" stroke="#6f91aa"><rect x="205" y="35" width="155" height="50" rx="4"/><rect x="395" y="35" width="140" height="50" rx="4"/></g><g fill="#f5f6f7" stroke="#8d9aa4"><rect x="570" y="35" width="145" height="50" rx="4"/><rect x="750" y="35" width="160" height="50" rx="4"/></g><text x="92" y="57">Project + FB.mnm</text><text x="92" y="73">ExpectedName</text><text x="282" y="57">header preflight</text><text x="282" y="73">MODULE_TYPE=2</text><text x="465" y="64">Flat Executor</text><text x="642" y="57">delete conflict</text><text x="642" y="73">import_mnm</text><text x="830" y="57">placement verify</text><text x="830" y="73">function_block</text><text x="1025" y="57">fb_import_result</text><text x="1025" y="73">run.log</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M170 60H200"/><path d="M360 60H390"/><path d="M535 60H565"/><path d="M715 60H745"/><path d="M910 60H940"/></g></g></svg>
-<h3>19.9 export_kv_structure_definitions.ps1</h3><p class="mono">ProjectPath* + optional StructureName[] → export_structure_definitions_guarded → 打开数据类型、提取用户结构成员、排除 System → structure_definitions.json。</p><svg viewBox="0 0 950 115"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#eef9f2" stroke="#6f9d7c"><rect x="15" y="30" width="175" height="50" rx="4"/><rect x="780" y="30" width="155" height="50" rx="4"/></g><g fill="#edf5fb" stroke="#6f91aa"><rect x="225" y="30" width="145" height="50" rx="4"/></g><g fill="#f5f6f7" stroke="#8d9aa4"><rect x="405" y="30" width="175" height="50" rx="4"/><rect x="615" y="30" width="130" height="50" rx="4"/></g><text x="102" y="53">Project + names[]</text><text x="102" y="69">或全部用户类型</text><text x="297" y="60">Flat Executor</text><text x="492" y="53">数据类型 UI / parse</text><text x="492" y="69">成员与类型</text><text x="680" y="60">exclude System</text><text x="857" y="53">structure_definitions</text><text x="857" y="69">.json</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M190 55H220"/><path d="M370 55H400"/><path d="M580 55H610"/><path d="M745 55H775"/></g></g></svg>
-<h3>19.10 mutate_kv_structure_definitions.ps1</h3><p class="mono">ProjectPath* + PlanPath* → create folder / create / fill_empty / update / delete → 对话框与表格 Guard → result.json + persistence verify。</p><svg viewBox="0 0 1100 160"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#eef9f2" stroke="#6f9d7c"><rect x="15" y="52" width="160" height="50" rx="4"/><rect x="925" y="52" width="160" height="50" rx="4"/></g><g fill="#edf5fb" stroke="#6f91aa"><rect x="210" y="52" width="145" height="50" rx="4"/></g><g fill="#f5f6f7" stroke="#8d9aa4"><rect x="395" y="15" width="180" height="45" rx="4"/><rect x="395" y="92" width="180" height="45" rx="4"/><rect x="615" y="52" width="145" height="50" rx="4"/><rect x="795" y="52" width="95" height="50" rx="4"/></g><text x="95" y="82">Project + plan.json</text><text x="282" y="82">Flat Executor</text><text x="485" y="43">create folder/type</text><text x="485" y="120">update / delete</text><text x="687" y="75">grid/dialog route</text><text x="687" y="91">persistence</text><text x="842" y="82">Guard</text><text x="1005" y="75">result.json</text><text x="1005" y="91">run.log</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M175 77H205"/><path d="M355 77H390"/><path d="M575 37H610"/><path d="M575 114H610"/><path d="M760 77H790"/><path d="M890 77H920"/></g></g></svg>
-<h3>19.11 set_kv_fb_program_body.ps1</h3><p class="mono">ProjectPath* + FbModuleName* + MnmPath* → 定位模块 → 删除旧程序 → Ctrl+D 编辑列表 → 粘贴/插入 → 正常保存或错误文本回读。当前正式回归未完成。</p><svg viewBox="0 0 1170 155"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#eef9f2" stroke="#6f9d7c"><rect x="15" y="48" width="155" height="55" rx="4"/><rect x="1000" y="48" width="155" height="55" rx="4"/></g><g fill="#edf5fb" stroke="#6f91aa"><rect x="205" y="48" width="135" height="55" rx="4"/></g><g fill="#f5f6f7" stroke="#8d9aa4"><rect x="375" y="48" width="135" height="55" rx="4"/><rect x="545" y="48" width="135" height="55" rx="4"/><rect x="715" y="18" width="145" height="45" rx="4"/><rect x="715" y="90" width="145" height="45" rx="4"/><rect x="895" y="48" width="70" height="55" rx="4"/></g><text x="92" y="70">Project + module</text><text x="92" y="88">MNM body</text><text x="272" y="80">Flat Executor</text><text x="442" y="70">定位/打开</text><text x="442" y="88">删除旧体</text><text x="612" y="70">Ctrl+D / paste</text><text x="612" y="88">Tab / Insert</text><text x="787" y="46">正常：保存</text><text x="787" y="112">错误：回读/退出</text><text x="930" y="80">Guard</text><text x="1077" y="70">program_body_result</text><text x="1077" y="88">run.log</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M170 75H200"/><path d="M340 75H370"/><path d="M510 75H540"/><path d="M680 75H710"/><path d="M860 40H890"/><path d="M860 112H890"/><path d="M965 75H995"/></g></g></svg>
-<h3>19.12 create_kv_project.ps1</h3><p class="mono">pending_validation / customer_callable=false。ProjectName* + ProjectRoot* + CpuModel* + OutDir* → create_project_local_guarded → create_project_result.json。</p><svg viewBox="0 0 920 115"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#eef9f2" stroke="#6f9d7c"><rect x="15" y="30" width="185" height="50" rx="4"/><rect x="750" y="30" width="155" height="50" rx="4"/></g><g fill="#edf5fb" stroke="#6f91aa"><rect x="235" y="30" width="145" height="50" rx="4"/></g><g fill="#f5f6f7" stroke="#8d9aa4"><rect x="415" y="30" width="170" height="50" rx="4"/><rect x="620" y="30" width="95" height="50" rx="4"/></g><text x="107" y="53">name/root/CPU</text><text x="107" y="69">credential</text><text x="307" y="60">Flat Executor</text><text x="500" y="53">new project dialog</text><text x="500" y="69">create local</text><text x="667" y="60">Guard</text><text x="827" y="53">create_project</text><text x="827" y="69">_result.json</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M200 55H230"/><path d="M380 55H410"/><path d="M585 55H615"/><path d="M715 55H745"/></g></g></svg>
-<h3>19.13 compile_kv_project.ps1</h3><p class="mono">pending_validation / customer_callable=false。ProjectPath* → compile_and_copy_result_bounded → copy_convert_result_from_tree_handle → result.json + compile_result_copied.txt；最终要求当前运行含转换结果 OK 且不含 NG。</p><svg viewBox="0 0 1060 115"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#eef9f2" stroke="#6f9d7c"><rect x="15" y="30" width="140" height="50" rx="4"/><rect x="875" y="30" width="170" height="50" rx="4"/></g><g fill="#edf5fb" stroke="#6f91aa"><rect x="190" y="30" width="140" height="50" rx="4"/></g><g fill="#f5f6f7" stroke="#8d9aa4"><rect x="365" y="30" width="170" height="50" rx="4"/><rect x="570" y="30" width="145" height="50" rx="4"/><rect x="750" y="30" width="90" height="50" rx="4"/></g><text x="85" y="60">ProjectPath</text><text x="260" y="60">Flat Executor</text><text x="450" y="53">compile bounded</text><text x="450" y="69">copy result</text><text x="642" y="53">tree handle</text><text x="642" y="69">copy convert text</text><text x="795" y="60">OK/NG verify</text><text x="960" y="53">result + copied text</text><text x="960" y="69">receipt</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M155 55H185"/><path d="M330 55H360"/><path d="M535 55H565"/><path d="M715 55H745"/><path d="M840 55H870"/></g></g></svg></section>
-<section><h2>20. 原子操作目录与流程</h2><p>本节对应实际脚本目录，而不是抽象的 workflow 名称。每个原子脚本都有单一职责：接收已解析的目标和数据，执行有限的 Guard 动作，产生可核对的证据。Runner Child 是业务原子，Guard 函数是输入原子，workflow_tools 是调度/证据原子；任何原子都不能绕过 <span class="mono">Local\KeyenceAgent.KvStudio.UI</span> 互斥锁或直接调用未批准的输入 API。</p>
-<h3>20.1 UI Guard 原子</h3><p class="mono">kv_ui_guard.ps1</p><svg viewBox="0 0 1080 145"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#eef9f2" stroke="#6f9d7c"><rect x="15" y="45" width="150" height="50" rx="4"/><rect x="920" y="45" width="145" height="50" rx="4"/></g><g fill="#edf5fb" stroke="#6f91aa"><rect x="195" y="45" width="150" height="50" rx="4"/><rect x="375" y="45" width="150" height="50" rx="4"/><rect x="555" y="45" width="150" height="50" rx="4"/><rect x="735" y="45" width="145" height="50" rx="4"/></g><text x="90" y="67">Runner 请求动作</text><text x="90" y="84">目标 HWND + Step</text><text x="270" y="67">前台断言</text><text x="270" y="84">标题/进程/恢复</text><text x="450" y="67">SendKeys / VK</text><text x="450" y="84">Clipboard / Mouse</text><text x="630" y="67">后置断言</text><text x="630" y="84">焦点仍正确</text><text x="807" y="67">耗时 + checkpoint</text><text x="807" y="84">写入 run.log</text><text x="992" y="67">原子结果</text><text x="992" y="84">pass / error_code</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M165 70H190"/><path d="M345 70H370"/><path d="M525 70H550"/><path d="M705 70H730"/><path d="M880 70H915"/></g></g></svg><pre><code>Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step
-[System.Windows.Forms.SendKeys]::SendWait($Keys)
-Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step "$Step postcondition"
-Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'SendKeys'</code></pre>
-<h3>20.2 Runner Child 原子</h3><p class="warn">审核规则：SVG 只表示顺序；下面的操作表才是执行契约。每一步都必须能在源码、Guard checkpoint 或 run.log 中找到证据。UIA 仅用于定位和读取控件，不代替键盘焦点操作。</p><table><tr><th>动作类别</th><th>实际调用/快捷键</th><th>UIA/Win32 作用</th><th>后置证据</th></tr><tr><td>前台绑定</td><td class="mono">Get-Process Kvs; SetFocus/SelectionItemPattern.Select</td><td>按 PID/HWND 绑定 KV STUDIO；ProjectTreeView 下查找 TreeItem，允许标题后缀</td><td>Guard before checkpoint：进程、HWND、标题匹配</td></tr><tr><td>键盘原子</td><td class="mono">Invoke-KvGuardedSendKeys -Keys ...；Invoke-KvGuardedCtrlChord；Invoke-KvGuardedAltVk</td><td>UIA 不发送按键；Guard 发送前后读取 GetForegroundWindow、窗口类名、标题</td><td>after checkpoint、elapsed_seconds &lt; 10、run.log</td></tr><tr><td>剪贴板原子</td><td class="mono">Invoke-KvGuardedClipboardSetText / ClipboardPaste</td><td>只写入受控剪贴板；粘贴目标由当前 HWND 绑定，不枚举表格控件</td><td>回读复制文本或 runner result JSON</td></tr><tr><td>弹窗退出</td><td class="mono">Invoke-KvGuardedSendKeysAllowTargetClose -Keys {ENTER}; 后续 %{F4}</td><td>允许目标弹窗关闭，但不把焦点恢复到旧窗口</td><td>目标 HWND 已关闭，主窗口 HWND 成为前台</td></tr></table><div class="grid"><div class="card"><h4>set_variables_guarded.ps1</h4><svg viewBox="0 0 760 100"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><text x="70" y="55">定位全局/局部表</text><text x="230" y="55">清理/粘贴 TSV</text><text x="390" y="55">保存</text><text x="550" y="55">复制回读</text><text x="700" y="55">持久化 JSON</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M120 50H205"/><path d="M280 50H365"/><path d="M440 50H525"/><path d="M600 50H675"/></g></g></svg><p>输入：ProjectPath、GlobalVariablesTsv/LocalVariablesTsv；输出变量快照与持久化核验。</p></div><div class="card"><h4>set_fb_arguments_guarded.ps1</h4><svg viewBox="0 0 760 100"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><text x="70" y="55">定位 FB</text><text x="220" y="55">Alt+L / Ctrl+Tab</text><text x="380" y="55">粘贴名称/方向/类型</text><text x="540" y="55">替换冲突</text><text x="700" y="55">回读快照</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M110 50H195"/><path d="M260 50H355"/><path d="M410 50H515"/><path d="M565 50H665"/></g></g></svg><p>输入 ArgumentsTsv；方向必须是 IN、OUT 或 IN-OUT；回读核对名称、方向、类型。</p></div></div>
-<div class="grid"><div class="card"><h4>set_fb_program_body_guarded.ps1</h4><svg viewBox="0 0 760 100"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><text x="70" y="55">打开程序区</text><text x="220" y="55">Ctrl+End / ↑</text><text x="380" y="55">Ctrl+Shift+Home 删除旧体</text><text x="540" y="55">Ctrl+D 粘贴并插入</text><text x="700" y="55">正常/错误证据</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M110 50H195"/><path d="M260 50H355"/><path d="M410 50H515"/><path d="M565 50H665"/></g></g></svg><p>错误分支只读取错误树文本，然后按回车关闭错误窗、Alt+F4 关闭编辑列表。</p></div><div class="card"><h4>import_mnm_guarded.ps1</h4><svg viewBox="0 0 760 100"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><text x="70" y="55">读取 MNM 头</text><text x="220" y="55">校验 MODULE_TYPE</text><text x="380" y="55">打开导入菜单</text><text x="540" y="55">选择文件并确认</text><text x="700" y="55">模块位置回读</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M110 50H195"/><path d="M260 50H355"/><path d="M410 50H515"/><path d="M565 50H665"/></g></g></svg><p>输出 import_result.json；同名模块按明确策略删除或拒绝。</p></div></div>
-<div class="grid"><div class="card"><h4>mutate_structure_definitions_guarded.ps1</h4><svg viewBox="0 0 760 100"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><text x="70" y="55">读取 plan</text><text x="220" y="55">创建文件夹/类型</text><text x="380" y="55">Ctrl+Home 清空表</text><text x="540" y="55">粘贴成员表</text><text x="700" y="55">保存回读</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M110 50H195"/><path d="M260 50H355"/><path d="M410 50H515"/><path d="M565 50H665"/></g></g></svg><p>支持 create、fill_empty、update、delete；System 类型排除。</p></div><div class="card"><h4>configure_expansion_units_guarded.ps1 / configure_ethercat_nodes_guarded.ps1</h4><svg viewBox="0 0 760 100"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><text x="70" y="55">读取模型/节点 JSON</text><text x="220" y="55">目录定向查找</text><text x="380" y="55">插入或修改</text><text x="540" y="55">首地址/节点号</text><text x="700" y="55">保存持久化</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M110 50H195"/><path d="M260 50H355"/><path d="M410 50H515"/><path d="M565 50H665"/></g></g></svg><p>每个模块有时间预算；不枚举深层树，使用已知目录与型号定位。</p></div></div>
-<h3>20.3 关键 Runner 的逐步操作明细</h3><table><tr><th>Runner</th><th>步骤</th><th>快捷键/输入</th><th>UIA 或窗口读取</th><th>成功判据</th></tr><tr><td rowspan="6" class="mono">set_fb_program_body_guarded.ps1</td><td>1. 找项目树</td><td>无按键</td><td>FromHandle(MainWindowHandle)；AutomationId=ProjectTreeView；TreeItem 名称精确或以 <span class="mono">名称:</span>/<span class="mono">名称 [</span> 开头</td><td>唯一 Kvs 窗口、模块 TreeItem 存在</td></tr><tr><td>2. 打开模块</td><td class="mono">SelectionItemPattern.Select; SetFocus; {ENTER}</td><td>UIA 只选中 TreeItem；Guard 断言 KV STUDIO 仍在前台</td><td>程序区打开</td></tr><tr><td>3. 删除旧程序体</td><td class="mono">^{END}; {UP}; ^+{HOME}; {DELETE}</td><td>不读取每一行；依赖 KV STUDIO 最后一行为空行的已知契约</td><td>每个 SendKeys 动作有 before/after checkpoint</td></tr><tr><td>4. 编辑列表</td><td class="mono">Ctrl+D</td><td>读取前台窗口；必须是 class <span class="mono">#32770</span> 且 PID 等于 Kvs PID</td><td>编辑列表 modal HWND 得到</td></tr><tr><td>5. 插入程序</td><td class="mono">ClipboardPaste(MNM文本); {TAB}; {ENTER}</td><td>粘贴目标是 modal HWND；不把焦点切回主窗口</td><td>modal 关闭；主窗口重新前台</td></tr><tr><td>6. 错误分支</td><td class="mono">错误窗 {ENTER}; 编辑列表 %{F4}</td><td>读取错误窗标题及 Descendants Name，写入 run.log</td><td>返回 <span class="mono">KV_PROGRAM_BODY_INVALID_MNEMONIC</span></td></tr><tr><td rowspan="5" class="mono">set_fb_arguments_guarded.ps1</td><td>1. 找 FB</td><td>TreeItem Select/SetFocus</td><td>ProjectTreeView；名称允许显示标签后缀</td><td>目标 FB 被选中</td></tr><tr><td>2. 打开变量编辑</td><td class="mono">Alt+L</td><td>Guard 前后台窗口检查；随后读取当前前台状态</td><td>变量编辑窗口出现</td></tr><tr><td>3. 切换表格</td><td class="mono">Ctrl+Tab 一次或两次，由当前表状态决定</td><td>不通过 UIA 猜测 grid；使用已验证的表状态/焦点路径</td><td>焦点进入自变量表左上角</td></tr><tr><td>4. 写入</td><td class="mono">ClipboardPaste(ArgumentsTsv); 冲突选替换</td><td>粘贴由 Guard 执行；保存后复制回读</td><td>名称、IN/OUT/IN-OUT、类型逐项匹配</td></tr><tr><td>5. 快照</td><td>无额外 UI 输入</td><td>解析回读 TSV</td><td>fb_snapshot_result.json</td></tr><tr><td rowspan="4" class="mono">import_mnm_guarded.ps1</td><td>1. 预检</td><td>无 UI</td><td>读取 MNM 文本，校验 MODULE_TYPE、ExpectedModuleName</td><td>非法文件在 UI 前失败</td></tr><tr><td>2. 菜单</td><td class="mono">Invoke-KvGuardedAltVk / VkTap</td><td>目标是已绑定主窗口；CapsLock 状态显式归一化</td><td>导入菜单路径已到达</td></tr><tr><td>3. 文件选择</td><td class="mono">SendKeys/ClipboardPaste + {ENTER}</td><td>文件对话框 HWND 由前台快照确认</td><td>导入完成或明确错误窗</td></tr><tr><td>4. 验证</td><td>无额外按键</td><td>assert_kv_module_placement 检查模块类别/位置</td><td>import_result.json</td></tr></table><h3>20.4 导出、编译与证据原子</h3><div class="grid"><div class="card"><h4>export_structure_definitions_guarded.ps1</h4><p>打开数据类型视图 → 选择指定类型 → 复制表格 → 解析成员 → 排除 System → 写入 <span class="mono">structure_definitions.json</span>。</p></div><div class="card"><h4>export_mnm_browse_default_folder_guarded.ps1</h4><p>创建副本工作区 → 菜单导出 → 默认文件夹确认 → 收集 MNM → 写入浏览与导出结果。</p></div><div class="card"><h4>compile_and_copy_result_bounded.ps1</h4><p>触发编译 → 等待有界完成 → 使用树句柄复制转换结果 → 检查 OK/NG → 保存文本与 JSON。</p></div><div class="card"><h4>workflow_tools</h4><p><span class="mono">invoke_kv_flat_execution_plan.ps1</span> 串行执行并持有 UI mutex；<span class="mono">kv_step_evidence.ps1</span> 记录 before/after；<span class="mono">assert_kv_module_placement.ps1</span> 做模块位置语义核验。</p></div></div>
-<h3>20.4 原子组合规则</h3><svg viewBox="0 0 1080 145"><g font-family="Segoe UI,Microsoft YaHei" font-size="12" text-anchor="middle"><g fill="#edf5fb" stroke="#6f91aa"><rect x="20" y="45" width="160" height="50" rx="4"/><rect x="220" y="45" width="160" height="50" rx="4"/><rect x="420" y="45" width="160" height="50" rx="4"/><rect x="620" y="45" width="160" height="50" rx="4"/></g><g fill="#eef9f2" stroke="#6f9d7c"><rect x="820" y="45" width="220" height="50" rx="4"/></g><text x="100" y="67">输入解析原子</text><text x="100" y="84">TSV / JSON / MNM</text><text x="300" y="67">定位原子</text><text x="300" y="84">HWND / 模块 / 表</text><text x="500" y="67">UI 输入原子</text><text x="500" y="84">Guard 包装动作</text><text x="700" y="67">语义验证原子</text><text x="700" y="84">回读 / 持久化</text><text x="930" y="67">Workflow 结果</text><text x="930" y="84">JSON + run.log</text><g stroke="#526b7d" marker-end="url(#w1)"><path d="M180 70H215"/><path d="M380 70H415"/><path d="M580 70H615"/><path d="M780 70H815"/></g></g></svg><p>组合只能由 workflow 通过 flat plan 声明；Runner 不得自行启动另一个 workflow，也不得把多个 UI 动作隐藏成无法审计的“大脚本”。</p></section></main></body></html>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KV STUDIO Operator - 系统审计</title>
+    <style>
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
+        :root {
+            --color-bg: #f5f7fa;
+            --color-surface: #ffffff;
+            --color-text: #1a202c;
+            --color-text-secondary: #4a5568;
+            --color-border: #e2e8f0;
+            --color-primary: #2563eb;
+            --color-success: #059669;
+            --color-warning: #d97706;
+            --color-danger: #dc2626;
+            --color-highlight: #fef3c7;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --radius-sm: 4px;
+            --radius-md: 8px;
+        }
 
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            line-height: 1.6;
+            color: var(--color-text);
+            background: var(--color-bg);
+            font-size: 15px;
+        }
 
+        /* Header */
+        .page-header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            color: white;
+            padding: 48px 24px;
+            box-shadow: var(--shadow-md);
+        }
 
+        .page-header h1 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
 
+        .page-header .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+
+        /* Section */
+        .section {
+            background: var(--color-surface);
+            border-radius: var(--radius-md);
+            padding: 32px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--color-border);
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--color-text);
+            border-bottom: 2px solid var(--color-primary);
+            padding-bottom: 12px;
+        }
+
+        .section-subtitle {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 28px 0 16px;
+            color: var(--color-text);
+        }
+
+        /* Typography */
+        p {
+            margin-bottom: 16px;
+            line-height: 1.7;
+            color: var(--color-text-secondary);
+        }
+
+        .note {
+            color: var(--color-text-secondary);
+            font-size: 14px;
+            font-style: italic;
+        }
+
+        .mono {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: var(--radius-sm);
+            word-break: break-word;
+        }
+
+        /* Status Colors */
+        .status-good {
+            color: var(--color-success);
+            font-weight: 600;
+        }
+
+        .status-warn {
+            color: var(--color-warning);
+            font-weight: 600;
+        }
+
+        .status-bad {
+            color: var(--color-danger);
+            font-weight: 600;
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            padding: 16px;
+            background: var(--color-highlight);
+            border-radius: var(--radius-sm);
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--color-border);
+            vertical-align: top;
+        }
+
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: var(--color-text);
+        }
+
+        tr:hover {
+            background: #f9fafb;
+        }
+
+        /* Flow Diagram */
+        .flow {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+
+        .flow-node {
+            background: #eff6ff;
+            border: 2px solid #3b82f6;
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            font-weight: 500;
+        }
+
+        .flow-arrow {
+            color: var(--color-text-secondary);
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        /* Pills */
+        .pill {
+            display: inline-block;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 16px;
+            padding: 4px 12px;
+            margin: 4px;
+            font-size: 12px;
+            font-family: 'Consolas', monospace;
+        }
+
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .card {
+            background: #f8fafc;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: 20px;
+        }
+
+        .card-title {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 12px;
+            color: var(--color-text);
+        }
+
+        /* Lists */
+        ul {
+            margin: 16px 0;
+            padding-left: 24px;
+        }
+
+        li {
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        /* Architecture Diagram */
+        .arch-diagram {
+            margin: 24px 0;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: var(--radius-md);
+            overflow-x: auto;
+        }
+
+        svg {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .page-header {
+                padding: 32px 16px;
+            }
+
+            .page-header h1 {
+                font-size: 24px;
+            }
+
+            .container {
+                padding: 16px;
+            }
+
+            .section {
+                padding: 20px;
+            }
+
+            .legend {
+                flex-direction: column;
+                gap: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="page-header">
+        <h1>KV STUDIO Operator 系统审计</h1>
+        <div class="subtitle">架构、目录、公开接口、原子动作、调度、守卫、证据与验证状态</div>
+    </header>
+
+    <div class="container">
+        <!-- Scope -->
+        <section class="section">
+            <h2 class="section-title">1. 审计范围</h2>
+            <p>
+                本文档描述 <span class="mono">H:\KeyenceAgent\kv-studio-operator</span> 当前代码的完整运行方式。
+                依据是 <span class="mono">scripts/script_manifest.json</span>、实际目录结构、flat executor、UI guard 和已产生的运行证据。
+            </p>
+            <div class="legend">
+                <div class="legend-item">
+                    <span class="status-good">● 绿色：有直接证据</span>
+                </div>
+                <div class="legend-item">
+                    <span class="status-warn">● 黄色：已发布但真实回归不完整</span>
+                </div>
+                <div class="legend-item">
+                    <span class="status-bad">● 红色：明确失败或未验证</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Architecture Overview -->
+        <section class="section">
+            <h2 class="section-title">2. 总体架构</h2>
+            <div class="arch-diagram">
+                <svg viewBox="0 0 1100 200" role="img" aria-label="工作流架构图">
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <polygon points="0 0, 10 3, 0 6" fill="#475569"/>
+                        </marker>
+                    </defs>
+
+                    <!-- Boxes -->
+                    <g>
+                        <rect x="20" y="60" width="140" height="60" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+                        <rect x="200" y="60" width="140" height="60" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+                        <rect x="380" y="60" width="140" height="60" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+                        <rect x="560" y="60" width="140" height="60" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+                        <rect x="740" y="60" width="140" height="60" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+                        <rect x="920" y="60" width="140" height="60" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+                    </g>
+
+                    <!-- Text -->
+                    <g font-family="Arial, sans-serif" font-size="14" fill="#1e293b" text-anchor="middle">
+                        <text x="90" y="95">Agent</text>
+                        <text x="270" y="85">Manifest</text>
+                        <text x="270" y="105">Resolver</text>
+                        <text x="450" y="85">Workflow</text>
+                        <text x="450" y="105">Plan</text>
+                        <text x="630" y="85">Flat</text>
+                        <text x="630" y="105">Executor</text>
+                        <text x="810" y="85">Runner</text>
+                        <text x="810" y="105">Child</text>
+                        <text x="990" y="85">UI Guard</text>
+                        <text x="990" y="105">→ KV STUDIO</text>
+                    </g>
+
+                    <!-- Arrows -->
+                    <g stroke="#475569" stroke-width="2" marker-end="url(#arrowhead)">
+                        <line x1="160" y1="90" x2="195" y2="90"/>
+                        <line x1="340" y1="90" x2="375" y2="90"/>
+                        <line x1="520" y1="90" x2="555" y2="90"/>
+                        <line x1="700" y1="90" x2="735" y2="90"/>
+                        <line x1="880" y1="90" x2="915" y2="90"/>
+                    </g>
+
+                    <!-- Labels -->
+                    <g font-family="Arial, sans-serif" font-size="12" fill="#64748b" text-anchor="middle">
+                        <text x="270" y="155">入口、角色和结果契约</text>
+                        <text x="630" y="155">锁、计划、串行步骤、receipt</text>
+                        <text x="910" y="155">前台、HWND、输入、检查点</text>
+                    </g>
+                </svg>
+            </div>
+            <p>
+                Agent 不拼接键盘、窗口或剪贴板操作。Workflow 只编排输入和步骤；Runner child 负责具体 UI 路线；
+                所有进程级输入必须经过 Guard。
+            </p>
+        </section>
+
+        <!-- Manifest -->
+        <section class="section">
+            <h2 class="section-title">2.1 script_manifest.json：运行时授权表，不是说明文件</h2>
+            <p>
+                manifest 的根字段是 <span class="mono">schema_version</span>、<span class="mono">layout_policy</span>、
+                <span class="mono">customer_entry_policy</span>、<span class="mono">ui_atomic_actions</span>、
+                <span class="mono">step_result_contracts</span> 和 <span class="mono">classes</span>。
+                它同时定义"谁可以被 Agent 调用""内部脚本能被谁调用""每步必须产生哪些结果文件"。
+            </p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>字段</th>
+                        <th>源码含义</th>
+                        <th>执行器如何使用</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="mono">customer_entry_policy.<br>allowed_classes</td>
+                        <td>允许客户态入口的类：customer_workflow、harness、scaffold tool、non-UI tool、gate</td>
+                        <td>resolver 拒绝 internal class 被直接当作 Agent API</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">classes.<br>customer_workflow</td>
+                        <td>workflow 路径、published/pending 状态、customer_callable、runner children、capabilities</td>
+                        <td>能力查询与 workflow 入口选择</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">classes.<br>runner_child_approved</td>
+                        <td>允许被 workflow 调度的 UI 子脚本</td>
+                        <td>flat executor 仅接受 allowed classes</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">ui_atomic_actions.<br>approved</td>
+                        <td>Guard 中允许出现的全局输入函数名</td>
+                        <td>静态 gate 发现未分类 action 即失败</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">step_result_contracts</td>
+                        <td>每个脚本必须写的 JSON/artifact，支持 switch variant</td>
+                        <td>Get-KvStepContract 绑定本步骤验收文件</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p class="note">
+                示例：<span class="mono">runner_children/set_variables_guarded.ps1</span> 默认必须写
+                set_variables_result.json 与 variable_persistence_validation.json；
+                带 <span class="mono">-SnapshotOnly</span> 则必须写 variable_snapshot_result.json。
+            </p>
+        </section>
+
+        <!-- Directory Structure -->
+        <section class="section">
+            <h2 class="section-title">3. 目录与职责</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>目录</th>
+                        <th>职责</th>
+                        <th>允许调用者</th>
+                        <th>是否直接面向 Agent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="mono">scripts/workflows</td>
+                        <td>客户入口；生成 plan，调用 flat executor</td>
+                        <td>Agent</td>
+                        <td>是，需 manifest customer_callable</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">scripts/runner_children</td>
+                        <td>UI/KV STUDIO 原子步骤组</td>
+                        <td>Workflow、Harness</td>
+                        <td>否</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">scripts/guards</td>
+                        <td>前台、HWND、键盘、鼠标、剪贴板保护</td>
+                        <td>Runner child</td>
+                        <td>否</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">scripts/workflow_tools</td>
+                        <td>计划、flat 执行、证据、结果收集</td>
+                        <td>Workflow、Executor</td>
+                        <td>否</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">scripts/gates</td>
+                        <td>静态 Guard 使用、Agent 边界检查</td>
+                        <td>Workflow preflight</td>
+                        <td>是，但仅作门禁</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">scripts/scaffold_tools</td>
+                        <td>样例项目脚手架和计划验证</td>
+                        <td>Agent/回归</td>
+                        <td>部分</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">scripts/probes</td>
+                        <td>未知 UI 路线研究</td>
+                        <td>Research mode</td>
+                        <td>否</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Workflow Lifecycle -->
+        <section class="section">
+            <h2 class="section-title">4. Workflow 生命周期</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>阶段</th>
+                        <th>系统动作</th>
+                        <th>输出/停止条件</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>参数预检</td>
+                        <td>检查项目、MNM、TSV、JSON 路径和必填参数</td>
+                        <td>失败则不启动 UI</td>
+                    </tr>
+                    <tr>
+                        <td>生成执行计划</td>
+                        <td>列出顺序步骤、runner、输出目录、结果契约</td>
+                        <td><span class="mono">execution_plan.json</span></td>
+                    </tr>
+                    <tr>
+                        <td>静态门禁</td>
+                        <td>检查 Guard 使用、approved action、Agent 边界</td>
+                        <td>失败则不进入 KV STUDIO</td>
+                    </tr>
+                    <tr>
+                        <td>互斥锁</td>
+                        <td>取得 <span class="mono">Local\KeyenceAgent.KvStudio.UI</span></td>
+                        <td>占用时返回 <span class="mono">KV_UI_WORKFLOW_BUSY</span></td>
+                    </tr>
+                    <tr>
+                        <td>串行执行</td>
+                        <td>按 plan 顺序调用 runner child，禁止并行 UI 操作</td>
+                        <td>任一步失败立即停止后续步骤</td>
+                    </tr>
+                    <tr>
+                        <td>结果验收</td>
+                        <td>检查结果 JSON、receipt hash、当前运行日志和语义快照</td>
+                        <td>不以文件存在代替成功</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 class="section-subtitle">4.1 Flat Executor：执行计划的唯一 UI 调度器</h3>
+            <p>
+                源码：<span class="mono">scripts/workflow_tools/invoke_kv_flat_execution_plan.ps1</span>。
+                它不是业务操作脚本；它是计划解释器和可靠性边界。Workflow 只写 plan，Executor 才依次启动 gate、workflow tool 或 runner child。
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>源码步骤</th>
+                        <th>具体行为</th>
+                        <th>工程意义</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>读取 plan</td>
+                        <td>要求 <span class="mono">plan.ok=true</span>、run_root、唯一 step.name、唯一 out_dir</td>
+                        <td>拒绝模糊或复用输出目录的执行</td>
+                    </tr>
+                    <tr>
+                        <td>解析 manifest</td>
+                        <td>只允许 runner_child_approved、workflow_tool、gate 等类</td>
+                        <td>禁止 workflow 任意执行路径</td>
+                    </tr>
+                    <tr>
+                        <td>取得 mutex</td>
+                        <td>WaitOne(0) 获取 Local\KeyenceAgent.KvStudio.UI</td>
+                        <td>不同 agent/process 不能并发操作同一桌面</td>
+                    </tr>
+                    <tr>
+                        <td>指纹</td>
+                        <td>写 code_fingerprint.json、输入 SHA-256</td>
+                        <td>证据可追溯到当前代码与当前输入</td>
+                    </tr>
+                    <tr>
+                        <td>Invoke-FlatWorkflowStep</td>
+                        <td>启动单步，写 step_started / step_succeeded / step_failed</td>
+                        <td>失败短路，禁止后续 UI 动作</td>
+                    </tr>
+                    <tr>
+                        <td>最终验收</td>
+                        <td>按 contract 读取结果；需要编译时还校验当前 run 的 OK/NG 文本</td>
+                        <td>阻止旧文件或假阳性结果</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- UI Guard Atomic Actions -->
+        <section class="section">
+            <h2 class="section-title">5. UI Guard 原子动作</h2>
+
+            <div class="grid">
+                <div class="card">
+                    <h3 class="card-title">前台与窗口</h3>
+                    <div>
+                        <span class="pill">Assert-KvUiForegroundHwnd</span>
+                        <span class="pill">Invoke-KvUiGuardForceForeground</span>
+                    </div>
+                    <p class="note">输入前绑定目标 HWND/PID；最多一次受控前台恢复；失败不发送输入。</p>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">键盘与快捷键</h3>
+                    <div>
+                        <span class="pill">Invoke-KvGuardedSendKeys</span>
+                        <span class="pill">Invoke-KvGuardedCtrlChord</span>
+                        <span class="pill">Invoke-KvGuardedAltVk</span>
+                        <span class="pill">Invoke-KvGuardedVkTap</span>
+                        <span class="pill">Invoke-KvGuardedShiftTab</span>
+                    </div>
+                    <p class="note">记录 before/after，单个动作预算小于 10 秒。</p>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">剪贴板与输入</h3>
+                    <div>
+                        <span class="pill">Invoke-KvGuardedClipboardPaste</span>
+                        <span class="pill">Invoke-KvGuardedClipboardSetText</span>
+                    </div>
+                    <p class="note">剪贴板设置、Ctrl+V、目标焦点和结果写入同一 run.log。</p>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">鼠标与菜单</h3>
+                    <div>
+                        <span class="pill">Invoke-KvGuardedMouseClick</span>
+                        <span class="pill">Invoke-KvGuardedMouseRightClick</span>
+                        <span class="pill">Invoke-KvGuardedMouseClickAllowProcessSuccessor</span>
+                    </div>
+                    <p class="note">用于树节点和菜单，禁止无目的深层遍历。</p>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">模态关闭</h3>
+                    <div>
+                        <span class="pill">Invoke-KvGuardedSendKeysAllowTargetClose</span>
+                        <span class="pill">Invoke-KvGuardedSendKeysAllowTargetCloseToWindow</span>
+                    </div>
+                    <p class="note">用于已定义的弹窗关闭和后继窗口转移。</p>
+                </div>
+            </div>
+
+            <h3 class="section-subtitle">5.1 源码责任矩阵</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>文件</th>
+                        <th>核心函数/字段</th>
+                        <th>责任</th>
+                        <th>不负责什么</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="mono">guards/kv_ui_guard.ps1</td>
+                        <td>Assert-KvUiForegroundHwnd、Invoke-KvGuarded*、Write-KvUiGuardCheckpoint</td>
+                        <td>窗口绑定、前台证明、输入封装、检查点、耗时</td>
+                        <td>不判断 PLC 变量语义</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">workflow_tools/<br>invoke_kv_flat_execution_plan.ps1</td>
+                        <td>plan 读取、manifest contract、mutex、Invoke-FlatWorkflowStep、Write-FlatWorkflowResult</td>
+                        <td>统一串行调度、失败短路、结果聚合</td>
+                        <td>不选择业务 UI 路线</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">runner_children/*.ps1</td>
+                        <td>业务步骤函数与 UIA/Guard 调用</td>
+                        <td>把输入模型变为 KV STUDIO 操作并验证</td>
+                        <td>不应被 Agent 直接调用</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">workflows/*.ps1</td>
+                        <td>参数、步骤列表、execution_plan.json</td>
+                        <td>公开 API 边界和组合</td>
+                        <td>不应重复实现 UI 输入</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">script_manifest.json</td>
+                        <td>classes、ui_atomic_actions、step_result_contracts</td>
+                        <td>授权、发现、脚本角色和结果文件契约</td>
+                        <td>不保存运行时项目状态</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 class="section-subtitle">5.2 设计审查要点</h3>
+            <ul>
+                <li>发布状态不等于真实验证通过：必须查看同次 run.log、receipt 和语义结果。</li>
+                <li>静态门禁只证明调用边界，不能证明焦点、粘贴、变量或程序体正确。</li>
+                <li>UIA 找到窗口不等于控件获得焦点；Guard 只保护前台，业务 runner 仍需证明表格状态。</li>
+                <li>所有 workflow 必须 flat；客户 workflow 不应递归调用客户 workflow。</li>
+                <li>每个新的全局输入动作必须先进入 Guard、manifest approved，再进入真实 workflow 回归。</li>
+            </ul>
+        </section>
+
+        <!-- Manifest and Capabilities -->
+        <section class="section">
+            <h2 class="section-title">6. Manifest 与能力状态</h2>
+            <p>Manifest 是唯一公开能力清单。当前客户态 workflow：</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>入口</th>
+                        <th>功能边界</th>
+                        <th>状态</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="mono">run_kv_mvp_scaffold.ps1</td>
+                        <td>新建样例、MNM、变量、FB、编译</td>
+                        <td><span class="status-good">published</span></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">run_kv_mvp_repair_existing_project.ps1</td>
+                        <td>现有项目修复流水线</td>
+                        <td><span class="status-good">published</span></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">set_kv_variables.ps1</td>
+                        <td>全局/局部变量写入、快照、持久化</td>
+                        <td><span class="status-good">published</span></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">set_kv_fb_arguments.ps1</td>
+                        <td>FB IN/OUT/IN-OUT 自变量、快照、回读</td>
+                        <td><span class="status-warn">published；最近正式回归在预处理失败</span></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">set_kv_fb_program_body.ps1</td>
+                        <td>FB/扫描模块程序体编辑列表插入</td>
+                        <td><span class="status-warn">published；正式回归未完成</span></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">import_kv_fb_module.ps1</td>
+                        <td>FB MNM 导入</td>
+                        <td><span class="status-good">published</span></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">mutate_kv_structure_definitions.ps1</td>
+                        <td>数据类型/文件夹增删改</td>
+                        <td><span class="status-good">published</span></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">export_kv_structure_definitions.ps1</td>
+                        <td>数据类型导出与成员校验</td>
+                        <td><span class="status-good">published</span></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">configure_kv_expansion_units.ps1</td>
+                        <td>PLC 扩展单元配置</td>
+                        <td><span class="status-good">published</span></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">configure_kv_ethercat_nodes.ps1</td>
+                        <td>EtherCAT 节点配置与持久化</td>
+                        <td><span class="status-good">published</span></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">export_mnm_project_copy_default_folder.ps1</td>
+                        <td>项目副本 MNM 导出</td>
+                        <td><span class="status-good">published</span></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">create_kv_project.ps1 / compile_kv_project.ps1</td>
+                        <td>项目创建/编译</td>
+                        <td><span class="status-warn">pending_validation，非客户态</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Variables and Data Types -->
+        <section class="section">
+            <h2 class="section-title">7. 变量、FB 与数据类型工作流</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>对象</th>
+                        <th>原子路径</th>
+                        <th>输入</th>
+                        <th>验收</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>全局变量</td>
+                        <td>菜单定位 → 全局表格 → TSV 粘贴 → 保存</td>
+                        <td>变量定义 TSV</td>
+                        <td>回读名称、类型、值和持久化</td>
+                    </tr>
+                    <tr>
+                        <td>FB 自变量</td>
+                        <td>定位 FB → 自变量表 → TSV 粘贴 → 冲突替换</td>
+                        <td>名称、IN/OUT/IN-OUT、类型等</td>
+                        <td>回读方向和类型</td>
+                    </tr>
+                    <tr>
+                        <td>FB/程序局部变量</td>
+                        <td>定位 owner program → 局部表格 → TSV 粘贴</td>
+                        <td>局部变量 TSV</td>
+                        <td>回读 owner、名称和类型</td>
+                    </tr>
+                    <tr>
+                        <td>数据类型</td>
+                        <td>数据类型树 → 结构体表格 → 增删改操作</td>
+                        <td>结构体成员 TSV/操作 JSON</td>
+                        <td>末尾空行不计成员；System 不修改</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p class="note">
+                自变量表和局部变量表共享焦点状态，Ctrl+Tab 路由必须封装在原子实现中，不应由 Agent 猜测。
+            </p>
+        </section>
+
+        <!-- MNM and Program Body -->
+        <section class="section">
+            <h2 class="section-title">8. MNM 与程序体边界</h2>
+            <p>MNM 是模块级导入/导出载体；程序体编辑列表是原位修改接口。两者不能混为同一验收：</p>
+            <div class="flow">
+                <div class="flow-node">MNM import</div>
+                <div class="flow-arrow">≠</div>
+                <div class="flow-node">程序体原位写入</div>
+                <div class="flow-arrow">≠</div>
+                <div class="flow-node">变量/FB 表格写入</div>
+            </div>
+            <p>
+                程序体原位 workflow 的设计目标是 FB 和每次扫描执行型模块共用同一入口：定位模块、打开程序区、
+                调用编辑列表插入 MNM 文本。对应 runner：<span class="mono">set_fb_program_body_guarded.ps1</span>
+                和 <span class="mono">set_scan_program_body_guarded.ps1</span>。
+            </p>
+
+            <h3 class="section-subtitle">8.1 关键 Runner 操作流程</h3>
+
+            <div class="grid">
+                <div class="card">
+                    <h3 class="card-title">import_mnm_guarded.ps1</h3>
+                    <ol style="margin: 12px 0; padding-left: 20px; font-size: 14px;">
+                        <li>预检：读取 MNM 文本，校验 MODULE_TYPE、ExpectedModuleName</li>
+                        <li>菜单：使用 Guard 调用导入菜单路径</li>
+                        <li>文件选择：SendKeys/ClipboardPaste + Enter</li>
+                        <li>验证：assert_kv_module_placement 检查模块类别/位置</li>
+                    </ol>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">set_fb_program_body_guarded.ps1</h3>
+                    <ol style="margin: 12px 0; padding-left: 20px; font-size: 14px;">
+                        <li>找项目树：UIA AutomationId=ProjectTreeView</li>
+                        <li>打开模块：Select + SetFocus + Enter</li>
+                        <li>删除旧程序体：^End, Up, ^+Home, Delete</li>
+                        <li>编辑列表：Ctrl+D 打开编辑列表 modal</li>
+                        <li>插入程序：ClipboardPaste MNM文本</li>
+                        <li>错误分支：错误窗 Enter 或编辑列表 Alt+F4</li>
+                    </ol>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">set_fb_arguments_guarded.ps1</h3>
+                    <ol style="margin: 12px 0; padding-left: 20px; font-size: 14px;">
+                        <li>找 FB：ProjectTreeView TreeItem Select/SetFocus</li>
+                        <li>打开变量编辑：Alt+L</li>
+                        <li>切换表格：Ctrl+Tab 一次或两次（由当前表状态决定）</li>
+                        <li>判断分支：Ctrl+A、Ctrl+C 回读当前表；空表跳过清除</li>
+                        <li>非空清除：Ctrl+A、Shift+Delete；确认弹窗保持前台，Alt+Y 确认</li>
+                        <li>写入：一次性 ClipboardPaste 完整 ArgumentsTsv；禁止逐行覆盖路线</li>
+                        <li>快照：解析回读 TSV，写入 fb_snapshot_result.json</li>
+                    </ol>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">compile_and_copy_result_bounded.ps1</h3>
+                    <ol style="margin: 12px 0; padding-left: 20px; font-size: 14px;">
+                        <li>触发编译：F7 或菜单</li>
+                        <li>等待有界完成：检测编译窗口状态变化</li>
+                        <li>使用树句柄复制转换结果</li>
+                        <li>检查 OK/NG：解析复制的文本</li>
+                        <li>保存文本与 JSON 结果</li>
+                    </ol>
+                </div>
+            </div>
+        </section>
+
+        <!-- Summary -->
+        <section class="section">
+            <h2 class="section-title">9. 总结与使用建议</h2>
+
+            <h3 class="section-subtitle">9.1 核心原则</h3>
+            <ul>
+                <li><strong>职责分离</strong>：Agent 准备输入，Workflow 编排流程，Runner 执行 UI，Guard 保护操作</li>
+                <li><strong>串行执行</strong>：Flat executor 保证 UI 操作串行，避免并发冲突</li>
+                <li><strong>证据驱动</strong>：每次运行产生完整证据链：计划、日志、结果、指纹</li>
+                <li><strong>契约验收</strong>：manifest 定义结果契约，执行器强制验收</li>
+                <li><strong>失败短路</strong>：任一步骤失败立即停止，不继续执行后续 UI 操作</li>
+            </ul>
+
+            <h3 class="section-subtitle">9.2 使用流程</h3>
+            <div class="flow">
+                <div class="flow-node">1. 查询能力</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node">2. 准备输入</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node">3. 调用 workflow</div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node">4. 验收结果</div>
+            </div>
+            <p style="margin-top: 16px;">
+                使用 <span class="mono">get_kv_capabilities.ps1</span> 查询可用接口，
+                准备 TSV/MNM/JSON 输入，以 <span class="mono">-STA -NoProfile -ExecutionPolicy Bypass</span>
+                调用 workflow，检查输出目录中的结果 JSON 和 run.log。
+            </p>
+
+            <h3 class="section-subtitle">9.3 维护要点</h3>
+            <ul>
+                <li>新增 UI 动作必须先加入 Guard 和 manifest approved 列表</li>
+                <li>Runner 变更必须更新 manifest 中的 step_result_contracts</li>
+                <li>保持 workflow flat，不要嵌套调用客户 workflow</li>
+                <li>UI 原子操作严格小于 10 秒，复杂操作分解为多个步骤</li>
+                <li>所有桌面操作必须先获取 UI mutex，避免并发冲突</li>
+            </ul>
+
+            <h3 class="section-subtitle">9.4 审计更新</h3>
+            <p>
+                本审计文档基于 <span class="mono">H:\KeyenceAgent\kv-studio-operator</span> 当前代码生成。
+                架构变更、新增能力或验证状态变化时应更新本文档。
+                文档源码：<span class="mono">H:/KeyenceAgent/kv-studio-operator/kv-studio-operator-audit.html</span>
+            </p>
+            <p class="note">
+                生成时间：2026-09-12 |
+                参考：script_manifest.json, SKILL.md, 各 runner 源码
+            </p>
+        </section>
+    </div>
+</body>
+</html>

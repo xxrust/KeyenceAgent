@@ -10,11 +10,11 @@
 
 ## 固定输入
 
-`fixtures/structure_plan.json` 在 `数据类型/zzMutationSimple` 下依次创建 `zzMutationInner`、创建引用它的 `zzMutationOuter`、把 Inner 的 `count` 从 `UINT` 改为 `UDINT` 并增加 `fault`，最后先删除 Outer、再删除 Inner。计划不创建文件夹，所以目标父文件夹必须预先存在于测试项目。
+`fixtures/structure_plan.json` 会先在“数据类型”下创建 `zzMutationSimple` 文件夹，再依次创建 `zzMutationInner`、创建引用它的 `zzMutationOuter`、把 Inner 的 `count` 从 `UINT` 改为 `UDINT` 并增加 `fault`，最后先删除 Outer、再删除 Inner。
 
 ## 当前状态
 
-`scenario.json` 设置 `enabled=false`。根目录 `run-all.bat` 不会执行它，因为这是破坏性、依赖项目前置结构的 opt-in 场景。运行前必须人工核对 fixture 与测试副本；不得对用户生产项目执行。
+`scenario.json` 已启用。该场景只对 runner 创建的测试副本执行，运行前仍应核对 fixture；不得对用户生产项目执行。
 
 ## 执行方法
 

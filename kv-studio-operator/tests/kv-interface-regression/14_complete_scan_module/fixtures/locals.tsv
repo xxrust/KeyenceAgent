@@ -1,0 +1,5 @@
+scope	owner_program	name	data_type	device	initial_value	comment	evidence	status
+local	QA_ScanLatch	Enable	BOOL				wiki_evidence.md	declared
+local	QA_ScanLatch	Reset	BOOL				wiki_evidence.md	declared
+local	QA_ScanLatch	Permit	BOOL				wiki_evidence.md	declared
+local	QA_ScanLatch	Active	BOOL				wiki_evidence.md	declared

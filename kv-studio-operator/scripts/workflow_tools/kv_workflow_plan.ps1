@@ -29,6 +29,10 @@ function Submit-KvWorkflowPlan {
   param([System.Collections.IDictionary]$Plan,[string]$ScriptsRoot,[switch]$PlanOnly)
   $path=Join-Path $Plan.run_root 'execution_plan.json'
   $Plan | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $path -Encoding UTF8
+  . (Join-Path $ScriptsRoot 'workflow_tools/kv_step_evidence.ps1')
+  . (Join-Path $ScriptsRoot 'workflow_tools/kv_plan_preflight.ps1')
+  $preflight=Test-KvExecutionPlanPreflight -Plan (Get-Content -Raw -Encoding UTF8 -LiteralPath $path | ConvertFrom-Json) -ScriptsRoot $ScriptsRoot
+  @{ok=$true;status='planned';inputs=@($preflight.inputs);execution_plan_sha256=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $Plan.run_root 'plan_preflight_result.json') -Encoding UTF8
   if ($PlanOnly) { return }
   $executor=Resolve-KvStudioOperatorScriptPath -ScriptRoot $ScriptsRoot -Name 'workflow_tools/invoke_kv_flat_execution_plan.ps1' -Classes workflow_tool
   & powershell -NoProfile -ExecutionPolicy Bypass -File $executor -PlanPath $path -TimeoutSeconds $Plan.timeout_seconds

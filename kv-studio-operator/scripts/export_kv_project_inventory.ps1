@@ -264,6 +264,10 @@ try {
   $scanCategoryName = -join ([char[]](0x6BCF,0x6B21,0x626B,0x63CF,0x6267,0x884C,0x578B,0x6A21,0x5757))
   $standbyCategoryName = -join ([char[]](0x540E,0x5907,0x6A21,0x5757))
   $bookmarkName = -join ([char[]](0x4E66,0x7B7E))
+  $localVariablesName = -join ([char[]](0x5C40,0x90E8,0x53D8,0x91CF))
+  $argumentName = -join ([char[]](0x81EA,0x53D8,0x91CF))
+  $programRootName = -join ([char[]](0x7A0B,0x5E8F))
+  $fbRootName = -join ([char[]](0x529F,0x80FD,0x5757))
   $motionAxes = @($treeNodes | Where-Object { $_.text -match '^(?:[0-9]+\s*:\s*)?Axis_[0-9]+(?:\s|:|$)' -and $_.path -notcontains 'EtherCAT' -and $_.path -notcontains $typeRootName -and $_.path -notcontains $variableRootName } | ForEach-Object {
     $axisNo = $null
     $mNo = [regex]::Match($_.text, '([0-9]+):Axis_([0-9]+)|Axis_([0-9]+)')
@@ -290,12 +294,21 @@ try {
     }
   })
 
-  $programModules = @($treeNodes | Where-Object { $_.text -match '^.+\s+\[\d+\]$' -and ($_.path -contains $scanCategoryName -or $_.path -contains $standbyCategoryName) -and $_.path -notcontains $bookmarkName } | ForEach-Object {
+  $programRootPattern = '^\u7A0B\u5E8F'
+  $programModules = @($treeNodes | Where-Object { $_.text -match '^.+\s+\[\d+\]$' -and $_.path[0] -match $programRootPattern -and $_.path -notcontains $bookmarkName } | ForEach-Object {
+    $rawPath=@($_.path | ForEach-Object {[string]$_})
+    $semanticPath=@($rawPath)
+    if ($semanticPath.Count -gt 0) { $semanticPath[0]=$programRootName }
     $m = [regex]::Match($_.text, '^(.+?)\s+\[(\d+)\]$')
+    if ($semanticPath.Count -gt 0) { $semanticPath[$semanticPath.Count-1]=$m.Groups[1].Value }
+    $category = if ($_.path.Count -ge 2) { [string]$_.path[1] } else { '' }
     [ordered]@{
       module_name = $m.Groups[1].Value
       execution_order = [int]$m.Groups[2].Value
       tree_text = $_.text
+      category = $category
+      tree_path = $semanticPath
+      source_tree_path = $rawPath
       path_text = $_.path_text
     }
   })
@@ -336,6 +349,61 @@ try {
       }
     }
   }
+
+  # Preserve structural folders even when they contain no program or FB. The
+  # WsTreeEnv source is authoritative; module extraction alone loses empty
+  # workstations/categories. Keep the raw paths here because module leaves
+  # must be matched against the source XML before semantic normalization.
+  $moduleLeafSourcePaths = [System.Collections.Generic.List[object]]::new()
+  foreach ($programModule in @($programModules)) {
+    $moduleLeafSourcePaths.Add([string[]]@($programModule.source_tree_path))
+  }
+  foreach ($fbNode in @($treeNodes | Where-Object {
+    $_.path.Count -gt 1 -and [string]$_.path[0] -eq $fbRootName -and
+    [string]$_.text -match '^[A-Za-z_][A-Za-z0-9_\[\]]+:.+$'
+  })) {
+    $moduleLeafSourcePaths.Add([string[]]@($fbNode.path))
+  }
+  foreach ($fbInfo in @($mnmInventory | Where-Object { $null -ne $_.module_type -and [int]$_.module_type -eq 2 })) {
+    $fbName = [string]$fbInfo.module_name
+    $fbNode = @($treeNodes | Where-Object { [string]$_.text -eq $fbName -or [string]$_.text -like "${fbName}:*" } | Select-Object -First 1)
+    if ($fbNode) { $moduleLeafSourcePaths.Add([string[]]@($fbNode[0].path)) }
+  }
+  $treeFolders = @($treeNodes | Where-Object {
+    $sourcePath = @($_.path | ForEach-Object {[string]$_})
+    $isProgramRoot = ($sourcePath.Count -gt 0 -and [string]$sourcePath[0] -match ('^' + [regex]::Escape($programRootName)))
+    $isFbRoot = ($sourcePath.Count -gt 0 -and [string]$sourcePath[0] -eq $fbRootName)
+    # Root labels are display metadata, not semantic folders.
+    if ($sourcePath.Count -le 1 -or (-not $isProgramRoot -and -not $isFbRoot)) { return $false }
+    $text = [string]$_.text
+    if ($sourcePath -contains $bookmarkName -or $sourcePath -contains $localVariablesName -or $sourcePath -contains $argumentName) { return $false }
+    $isModuleLeaf = $false
+    foreach ($leafPath in @($moduleLeafSourcePaths)) {
+      $leaf = @($leafPath)
+      if ($leaf.Count -gt 0 -and $sourcePath.Count -eq $leaf.Count) {
+        $same = $true
+        for ($i = 0; $i -lt $leaf.Count; $i++) { if ([string]$sourcePath[$i] -cne [string]$leaf[$i]) { $same = $false; break } }
+        if ($same) { $isModuleLeaf = $true; break }
+      }
+    }
+    -not $isModuleLeaf
+  } | ForEach-Object {
+    $folderNode = $_
+    $rawPath=@($folderNode.path | ForEach-Object {[string]$_})
+    $semanticPath=@($rawPath)
+    if ($semanticPath.Count -gt 0 -and $semanticPath[0] -match ('^' + [regex]::Escape($programRootName))) {
+      $semanticPath[0]=$programRootName
+    }
+    $semanticPathText=($semanticPath -join ' > ')
+    [ordered]@{
+      path = $semanticPath
+      path_text = $semanticPathText
+      source_tree_path = $rawPath
+      source_path_text = [string]$folderNode.path_text
+      expanded = $folderNode.expanded
+      has_children = (@($treeNodes | Where-Object { $_.parent_id -eq $folderNode.id }).Count -gt 0)
+    }
+  })
 
   $stringPatterns = @(
     'KV-[A-Za-z0-9*]+',
@@ -412,6 +480,7 @@ try {
       source = $treePath
       node_count = $treeNodes.Count
       nodes = $treeNodes
+      folders = $treeFolders
     }
     topology = [ordered]@{
       cpu = $cpu

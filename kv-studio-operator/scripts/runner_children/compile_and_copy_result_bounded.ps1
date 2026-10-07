@@ -4,6 +4,7 @@
   [Parameter(Mandatory=$true)]
   [string]$OutDir,
   [string]$ChecklistPath = '',
+  [string]$CreatedProjectResultPath = '',
   [int]$WaitSeconds = 40,
   [switch]$AuditCompileWait,
   [switch]$AuditScreenshots,
@@ -49,6 +50,7 @@ public class KvCompileBoundedWin32 {
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr hWnd, StringBuilder text, int count);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
   public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+  [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hwnd, uint command);
   public static List<IntPtr> EnumChildren(IntPtr parent) {
     List<IntPtr> result = new List<IntPtr>();
     EnumChildWindows(parent, delegate(IntPtr hwnd, IntPtr lparam) {
@@ -145,8 +147,19 @@ function Invoke-CompileAction {
     [string]$AttemptName
   )
   if ($ConvertAction -eq 'CtrlF9') {
-    Invoke-KvGuardedCtrlChord -TargetHwnd $TargetHwnd -Step "compile convert Ctrl+F9 $AttemptName" -Vk 0x78 -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action "Ctrl+F9 compile/convert $AttemptName" -SleepMs 300 -AllowModalAfter
-    Log "sent Ctrl+F9 $AttemptName"
+    Invoke-KvGuardedSendKeys -TargetHwnd $TargetHwnd -Step 'open conversion menu' -Keys '%a' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action 'Alt+A opens the conversion menu' -SleepMs 200
+    $root=[Windows.Automation.AutomationElement]::FromHandle($TargetHwnd)
+    $popupHwnd=[KvCompileBoundedWin32]::GetWindow($TargetHwnd,6)
+    if($popupHwnd -eq [IntPtr]::Zero -or -not [KvCompileBoundedWin32]::IsWindowVisible($popupHwnd)){throw 'KV_COMPILE_MENU_NOT_ACTIVE'}
+    $convertMenu=[Windows.Automation.AutomationElement]::FromHandle($popupHwnd)
+    if($convertMenu.Current.ProcessId -ne $root.Current.ProcessId -or $convertMenu.Current.ControlType -ne [Windows.Automation.ControlType]::Menu -or $convertMenu.Current.IsOffscreen){throw 'KV_COMPILE_MENU_NOT_ACTIVE'}
+    $commands=@($convertMenu.FindAll([Windows.Automation.TreeScope]::Children,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AcceleratorKeyProperty,'Ctrl+F9'))))
+    if($commands.Count -ne 1 -or -not $commands[0].Current.IsEnabled -or $commands[0].Current.AccessKey -ne 'c'){throw 'KV_COMPILE_COMMAND_UNAVAILABLE'}
+    if($commands[0].Current.IsOffscreen -or -not $commands[0].Current.HasKeyboardFocus){throw 'KV_COMPILE_MENU_NOT_ACTIVE'}
+    # UIA Invoke blocks on the synchronous conversion modal. The verified
+    # menu access key dispatches the same command without blocking the caller.
+    Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $TargetHwnd -Step 'invoke verified conversion command' -Keys 'c' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -SuccessTitleLike @("KV STUDIO*$ProjectNeedle*",'转换结果') -Action 'C invokes the verified enabled conversion menu command' -SleepMs 300
+    Log "invoked verified Ctrl+F9 menu command $AttemptName"
   } else {
     Invoke-KvGuardedCtrlChord -TargetHwnd $TargetHwnd -Step "compile convert Ctrl+F2 $AttemptName" -Vk 0x71 -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" -Action "Ctrl+F2 compile/convert $AttemptName" -SleepMs 300 -AllowModalAfter
     Log "sent Ctrl+F2 $AttemptName"
@@ -203,10 +216,14 @@ function Get-KvWindows {
     [Windows.Automation.AutomationElement]::ControlTypeProperty,
     [Windows.Automation.ControlType]::Window
   )
-  $root.FindAll(
-    [Windows.Automation.TreeScope]::Descendants,
+  $topWindows=$root.FindAll(
+    [Windows.Automation.TreeScope]::Children,
     (New-Object Windows.Automation.AndCondition($pidCondition, $windowCondition))
   )
+  foreach($window in $topWindows){
+    $window
+    foreach($child in $window.FindAll([Windows.Automation.TreeScope]::Children,$windowCondition)){ $child }
+  }
 }
 
 function Get-WindowTextFlat {
@@ -302,18 +319,15 @@ function Find-ResultArea {
 
 try {
   $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
-  $pathMatches=@(Get-CimInstance Win32_Process -Filter "Name='Kvs.exe'" -ErrorAction SilentlyContinue | Where-Object {$_.CommandLine -and $_.CommandLine.IndexOf([IO.Path]::GetFullPath($ProjectPath),[StringComparison]::OrdinalIgnoreCase) -ge 0} | ForEach-Object {Get-Process -Id ([int]$_.ProcessId) -ErrorAction SilentlyContinue} | Where-Object {$_.MainWindowHandle -ne 0})
-  if($pathMatches.Count -eq 1){$process=$pathMatches[0]}
-  else {
-    $process = Get-Process Kvs -ErrorAction Stop |
-      Where-Object {
-        $_.MainWindowHandle -ne 0 -and
-        $_.MainWindowTitle -like 'KV STUDIO*' -and
-        $_.MainWindowTitle -like "*$projectNeedle*"
-      } |
-      Sort-Object StartTime -Descending |
-      Select-Object -First 1
+  $fullProjectPath=[IO.Path]::GetFullPath($ProjectPath)
+  $pathPattern='(?:^|\s)(?:"'+[regex]::Escape($fullProjectPath)+'"|'+[regex]::Escape($fullProjectPath)+')(?=\s|$)'
+  $pathMatches=@(Get-CimInstance Win32_Process -Filter "Name='Kvs.exe'" -ErrorAction SilentlyContinue | Where-Object {$_.CommandLine -and $_.CommandLine -match $pathPattern} | ForEach-Object {Get-Process -Id ([int]$_.ProcessId) -ErrorAction SilentlyContinue} | Where-Object {$_.MainWindowHandle -ne 0})
+  if ($CreatedProjectResultPath) {
+    . (Join-Path (Split-Path -Parent $PSScriptRoot) 'kv_project_process_binding.ps1')
+    $pathMatches=@(Get-KvCreatedProjectProcess $ProjectPath $CreatedProjectResultPath)
   }
+  if($pathMatches.Count -ne 1){throw 'KV_COMPILE_PROJECT_PROCESS_AMBIGUOUS'}
+  $process=$pathMatches[0]
   if (-not $process) { throw "No visible Kvs process matched target project '$projectNeedle'. Refusing to operate another project window." }
 
   Assert-NoBlockingPopup $process.Id
@@ -336,19 +350,14 @@ try {
     throw "KV STUDIO is in simulator mode before compile. Close simulator mode or restart from a clean editor-state workflow. title=$title"
   }
 
-  Invoke-KvGuardedVkTap -TargetHwnd $process.MainWindowHandle -Step 'compile editor focus settle Esc' -Vk 0x1B -ExpectedTitleLike "KV STUDIO*$projectNeedle*" -SleepMs 250
-  Log 'sent Esc to settle editor focus before conversion'
+  # Use the verified menu command because the native ladder editor can consume
+  # the synthetic Ctrl+F9 chord without starting conversion.
+  Log 'kept the verified KV STUDIO main window focus before conversion'
 
   Ensure-CapsLockOn $process.MainWindowHandle "KV STUDIO*$projectNeedle*"
   Save-Screenshot '00_before_compile.png'
   Invoke-CompileAction $process.MainWindowHandle $projectNeedle 'attempt1'
-  $resultTreeVisible = Wait-VisibleResultTree $process.MainWindowHandle 8 'after_attempt1'
-  if (-not $resultTreeVisible) {
-    Log 'visible result tree did not appear after first compile action; sending one more guarded compile action inside compile atomic step'
-    Invoke-CompileAction $process.MainWindowHandle $projectNeedle 'attempt2'
-    $secondWaitSeconds = [math]::Max(8, [math]::Min($WaitSeconds, 20))
-    $resultTreeVisible = Wait-VisibleResultTree $process.MainWindowHandle $secondWaitSeconds 'after_attempt2'
-  }
+  $resultTreeVisible = Wait-VisibleResultTree $process.MainWindowHandle $WaitSeconds 'after_attempt1'
   if (-not $resultTreeVisible) {
     throw 'Visible conversion result tree did not appear after guarded compile actions.'
   }
@@ -394,6 +403,8 @@ try {
   Log 'done'
   return
 } catch {
+  $AuditScreenshots=$true
+  try { Save-Screenshot 'failure.png' } catch { Log ('failure screenshot unavailable: '+$_.Exception.Message) }
   Log ('ERROR ' + $_.Exception.ToString())
   $_.Exception.ToString() | Set-Content -LiteralPath (Join-Path $OutDir 'fail.txt') -Encoding UTF8
   exit 1

@@ -30,8 +30,8 @@ function Stop-Gate([string]$ErrorCode, [string]$Message, [string[]]$Evidence = @
     message = $Message
     evidence = $Evidence
     remediation = @(
-      'Open the exact current .kpr in KV STUDIO and export MNM plus variable manifests into a task source_snapshot directory.',
-      'Run new_kv_existing_project_update_workspace.ps1 again, or update the manifest after the fresh export.',
+      'Run the published read_only_project_text_snapshot workflow against the exact current .kpr.',
+      'Use its snapshot/source_snapshot_manifest.json, or complete the legacy schema v1 workspace with fresh exports.',
       'Do not run existing-project repair/update until this gate reports ok=true.'
     )
   }
@@ -104,8 +104,9 @@ try {
   Stop-Gate 'KV_SOURCE_SNAPSHOT_MANIFEST_INVALID_JSON' "Snapshot manifest is not valid JSON: $($_.Exception.Message)" @($SnapshotManifestPath)
 }
 
-if ([int]$manifest.schema_version -ne 1) {
-  Stop-Gate 'KV_SOURCE_SNAPSHOT_SCHEMA_UNSUPPORTED' 'Snapshot manifest must use schema_version=1.' @($SnapshotManifestPath)
+$schemaVersion = [int]$manifest.schema_version
+if ($schemaVersion -notin @(1, 2)) {
+  Stop-Gate 'KV_SOURCE_SNAPSHOT_SCHEMA_UNSUPPORTED' 'Snapshot manifest must use schema_version=1 or schema_version=2.' @($SnapshotManifestPath)
 }
 
 $status = [string]$manifest.status
@@ -115,7 +116,7 @@ if ($status -ne 'ready') {
 
 $projectRoot = Get-ProjectRoot $ProjectPath
 $currentFingerprint = Get-DirectoryFingerprint $projectRoot
-$expectedHash = [string]$manifest.project_fingerprint.hash
+$expectedHash = if ($schemaVersion -eq 2) { [string]$manifest.project.fingerprint.hash } else { [string]$manifest.project_fingerprint.hash }
 if (-not $expectedHash) {
   Stop-Gate 'KV_SOURCE_SNAPSHOT_FINGERPRINT_MISSING' 'Snapshot manifest missing project_fingerprint.hash.' @($SnapshotManifestPath)
 }
@@ -127,6 +128,86 @@ if ($currentFingerprint.hash -ne $expectedHash) {
     $currentFingerprint | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $fingerprintPath -Encoding UTF8
   }
   Stop-Gate 'KV_SOURCE_SNAPSHOT_STALE' "Current project fingerprint differs from the parsed source snapshot. expected=$expectedHash actual=$($currentFingerprint.hash)" @($SnapshotManifestPath, $fingerprintPath)
+}
+
+if ($schemaVersion -eq 2) {
+  if ([string]$manifest.snapshot_schema -ne 'kv_project_text_snapshot') {
+    Stop-Gate 'KV_SOURCE_SNAPSHOT_SCHEMA_UNSUPPORTED' 'Schema v2 manifest must use snapshot_schema=kv_project_text_snapshot.' @($SnapshotManifestPath)
+  }
+  if ([string]$manifest.semantic_project_status -ne 'complete') {
+    Stop-Gate 'KV_SOURCE_SEMANTIC_PROJECT_NOT_COMPLETE' "Semantic project status must be complete. status=$($manifest.semantic_project_status)" @($SnapshotManifestPath)
+  }
+
+  $snapshotPath = $manifestDir
+  $semanticProjectPath = Resolve-ManifestPath $manifestDir ([string]$manifest.artifacts.semantic_project)
+  $mnmDir = Resolve-ManifestPath $manifestDir ([string]$manifest.artifacts.mnm)
+  $variablesDir = Resolve-ManifestPath $manifestDir ([string]$manifest.artifacts.variables)
+  $inventoryPath = Resolve-ManifestPath $manifestDir ([string]$manifest.artifacts.inventory)
+  $architecturePath = Join-Path (Resolve-ManifestPath $manifestDir ([string]$manifest.layout.architecture)) 'project_map.json'
+  $entityIndexPath = Join-Path $semanticProjectPath '_index\entities.jsonl'
+  $restorePlanPath = Join-Path $semanticProjectPath '_index\restore_plan.json'
+
+  foreach ($requiredDirectory in @($semanticProjectPath, $mnmDir, $variablesDir)) {
+    if (-not $requiredDirectory -or -not (Test-Path -LiteralPath $requiredDirectory -PathType Container)) {
+      Stop-Gate 'KV_SOURCE_SNAPSHOT_PATH_MISSING' "Semantic snapshot directory not found: $requiredDirectory" @($SnapshotManifestPath)
+    }
+  }
+  foreach ($requiredFile in @($inventoryPath, $architecturePath, $entityIndexPath, $restorePlanPath)) {
+    if (-not $requiredFile -or -not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
+      Stop-Gate 'KV_SOURCE_SNAPSHOT_ARTIFACT_MISSING' "Semantic snapshot artifact not found: $requiredFile" @($SnapshotManifestPath)
+    }
+  }
+
+  $mnmFiles = @(Get-ChildItem -LiteralPath $semanticProjectPath -File -Filter 'body.mnm' -Recurse -ErrorAction SilentlyContinue | Sort-Object FullName)
+  if ($mnmFiles.Count -eq 0) {
+    Stop-Gate 'KV_SOURCE_SNAPSHOT_MNM_EMPTY' "Semantic snapshot must contain at least one body.mnm: $semanticProjectPath" @($SnapshotManifestPath)
+  }
+  $variableFiles = @(Get-ChildItem -LiteralPath $semanticProjectPath -File -Filter '*.tsv' -Recurse -ErrorAction SilentlyContinue | Sort-Object FullName)
+  if ($variableFiles.Count -eq 0) {
+    Stop-Gate 'KV_SOURCE_SNAPSHOT_VARIABLES_EMPTY' "Semantic snapshot must contain variable or argument TSV files: $semanticProjectPath" @($SnapshotManifestPath)
+  }
+
+  $incompleteEntities = [System.Collections.Generic.List[object]]::new()
+  foreach ($line in @(Get-Content -LiteralPath $entityIndexPath -Encoding UTF8 | Where-Object { $_.Trim() })) {
+    try { $entity = $line | ConvertFrom-Json } catch {
+      Stop-Gate 'KV_SOURCE_SNAPSHOT_ENTITY_INDEX_INVALID' "Entity index contains invalid JSON: $($_.Exception.Message)" @($entityIndexPath)
+    }
+    foreach ($property in @($entity.status.PSObject.Properties)) {
+      if ([string]$property.Value -in @('failed','missing','partial','unresolved')) {
+        $incompleteEntities.Add([ordered]@{ entity_id=[string]$entity.id; field=[string]$property.Name; status=[string]$property.Value })
+      }
+    }
+  }
+
+  try { $architecture = Get-Content -Raw -LiteralPath $architecturePath -Encoding UTF8 | ConvertFrom-Json } catch {
+    Stop-Gate 'KV_UPDATE_ARCHITECTURE_INVALID_JSON' "Architecture file is not valid JSON: $($_.Exception.Message)" @($architecturePath)
+  }
+  if (-not $architecture.extension_points) {
+    Stop-Gate 'KV_UPDATE_ARCHITECTURE_NOT_OPEN' 'Architecture file must contain extension_points for future configuration categories.' @($architecturePath)
+  }
+
+  $payload = [ordered]@{
+    ok = $true
+    operation = 'assert KV existing project semantic source snapshot'
+    schema_version = 2
+    project_path = $ProjectPath
+    project_root = $projectRoot
+    snapshot_manifest_path = $SnapshotManifestPath
+    snapshot_path = $snapshotPath
+    semantic_project_path = $semanticProjectPath
+    project_fingerprint = $currentFingerprint
+    mnm_count = $mnmFiles.Count
+    variable_manifest_count = $variableFiles.Count
+    entity_index_path = $entityIndexPath
+    restore_plan_path = $restorePlanPath
+    semantic_warnings = @($manifest.semantic_warnings)
+    incomplete_entities = @($incompleteEntities)
+    architecture_path = $architecturePath
+  }
+  $resultPath = Write-Result $payload
+  if ($resultPath) { $payload.result_path = $resultPath }
+  $payload | ConvertTo-Json -Depth 8
+  exit 0
 }
 
 $snapshotPath = Resolve-ManifestPath $manifestDir ([string]$manifest.snapshot.path)

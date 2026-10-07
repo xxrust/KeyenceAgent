@@ -25,11 +25,24 @@
 5. `Ctrl+F2` 或 `Ctrl+F9` 转换/编译通过。
 6. 程序 inventory 与参考意图一致：模块、扫描/任务位置、主要状态转移和设备交互。
 
+## 语义源树
+
+完整项目复刻以同次运行生成的 `snapshot/project/` 为规范源树：
+
+- `project/_index/restore_plan.json` 给出恢复依赖与顺序。
+- FB 实体必须同时核对分组、MNM、自变量、局部变量和 `entity.json.status`。
+- 普通程序实体必须同时核对模块类别、MNM、局部变量和 `entity.json.status`。
+- 单元、EtherCAT、全局变量和类型从 `project/配置`、`project/类型` 取得。
+- `text/` 和 `raw/` 用于来源追溯及失败诊断，不作为另一套项目结构。
+
+顶层 `status=ready` 或 `semantic_project_status=complete` 不会消除实体 warning。
+存在 `failed`、`missing`、`partial`、`unresolved` 时，该实体不得声明为已完整复刻。
+
 ## 完整性检查
 
 复刻完整性由以下条件共同证明：
 
-- 目标项目拥有独立的当前项目路径、source snapshot 和验证证据。
+- 目标项目拥有独立的当前项目路径、source snapshot、语义项目树和验证证据。
 - 官方 FB 作为库依赖存在；用户逻辑以 MNM/变量 manifest/单元配置证据表达。
 - 编译错误清单为空。
 - MNM 引用的变量都能在全局/局部变量表、FB 实例或设备映射中解析。

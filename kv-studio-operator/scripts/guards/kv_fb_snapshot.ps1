@@ -11,6 +11,8 @@ public class KvFbSnapshotNative {
 function Assert-KvFbNoPopup([IntPtr]$MainHwnd){
  $popup=[KvFbSnapshotNative]::GetWindow($MainHwnd,6)
  if($popup -ne [IntPtr]::Zero -and $popup -ne $MainHwnd -and [KvFbSnapshotNative]::IsWindowVisible($popup)){
+  $element=[Windows.Automation.AutomationElement]::FromHandle($popup)
+  Write-KvUiGuardRunLog -Event 'fb_snapshot_popup_identity' -Data @{popup_hwnd=$popup.ToInt64();name=$element.Current.Name;class=$element.Current.ClassName;automation_id=$element.Current.AutomationId;control_type=$element.Current.ControlType.ProgrammaticName}
   Write-KvUiGuardRunLog -Event 'fb_snapshot_blocked_popup' -Data @{main_hwnd=$MainHwnd.ToInt64();popup_hwnd=$popup.ToInt64();error_code='KV_MODAL_PRESENT'}
   throw 'KV_MODAL_PRESENT'
  }

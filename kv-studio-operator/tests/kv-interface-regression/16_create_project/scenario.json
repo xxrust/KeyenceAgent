@@ -1,0 +1,11 @@
+{
+  "name": "16_create_project",
+  "enabled": true,
+  "project_mode": "new_project",
+  "project_name": "QA_BlankProject",
+  "cpu_model": "KV-X520",
+  "open_project": false,
+  "workflow": "scripts/workflows/create_kv_project.ps1",
+  "result_file": "workflow\\workflow_result.json",
+  "arguments": ["-ProjectName", "QA_BlankProject", "-ProjectRoot", "${project_root}", "-CpuModel", "KV-X520", "-OutDir", "${out}\\workflow", "-TimeoutSeconds", "120"]
+}

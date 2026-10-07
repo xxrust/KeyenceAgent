@@ -12,6 +12,27 @@ $script:KvScalarVariableDataTypes = @(
 $script:KvNoLocalVariablesMarkerName = '__NO_LOCAL_VARIABLES__'
 $script:KvNoLocalVariablesMarkerStatus = 'no_local_variables'
 
+# STUse.pdf pp302-304, wiki chunk pdf::STUse::chunk-133. Function names
+# and instruction names require their own KB check; this is the keyword list.
+$script:KvReservedVariableNames = @(
+  'AND','AS','B','BREAK','C','CASE','CM','CR','CTC','CTH','DIM','DM','DO',
+  'DOUBLE','DR','ELSE','EM','END','FALSE','FM','FOR','IF','IS','LR','MC','MCR',
+  'MOD','MR','NEXT','NOT','OFF','ON','OR','P','R','REM','SELECT','STEP','STRWORK',
+  'T','THEN','TM','TO','TRUE','TYPE','UM','UNTIL','UR','UV','V','W','WHILE','XOR','Z','ZF',
+  'TIME','DATE','TIME_OF_DAY','TOD','DATE_AND_TIME','DT','BOOL','SINT','INT','DINT',
+  'LINT','USINT','UINT','UDINT','ULINT','REAL','LREAL','STRING','WSTRING','BYTE',
+  'WORD','DWORD','LWORD','ANY','ANY_DERIVED','ANY_ELEMENTARY','ANY_MAGNITUDE',
+  'ANY_NUM','ANY_REAL','ANY_INT','ANY_BIT','ANY_STRING','ANY_DATE','ACTION',
+  'END_ACTION','ARRAY','OF','AT','END_CASE','CONFIGURATION','END_CONFIGURATION',
+  'CONSTANT','EN','ENO','EXIT','F_EDGE','BY','END_FOR','FUNCTION','END_FUNCTION',
+  'FUNCTION_BLOCK','END_FUNCTION_BLOCK','ELSIF','END_IF','INITIAL_STEP','END_STEP',
+  'PROGRAM','WITH','END_PROGRAM','R_EDGE','READ_ONLY','READ_WRITE','REPEAT',
+  'END_REPEAT','RESOURCE','END_RESOURCE','RETAIN','NON_RETAIN','RETURN','STRUCT',
+  'END_STRUCT','TASK','TRANSITION','FROM','END_TRANSITION','END_TYPE','VAR',
+  'VAR_INPUT','VAR_OUTPUT','VAR_IN_OUT','VAR_TEMP','VAR_EXTERNAL','VAR_ACCESS',
+  'VAR_CONFIG','VAR_GLOBAL','END_VAR','END_WHILE'
+)
+
 function Normalize-KvVariableCustomDataTypes([string[]]$AllowedCustomDataTypes = @()) {
   @(
     $AllowedCustomDataTypes |
@@ -73,6 +94,7 @@ function Test-KvVariableDataType([string]$DataType, [string[]]$AllowedCustomData
 
 function Test-KvSoftDeviceLikeVariableName([string]$Name) {
   if ([string]::IsNullOrWhiteSpace($Name)) { return $false }
+  if ($Name -in $script:KvReservedVariableNames) { return $true }
   return ($Name -match '^(X|Y|R|MR|LR|CR|B|VB|DM|EM|FM|ZF|W|TM|TC|TS|CM|CC|CS|T|C)\d+([._][A-Za-z0-9]+)?$')
 }
 
@@ -314,7 +336,7 @@ function Get-KvVariableDefinitionErrors {
         name = $name
         data_type = $dataType
         source = $SourcePath
-        message = 'Variable name looks like a KV soft-device name and must not be used as a variable identifier.'
+        message = 'Variable name is a documented KEYENCE/IEC keyword or looks like a KV soft-device name; use a descriptive identifier.'
       })
     }
 

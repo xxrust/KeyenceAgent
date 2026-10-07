@@ -4078,7 +4078,7 @@
 							<Child>
 								<value.first>FB_Cylinder:气缸控制</value.first>
 								<value.second>
-									<Expanded>0</Expanded>
+									<Expanded>1</Expanded>
 									<Child>
 										<value.first>书签</value.first>
 										<value.second>
@@ -4416,193 +4416,193 @@
 								<value.second>
 									<Expanded>0</Expanded>
 									<Child>
-										<value.first>[11] : SV630_1Axis_03713</value.first>
+										<value.first>[11] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[12] : SV630_1Axis_03713</value.first>
+										<value.first>[12] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[13] : SV630_1Axis_03713</value.first>
+										<value.first>[13] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[14] : SV630_1Axis_03713</value.first>
+										<value.first>[14] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[16] : SV630_1Axis_03713</value.first>
+										<value.first>[16] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[17] : SV630_1Axis_03713</value.first>
+										<value.first>[17] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[18] : SV630_1Axis_03713</value.first>
+										<value.first>[18] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[19] : SV630_1Axis_03713</value.first>
+										<value.first>[19] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[1] : SGDXS-xxxxA0x EtherCAT(CoE) SERVOPACK Rev01.05</value.first>
+										<value.first>[1] SGDXS-xxxxA0x EtherCAT(CoE) SERVOPACK Rev01.05</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[20] : SV630_1Axis_03713</value.first>
+										<value.first>[20] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[21] : SV630_1Axis_03713</value.first>
+										<value.first>[21] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[22] : SV630_1Axis_03713</value.first>
+										<value.first>[22] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[23] : SV630_1Axis_03713</value.first>
+										<value.first>[23] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[24] : SV630_1Axis_03713</value.first>
+										<value.first>[24] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[25] : SV630_1Axis_03713</value.first>
+										<value.first>[25] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[26] : SV630_1Axis_03713</value.first>
+										<value.first>[26] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[28] : SV630_1Axis_03713</value.first>
+										<value.first>[28] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[29] : SV630_1Axis_03713</value.first>
+										<value.first>[29] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[2] : CL3C-EC503(COE)</value.first>
+										<value.first>[2] CL3C-EC503(COE)</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[30] : SV630_1Axis_03713</value.first>
+										<value.first>[30] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[31] : SV630_1Axis_03713</value.first>
+										<value.first>[31] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[32] : SV630_1Axis_03713</value.first>
+										<value.first>[32] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[33] : SV630_1Axis_03713</value.first>
+										<value.first>[33] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[34] : SV630_1Axis_03713</value.first>
+										<value.first>[34] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[35] : SV630_1Axis_03713</value.first>
+										<value.first>[35] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[3] : YAKO MS-MINI3E</value.first>
+										<value.first>[3] YAKO MS-MINI3E</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[4] : KV-EC01</value.first>
+										<value.first>[4] KV-EC01</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[5] : KV-EC01</value.first>
+										<value.first>[5] KV-EC01</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[6] : KV-EC01</value.first>
+										<value.first>[6] KV-EC01</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[7] : SV630_1Axis_03713</value.first>
+										<value.first>[7] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[8] : SV630_1Axis_03713</value.first>
+										<value.first>[8] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>[9] : SV630_1Axis_03713</value.first>
+										<value.first>[9] SV630_1Axis_03713</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 										</value.second>
@@ -5008,7 +5008,7 @@
 				<value.second>
 					<Expanded>0</Expanded>
 					<Child>
-						<value.first>(Default)</value.first>
+						<value.first>(Default) 用户全局</value.first>
 						<value.second>
 							<Expanded>0</Expanded>
 						</value.second>
@@ -5682,7 +5682,7 @@
 				</value.second>
 			</Child>
 			<Child>
-				<value.first>程序(显示群组): KVX样例程序_v100</value.first>
+				<value.first>程序(显示执行顺序): KVX样例程序_v100</value.first>
 				<value.second>
 					<Expanded>1</Expanded>
 					<Child>
@@ -5738,69 +5738,21 @@
 						<value.second>
 							<Expanded>1</Expanded>
 							<Child>
-								<value.first>A01_输入</value.first>
+								<value.first>A1_气缸控制 [19]</value.first>
 								<value.second>
-									<Expanded>1</Expanded>
+									<Expanded>0</Expanded>
 									<Child>
-										<value.first>IO输入 [1]</value.first>
+										<value.first>书签</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 											<Child>
-												<value.first>书签</value.first>
+												<value.first>功能块调用</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
-													<Child>
-														<value.first>ST00:插针_演示用</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST01:上料区A</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST02:上料区B</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST03:上料区C</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST04:传送带</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST05:旋转点胶</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST06:下料区</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>设备面板按钮</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
 												</value.second>
 											</Child>
 											<Child>
-												<value.first>局部变量</value.first>
+												<value.first>气缸控制</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
 												</value.second>
@@ -5808,137 +5760,59 @@
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>模拟量输入 [3]</value.first>
+										<value.first>局部变量</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
-											<Child>
-												<value.first>书签</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-												</value.second>
-											</Child>
-											<Child>
-												<value.first>局部变量</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-												</value.second>
-											</Child>
-										</value.second>
-									</Child>
-									<Child>
-										<value.first>高速计数器输入 [2]</value.first>
-										<value.second>
-											<Expanded>0</Expanded>
-											<Child>
-												<value.first>书签</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-												</value.second>
-											</Child>
-											<Child>
-												<value.first>局部变量</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-												</value.second>
-											</Child>
 										</value.second>
 									</Child>
 								</value.second>
 							</Child>
 							<Child>
-								<value.first>A02_初始化</value.first>
+								<value.first>A2_真空控制 [20]</value.first>
 								<value.second>
-									<Expanded>1</Expanded>
+									<Expanded>0</Expanded>
 									<Child>
-										<value.first>初始化 [4]</value.first>
+										<value.first>书签</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 											<Child>
-												<value.first>书签</value.first>
+												<value.first>功能块调用</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
-													<Child>
-														<value.first>工站初始化</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>气缸初始化</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
 												</value.second>
 											</Child>
 											<Child>
-												<value.first>局部变量</value.first>
+												<value.first>真空控制</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
 												</value.second>
 											</Child>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 								</value.second>
 							</Child>
 							<Child>
-								<value.first>A03_组件</value.first>
+								<value.first>A3_轴控制 [21]</value.first>
 								<value.second>
-									<Expanded>1</Expanded>
+									<Expanded>0</Expanded>
 									<Child>
-										<value.first>调用气缸FB [5]</value.first>
+										<value.first>书签</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 											<Child>
-												<value.first>书签</value.first>
+												<value.first>功能块调用</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
-													<Child>
-														<value.first>ST00:插针</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST01:上料区A</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST02:上料区B</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST03:上料区C</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST04:传送带</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST05:旋转点胶</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST06:下料区</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
 												</value.second>
 											</Child>
 											<Child>
-												<value.first>局部变量</value.first>
+												<value.first>轴控制</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
 												</value.second>
@@ -5946,143 +5820,41 @@
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>调用真空FB [6]</value.first>
+										<value.first>局部变量</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
-											<Child>
-												<value.first>书签</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-													<Child>
-														<value.first>ST01:上料区A</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST02:上料区B</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-												</value.second>
-											</Child>
-											<Child>
-												<value.first>局部变量</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-												</value.second>
-											</Child>
-										</value.second>
-									</Child>
-									<Child>
-										<value.first>调用轴控FB [7]</value.first>
-										<value.second>
-											<Expanded>0</Expanded>
-											<Child>
-												<value.first>书签</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-													<Child>
-														<value.first>伺服参数读写</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>原点传感器</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>方法1：使用PLCopen的MC功能块</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>方法2：调用二次封装功能块</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>调用功能块</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>轴功能启用</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>轴状态映射</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>轴节点状态</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-												</value.second>
-											</Child>
-											<Child>
-												<value.first>局部变量</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-												</value.second>
-											</Child>
 										</value.second>
 									</Child>
 								</value.second>
 							</Child>
 							<Child>
-								<value.first>A04_工站</value.first>
+								<value.first>A4_ModbusTCP [22]</value.first>
 								<value.second>
-									<Expanded>1</Expanded>
+									<Expanded>0</Expanded>
 									<Child>
-										<value.first>ST00_插针_演示 [8]</value.first>
+										<value.first>书签</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 											<Child>
-												<value.first>书签</value.first>
+												<value.first>功能块实例化</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
-													<Child>
-														<value.first>初始化</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>手动</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>报警映射</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>自动流程</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
 												</value.second>
 											</Child>
 											<Child>
-												<value.first>局部变量</value.first>
+												<value.first>参数设定</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>编辑发送数据列表</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>通信控制</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
 												</value.second>
@@ -6090,449 +5862,227 @@
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>ST01_上料区A [9]</value.first>
+										<value.first>局部变量</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
-											<Child>
-												<value.first>书签</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-													<Child>
-														<value.first>初始化</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>手动</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>报警映射</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>自动流程</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-												</value.second>
-											</Child>
-											<Child>
-												<value.first>局部变量</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-												</value.second>
-											</Child>
-										</value.second>
-									</Child>
-									<Child>
-										<value.first>ST02_上料区B [10]</value.first>
-										<value.second>
-											<Expanded>0</Expanded>
-											<Child>
-												<value.first>书签</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-													<Child>
-														<value.first>初始化</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>手动</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>报警映射</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>自动流程</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-												</value.second>
-											</Child>
-											<Child>
-												<value.first>局部变量</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-												</value.second>
-											</Child>
-										</value.second>
-									</Child>
-									<Child>
-										<value.first>ST03_上料区C [11]</value.first>
-										<value.second>
-											<Expanded>0</Expanded>
-											<Child>
-												<value.first>书签</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-													<Child>
-														<value.first>初始化</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>手动</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>报警映射</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>自动流程</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-												</value.second>
-											</Child>
-											<Child>
-												<value.first>局部变量</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-												</value.second>
-											</Child>
-										</value.second>
-									</Child>
-									<Child>
-										<value.first>ST04_传送带 [12]</value.first>
-										<value.second>
-											<Expanded>0</Expanded>
-											<Child>
-												<value.first>书签</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-													<Child>
-														<value.first>初始化</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>手动</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>报警映射</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>自动流程</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-												</value.second>
-											</Child>
-											<Child>
-												<value.first>局部变量</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-												</value.second>
-											</Child>
-										</value.second>
-									</Child>
-									<Child>
-										<value.first>ST05_旋转点胶 [13]</value.first>
-										<value.second>
-											<Expanded>0</Expanded>
-											<Child>
-												<value.first>书签</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-													<Child>
-														<value.first>初始化</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>手动</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>报警映射</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>自动流程</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-												</value.second>
-											</Child>
-											<Child>
-												<value.first>局部变量</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-												</value.second>
-											</Child>
-										</value.second>
-									</Child>
-									<Child>
-										<value.first>ST06_下料区 [14]</value.first>
-										<value.second>
-											<Expanded>0</Expanded>
-											<Child>
-												<value.first>书签</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-													<Child>
-														<value.first>初始化</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>手动</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>报警映射</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>自动流程</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-												</value.second>
-											</Child>
-											<Child>
-												<value.first>局部变量</value.first>
-												<value.second>
-													<Expanded>0</Expanded>
-												</value.second>
-											</Child>
 										</value.second>
 									</Child>
 								</value.second>
 							</Child>
 							<Child>
-								<value.first>A05_设备</value.first>
+								<value.first>A5_手自动 [23]</value.first>
 								<value.second>
-									<Expanded>1</Expanded>
+									<Expanded>0</Expanded>
 									<Child>
-										<value.first>设备状态 [15]</value.first>
+										<value.first>书签</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 											<Child>
-												<value.first>书签</value.first>
+												<value.first>工站1程序</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
 												</value.second>
 											</Child>
 											<Child>
-												<value.first>局部变量</value.first>
+												<value.first>工站2程序</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
 												</value.second>
 											</Child>
+											<Child>
+												<value.first>操作说明</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>设备模式控制</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 								</value.second>
 							</Child>
 							<Child>
-								<value.first>A06_报警</value.first>
+								<value.first>Alarm报警 [16]</value.first>
 								<value.second>
-									<Expanded>1</Expanded>
+									<Expanded>0</Expanded>
 									<Child>
-										<value.first>Alarm报警 [16]</value.first>
+										<value.first>书签</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 											<Child>
-												<value.first>书签</value.first>
+												<value.first>报警状态处理</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
-													<Child>
-														<value.first>报警状态处理</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>报警状态汇总</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
 												</value.second>
 											</Child>
 											<Child>
-												<value.first>局部变量</value.first>
+												<value.first>报警状态汇总</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
 												</value.second>
 											</Child>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 								</value.second>
 							</Child>
 							<Child>
-								<value.first>A07_HMI</value.first>
+								<value.first>HMI [17]</value.first>
 								<value.second>
-									<Expanded>1</Expanded>
+									<Expanded>0</Expanded>
 									<Child>
-										<value.first>HMI [17]</value.first>
+										<value.first>书签</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 											<Child>
-												<value.first>书签</value.first>
+												<value.first>HMI轴控制</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
-													<Child>
-														<value.first>HMI轴控制</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>设备画面</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
 												</value.second>
 											</Child>
 											<Child>
-												<value.first>局部变量</value.first>
+												<value.first>设备画面</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
 												</value.second>
 											</Child>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 								</value.second>
 							</Child>
 							<Child>
-								<value.first>A08_输出</value.first>
+								<value.first>IO输入 [1]</value.first>
 								<value.second>
-									<Expanded>1</Expanded>
+									<Expanded>0</Expanded>
 									<Child>
-										<value.first>IO输出 [18]</value.first>
+										<value.first>书签</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 											<Child>
-												<value.first>书签</value.first>
+												<value.first>ST00:插针_演示用</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
-													<Child>
-														<value.first>ST01:上料区A</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST02:上料区B</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST03:上料区C</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST04:传送带</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST05:旋转点胶</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>ST06:下料区</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>三色灯/蜂鸣器/面板灯</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
 												</value.second>
 											</Child>
 											<Child>
-												<value.first>局部变量</value.first>
+												<value.first>ST01:上料区A</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
 												</value.second>
 											</Child>
+											<Child>
+												<value.first>ST02:上料区B</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST03:上料区C</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST04:传送带</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST05:旋转点胶</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST06:下料区</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>设备面板按钮</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 								</value.second>
 							</Child>
 							<Child>
-								<value.first>演示用</value.first>
+								<value.first>IO输出 [18]</value.first>
 								<value.second>
-									<Expanded>1</Expanded>
+									<Expanded>0</Expanded>
 									<Child>
-										<value.first>A1_气缸控制 [19]</value.first>
+										<value.first>书签</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 											<Child>
-												<value.first>书签</value.first>
+												<value.first>ST01:上料区A</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
-													<Child>
-														<value.first>功能块调用</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>气缸控制</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
 												</value.second>
 											</Child>
 											<Child>
-												<value.first>局部变量</value.first>
+												<value.first>ST02:上料区B</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST03:上料区C</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST04:传送带</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST05:旋转点胶</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST06:下料区</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>三色灯/蜂鸣器/面板灯</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
 												</value.second>
@@ -6540,29 +6090,41 @@
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>A2_真空控制 [20]</value.first>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+								</value.second>
+							</Child>
+							<Child>
+								<value.first>ST00_插针_演示 [8]</value.first>
+								<value.second>
+									<Expanded>0</Expanded>
+									<Child>
+										<value.first>书签</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 											<Child>
-												<value.first>书签</value.first>
+												<value.first>初始化</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
-													<Child>
-														<value.first>功能块调用</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>真空控制</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
 												</value.second>
 											</Child>
 											<Child>
-												<value.first>局部变量</value.first>
+												<value.first>手动</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>报警映射</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>自动流程</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
 												</value.second>
@@ -6570,29 +6132,41 @@
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>A3_轴控制 [21]</value.first>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+								</value.second>
+							</Child>
+							<Child>
+								<value.first>ST01_上料区A [9]</value.first>
+								<value.second>
+									<Expanded>0</Expanded>
+									<Child>
+										<value.first>书签</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 											<Child>
-												<value.first>书签</value.first>
+												<value.first>初始化</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
-													<Child>
-														<value.first>功能块调用</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>轴控制</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
 												</value.second>
 											</Child>
 											<Child>
-												<value.first>局部变量</value.first>
+												<value.first>手动</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>报警映射</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>自动流程</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
 												</value.second>
@@ -6600,41 +6174,41 @@
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>A4_ModbusTCP [22]</value.first>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+								</value.second>
+							</Child>
+							<Child>
+								<value.first>ST02_上料区B [10]</value.first>
+								<value.second>
+									<Expanded>0</Expanded>
+									<Child>
+										<value.first>书签</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 											<Child>
-												<value.first>书签</value.first>
+												<value.first>初始化</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
-													<Child>
-														<value.first>功能块实例化</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>参数设定</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>编辑发送数据列表</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>通信控制</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
 												</value.second>
 											</Child>
 											<Child>
-												<value.first>局部变量</value.first>
+												<value.first>手动</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>报警映射</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>自动流程</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
 												</value.second>
@@ -6642,45 +6216,417 @@
 										</value.second>
 									</Child>
 									<Child>
-										<value.first>A5_手自动 [23]</value.first>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+								</value.second>
+							</Child>
+							<Child>
+								<value.first>ST03_上料区C [11]</value.first>
+								<value.second>
+									<Expanded>0</Expanded>
+									<Child>
+										<value.first>书签</value.first>
 										<value.second>
 											<Expanded>0</Expanded>
 											<Child>
-												<value.first>书签</value.first>
+												<value.first>初始化</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
-													<Child>
-														<value.first>工站1程序</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>工站2程序</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>操作说明</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
-													<Child>
-														<value.first>设备模式控制</value.first>
-														<value.second>
-															<Expanded>0</Expanded>
-														</value.second>
-													</Child>
 												</value.second>
 											</Child>
 											<Child>
-												<value.first>局部变量</value.first>
+												<value.first>手动</value.first>
 												<value.second>
 													<Expanded>0</Expanded>
 												</value.second>
 											</Child>
+											<Child>
+												<value.first>报警映射</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>自动流程</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+								</value.second>
+							</Child>
+							<Child>
+								<value.first>ST04_传送带 [12]</value.first>
+								<value.second>
+									<Expanded>0</Expanded>
+									<Child>
+										<value.first>书签</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+											<Child>
+												<value.first>初始化</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>手动</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>报警映射</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>自动流程</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+								</value.second>
+							</Child>
+							<Child>
+								<value.first>ST05_旋转点胶 [13]</value.first>
+								<value.second>
+									<Expanded>0</Expanded>
+									<Child>
+										<value.first>书签</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+											<Child>
+												<value.first>初始化</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>手动</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>报警映射</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>自动流程</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+								</value.second>
+							</Child>
+							<Child>
+								<value.first>ST06_下料区 [14]</value.first>
+								<value.second>
+									<Expanded>0</Expanded>
+									<Child>
+										<value.first>书签</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+											<Child>
+												<value.first>初始化</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>手动</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>报警映射</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>自动流程</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+								</value.second>
+							</Child>
+							<Child>
+								<value.first>初始化 [4]</value.first>
+								<value.second>
+									<Expanded>0</Expanded>
+									<Child>
+										<value.first>书签</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+											<Child>
+												<value.first>工站初始化</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>气缸初始化</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+								</value.second>
+							</Child>
+							<Child>
+								<value.first>模拟量输入 [3]</value.first>
+								<value.second>
+									<Expanded>0</Expanded>
+									<Child>
+										<value.first>书签</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+								</value.second>
+							</Child>
+							<Child>
+								<value.first>设备状态 [15]</value.first>
+								<value.second>
+									<Expanded>0</Expanded>
+									<Child>
+										<value.first>书签</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+								</value.second>
+							</Child>
+							<Child>
+								<value.first>调用气缸FB [5]</value.first>
+								<value.second>
+									<Expanded>0</Expanded>
+									<Child>
+										<value.first>书签</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+											<Child>
+												<value.first>ST00:插针</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST01:上料区A</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST02:上料区B</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST03:上料区C</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST04:传送带</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST05:旋转点胶</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST06:下料区</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+								</value.second>
+							</Child>
+							<Child>
+								<value.first>调用真空FB [6]</value.first>
+								<value.second>
+									<Expanded>0</Expanded>
+									<Child>
+										<value.first>书签</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+											<Child>
+												<value.first>ST01:上料区A</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>ST02:上料区B</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+								</value.second>
+							</Child>
+							<Child>
+								<value.first>调用轴控FB [7]</value.first>
+								<value.second>
+									<Expanded>0</Expanded>
+									<Child>
+										<value.first>书签</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+											<Child>
+												<value.first>伺服参数读写</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>原点传感器</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>方法1：使用PLCopen的MC功能块</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>方法2：调用二次封装功能块</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>调用功能块</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>轴功能启用</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>轴状态映射</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+											<Child>
+												<value.first>轴节点状态</value.first>
+												<value.second>
+													<Expanded>0</Expanded>
+												</value.second>
+											</Child>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+								</value.second>
+							</Child>
+							<Child>
+								<value.first>高速计数器输入 [2]</value.first>
+								<value.second>
+									<Expanded>0</Expanded>
+									<Child>
+										<value.first>书签</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
+										</value.second>
+									</Child>
+									<Child>
+										<value.first>局部变量</value.first>
+										<value.second>
+											<Expanded>0</Expanded>
 										</value.second>
 									</Child>
 								</value.second>

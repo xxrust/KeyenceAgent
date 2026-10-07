@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "module_name": "FB_QA_STStats",
+  "category": "function_block",
+  "parent_path": ["功能块", "level2_工站"],
+  "source_path": "FB_QA_STStats.st",
+  "body_path": "FB_QA_STStats.mnm",
+  "locals_path": "locals.tsv",
+  "arguments_path": "arguments.tsv",
+  "evidence_paths": ["wiki_evidence.md"]
+}

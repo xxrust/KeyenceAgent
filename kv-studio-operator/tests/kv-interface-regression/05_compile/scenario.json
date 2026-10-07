@@ -1,7 +1,6 @@
 {
   "name": "05_compile",
-  "enabled": false,
-  "reason": "Workflow is pending live validation in script_manifest.json.",
+  "enabled": true,
   "workflow": "scripts/workflows/compile_kv_project.ps1",
   "result_file": "workflow\\workflow_result.json",
   "arguments": ["-ProjectPath", "${project}", "-OutDir", "${out}\\workflow", "-TimeoutSeconds", "120"]

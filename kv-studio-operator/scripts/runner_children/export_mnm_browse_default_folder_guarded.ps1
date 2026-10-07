@@ -9,6 +9,7 @@ param(
   [string]$OutDir,
 
   [string]$KvsExe = '',
+  [string]$CreatedProjectResultPath = '',
   [switch]$RestartKvs,
   [switch]$InspectOnly,
   [int]$TimeoutSeconds = 90
@@ -16,6 +17,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force -Path $OutDir, $ExportDir | Out-Null
+$script:LaunchedByRunner = $false
+$script:ProcessId = 0
+$script:StoppedProcessIds = @()
+$script:ProjectSaved = $false
+$script:FinalProjectTitle = ''
+$script:ProjectSaveChecks = @()
 
 function Log([string]$Message) {
   $path=if($env:KV_WORKFLOW_RUN_LOG){$env:KV_WORKFLOW_RUN_LOG}else{Join-Path $OutDir 'run.log'}
@@ -30,6 +37,13 @@ function Write-Result([bool]$Ok, [string]$Code, [string]$Message, [object[]]$Mnm
     project_path = $ProjectPath
     export_dir = $ExportDir
     out_dir = $OutDir
+    process_id = $script:ProcessId
+    launched_by_runner = $script:LaunchedByRunner
+    restart_requested = [bool]$RestartKvs
+    stopped_process_ids = @($script:StoppedProcessIds)
+    project_saved = $script:ProjectSaved
+    final_title = $script:FinalProjectTitle
+    project_save_checks = @($script:ProjectSaveChecks)
     mnm_files = @($MnmFiles)
   } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'browse_folder_export_result.json') -Encoding UTF8
 }
@@ -82,6 +96,31 @@ function Get-WindowTitle([IntPtr]$Hwnd) {
   $builder = New-Object System.Text.StringBuilder 512
   [void][KvBrowseFolderWin32]::GetWindowText($Hwnd, $builder, $builder.Capacity)
   return $builder.ToString()
+}
+
+function Save-KvExportProject([int]$ProcessId,[IntPtr]$Hwnd,[string]$ProjectName,[string]$Stage) {
+  $cleanPattern='^KV STUDIO.* - \['+[regex]::Escape($ProjectName)+'\]$'
+  $dirtyPattern='^KV STUDIO.* - \['+[regex]::Escape($ProjectName)+' \*\]$'
+  $bound=Get-Process -Id $ProcessId -ErrorAction Stop
+  $before=Get-WindowTitle $Hwnd
+  if($bound.MainWindowHandle -ne $Hwnd -or ($before -notmatch $cleanPattern -and $before -notmatch $dirtyPattern)){throw 'KV_EXPORT_SAVE_PROJECT_IDENTITY_MISMATCH'}
+  $saveRequested=$before -match $dirtyPattern
+  if($saveRequested){
+    Invoke-KvGuardedSendKeys -TargetHwnd $Hwnd -Step ('save project '+$Stage) -Keys '^s' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+S saves the bound project before final export acceptance' -SleepMs 500
+  }
+  $deadline=(Get-Date).AddSeconds(5)
+  do {
+    $bound=Get-Process -Id $ProcessId -ErrorAction Stop
+    $title=Get-WindowTitle $Hwnd
+    if($bound.MainWindowHandle -ne $Hwnd -or ($title -notmatch $cleanPattern -and $title -notmatch $dirtyPattern)){throw 'KV_EXPORT_SAVE_PROJECT_IDENTITY_MISMATCH'}
+    if($title -match $cleanPattern){break}
+    Start-Sleep -Milliseconds 100
+  } while((Get-Date) -lt $deadline)
+  if($title -notmatch $cleanPattern){throw 'KV_EXPORT_PROJECT_NOT_SAVED'}
+  $script:ProjectSaveChecks+=@{stage=$Stage;process_id=$ProcessId;hwnd=$Hwnd.ToInt64();before_title=$before;final_title=$title;ctrl_s_sent=[bool]$saveRequested;project_saved=$true}
+  $script:ProjectSaved=$true
+  $script:FinalProjectTitle=$title
+  Log ('verified saved project '+$Stage+': '+$title)
 }
 
 function Get-WindowClass([IntPtr]$Hwnd) {
@@ -428,34 +467,57 @@ try {
 
   $runStart = Get-Date
   Log "start ProjectPath=$ProjectPath ExportDir=$ExportDir RestartKvs=$RestartKvs"
-  if ($RestartKvs) {
-    Get-Process Kvs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 2
-  }
-
   $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
-  $process = Get-Process Kvs -ErrorAction SilentlyContinue |
-    Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$projectNeedle*" } |
-    Select-Object -First 1
-  if (-not $process) {
-    Start-Process -FilePath $KvsExe -ArgumentList ('"' + $ProjectPath + '"') | Out-Null
+  $projectTitlePattern='^KV STUDIO.* - \['+[regex]::Escape($projectNeedle)+'(?: \*)?\]$'
+  $projectPattern='(?:^|\s)(?:"'+[regex]::Escape($ProjectPath)+'"|'+[regex]::Escape($ProjectPath)+')(?=\s|$)'
+  $bound=@(Get-CimInstance Win32_Process -Filter "Name='Kvs.exe'" | Where-Object { $_.CommandLine -and $_.CommandLine -match $projectPattern } | ForEach-Object { Get-Process -Id ([int]$_.ProcessId) -ErrorAction SilentlyContinue })
+  if ($CreatedProjectResultPath) {
+    $creation=Get-Content -LiteralPath $CreatedProjectResultPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($creation.ok -isnot [bool] -or -not $creation.ok -or -not $creation.project_path -or [IO.Path]::GetFullPath([string]$creation.project_path) -ine $ProjectPath -or -not $creation.requested_project_path -or [IO.Path]::GetFullPath([string]$creation.requested_project_path) -ine $ProjectPath -or -not $creation.process_id -or -not $creation.process_start_utc) { throw 'KV_EXPORT_CREATION_EVIDENCE_INVALID' }
+    $created=Get-Process -Id ([int]$creation.process_id) -ErrorAction Stop
+    $started=[DateTime]::Parse([string]$creation.process_start_utc,[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+    if ($created.ProcessName -ine 'Kvs' -or $created.StartTime.ToUniversalTime() -ne $started -or $created.MainWindowHandle -eq 0 -or $created.MainWindowTitle -notmatch $projectTitlePattern -or -not $creation.kvs_exe -or [IO.Path]::GetFullPath($created.Path) -ine [IO.Path]::GetFullPath([string]$creation.kvs_exe)) { throw 'KV_EXPORT_CREATED_PROCESS_IDENTITY_MISMATCH' }
+    if (@($bound | Where-Object { $_.Id -ne $created.Id }).Count) { throw 'KV_EXPORT_PROJECT_PROCESS_AMBIGUOUS' }
+    $bound=@($created)
+  }
+  if ($bound.Count -gt 1) { throw 'KV_EXPORT_PROJECT_PROCESS_AMBIGUOUS' }
+  if ($RestartKvs) {
+    $toStop = @($bound)
+    $script:StoppedProcessIds = @($toStop | ForEach-Object { $_.Id })
+    $toStop | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    $bound=@()
   }
 
+  $process=$bound | Select-Object -First 1
+  if (-not $process) {
+    $matching=@(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -match $projectTitlePattern })
+    if ($matching.Count -gt 1 -or ($RestartKvs -and $matching.Count)) { throw 'KV_EXPORT_PROJECT_PATH_BINDING_REQUIRED' }
+    if ($matching.Count -eq 1) { $process=$matching[0] }
+  }
+  if (-not $process) {
+    $launched = Start-Process -FilePath $KvsExe -ArgumentList ('"' + $ProjectPath + '"') -PassThru
+    $script:LaunchedByRunner = $true
+    $script:ProcessId = $launched.Id
+    $process=$launched
+  }
+
+  $targetProcessId=$process.Id
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
   do {
-    $process = Get-Process Kvs -ErrorAction SilentlyContinue |
-      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' } |
-      Select-Object -First 1
-    if ($process -and $process.MainWindowTitle -like "*$projectNeedle*") { break }
+    $process = Get-Process -Id $targetProcessId -ErrorAction SilentlyContinue
+    if ($process -and $process.MainWindowHandle -ne 0 -and $process.MainWindowTitle -match $projectTitlePattern) { break }
     Start-Sleep -Milliseconds 500
   } while ((Get-Date) -lt $deadline)
-  if (-not $process) { throw 'KV STUDIO visible main window not found.' }
+  if (-not $process -or $process.MainWindowHandle -eq 0 -or $process.MainWindowTitle -notmatch $projectTitlePattern) { throw 'KV STUDIO target main window not ready.' }
+  $script:ProcessId = $process.Id
 
   [KvBrowseFolderWin32]::ShowWindow($process.MainWindowHandle, 3) | Out-Null
   [KvBrowseFolderWin32]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
   Start-Sleep -Milliseconds 800
   Save-TopWindowSnapshot 'top_windows_before_prefix.json'
   Save-ForegroundSnapshot 'foreground_before_prefix.json'
+  Save-KvExportProject -ProcessId $process.Id -Hwnd $process.MainWindowHandle -ProjectName $projectNeedle -Stage 'before MNM export'
 
   Log 'send known prefix Alt+F,R,S through guarded physical VK uppercase accelerators'
   Invoke-KvGuardedAltVk -TargetHwnd $process.MainWindowHandle -Step 'mnm export Alt+F' -Vk 0x46 -ExpectedTitleLike 'KV STUDIO*' -SleepMs 300
@@ -493,6 +555,7 @@ try {
   $mnmFiles | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'mnm_files.json') -Encoding UTF8
   if ($mnmFiles.Count -eq 0) { throw "No current-run .mnm files were exported under $ExportDir" }
   Invoke-KvStudioCleanStatePostcheck | Out-Null
+  Save-KvExportProject -ProcessId $process.Id -Hwnd $process.MainWindowHandle -ProjectName $projectNeedle -Stage 'after MNM export'
   Write-Result $true '' 'MNM export completed through browse-folder selection.' $mnmFiles
   exit 0
 } catch {

@@ -2,6 +2,7 @@
   [Parameter(Mandatory=$true)]
   [string]$ProjectNeedle,
   [string]$ProjectPath = '',
+  [string]$CreatedProjectResultPath = '',
   [Parameter(Mandatory=$true)]
   [string]$OutDir,
   [string]$ChecklistPath = '',
@@ -199,6 +200,10 @@ try {
   if($processes.Count -eq 0){$processes = @(Get-Process Kvs -ErrorAction Stop | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectNeedle*" })}
   if ($processes.Count -eq 0) {
     throw "No visible Kvs process found for project needle $ProjectNeedle."
+  }
+  if ($CreatedProjectResultPath) {
+    . (Join-Path (Split-Path -Parent $PSScriptRoot) 'kv_project_process_binding.ps1')
+    $processes=@(Get-KvCreatedProjectProcess $ProjectPath $CreatedProjectResultPath)
   }
   if ($processes.Count -ne 1) { throw 'KV_TARGET_WINDOW_AMBIGUOUS: More than one project matches.' }
   $process = $processes[0]

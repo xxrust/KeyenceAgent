@@ -130,6 +130,7 @@ public class KvWin32 {
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, string lParam);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, System.Text.StringBuilder lParam);
   [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
 }
 "@
@@ -165,7 +166,7 @@ function Find-ElementByAutomationId([string]$AutomationId, [int]$Seconds = 10) {
   $deadline = (Get-Date).AddSeconds($Seconds)
   $condition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, $AutomationId)
   do {
-    $element = [System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+    $element = Find-ElementByAutomationIdNow $AutomationId
     if ($element) { return $element }
     Start-Sleep -Milliseconds 200
   } while ((Get-Date) -lt $deadline)
@@ -182,13 +183,14 @@ function Find-NewProjectDialog([int]$Seconds = 30) {
   $newProjectTitle = [string]::Concat([char[]]@(0x65B0,0x5EFA,0x9879,0x76EE))
   $deadline = (Get-Date).AddSeconds($Seconds)
   do {
-    $hwnd = [KvWin32]::FindWindow('#32770', $newProjectTitle)
-    if ($hwnd -ne [IntPtr]::Zero) {
+    $foreground = Get-KvForegroundSnapshot
+    $hwnd = [IntPtr]$foreground.hwnd
+    if ($foreground.process_id -eq $script:CreateProcessId -and $foreground.class_name -eq '#32770' -and $foreground.title -eq $newProjectTitle) {
       $dialog = [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)
       $title = [string]$dialog.Current.Name
       $projectNameEdit = Find-ChildByAutomationId $dialog '1000'
       $cpuCombo = Find-ChildByAutomationId $dialog '1002'
-      if ($projectNameEdit -and $cpuCombo -and ($title -eq $newProjectTitle -or $title.Contains($newProjectTitle))) {
+      if ($projectNameEdit -and $cpuCombo -and $dialog.Current.ProcessId -eq $script:CreateProcessId) {
         Log "found new project dialog by hwnd=$hwnd title=$title"
         return $dialog
       }
@@ -209,14 +211,25 @@ function Find-ElementByName([string]$Name, [int]$Seconds = 5) {
   return $null
 }
 
-function Set-TextById([string]$AutomationId, [string]$Text) {
-  $element = Find-ElementByAutomationId $AutomationId 8
+function Get-BoundCreateControl([IntPtr]$WindowHwnd, [string]$AutomationId, [string]$ControlType, [switch]$AllowDisabled) {
+  Assert-KvUiForegroundHwnd -ExpectedHwnd $WindowHwnd -Step "verify create control $AutomationId" | Out-Null
+  $window = [System.Windows.Automation.AutomationElement]::FromHandle($WindowHwnd)
+  if ($window.Current.ProcessId -ne $script:CreateProcessId) { throw 'KV_CREATE_CONTROL_OWNER_MISMATCH' }
+  $element = Find-ChildByAutomationId $window $AutomationId
+  if (-not $element -or $element.Current.ProcessId -ne $script:CreateProcessId -or (-not $AllowDisabled -and -not $element.Current.IsEnabled) -or $element.Current.ControlType.ProgrammaticName -ne $ControlType) {
+    throw "KV_CREATE_BOUND_CONTROL_MISMATCH: $AutomationId"
+  }
+  return $element
+}
+
+function Set-TextById([string]$AutomationId, [string]$Text, [IntPtr]$WindowHwnd, [string]$ControlType='ControlType.Edit') {
+  $element = Get-BoundCreateControl $WindowHwnd $AutomationId $ControlType
   if (-not $element) { throw "Control not found: $AutomationId" }
   [KvWin32]::SendMessage([IntPtr]$element.Current.NativeWindowHandle, $WM_SETTEXT, [IntPtr]::Zero, $Text) | Out-Null
 }
 
-function Click-ById([string]$AutomationId) {
-  $element = Find-ElementByAutomationId $AutomationId 8
+function Click-ById([string]$AutomationId, [IntPtr]$WindowHwnd) {
+  $element = Get-BoundCreateControl $WindowHwnd $AutomationId 'ControlType.Button'
   if (-not $element) { throw "Control not found: $AutomationId" }
   [KvWin32]::SendMessage([IntPtr]$element.Current.NativeWindowHandle, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
 }
@@ -251,11 +264,16 @@ function Dismiss-UnitConfigPromptNoByAltN([int]$Seconds = 8) {
   return $false
 }
 
-function Select-ComboById([string]$AutomationId, [string]$Value) {
-  $element = Find-ElementByAutomationId $AutomationId 8
+function Select-ComboById([string]$AutomationId, [string]$Value, [IntPtr]$WindowHwnd) {
+  $element = Get-BoundCreateControl $WindowHwnd $AutomationId 'ControlType.ComboBox'
   if (-not $element) { throw "Combo not found: $AutomationId" }
-  [KvWin32]::SendMessage([IntPtr]$element.Current.NativeWindowHandle, $CB_SELECTSTRING, [IntPtr]::new(-1), $Value) | Out-Null
-  [KvWin32]::SendMessage([IntPtr]$element.Current.NativeWindowHandle, $WM_SETTEXT, [IntPtr]::Zero, $Value) | Out-Null
+  $selected = [KvWin32]::SendMessage([IntPtr]$element.Current.NativeWindowHandle, $CB_SELECTSTRING, [IntPtr]::new(-1), $Value)
+  if ($selected.ToInt64() -lt 0) { throw "KV_CREATE_CPU_NOT_AVAILABLE: $Value" }
+  $text = New-Object Text.StringBuilder 128
+  $selection = [KvWin32]::SendMessage([IntPtr]$element.Current.NativeWindowHandle, 0x0147, [IntPtr]::Zero, [IntPtr]::Zero)
+  if ($selection.ToInt64() -ne $selected.ToInt64()) { throw 'KV_CREATE_CPU_SELECTION_NOT_COMMITTED' }
+  [void][KvWin32]::SendMessage([IntPtr]$element.Current.NativeWindowHandle, 0x0148, $selection, $text)
+  if ($text.ToString() -ne $Value) { throw "KV_CREATE_CPU_SELECTION_MISMATCH: $Value" }
 }
 
 function Get-ForegroundTitle {
@@ -280,8 +298,13 @@ function Get-KvStudioMainProcess {
 }
 
 function Find-ElementByAutomationIdNow([string]$AutomationId) {
+  $foreground = Get-KvForegroundSnapshot
+  if ($foreground.process_id -ne $script:CreateProcessId) { throw 'KV_CREATE_CONTROL_FOREGROUND_OWNER_MISMATCH' }
+  $window = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$foreground.hwnd)
   $condition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, $AutomationId)
-  return [System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+  $element = $window.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+  if ($element -and $element.Current.ProcessId -ne $script:CreateProcessId) { throw 'KV_CREATE_CONTROL_OWNER_MISMATCH' }
+  return $element
 }
 
 function Resolve-InitialAdminDialog([pscustomobject]$Credential, [int]$WaitSeconds = 25) {
@@ -293,10 +316,16 @@ function Resolve-InitialAdminDialog([pscustomobject]$Credential, [int]$WaitSecon
   do {
     $adminUser = Find-ElementByAutomationIdNow '_ltxUserName'
     if ($adminUser) {
-      Set-TextById '_ltxUserName' $Credential.User
-      Set-TextById '_ltxPassword' $Credential.Password
-      Set-TextById '_ltxPasswordConfirmation' $Credential.Password
-      Click-ById '_btnOK'
+      $adminHwnd = [IntPtr](Get-KvForegroundSnapshot).hwnd
+      # Validate the whole expected dialog before entering credentials.
+      foreach ($id in @('_ltxUserName','_ltxPassword','_ltxPasswordConfirmation')) {
+        $null = Get-BoundCreateControl $adminHwnd $id 'ControlType.Edit'
+      }
+      $null = Get-BoundCreateControl $adminHwnd '_btnOK' 'ControlType.Button' -AllowDisabled
+      Set-TextById '_ltxUserName' $Credential.User $adminHwnd
+      Set-TextById '_ltxPassword' $Credential.Password $adminHwnd
+      Set-TextById '_ltxPasswordConfirmation' $Credential.Password $adminHwnd
+      Click-ById '_btnOK' $adminHwnd
       Log 'submitted admin dialog'
 
       $dismissDeadline = (Get-Date).AddSeconds(5)
@@ -406,21 +435,8 @@ function Restore-KvStudioForeground {
     [System.Diagnostics.Process]$Process,
     [string]$Action
   )
-  for ($try = 1; $try -le 20; $try++) {
-    $latest = Get-KvStudioMainProcess 1
-    if ($latest) { $Process = $latest }
-    $uia = Get-KvStudioUiaWindow
-    $targetHwnd = if ($uia) { [IntPtr]$uia.Hwnd } elseif ($Process) { [IntPtr]$Process.MainWindowHandle } else { [IntPtr]::Zero }
-    if ($Process -and $Process.Id) { try { [Microsoft.VisualBasic.Interaction]::AppActivate([int]$Process.Id) | Out-Null } catch {} }
-    [void](Force-KvStudioForeground $targetHwnd)
-    Start-Sleep -Milliseconds 250
-    $fg = Get-ForegroundTitle
-    Log ("foreground restore ${Action}: try=$try hwnd=$($fg.Hwnd) title=$($fg.Title)")
-    if ($fg.Title -like 'KV STUDIO*' -or ($uia -and $uia.Title -like 'KV STUDIO*')) {
-      return
-    }
-  }
-  Assert-KvStudioForeground $Action
+  if (-not $Process -or $Process.Id -ne $script:CreateProcessId) { throw 'KV_CREATE_PROCESS_BINDING_MISMATCH' }
+  Assert-KvUiForegroundHwnd -ExpectedHwnd $Process.MainWindowHandle -Step "create initial foreground $Action" -ExpectedTitleLike 'KV STUDIO*' -AllowSingleRecovery | Out-Null
 }
 
 function Wait-ProjectSaveSettled([string]$ProjectPath, [string]$ProjectName, [int]$Seconds = 8) {
@@ -470,6 +486,7 @@ try {
   # alone. Bind all subsequent main-window lookup to this launch.
   $launched = Start-Process -FilePath $KvsExe -WorkingDirectory (Split-Path -Parent $KvsExe) -PassThru
   $script:CreateProcessId = $launched.Id
+  $script:CreateProcessStartUtc = $launched.StartTime.ToUniversalTime().ToString('o')
   Log ("created isolated KV STUDIO instance pid="+$script:CreateProcessId)
 
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -488,21 +505,21 @@ try {
   if (-not $uiaInvoked) {
     Log 'UIA invoke unavailable; fallback requires verified foreground'
     Assert-KvStudioForeground 'Ctrl+N'
-    Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'create project Ctrl+N' -Keys '^n' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+N opens new project dialog' -SleepMs 200
+    Invoke-KvGuardedCtrlChord -TargetHwnd $process.MainWindowHandle -Step 'create project Ctrl+N' -Vk 0x4E -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+N opens new project dialog' -AllowModalAfter -SleepMs 200
   }
   $newProjectDialog = Find-NewProjectDialog 45
   if (-not $newProjectDialog) {
     Save-Uia 'fail_no_new_project_dialog.json'
     throw 'New project dialog did not open'
   }
-  [KvWin32]::SetForegroundWindow([IntPtr]$newProjectDialog.Current.NativeWindowHandle) | Out-Null
-  Start-Sleep -Milliseconds 200
+  Assert-KvUiForegroundHwnd -ExpectedHwnd ([IntPtr]$newProjectDialog.Current.NativeWindowHandle) -Step 'verify owned new project dialog' -ExpectedTitleLike $newProjectDialog.Current.Name | Out-Null
 
-  Set-TextById '1000' $ProjectName
-  Select-ComboById '1002' $CpuModel
-  Set-TextById '1001' $ProjectRoot
-  Set-TextById '1004' "created by create_project_local.ps1"
-  Click-ById '1'
+  $newProjectHwnd = [IntPtr]$newProjectDialog.Current.NativeWindowHandle
+  Set-TextById '1000' $ProjectName $newProjectHwnd
+  Select-ComboById '1002' $CpuModel $newProjectHwnd
+  Set-TextById '1001' $ProjectRoot $newProjectHwnd
+  Set-TextById '1004' "created by create_project_local.ps1" $newProjectHwnd 'ControlType.Document'
+  Click-ById '1' $newProjectHwnd
   Log 'submitted new project dialog'
 
   $projectPath = Join-Path (Join-Path $ProjectRoot $ProjectName) ($ProjectName + '.kpr')
@@ -510,7 +527,7 @@ try {
   $fastPathReady = $false
   do {
     $projectProcess = Get-Process Kvs -ErrorAction SilentlyContinue |
-      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectName*" } |
+      Where-Object { $_.Id -eq $script:CreateProcessId -and $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectName*" } |
       Select-Object -First 1
     if ((Test-Path -LiteralPath $projectPath) -and $projectProcess) {
       $fastPathReady = $true
@@ -532,8 +549,7 @@ try {
   Start-Sleep -Seconds 2
   $process = Get-KvStudioMainProcess 1
   if ($process -and $process.MainWindowHandle -ne 0) {
-    [KvWin32]::SetForegroundWindow($process.MainWindowHandle) | Out-Null
-    Assert-KvStudioForeground 'Ctrl+S'
+    Assert-KvUiForegroundHwnd -ExpectedHwnd $process.MainWindowHandle -Step 'created project save foreground' -ExpectedTitleLike 'KV STUDIO*' | Out-Null
     Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step 'save created project Ctrl+S' -Keys '^s' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+S saves created project' -SleepMs 300
     if (-not (Wait-ProjectSaveSettled $projectPath $ProjectName 8)) { throw 'KV_CREATED_PROJECT_SAVE_NOT_SETTLED' }
   }
@@ -541,17 +557,18 @@ try {
   $found = $null
   if (Test-Path -LiteralPath $projectPath) {
     $found = $projectPath
-  } else {
-    $cutoff = $startedAt.AddMinutes(-1)
-    $found = Get-ChildItem -LiteralPath $ProjectRoot -Recurse -Filter '*.kpr' -ErrorAction SilentlyContinue |
-      Where-Object { $_.LastWriteTime -ge $cutoff } |
-      Sort-Object LastWriteTime -Descending |
-      Select-Object -First 1 -ExpandProperty FullName
   }
   if (-not $found) {
     Save-Uia 'fail_no_project_file.json'
     throw "Project file was not created under $ProjectRoot"
   }
+
+  $treePath = Join-Path (Split-Path -Parent $found) 'WsTreeEnv.xml'
+  [xml]$savedTree = Get-Content -LiteralPath $treePath -Raw -Encoding UTF8
+  $cpuModels = @($savedTree.SelectNodes('//value.first') | ForEach-Object {
+    if ($_.InnerText -match '^\[0\]\s+(KV-[A-Z0-9*]+)\s*$') { $Matches[1] }
+  } | Select-Object -Unique)
+  if ($cpuModels.Count -ne 1 -or $cpuModels[0] -ne $CpuModel) { throw 'KV_CREATE_SAVED_CPU_MISMATCH' }
 
   $result = [pscustomobject]@{
     ok = $true
@@ -559,6 +576,10 @@ try {
     requested_project_path = $projectPath
     kvs_exe = $KvsExe
     cpu_model_requested = $CpuModel
+    cpu_model_actual = $cpuModels[0]
+    cpu_evidence_path = $treePath
+    process_id = $script:CreateProcessId
+    process_start_utc = $script:CreateProcessStartUtc
     admin_credential_source = $adminCredential.Source
     elapsed_seconds = [Math]::Round(((Get-Date) - $startedAt).TotalSeconds, 3)
   }

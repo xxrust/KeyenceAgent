@@ -13,6 +13,8 @@
   [switch]$DeleteExistingModuleBeforeImport,
   [object]$RestartKvs = $true,
   [string]$ExpectedCategory = '',
+  [string[]]$ParentPath = @(),
+  [string]$CreatedProjectResultPath = '',
   [string]$ChecklistPath = '',
   [switch]$VerboseUiDump,
   [switch]$AuditProjectTextScan,
@@ -483,10 +485,8 @@ function FindKvsMainWindowElement(){
 function WaitKvsMainWindowReady([int]$seconds){
   $deadline=(Get-Date).AddSeconds($seconds)
   do{
-    $process=Get-Process Kvs -ErrorAction SilentlyContinue |
-      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' } |
-      Sort-Object StartTime -Descending |
-      Select-Object -First 1
+    $process=Get-Process -Id $script:ImportTargetProcessId -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' }
     if($process){
       $hwnd=[IntPtr]$process.MainWindowHandle
       if($script:AllowBoundTargetWithoutForeground -and $process.Responding){
@@ -561,15 +561,29 @@ function OpenProjectModuleEditor([string]$moduleName){
   Log ('project module not found before MNM import: '+$moduleName)
   return $false
 }
-function FindProjectModuleTreeItem([string]$moduleName){
+function FindProjectModuleTreeItem([string]$moduleName,[string[]]$ExpectedPath=@()){
   if(-not $moduleName){ return $null }
   $lookupTimer = [Diagnostics.Stopwatch]::StartNew()
   $maxLookupMs = 1000
   $root=[System.Windows.Automation.AutomationElement]::FromHandle($script:KvGuardTargetHwnd)
-  $tree=$root.FindFirst(
-    [System.Windows.Automation.TreeScope]::Descendants,
-    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty,'ProjectTreeView'))
-  )
+  $ownerId=$root.Current.ProcessId
+  $tree=$null
+  if($script:ImportProjectTreeCache){
+    if($script:ImportProjectTreeCacheHwnd -ne $script:KvGuardTargetHwnd.ToInt64() -or $script:ImportProjectTreeCachePid -ne $ownerId){throw 'KV_IMPORT_PROJECT_TREE_CACHE_OWNER_MISMATCH'}
+    $tree=$script:ImportProjectTreeCache
+    if($tree.Current.ProcessId -ne $ownerId -or $tree.Current.AutomationId -cne 'ProjectTreeView'){throw 'KV_IMPORT_PROJECT_TREE_CACHE_IDENTITY_MISMATCH'}
+  }else{
+    $tree=$root.FindFirst(
+      [System.Windows.Automation.TreeScope]::Descendants,
+      ([System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty,'ProjectTreeView')))
+    if($tree){
+      if($tree.Current.ProcessId -ne $ownerId){throw 'KV_IMPORT_PROJECT_TREE_OWNER_MISMATCH'}
+      $script:ImportProjectTreeCache=$tree
+      $script:ImportProjectTreeCacheHwnd=$script:KvGuardTargetHwnd.ToInt64()
+      $script:ImportProjectTreeCachePid=$ownerId
+    }
+  }
+  $treeLookupMs=[int]$lookupTimer.ElapsedMilliseconds
   if(-not $tree){
     $lookupElapsedMs = [int]$lookupTimer.ElapsedMilliseconds
     LogContract 'module_lookup' @{ module_name=$moduleName; elapsed_ms=$lookupElapsedMs; direct_name_query=$true; project_tree_found=$false }
@@ -581,11 +595,29 @@ function FindProjectModuleTreeItem([string]$moduleName){
   }
   # Use one direct UIA name query. Do not enumerate project-tree descendants
   # or retry a second traversal for one module existence check.
-  $nameCondition = New-Object System.Windows.Automation.PropertyCondition(
+  $nameCondition = [System.Windows.Automation.PropertyCondition]::new(
     [System.Windows.Automation.AutomationElement]::NameProperty, $moduleName)
-  $item = $tree.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $nameCondition)
+  $item=$null
+  if($ExpectedPath.Count){
+    if($ExpectedPath.Count -gt 5 -or $ExpectedPath[-1] -cne $moduleName){throw 'KV_IMPORT_EXPECTED_PATH_INVALID'}
+    # Resolve the unique category once, then inspect only direct children for
+    # each declared path segment instead of walking every same-name descendant.
+    $current=$tree
+    for($index=0;$index -lt $ExpectedPath.Count;$index++){
+      $condition=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,[string]$ExpectedPath[$index])
+      $scope=if($index -eq 0){[System.Windows.Automation.TreeScope]::Descendants}else{[System.Windows.Automation.TreeScope]::Children}
+      $matching=$current.FindAll($scope,$condition)
+      if($matching.Count -gt 1){throw 'KV_IMPORT_PARENT_PATH_AMBIGUOUS'}
+      if($matching.Count -eq 0){$current=$null;break}
+      $current=$matching.Item(0)
+      if($current.Current.ProcessId -ne $ownerId -or $current.Current.ControlType -ne [System.Windows.Automation.ControlType]::TreeItem){throw 'KV_IMPORT_PATH_ELEMENT_IDENTITY_MISMATCH'}
+    }
+    $item=$current
+  } else {
+    $item = $tree.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $nameCondition)
+  }
   $lookupElapsedMs = [int]$lookupTimer.ElapsedMilliseconds
-  LogContract 'module_lookup' @{ module_name=$moduleName; elapsed_ms=$lookupElapsedMs; direct_name_query=$true; project_tree_found=$true }
+  LogContract 'module_lookup' @{ module_name=$moduleName; elapsed_ms=$lookupElapsedMs; tree_lookup_ms=$treeLookupMs; direct_name_query=$true; project_tree_found=$true; path_depth=$ExpectedPath.Count; path_strategy=if($ExpectedPath.Count){'unique category then direct children'}else{'direct name query'} }
   if($lookupElapsedMs -ge $maxLookupMs){
     $script:LastErrorCode = 'KV_MODULE_LOOKUP_TIMEOUT'
     throw "KV_MODULE_LOOKUP_TIMEOUT: target module lookup exceeded ${maxLookupMs}ms: $moduleName"
@@ -1915,31 +1947,48 @@ try{
   if($MnmPath -and -not (Test-Path -LiteralPath $MnmPath)){ throw "MnmPath not found: $MnmPath" }
   AssertMnmChineseEncoding $MnmPath
   $expectedProjectNeedle=[IO.Path]::GetFileNameWithoutExtension($project)
+  $expectedProjectTitlePattern='^KV STUDIO.* - \['+[regex]::Escape($expectedProjectNeedle)+'(?: \*)?\]$'
+  $projectArgumentPattern='(?:^|\s)(?:"'+[regex]::Escape($project)+'"|'+[regex]::Escape($project)+')(?=\s|$)'
+  $boundProcesses = @(Get-CimInstance Win32_Process -Filter "Name='Kvs.exe'" |
+    Where-Object { $_.CommandLine -and $_.CommandLine -match $projectArgumentPattern } |
+    ForEach-Object { Get-Process -Id ([int]$_.ProcessId) -ErrorAction SilentlyContinue })
+  if ($CreatedProjectResultPath) {
+    $creation=Get-Content -LiteralPath $CreatedProjectResultPath -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json
+    if ($creation.ok -isnot [bool] -or -not $creation.ok -or -not $creation.project_path -or [IO.Path]::GetFullPath([string]$creation.project_path) -ine $project -or -not $creation.requested_project_path -or [IO.Path]::GetFullPath([string]$creation.requested_project_path) -ine $project -or -not $creation.process_id -or -not $creation.process_start_utc) { throw 'KV_IMPORT_CREATION_EVIDENCE_INVALID' }
+    $createdProcess=Get-Process -Id ([int]$creation.process_id) -ErrorAction Stop
+    $createdStart=[DateTime]::Parse([string]$creation.process_start_utc,[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+    if ($createdProcess.ProcessName -ine 'Kvs' -or $createdProcess.StartTime.ToUniversalTime() -ne $createdStart -or $createdProcess.MainWindowHandle -eq 0 -or $createdProcess.MainWindowTitle -notmatch $expectedProjectTitlePattern -or -not $creation.kvs_exe -or [IO.Path]::GetFullPath($createdProcess.Path) -ine [IO.Path]::GetFullPath([string]$creation.kvs_exe)) { throw 'KV_IMPORT_CREATED_PROCESS_IDENTITY_MISMATCH' }
+    if (@($boundProcesses | Where-Object { $_.Id -ne $createdProcess.Id }).Count) { throw 'KV_IMPORT_PROJECT_PROCESS_AMBIGUOUS' }
+    $boundProcesses=@($createdProcess)
+    LogContract 'import_created_process_bound' @{process_id=$createdProcess.Id;process_start_utc=$createdStart.ToString('o');project_path=$project;creation_evidence=[IO.Path]::GetFullPath($CreatedProjectResultPath)}
+  }
+  if($boundProcesses.Count -gt 1){ throw 'KV_IMPORT_PROJECT_PROCESS_AMBIGUOUS' }
   if($RestartKvs){
-    Get-Process Kvs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 2
+    $boundProcesses | Stop-Process -Force -ErrorAction Stop
+    if($boundProcesses.Count){ Start-Sleep -Seconds 2 }
+    $boundProcesses=@()
   }
-  $p = Get-Process Kvs -ErrorAction SilentlyContinue |
-    Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like ('*'+$expectedProjectNeedle+'*') } |
-    Select-Object -First 1
-  $projectOpenRequested = $false
+  $p = $boundProcesses | Select-Object -First 1
   if(-not $p){
-    Start-Process -FilePath $kvs -ArgumentList ('"'+$project+'"') | Out-Null
-    $projectOpenRequested = $true
+    $titleMatches = @(Get-Process Kvs -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like ('*'+$expectedProjectNeedle+'*') })
+    if($titleMatches.Count){ throw 'KV_IMPORT_PROJECT_PATH_BINDING_REQUIRED' }
   }
+  if(-not $p){
+    $p = Start-Process -FilePath $kvs -ArgumentList ('"'+$project+'"') -PassThru
+    LogContract 'import_process_started' @{process_id=$p.Id;project_path=$project}
+  } else {
+    LogContract 'import_process_reused' @{process_id=$p.Id;project_path=$project}
+  }
+  $script:ImportTargetProcessId=$p.Id
   $deadline=(Get-Date).AddSeconds(90)
-  while((-not $p) -and (Get-Date) -lt $deadline) {
+  while((Get-Date) -lt $deadline) {
+    $p.Refresh()
+    if($p.HasExited){ throw 'KV_IMPORT_PROJECT_PROCESS_EXITED' }
+    if($p.MainWindowHandle -ne 0 -and $p.MainWindowTitle -like 'KV STUDIO*' -and $p.MainWindowTitle -like ('*'+$expectedProjectNeedle+'*')){ break }
     Start-Sleep -Milliseconds 500
-    $p=Get-Process Kvs -ErrorAction SilentlyContinue |
-      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like ('*'+$expectedProjectNeedle+'*') } |
-      Select-Object -First 1
-    if((-not $p) -and (-not $projectOpenRequested) -and (Get-Date) -gt $deadline.AddSeconds(-82)){
-      Log ('target project window not visible yet; requesting project open explicitly: '+$project)
-      Start-Process -FilePath $kvs -ArgumentList ('"'+$project+'"') | Out-Null
-      $projectOpenRequested = $true
-    }
   }
-  if(-not $p){ throw "Kvs target project window not found after start: $expectedProjectNeedle" }
+  if($p.MainWindowHandle -eq 0 -or $p.MainWindowTitle -notlike ('*'+$expectedProjectNeedle+'*')){ throw "Kvs target project window not found after start: $expectedProjectNeedle" }
   [void](ForceKvStudioForeground ([IntPtr]$p.MainWindowHandle))
   Start-Sleep -Milliseconds 150
   [void](ForceKvStudioForeground ([IntPtr]$p.MainWindowHandle))
@@ -1950,20 +1999,12 @@ try{
     throw 'KV STUDIO main window still shows splash/loader; refusing menu route.'
   }
   $titleDeadline=(Get-Date).AddSeconds(60)
-  $reopenRequestedForTitle=$false
   while((Get-Date) -lt $titleDeadline){
-    $targetProjectProcess=Get-Process Kvs -ErrorAction SilentlyContinue |
-      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like ('*'+$expectedProjectNeedle+'*') } |
-      Select-Object -First 1
-    if($targetProjectProcess){
-      $p=$targetProjectProcess
+    $p.Refresh()
+    if($p.HasExited){ throw 'KV_IMPORT_PROJECT_PROCESS_EXITED' }
+    if($p.MainWindowHandle -ne 0 -and $p.MainWindowTitle -like ('*'+$expectedProjectNeedle+'*')){
       [void](ForceKvStudioForeground ([IntPtr]$p.MainWindowHandle))
       break
-    }
-    if((-not $reopenRequestedForTitle) -and (Get-Date) -gt $titleDeadline.AddSeconds(-52)){
-      Log ('foreground KV STUDIO title does not contain target project; requesting project open before startup guard: '+$project)
-      Start-Process -FilePath $kvs -ArgumentList ('"'+$project+'"') | Out-Null
-      $reopenRequestedForTitle=$true
     }
     Start-Sleep -Milliseconds 500
   }
@@ -1991,6 +2032,17 @@ try{
     }
   }elseif($ExpectedModuleName){
     Log ('skipping project-tree module open before MNM import; full MNM import must create/update module: '+$ExpectedModuleName)
+  }
+  if($ParentPath.Count){
+    $parentItem=FindProjectModuleTreeItem $ParentPath[-1] $ParentPath
+    if(-not $parentItem){throw 'KV_IMPORT_PARENT_NOT_VISIBLE'}
+    $current=$parentItem
+    $walker=[System.Windows.Automation.TreeWalker]::ControlViewWalker
+    for($index=$ParentPath.Count-1;$index -ge 0;$index--){
+      if(-not $current -or $current.Current.Name -cne $ParentPath[$index]){throw 'KV_IMPORT_PARENT_PATH_MISMATCH'}
+      $current=$walker.GetParent($current)
+    }
+    LogContract 'import_parent_resolved' @{parent_path=$ParentPath;process_id=$p.Id}
   }
   if($script:AllowBoundTargetWithoutForeground){
     $bound=AssertBoundTargetWindow 'MNM import route' $expectedProjectNeedle
@@ -2034,6 +2086,21 @@ try{
   Shot '03_after_import_confirm.png'
   if($VerboseUiDump){ DumpUi 'uia_after_import_confirm.json' }
   AssertNoMnmReadFailureDialog 'after_import_confirm'
+  if($ExpectedCategory -eq 'function_block' -and $ParentPath.Count -gt 1){
+    $expectedPath=@($ParentPath)+@($ExpectedModuleName)
+    if(-not (FindProjectModuleTreeItem $ExpectedModuleName $expectedPath)){
+      $source=FindProjectModuleTreeItem $ExpectedModuleName @($ParentPath[0],$ExpectedModuleName)
+      $destination=FindProjectModuleTreeItem $ParentPath[-1] $ParentPath
+      if(-not $source -or -not $destination){throw 'KV_IMPORT_MOVE_TARGET_MISSING'}
+      foreach($item in @($source,$destination)){
+        $scroll=$null
+        if($item.TryGetCurrentPattern([System.Windows.Automation.ScrollItemPattern]::Pattern,[ref]$scroll)){$scroll.ScrollIntoView()}
+      }
+      Invoke-KvGuardedTreeItemDrag -TargetHwnd $p.MainWindowHandle -Source $source -Destination $destination -ExpectedTitleLike $script:KvGuardExpectedTitleLike
+      if(-not(FindProjectModuleTreeItem $ExpectedModuleName $expectedPath)){throw 'KV_IMPORT_MOVE_PARENT_MISMATCH'}
+      LogContract 'import_parent_verified' @{module_name=$ExpectedModuleName;parent_path=$ParentPath;process_id=$p.Id}
+    }
+  }
   $foundExpected=$false
   if($AuditUiNameScan -and $ExpectedModuleName){
     $foundExpected=TestUiElementName $ExpectedModuleName
@@ -2070,9 +2137,8 @@ try{
     throw "Expected module name is not visible in KV STUDIO after MNM import: $ExpectedModuleName"
   }
   if($SaveAfterImport){
-    $saveProcess=Get-Process Kvs -ErrorAction SilentlyContinue |
-      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like ('*'+$expectedProjectNeedle+'*') } |
-      Select-Object -First 1
+    $saveProcess=Get-Process -Id $script:ImportTargetProcessId -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like ('*'+$expectedProjectNeedle+'*') }
     if(-not $saveProcess){
       throw "KV STUDIO target project window not found before Ctrl+S after MNM import: $expectedProjectNeedle"
     }
@@ -2086,6 +2152,12 @@ try{
     Shot '04_after_save.png'
     if($VerboseUiDump){ DumpUi 'uia_after_save.json' }
     AssertNoMnmReadFailureDialog 'after_save'
+    if($ParentPath.Count){
+      . (Join-Path (Split-Path -Parent $PSScriptRoot) 'workflow_tools\kv_complete_module_contract.ps1')
+      $saved=@(Get-KvModuleTreePaths $project|Where-Object {Test-KvTreePathSuffix $_.path (@($ParentPath)+@($ExpectedModuleName))})
+      if($saved.Count -ne 1){throw 'KV_IMPORT_SAVED_PARENT_MISMATCH'}
+      LogContract 'import_saved_parent_verified' @{module_name=$ExpectedModuleName;tree_path=$saved[0].path;project_path=$project}
+    }
     $projectMatches=@()
     $projectContentMatchesAfterSave=@()
     if($AuditProjectTextScan){
@@ -2132,10 +2204,8 @@ try{
   $_.Exception.ToString()|Set-Content -LiteralPath (Join-Path $out 'fail.txt') -Encoding UTF8
   '1'|Set-Content -LiteralPath (Join-Path $out 'exit_code.txt') -Encoding ASCII
   try{
-    Get-Process Kvs -ErrorAction SilentlyContinue |
-      Where-Object { $_.MainWindowHandle -ne 0 } |
-      Stop-Process -Force -ErrorAction SilentlyContinue
-    Log 'closed visible KV STUDIO windows after import failure'
+    Shot 'failure.png'
+    Log 'preserved KV STUDIO failure state without further input'
   }catch{}
   exit 1
 }

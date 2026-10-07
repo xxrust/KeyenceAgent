@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-20",
+  "scope": "Real KV STUDIO desktop regression; no PLC runtime validation",
+  "regression_runs": [
+    {
+      "scenario": "01_fb_arguments",
+      "test_result": "H:/r13v2/01_fb_arguments_20260920_020154_940_aa92f106/test_result.json"
+    },
+    {
+      "scenario": "02_fb_program_body",
+      "test_result": "H:/r13v2/02_fb_program_body_20260920_020209_799_e7970a28/test_result.json"
+    },
+    {
+      "scenario": "03_variables_snapshot",
+      "test_result": "H:/rfinal/03_variables_snapshot_20260920_023752_937_983d5b8d/test_result.json"
+    },
+    {
+      "scenario": "04_structures_snapshot",
+      "test_result": "H:/r13v2/04_structures_snapshot_20260920_020245_088_e45d0e38/test_result.json"
+    },
+    {
+      "scenario": "05_compile",
+      "test_result": "H:/rfinal/05_compile_20260920_023813_073_c9319535/test_result.json"
+    },
+    {
+      "scenario": "06_expansion_units",
+      "test_result": "H:/r13v2/06_expansion_units_20260920_020352_473_c83f59a3/test_result.json"
+    },
+    {
+      "scenario": "07_ethercat_nodes",
+      "test_result": "H:/r13v2/07_ethercat_nodes_20260920_020410_377_854c38ea/test_result.json"
+    },
+    {
+      "scenario": "08_save_as",
+      "test_result": "H:/r13v2/08_save_as_20260920_020441_568_e37de16b/test_result.json"
+    },
+    {
+      "scenario": "09_import_fb",
+      "test_result": "H:/r13v2/09_import_fb_20260920_020454_453_45a69713/test_result.json"
+    },
+    {
+      "scenario": "10_export_mnm",
+      "test_result": "H:/rfinal/10_export_mnm_20260920_023831_852_5548373a/test_result.json"
+    },
+    {
+      "scenario": "11_structure_mutation",
+      "test_result": "H:/r13v2b/11_structure_mutation_20260920_020730_986_34787a07/test_result.json"
+    },
+    {
+      "scenario": "12_structure_targets",
+      "test_result": "H:/r13v2b/12_structure_targets_20260920_021027_581_81c5d2b2/test_result.json"
+    },
+    {
+      "scenario": "13_project_text_snapshot",
+      "test_result": "H:/rfinal/13_project_text_snapshot_20260920_024041_728_6ace4c4e/test_result.json"
+    },
+    {
+      "scenario": "14_complete_scan_module",
+      "test_result": "H:/rfinal/14_complete_scan_module_20260920_023900_542_0e06e1b6/test_result.json"
+    },
+    {
+      "scenario": "15_complete_station_fb",
+      "test_result": "H:/c15final/15_complete_station_fb_20260920_023115_540_9db8e403/test_result.json"
+    }
+  ],
+  "independent_agent_report": "H:/kvOp/_validation/compose_round2/REPORT.md",
+  "independent_live_results": [
+    "H:/kvOp/_validation/compose_round2/validation/scan-live/workflow_result.json",
+    "H:/kvOp/_validation/compose_round2/validation/fb-live/workflow_result.json"
+  ],
+  "gate_suites": [
+    "H:/kvOp/_validation/compose_gate_negative2/test_result.json",
+    "H:/kvOp/_validation/compose_fb_readback_negative/test_result.json",
+    "H:/kvOp/_validation/compose_fb_readback_scan_unchanged/test_result.json",
+    "H:/kvOp/_validation/complete_gate_final_gaps/test_result.json",
+    "H:/kvOp/_validation/tree_drag_guard_final/test_result.json",
+    "H:/kvOp/_validation/harness_successor_cleanup/test_result.json",
+    "H:/kvOp/_validation/complete_contract_paths_final/test_result.json"
+  ],
+  "earlier_failures_preserved": [
+    "H:/r13v2/11_structure_mutation_20260920_020542_583_11c69db5/test_result.json"
+  ]
+}

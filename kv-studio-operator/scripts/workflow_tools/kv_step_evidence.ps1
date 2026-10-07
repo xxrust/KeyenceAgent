@@ -89,3 +89,9 @@ function Get-KvCodeFingerprint([string]$ScriptsRoot) {
   try { $hash = [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-','') } finally { $sha.Dispose() }
   [pscustomobject]@{sha256=$hash;files=$rows}
 }
+
+function Assert-KvCodeUnchanged([string]$ScriptsRoot,[object]$Expected) {
+  if (-not $Expected -or -not $Expected.sha256) { throw 'KV_WORKFLOW_CODE_CHANGED: missing initial code fingerprint' }
+  $current=Get-KvCodeFingerprint $ScriptsRoot
+  if ($current.sha256 -cne $Expected.sha256) { throw 'KV_WORKFLOW_CODE_CHANGED: workflow scripts changed after the initial fingerprint' }
+}
