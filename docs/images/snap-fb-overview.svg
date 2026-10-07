@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 680" preserveAspectRatio="xMidYMid meet" role="img" aria-label="FB_Cylinder功能块完整内容">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 710" preserveAspectRatio="xMidYMid meet" role="img" aria-label="FB_Cylinder功能块完整内容">
   <defs>
     <style>
       text { font-family: "Microsoft YaHei","PingFang SC","Segoe UI",Arial,sans-serif; }
@@ -24,7 +24,7 @@
   ═══════════════════════════════════════════════ -->
   <rect fill="#1a5fa0" x="12" y="44" width="776" height="20" rx="5"/>
   <text class="hdr" x="400" y="58" text-anchor="middle">① 自变量 arguments.tsv — 功能块对外接口</text>
-  <rect fill="#f0f7ff" stroke="#7baed4" stroke-width="1" x="12" y="64" width="776" height="202" rx="5" filter="url(#sh)"/>
+  <rect fill="#f0f7ff" stroke="#7baed4" stroke-width="1" x="12" y="64" width="776" height="230" rx="5" filter="url(#sh)"/>
 
   <!-- Column headers: 变量名(x=20,w=180) 方向(x=210,w=60) 类型(x=280,w=180) 注释(x=470) -->
   <text class="col" x="20"  y="78">变量名</text>
