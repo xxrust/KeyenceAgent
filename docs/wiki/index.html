@@ -727,6 +727,226 @@ footer {
 </section>
 
 <!-- ═══════════════════════════════════════════════════ -->
+<section id="harness">
+  <h2>Harness 执行链</h2>
+  <p>每次调用工作流，都经过一条严格的执行链：Agent 只能触达最顶层的 <strong>customer_callable</strong> 入口，内部各层的逻辑对外完全不可见。</p>
+
+  <div class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" width="820" height="420" viewBox="0 0 820 420" role="img" aria-label="Harness执行链示意">
+      <defs>
+        <style>
+          .ht{font:700 15px "Microsoft YaHei",sans-serif;fill:#1a2635}
+          .hl{font:600 12px "Microsoft YaHei",sans-serif;fill:#1a2635}
+          .hs{font:11px "Microsoft YaHei",sans-serif;fill:#5a7080}
+          .hw{font:11px "Microsoft YaHei",sans-serif;fill:#fff}
+          .hm{font:11px "Microsoft YaHei",sans-serif;fill:rgba(255,255,255,.75)}
+          .hcode{font:11px "Consolas","Courier New",monospace;fill:#c8d8e8}
+        </style>
+        <marker id="h-arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+          <path d="M0,0 L7,3.5 L0,7 z" fill="#3a6080"/>
+        </marker>
+        <filter id="h-sh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000018"/></filter>
+      </defs>
+
+      <text class="ht" x="410" y="26" text-anchor="middle">Harness 执行链 — 从 Agent 调用到 KV STUDIO 操作</text>
+
+      <!-- Step 1: Agent call -->
+      <rect fill="#e8f4e8" stroke="#2a8a55" stroke-width="2" x="20" y="50" width="185" height="80" rx="10" filter="url(#h-sh)"/>
+      <text class="hl" x="112" y="76" text-anchor="middle" fill="#1a4a28">① Agent 调用</text>
+      <text class="hs" x="112" y="96" text-anchor="middle">powershell -STA -File</text>
+      <text class="hs" x="112" y="112" text-anchor="middle">workflows/import_kv_module.ps1</text>
+
+      <path d="M205 90 L240 90" stroke="#3a6080" stroke-width="1.5" fill="none" marker-end="url(#h-arr)"/>
+
+      <!-- Step 2: Agent boundary gate -->
+      <rect fill="#fff7ed" stroke="#d97706" stroke-width="2" x="245" y="50" width="165" height="80" rx="10" filter="url(#h-sh)"/>
+      <text class="hl" x="327" y="76" text-anchor="middle">② Agent 边界门</text>
+      <text class="hs" x="327" y="96" text-anchor="middle">检查调用方是否有权</text>
+      <text class="hs" x="327" y="112" text-anchor="middle">拒绝内部脚本直接调用</text>
+
+      <path d="M410 90 L445 90" stroke="#3a6080" stroke-width="1.5" fill="none" marker-end="url(#h-arr)"/>
+
+      <!-- Step 3: Flat executor -->
+      <rect fill="#eaf4ee" stroke="#2a6e4a" stroke-width="2" x="450" y="50" width="165" height="80" rx="10" filter="url(#h-sh)"/>
+      <text class="hl" x="532" y="76" text-anchor="middle">③ 平面执行器</text>
+      <text class="hs" x="532" y="96" text-anchor="middle">读取执行计划</text>
+      <text class="hs" x="532" y="112" text-anchor="middle">逐步驱动 runner child</text>
+
+      <path d="M615 90 L650 90" stroke="#3a6080" stroke-width="1.5" fill="none" marker-end="url(#h-arr)"/>
+
+      <!-- Step 4: Runner child -->
+      <rect fill="#f2ecfb" stroke="#5a3a8a" stroke-width="2" x="655" y="50" width="145" height="80" rx="10" filter="url(#h-sh)"/>
+      <text class="hl" x="727" y="76" text-anchor="middle">④ Runner Child</text>
+      <text class="hs" x="727" y="96" text-anchor="middle">底层 UI 工作进程</text>
+      <text class="hs" x="727" y="112" text-anchor="middle">产出 result.json</text>
+
+      <!-- Arrow down from runner child to guard -->
+      <path d="M727 130 L727 165" stroke="#3a6080" stroke-width="1.5" fill="none" marker-end="url(#h-arr)"/>
+
+      <!-- Step 5: UI Guard -->
+      <rect fill="#1a2635" stroke="#0e1f30" stroke-width="1.5" x="550" y="168" width="355" height="70" rx="10" filter="url(#h-sh)"/>
+      <text class="hw" x="727" y="194" text-anchor="middle" font-weight="600">⑤ UI 防护层 kv_ui_guard.ps1</text>
+      <text class="hm" x="727" y="214" text-anchor="middle">互斥锁 Local\KeyenceAgent.KvStudio.UI · 18 个已审批原子动作</text>
+      <text class="hcode" x="727" y="230" text-anchor="middle">Invoke-KvGuardedMouseClick · Invoke-KvGuardedClipboardPaste · Invoke-KvGuardedSendKeys</text>
+
+      <!-- Arrow down from guard to KVS -->
+      <path d="M727 238 L727 268" stroke="#3a6080" stroke-width="1.5" fill="none" marker-end="url(#h-arr)"/>
+
+      <!-- Step 6: KV STUDIO -->
+      <rect fill="#5a3a8a" stroke="#3a1a6a" stroke-width="2" x="600" y="270" width="255" height="65" rx="10" filter="url(#h-sh)"/>
+      <text class="hw" x="727" y="298" text-anchor="middle" font-size="13" font-weight="600">⑥ KV STUDIO (Kvs.exe)</text>
+      <text class="hm" x="727" y="318" text-anchor="middle">实际桌面 UI 操作</text>
+
+      <!-- Evidence output on left -->
+      <rect fill="#fff3e0" stroke="#d97706" stroke-width="1.5" x="20" y="200" width="480" height="130" rx="10" filter="url(#h-sh)"/>
+      <text class="hl" x="260" y="226" text-anchor="middle">📋 每步产出可验证的证据文件</text>
+      <line x1="30" y1="234" x2="490" y2="234" stroke="#fde68a" stroke-width="1"/>
+      <text class="hs" x="260" y="252" text-anchor="middle" font-family="Consolas,monospace" font-size="11">execution_plan.json   — 本次完整执行计划</text>
+      <text class="hs" x="260" y="269" text-anchor="middle" font-family="Consolas,monospace" font-size="11">run.log               — 全流程时序日志</text>
+      <text class="hs" x="260" y="286" text-anchor="middle" font-family="Consolas,monospace" font-size="11">step_NN/receipt.json  — 每步收据（含截图路径）</text>
+      <text class="hs" x="260" y="303" text-anchor="middle" font-family="Consolas,monospace" font-size="11">step_NN/*_result.json — 操作结果（ok: true/false）</text>
+      <text class="hs" x="260" y="320" text-anchor="middle" font-family="Consolas,monospace" font-size="11">snapshot/             — 操作后的语义项目快照</text>
+
+      <!-- Mutex note -->
+      <rect fill="#fef2f2" stroke="#c0392b" stroke-width="1" x="20" y="350" width="480" height="36" rx="8"/>
+      <text font-size="12" fill="#7f1d1d" x="260" y="372" text-anchor="middle">🔒  并发保护：同一时刻只允许一个工作流持有 UI 互斥锁，多余的请求立即返回 KV_UI_WORKFLOW_BUSY</text>
+
+      <text class="hs" x="410" y="410" text-anchor="middle" font-size="11">所有箭头方向均为单向：Agent 只能进入顶层入口，不能跨层调用内部脚本</text>
+    </svg>
+  </div>
+
+  <h3>调用工作流的完整命令格式</h3>
+  <pre><code># 导入 MNM 程序模块
+powershell -STA -NoProfile -ExecutionPolicy Bypass -File \
+  kv-studio-operator\scripts\workflows\import_kv_module.ps1 \
+  -ProjectPath "C:\KvAgentWork\MyProject" \
+  -MnmPath    "C:\KvAgentWork\output\main_program.mnm"
+
+# 设置全局变量
+powershell -STA -NoProfile -ExecutionPolicy Bypass -File \
+  kv-studio-operator\scripts\workflows\set_kv_variables.ps1 \
+  -ProjectPath    "C:\KvAgentWork\MyProject" \
+  -VariablesTsv   "C:\KvAgentWork\output\global_vars.tsv"
+
+# 导出语义项目快照（只读，不修改项目）
+powershell -STA -NoProfile -ExecutionPolicy Bypass -File \
+  kv-studio-operator\scripts\workflows\export_kv_project_text_snapshot.ps1 \
+  -ProjectPath    "C:\KvAgentWork\MyProject" \
+  -SnapshotOutput "C:\KvAgentWork\snapshot"</code></pre>
+
+  <p>查询所有可用工作流及其参数，运行能力查询脚本：</p>
+  <pre><code>powershell -NoProfile -File \
+  kv-studio-operator\scripts\get_kv_capabilities.ps1</code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="snapshot-demo">
+  <h2>真实快照示例</h2>
+  <p>下面展示的是对一个真实 KV-X520 工程项目执行快照后的实际输出。这个项目包含多品牌伺服电机的通用库 FB、ModbusTCP 通信模块、以及完整的工站程序结构。</p>
+
+  <div class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" width="820" height="480" viewBox="0 0 820 480" role="img" aria-label="真实项目快照结构">
+      <defs>
+        <style>
+          .nt{font:700 14px "Microsoft YaHei",sans-serif;fill:#1a2635}
+          .nl{font:600 12px "Microsoft YaHei",sans-serif;fill:#1a2635}
+          .ns{font:11px "Microsoft YaHei",sans-serif;fill:#5a7080}
+          .nc{font:11px "Consolas","Courier New",monospace;fill:#1a2635}
+          .nok{font:11px "Microsoft YaHei",sans-serif;fill:#166534}
+          .nmiss{font:11px "Microsoft YaHei",sans-serif;fill:#7c3a00}
+          .nfail{font:11px "Microsoft YaHei",sans-serif;fill:#7f1d1d}
+        </style>
+        <filter id="n-sh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000015"/></filter>
+      </defs>
+
+      <text class="nt" x="410" y="26" text-anchor="middle">KVX样例程序_v100 — 快照摘要（真实输出）</text>
+
+      <!-- Stats bar -->
+      <rect fill="#f0f4f9" stroke="#d8e2ee" stroke-width="1" x="20" y="44" width="780" height="48" rx="8"/>
+      <text class="nl" x="120" y="63" text-anchor="middle">实体总数</text>
+      <text font-size="22" font-weight="700" fill="#1a5fa0" x="120" y="84" text-anchor="middle">86</text>
+      <line x1="200" y1="52" x2="200" y2="84" stroke="#d8e2ee" stroke-width="1"/>
+      <text class="nl" x="290" y="63" text-anchor="middle">complete</text>
+      <text font-size="22" font-weight="700" fill="#166534" x="290" y="84" text-anchor="middle">61</text>
+      <line x1="380" y1="52" x2="380" y2="84" stroke="#d8e2ee" stroke-width="1"/>
+      <text class="nl" x="460" y="63" text-anchor="middle">missing</text>
+      <text font-size="22" font-weight="700" fill="#7c3a00" x="460" y="84" text-anchor="middle">23</text>
+      <line x1="540" y1="52" x2="540" y2="84" stroke="#d8e2ee" stroke-width="1"/>
+      <text class="nl" x="610" y="63" text-anchor="middle">failed</text>
+      <text font-size="22" font-weight="700" fill="#7f1d1d" x="610" y="84" text-anchor="middle">1</text>
+      <line x1="680" y1="52" x2="680" y2="84" stroke="#d8e2ee" stroke-width="1"/>
+      <text class="nl" x="750" y="63" text-anchor="middle">warnings</text>
+      <text font-size="22" font-weight="700" fill="#7c5800" x="750" y="84" text-anchor="middle">25</text>
+
+      <!-- Entity tree -->
+      <!-- 配置 group -->
+      <rect fill="#dce8f5" stroke="#1a5fa0" stroke-width="1.5" x="20" y="110" width="370" height="160" rx="8" filter="url(#n-sh)"/>
+      <text class="nl" x="205" y="130" text-anchor="middle" fill="#0e3d6b">配置 (config)</text>
+      <line x1="30" y1="138" x2="380" y2="138" stroke="#c8d8f0" stroke-width="1"/>
+      <text class="nc" x="35" y="156">✅  config:单元</text>
+      <text class="nok" x="260" y="156">complete · unit_configuration</text>
+      <text class="nc" x="35" y="175">✅  config:EtherCAT</text>
+      <text class="nok" x="260" y="175">complete · ethercat_configuration</text>
+      <text class="nc" x="35" y="194">✅  config:全局变量</text>
+      <text class="nok" x="260" y="194">complete · global_variables</text>
+      <text class="nc" x="35" y="213">✅  types:structure_definitions</text>
+      <text class="nok" x="260" y="213">complete · data_types</text>
+      <text class="ns" x="205" y="256" text-anchor="middle">restore order: 10 → 20 → 30 → 40</text>
+
+      <!-- 功能块 group -->
+      <rect fill="#eaf4ee" stroke="#2a6e4a" stroke-width="1.5" x="20" y="285" width="370" height="170" rx="8" filter="url(#n-sh)"/>
+      <text class="nl" x="205" y="305" text-anchor="middle" fill="#1a4a28">功能块 FB (共 25 个)</text>
+      <line x1="30" y1="313" x2="380" y2="313" stroke="#c8e8d8" stroke-width="1"/>
+      <text class="nc" x="35" y="331">✅  fb:功能块/level1_组件/FB_Cylinder</text>
+      <text class="nok" x="300" y="331">气缸控制</text>
+      <text class="nc" x="35" y="349">✅  fb:功能块/level1_组件/FB_Motion</text>
+      <text class="nok" x="300" y="349">运动控制</text>
+      <text class="nc" x="35" y="367">✅  fb:功能块/level1_组件/FB_Vacuum</text>
+      <text class="nok" x="300" y="367">真空控制</text>
+      <text class="nc" x="35" y="385">✅  fb:功能块/库/MC_*_YASKA_SigmaXS_V100</text>
+      <text class="nok" x="300" y="385">7 个</text>
+      <text class="nc" x="35" y="403">✅  fb:功能块/库/ModbusTCPClient_*</text>
+      <text class="nok" x="300" y="403">Connect / Command</text>
+      <text class="nc" x="35" y="421">❌  fb:功能块/level3_设备/FB_McMode</text>
+      <text class="nfail" x="300" y="421">failed</text>
+      <text class="ns" x="205" y="444" text-anchor="middle">restore order: 50 · 依赖 types + 全局变量</text>
+
+      <!-- 程序 group -->
+      <rect fill="#f2ecfb" stroke="#5a3a8a" stroke-width="1.5" x="430" y="110" width="370" height="200" rx="8" filter="url(#n-sh)"/>
+      <text class="nl" x="615" y="130" text-anchor="middle" fill="#3a1a6a">程序模块 (共 24 个)</text>
+      <line x1="440" y1="138" x2="790" y2="138" stroke="#d8c8f8" stroke-width="1"/>
+      <text class="nc" x="445" y="156">✅  program:每次扫描/ST00_插针_演示</text>
+      <text class="nok" x="750" y="156">complete</text>
+      <text class="nc" x="445" y="175">✅  program:每次扫描/ST04_传送带</text>
+      <text class="nok" x="750" y="175">complete</text>
+      <text class="nc" x="445" y="194">✅  program:每次扫描/ST05_旋转点胶</text>
+      <text class="nok" x="750" y="194">complete</text>
+      <text class="nc" x="445" y="213">⚠️  program:每次扫描/IO输入</text>
+      <text class="nmiss" x="750" y="213">missing</text>
+      <text class="nc" x="445" y="232">⚠️  program:每次扫描/IO输出</text>
+      <text class="nmiss" x="750" y="232">missing</text>
+      <text class="nc" x="445" y="251">⚠️  program:每次扫描/HMI</text>
+      <text class="nmiss" x="251" y="251">…共 23 个 missing</text>
+      <text class="ns" x="615" y="296" text-anchor="middle">restore order: 60 · 依赖 FB + 全局变量</text>
+
+      <!-- entity.json example -->
+      <rect fill="#1a2635" stroke="#0e1f30" stroke-width="1" x="430" y="328" width="370" height="130" rx="8" filter="url(#n-sh)"/>
+      <text font-size="11" font-weight="600" fill="#7baed4" x="615" y="348" text-anchor="middle">entity.json 示例 — FB_Cylinder</text>
+      <text class="hcode" font-size="10.5" x="444" y="367" font-family="Consolas,monospace" fill="#c8d8e8">"id": "fb:功能块/level1_组件/FB_Cylinder",</text>
+      <text class="hcode" font-size="10.5" x="444" y="383" font-family="Consolas,monospace" fill="#c8d8e8">"display_name": "气缸控制",</text>
+      <text class="hcode" font-size="10.5" x="444" y="399" font-family="Consolas,monospace" fill="#c8d8e8">"restore": &#123; "order": 50,</text>
+      <text class="hcode" font-size="10.5" x="444" y="415" font-family="Consolas,monospace" fill="#c8d8e8">  "strategy": "import_body_then_set_arguments_then_set_locals",</text>
+      <text class="hcode" font-size="10.5" x="444" y="431" font-family="Consolas,monospace" fill="#c8d8e8">  "depends_on": ["types:structure_definitions", "config:全局变量"] &#125;</text>
+      <text class="hcode" font-size="10.5" x="444" y="449" font-family="Consolas,monospace" fill="#7baed4">"status": &#123; "body": "complete", "arguments": "complete" &#125;</text>
+    </svg>
+  </div>
+
+  <div class="callout">
+    <strong>快照用途：</strong> AI 读取快照后，能够了解项目的完整结构（哪些 FB 存在、依赖关系、变量名称），再进行下一轮编程或修改时就有了准确的上下文，不会产生命名冲突或依赖缺失。
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
 <section id="capabilities">
   <h2>当前能力状态</h2>
 

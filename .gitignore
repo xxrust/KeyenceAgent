@@ -68,6 +68,16 @@ credentials.xml
 artifacts/
 **/artifacts/
 
+# Test run outputs (generated at runtime, not source)
+kv-studio-operator/tests/runs/
+kv-studio-operator/tests/kv-interface-regression/runs/
+kv-studio-operator/tests/kv-interface-regression/live-runs/
+kv-studio-operator/tests/kv-interface-regression/plan-runs*/
+kv-studio-operator/tests/kv-interface-regression/plan-*/
+
+# Validation gate results (generated at runtime)
+_validation/
+
 # KV STUDIO project files (optional - uncomment if you don't want to track)
 # *.kpr
 # *.kvbak
