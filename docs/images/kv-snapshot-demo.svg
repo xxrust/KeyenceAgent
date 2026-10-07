@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="700" viewBox="0 0 960 700" role="img" aria-label="KeyenceAgent快照内容展示">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="760" viewBox="0 0 960 760" role="img" aria-label="KeyenceAgent快照内容展示">
   <defs>
     <style>
       text { font-family: "Microsoft YaHei","PingFang SC","Segoe UI",sans-serif; }
@@ -150,7 +150,7 @@
   <rect fill="#5a3a8a" x="12" y="336" width="454" height="24" rx="6"/>
   <text class="hdr" x="239" y="353" text-anchor="middle">③ 局部变量（内部状态）locals.tsv</text>
 
-  <rect fill="#f8f4ff" stroke="#c8b8f8" stroke-width="1" x="12" y="360" width="454" height="230" rx="6" filter="url(#sh)"/>
+  <rect fill="#f8f4ff" stroke="#c8b8f8" stroke-width="1" x="12" y="360" width="454" height="250" rx="6" filter="url(#sh)"/>
 
   <text class="col" x="20" y="376">变量名</text>
   <text class="col" x="200" y="376">类型</text>
@@ -176,7 +176,7 @@
   <rect fill="#7c5800" x="494" y="336" width="454" height="24" rx="6"/>
   <text class="hdr" x="721" y="353" text-anchor="middle">④ 全局变量 + 基恩士设备地址映射 variables.tsv</text>
 
-  <rect fill="#fffbf0" stroke="#fde68a" stroke-width="1" x="494" y="360" width="454" height="230" rx="6" filter="url(#sh)"/>
+  <rect fill="#fffbf0" stroke="#fde68a" stroke-width="1" x="494" y="360" width="454" height="250" rx="6" filter="url(#sh)"/>
 
   <text class="col" x="502" y="376">变量名</text>
   <text class="col" x="700" y="376">设备地址</text>
@@ -199,23 +199,23 @@
   <!-- ══════════════════════════════════════════════════════════
        BOTTOM summary bar
   ═══════════════════════════════════════════════════════════════ -->
-  <rect fill="#0e3d6b" x="12" y="600" width="936" height="84" rx="10" filter="url(#sh)"/>
-  <text font-size="13" font-weight="700" fill="#fff" x="480" y="622" text-anchor="middle">快照 = 整个项目的结构化语义镜像 — 四维度同时可见</text>
-  <line x1="24" y1="630" x2="936" y2="630" stroke="rgba(255,255,255,.15)" stroke-width="1"/>
+  <rect fill="#0e3d6b" x="12" y="626" width="936" height="84" rx="10" filter="url(#sh)"/>
+  <text font-size="13" font-weight="700" fill="#fff" x="480" y="648" text-anchor="middle">快照 = 整个项目的结构化语义镜像 — 四维度同时可见</text>
+  <line x1="24" y1="656" x2="936" y2="656" stroke="rgba(255,255,255,.15)" stroke-width="1"/>
 
-  <text font-size="11" fill="#7baed4"         x="126" y="648" text-anchor="middle">📐 FB 接口</text>
-  <text font-size="10" fill="rgba(255,255,255,.75)" x="126" y="663" text-anchor="middle">方向 / 类型 / 注释齐全</text>
-  <text font-size="10" fill="rgba(255,255,255,.75)" x="126" y="676" text-anchor="middle">AI 知道如何正确调用</text>
+  <text font-size="11" fill="#7baed4"         x="126" y="674" text-anchor="middle">📐 FB 接口</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="126" y="689" text-anchor="middle">方向 / 类型 / 注释齐全</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="126" y="702" text-anchor="middle">AI 知道如何正确调用</text>
 
-  <text font-size="11" fill="#c8d8e8"          x="354" y="648" text-anchor="middle">📜 梯形图程序体</text>
-  <text font-size="10" fill="rgba(255,255,255,.75)" x="354" y="663" text-anchor="middle">基恩士专有指令原文</text>
-  <text font-size="10" fill="rgba(255,255,255,.75)" x="354" y="676" text-anchor="middle">可直接读懂逻辑并修改</text>
+  <text font-size="11" fill="#c8d8e8"          x="354" y="674" text-anchor="middle">📜 梯形图程序体</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="354" y="689" text-anchor="middle">基恩士专有指令原文</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="354" y="702" text-anchor="middle">可直接读懂逻辑并修改</text>
 
-  <text font-size="11" fill="#c8b8f8"          x="606" y="648" text-anchor="middle">🧠 局部变量</text>
-  <text font-size="10" fill="rgba(255,255,255,.75)" x="606" y="663" text-anchor="middle">内部状态全部透明</text>
-  <text font-size="10" fill="rgba(255,255,255,.75)" x="606" y="676" text-anchor="middle">改代码不会命名冲突</text>
+  <text font-size="11" fill="#c8b8f8"          x="606" y="674" text-anchor="middle">🧠 局部变量</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="606" y="689" text-anchor="middle">内部状态全部透明</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="606" y="702" text-anchor="middle">改代码不会命名冲突</text>
 
-  <text font-size="11" fill="#fde68a"          x="834" y="648" text-anchor="middle">🗺️ 全局变量+设备地址</text>
-  <text font-size="10" fill="rgba(255,255,255,.75)" x="834" y="663" text-anchor="middle">CR2004 = 10ms 时钟</text>
-  <text font-size="10" fill="rgba(255,255,255,.75)" x="834" y="676" text-anchor="middle">无需手翻基恩士手册</text>
+  <text font-size="11" fill="#fde68a"          x="834" y="674" text-anchor="middle">🗺️ 全局变量+设备地址</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="834" y="689" text-anchor="middle">CR2004 = 10ms 时钟</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="834" y="702" text-anchor="middle">无需手翻基恩士手册</text>
 </svg>
