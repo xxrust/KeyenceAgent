@@ -21,6 +21,35 @@ KeyenceAgent 仓库保存三个 KEYENCE skill 的发布源码。Codex 安装目�
 - Codex
 - 已准备的 `llm-wiki-v2-keyence` 目录
 
+## 下载 Wiki V2 知识库
+
+当前运行时只需要 `wiki.v2.cleaned.db` 及其查询脚本。知识库压缩包通过百度网盘发布：
+
+- 文件：`llm-wiki-v2-keyence-cleaned.zip`
+- 下载地址：[百度网盘分享](https://pan.baidu.com/s/16eywbrivGbS8tP7DEkTspw?pwd=tn2y)
+- 提取码：`tn2y`
+- 数据库 SHA256：`CD6D08F561913D1C8C51F6FDE8279593BF987D59F8E725B95563C2EFE1E13B7C`
+
+解压后，将 `wiki_root` 指向同时包含以下内容的目录：
+
+```text
+llm-wiki-v2-keyence/
+├── wiki.v2.cleaned.db
+└── scripts/
+    ├── wiki_query.py
+    └── wiki_common.py
+```
+
+可以用下面的命令确认数据库文件和查询脚本存在：
+
+```powershell
+$wiki = 'C:\Path\To\llm-wiki-v2-keyence'
+Test-Path (Join-Path $wiki 'wiki.v2.cleaned.db')
+Test-Path (Join-Path $wiki 'scripts\wiki_query.py')
+```
+
+然后运行安装脚本，在 `Wiki V2 root` 提示处填写 `$wiki`。压缩包包含检索数据库和查询运行文件，不包含原始 HTML/Markdown 证据库；查询结果中的部分原始证据路径可能无法在另一台电脑直接打开。
+
 ## 普通用户安装
 
 ```powershell
