@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 540" preserveAspectRatio="xMidYMid meet" role="img" aria-label="快照目录结构">
+  <defs>
+    <style>
+      text { font-family: "Microsoft YaHei","PingFang SC","Segoe UI",Arial,sans-serif; }
+      .ttl { font-size:14px; font-weight:700; fill:#1a2635; }
+      .sub { font-size:10px; fill:#5a7080; }
+      .hdr { font-size:11px; font-weight:700; fill:#fff; }
+      .dir { font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#1a5fa0; font-weight:600; }
+      .jsn { font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#166534; }
+      .tsv { font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#b45309; }
+      .mnm { font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#7c3a8a; }
+      .mdf { font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#5a7080; }
+      .cmt { font-size:10px; fill:#5a7080; }
+      .tre { font-size:10px; font-family:"Consolas","Courier New",monospace; fill:#9ca3af; }
+    </style>
+    <filter id="sh"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#00000014"/></filter>
+  </defs>
+
+  <text class="ttl" x="400" y="22" text-anchor="middle">快照目录结构 — snapshot/ 下的完整文件树</text>
+  <text class="sub" x="400" y="38" text-anchor="middle">每个文件有明确用途 · 颜色区分文件类型 · AI 按需读取对应文件</text>
+
+  <rect fill="#1a2635" x="12" y="48" width="776" height="20" rx="5"/>
+  <text class="hdr" x="400" y="62" text-anchor="middle">snapshot/</text>
+
+  <rect fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" x="12" y="68" width="776" height="410" rx="5" filter="url(#sh)"/>
+
+  <!-- Legend -->
+  <rect fill="#dbeafe" stroke="#1a5fa0" stroke-width="1" x="520" y="78" width="60" height="14" rx="3"/>
+  <text class="dir" x="550" y="89" text-anchor="middle">目录/</text>
+  <rect fill="#dcfce7" stroke="#166534" stroke-width="1" x="592" y="78" width="40" height="14" rx="3"/>
+  <text class="jsn" x="612" y="89" text-anchor="middle">.json</text>
+  <rect fill="#fef9c3" stroke="#b45309" stroke-width="1" x="642" y="78" width="36" height="14" rx="3"/>
+  <text class="tsv" x="660" y="89" text-anchor="middle">.tsv</text>
+  <rect fill="#f3e8ff" stroke="#7c3a8a" stroke-width="1" x="688" y="78" width="38" height="14" rx="3"/>
+  <text class="mnm" x="707" y="89" text-anchor="middle">.mnm</text>
+  <rect fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" x="736" y="78" width="38" height="14" rx="3"/>
+  <text class="mdf" x="755" y="89" text-anchor="middle">.md</text>
+
+  <!-- Tree content, 16px line height -->
+  <text x="24" y="114"><tspan class="mdf">├──</tspan> <tspan class="mdf">README.md</tspan>                         <tspan class="cmt">← 本次快照摘要（实体数、状态、警告）</tspan></text>
+  <text x="24" y="130"><tspan class="mdf">├──</tspan> <tspan class="jsn">source_snapshot_manifest.json</tspan>    <tspan class="cmt">← 源项目文件指纹（SHA256，33个文件）</tspan></text>
+  <text x="24" y="146"><tspan class="mdf">├──</tspan> <tspan class="dir">architecture/</tspan></text>
+  <text x="24" y="162"><tspan class="mdf">│   └──</tspan> <tspan class="jsn">project_map.json</tspan>               <tspan class="cmt">← 项目整体映射</tspan></text>
+  <text x="24" y="178"><tspan class="mdf">├──</tspan> <tspan class="dir">project/</tspan></text>
+  <text x="24" y="194"><tspan class="mdf">│   ├──</tspan> <tspan class="mdf">overview.md</tspan>                    <tspan class="cmt">← 人类可读的项目概览（恢复顺序表）</tspan></text>
+  <text x="24" y="210"><tspan class="mdf">│   ├──</tspan> <tspan class="jsn">project.json</tspan>                   <tspan class="cmt">← 实体索引元数据（86个实体）</tspan></text>
+  <text x="24" y="226"><tspan class="mdf">│   ├──</tspan> <tspan class="dir">_index/</tspan></text>
+  <text x="24" y="242"><tspan class="mdf">│   │   ├──</tspan> <tspan class="jsn">index.json</tspan>                 <tspan class="cmt">← 86个实体的完整索引</tspan></text>
+  <text x="24" y="258"><tspan class="mdf">│   │   ├──</tspan> <tspan class="jsn">entities.jsonl</tspan>             <tspan class="cmt">← 实体详情（每行一个JSON）</tspan></text>
+  <text x="24" y="274"><tspan class="mdf">│   │   ├──</tspan> <tspan class="jsn">restore_plan.json</tspan>          <tspan class="cmt">← 恢复顺序与依赖关系（可执行重建计划）</tspan></text>
+  <text x="24" y="290"><tspan class="mdf">│   │   └──</tspan> <tspan class="jsn">materialization_result.json</tspan>  <tspan class="cmt">← 本次快照生成结果</tspan></text>
+  <text x="24" y="306"><tspan class="mdf">│   ├──</tspan> <tspan class="dir">配置/</tspan></text>
+  <text x="24" y="322"><tspan class="mdf">│   │   ├──</tspan> <tspan class="dir">单元/</tspan>        <tspan class="jsn">entity.json</tspan> <tspan class="cmt">+</tspan> <tspan class="jsn">unit_config.json</tspan></text>
+  <text x="24" y="338"><tspan class="mdf">│   │   ├──</tspan> <tspan class="dir">EtherCAT/</tspan>    <tspan class="jsn">entity.json</tspan> <tspan class="cmt">+</tspan> <tspan class="jsn">topology.json</tspan>   <tspan class="cmt">← 总线拓扑</tspan></text>
+  <text x="24" y="354"><tspan class="mdf">│   │   └──</tspan> <tspan class="dir">全局变量/</tspan>    <tspan class="jsn">entity.json</tspan> <tspan class="cmt">+</tspan> <tspan class="tsv">variables.tsv</tspan>   <tspan class="cmt">← 变量↔寄存器地址</tspan></text>
+  <text x="24" y="370"><tspan class="mdf">│   ├──</tspan> <tspan class="dir">类型/</tspan></text>
+  <text x="24" y="386"><tspan class="mdf">│   │   └──</tspan> <tspan class="jsn">structure_definitions.json</tspan>   <tspan class="cmt">← 26个结构体定义</tspan></text>
+  <text x="24" y="402"><tspan class="mdf">│   ├──</tspan> <tspan class="dir">功能块/level1_组件/FB_Cylinder/</tspan></text>
+  <text x="24" y="418"><tspan class="mdf">│   │   ├──</tspan> <tspan class="jsn">entity.json</tspan>  <tspan class="tsv">arguments.tsv</tspan>  <tspan class="mnm">body.mnm</tspan>  <tspan class="tsv">locals.tsv</tspan>   <tspan class="cmt">← FB完整内容</tspan></text>
+  <text x="24" y="434"><tspan class="mdf">│   └──</tspan> <tspan class="dir">程序/每次扫描执行型模块/ST04_传送带/</tspan></text>
+  <text x="24" y="450"><tspan class="mdf">│       └──</tspan> <tspan class="jsn">entity.json</tspan>  <tspan class="mnm">body.mnm</tspan>                    <tspan class="cmt">← 程序模块梯形图</tspan></text>
+  <text x="24" y="466"><tspan class="mdf">└──</tspan> <tspan class="dir">raw/</tspan>                                   <tspan class="cmt">← 原始UI操作请求记录（调试用）</tspan></text>
+
+  <rect fill="#0e3d6b" x="12" y="492" width="776" height="36" rx="5"/>
+  <text font-size="10" font-weight="700" fill="#fff" x="400" y="508" text-anchor="middle">每个 FB 和程序模块各自独立成目录 · 86个实体 · 结构清晰可按需读取</text>
+  <text font-size="9" fill="rgba(255,255,255,.7)" x="400" y="522" text-anchor="middle">AI 不必读取整个项目 — 需要哪个 FB 的信息就读哪个目录，高效且精准</text>
+</svg>

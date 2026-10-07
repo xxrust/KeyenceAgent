@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560" preserveAspectRatio="xMidYMid meet" role="img" aria-label="恢复顺序依赖关系图">
+  <defs>
+    <style>
+      text { font-family: "Microsoft YaHei","PingFang SC","Segoe UI",Arial,sans-serif; }
+      .ttl { font-size:14px; font-weight:700; fill:#1a2635; }
+      .sub { font-size:10px; fill:#5a7080; }
+      .hdr { font-size:11px; font-weight:700; fill:#fff; }
+      .ord { font-size:9px; font-weight:700; fill:#fff; }
+      .stt { font-size:11px; font-weight:700; fill:#1a2635; }
+      .det { font-size:9px; fill:#374151; }
+      .str { font-size:9px; font-family:"Consolas","Courier New",monospace; fill:#5a7080; }
+      .dep { font-size:9px; fill:#6b7280; font-style:italic; }
+    </style>
+    <filter id="sh"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#00000014"/></filter>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#6b7280"/>
+    </marker>
+    <marker id="arr2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#1a5fa0"/>
+    </marker>
+  </defs>
+
+  <text class="ttl" x="400" y="22" text-anchor="middle">恢复顺序 — AI 按正确依赖顺序重建整个项目</text>
+  <text class="sub" x="400" y="38" text-anchor="middle">restore_plan.json 记录了 86 个实体的依赖关系与恢复策略 · 这不是文档，是可执行的重建计划</text>
+
+  <!-- Stage 1: config:单元 -->
+  <rect fill="#1a5fa0" x="300" y="52" width="40" height="18" rx="3"/>
+  <text class="ord" x="320" y="65" text-anchor="middle">order 10</text>
+  <rect fill="#dce8f5" stroke="#1a5fa0" stroke-width="1.5" x="180" y="70" width="440" height="56" rx="6" filter="url(#sh)"/>
+  <text class="stt" x="400" y="90" text-anchor="middle">config:单元</text>
+  <text class="det" x="400" y="106" text-anchor="middle">单元配置 · 硬件基础 · strategy: configure_unit</text>
+  <text class="str" x="400" y="118" text-anchor="middle">depends_on: []  （无依赖，第一个恢复）</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="400" y1="126" x2="400" y2="152" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text class="dep" x="415" y="143">depends_on: config:单元</text>
+
+  <!-- Stage 2: config:EtherCAT -->
+  <rect fill="#0ea5e9" x="300" y="154" width="40" height="18" rx="3"/>
+  <text class="ord" x="320" y="167" text-anchor="middle">order 20</text>
+  <rect fill="#e0f2fe" stroke="#0ea5e9" stroke-width="1.5" x="180" y="172" width="440" height="56" rx="6" filter="url(#sh)"/>
+  <text class="stt" x="400" y="192" text-anchor="middle">config:EtherCAT</text>
+  <text class="det" x="400" y="208" text-anchor="middle">EtherCAT 拓扑 · 总线配置 · strategy: configure_ethercat</text>
+  <text class="str" x="400" y="220" text-anchor="middle">topology.json → 节点编号 + 驱动器型号</text>
+
+  <!-- Arrow 2→3 (split to two) -->
+  <line x1="400" y1="228" x2="400" y2="254" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Stage 3: parallel -->
+  <rect fill="#166534" x="180" y="256" width="40" height="18" rx="3"/>
+  <text class="ord" x="200" y="269" text-anchor="middle">order 30</text>
+  <rect fill="#dcfce7" stroke="#166534" stroke-width="1.5" x="20" y="274" width="360" height="56" rx="6" filter="url(#sh)"/>
+  <text class="stt" x="200" y="294" text-anchor="middle">config:全局变量</text>
+  <text class="det" x="200" y="310" text-anchor="middle">全局变量 · 设备地址映射</text>
+  <text class="str" x="200" y="322" text-anchor="middle">variables.tsv → 变量名 ↔ CR/CM 地址</text>
+
+  <rect fill="#166534" x="580" y="256" width="40" height="18" rx="3"/>
+  <text class="ord" x="600" y="269" text-anchor="middle">order 40</text>
+  <rect fill="#dcfce7" stroke="#166534" stroke-width="1.5" x="420" y="274" width="360" height="56" rx="6" filter="url(#sh)"/>
+  <text class="stt" x="600" y="294" text-anchor="middle">data_types:结构体定义</text>
+  <text class="det" x="600" y="310" text-anchor="middle">26 个结构体定义</text>
+  <text class="str" x="600" y="322" text-anchor="middle">structure_definitions.json</text>
+
+  <!-- Parallel label -->
+  <text font-size="9" fill="#166534" font-weight="600" x="400" y="306" text-anchor="middle">← 可并行 →</text>
+
+  <!-- Arrows 3→4 -->
+  <line x1="200" y1="330" x2="320" y2="356" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="600" y1="330" x2="480" y2="356" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text class="dep" x="400" y="350" text-anchor="middle">depends_on: types + 全局变量</text>
+
+  <!-- Stage 4: FB -->
+  <rect fill="#5a3a8a" x="300" y="358" width="40" height="18" rx="3"/>
+  <text class="ord" x="320" y="371" text-anchor="middle">order 50</text>
+  <rect fill="#f2ecfb" stroke="#5a3a8a" stroke-width="1.5" x="20" y="376" width="760" height="64" rx="6" filter="url(#sh)"/>
+  <text class="stt" x="400" y="396" text-anchor="middle">fb:功能块/* （25 个 FB）</text>
+  <text class="det" x="400" y="412" text-anchor="middle">含气缸/真空/运动控制 + 安川/汇川/松下/雷赛/汇川多品牌伺服库</text>
+  <text class="str" x="400" y="426" text-anchor="middle">strategy: import_body_then_set_arguments_then_set_locals</text>
+
+  <!-- Arrow 4→5 -->
+  <line x1="400" y1="440" x2="400" y2="462" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text class="dep" x="415" y="455">depends_on: FB + 全局变量</text>
+
+  <!-- Stage 5: Programs -->
+  <rect fill="#d97706" x="300" y="464" width="40" height="18" rx="3"/>
+  <text class="ord" x="320" y="477" text-anchor="middle">order 60</text>
+  <rect fill="#fff3e0" stroke="#d97706" stroke-width="1.5" x="20" y="482" width="760" height="52" rx="6" filter="url(#sh)"/>
+  <text class="stt" x="400" y="502" text-anchor="middle">program:每次扫描执行型模块/* （24 个程序模块）</text>
+  <text class="det" x="400" y="518" text-anchor="middle">工站逻辑 · ST00~ST06 · IO · 轴控 · 报警 · HMI</text>
+
+  <!-- Bottom callout -->
+  <rect fill="#0e3d6b" x="20" y="548" width="760" height="0" rx="5"/>
+</svg>

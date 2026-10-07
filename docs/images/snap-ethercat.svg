@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" preserveAspectRatio="xMidYMid meet" role="img" aria-label="EtherCAT总线拓扑">
+  <defs>
+    <style>
+      text { font-family: "Microsoft YaHei","PingFang SC","Segoe UI",Arial,sans-serif; }
+      .ttl { font-size:14px; font-weight:700; fill:#1a2635; }
+      .sub { font-size:10px; fill:#5a7080; }
+      .hdr { font-size:11px; font-weight:700; fill:#fff; }
+      .lbl { font-size:9px; font-weight:600; fill:#1a2635; }
+      .dev { font-size:8px; font-family:"Consolas","Courier New",monospace; fill:#374151; }
+      .nd  { font-size:9px; font-weight:700; fill:#fff; }
+    </style>
+    <filter id="sh"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#00000018"/></filter>
+  </defs>
+
+  <text class="ttl" x="400" y="22" text-anchor="middle">EtherCAT 总线拓扑 — 从快照中读取的实际配置</text>
+  <text class="sub" x="400" y="38" text-anchor="middle">topology.json 记录了所有从站的节点编号与设备型号，AI 配置轴参数时不会搞错节点</text>
+
+  <!-- KV Controller box -->
+  <rect fill="#1a2635" x="12" y="60" width="110" height="60" rx="6" filter="url(#sh)"/>
+  <text font-size="10" font-weight="700" fill="#fff" x="67" y="84" text-anchor="middle">KV-X520</text>
+  <text font-size="9" fill="rgba(255,255,255,.75)" x="67" y="98" text-anchor="middle">EtherCAT Master</text>
+  <text font-size="8" fill="rgba(255,255,255,.6)" x="67" y="112" text-anchor="middle">config:单元</text>
+
+  <!-- Bus line -->
+  <line x1="122" y1="90" x2="780" y2="90" stroke="#d97706" stroke-width="4"/>
+  <text font-size="9" font-weight="600" fill="#d97706" x="400" y="86" text-anchor="middle">EtherCAT Bus</text>
+
+  <!-- Node drop lines and boxes -->
+  <!-- Node 1: SGDXS Yaskawa -->
+  <line x1="170" y1="90" x2="170" y2="130" stroke="#d97706" stroke-width="2"/>
+  <rect fill="#fef3c7" stroke="#d97706" stroke-width="1.5" x="130" y="130" width="80" height="56" rx="4" filter="url(#sh)"/>
+  <rect fill="#d97706" x="130" y="130" width="80" height="16" rx="4"/>
+  <text class="nd" x="170" y="142" text-anchor="middle">Node 1</text>
+  <text class="dev" x="170" y="160" text-anchor="middle">SGDXS-xxxxA0x</text>
+  <text class="dev" x="170" y="172" text-anchor="middle">EtherCAT(CoE)</text>
+  <text font-size="8" fill="#92400e" x="170" y="182" text-anchor="middle">安川 SERVOPACK</text>
+
+  <!-- Nodes 11-14: SV630 -->
+  <line x1="250" y1="90" x2="250" y2="130" stroke="#d97706" stroke-width="2"/>
+  <rect fill="#f0f9ff" stroke="#0ea5e9" stroke-width="1.5" x="215" y="130" width="70" height="56" rx="4" filter="url(#sh)"/>
+  <rect fill="#0ea5e9" x="215" y="130" width="70" height="16" rx="4"/>
+  <text class="nd" x="250" y="142" text-anchor="middle">Node 11</text>
+  <text class="dev" x="250" y="160" text-anchor="middle">SV630</text>
+  <text class="dev" x="250" y="172" text-anchor="middle">1Axis_03713</text>
+  <text font-size="8" fill="#0369a1" x="250" y="182" text-anchor="middle">汇川单轴伺服</text>
+
+  <line x1="330" y1="90" x2="330" y2="130" stroke="#d97706" stroke-width="2"/>
+  <rect fill="#f0f9ff" stroke="#0ea5e9" stroke-width="1.5" x="295" y="130" width="70" height="56" rx="4" filter="url(#sh)"/>
+  <rect fill="#0ea5e9" x="295" y="130" width="70" height="16" rx="4"/>
+  <text class="nd" x="330" y="142" text-anchor="middle">Node 12</text>
+  <text class="dev" x="330" y="160" text-anchor="middle">SV630</text>
+  <text class="dev" x="330" y="172" text-anchor="middle">1Axis_03713</text>
+  <text font-size="8" fill="#0369a1" x="330" y="182" text-anchor="middle">汇川单轴伺服</text>
+
+  <line x1="410" y1="90" x2="410" y2="130" stroke="#d97706" stroke-width="2"/>
+  <rect fill="#f0f9ff" stroke="#0ea5e9" stroke-width="1.5" x="375" y="130" width="70" height="56" rx="4" filter="url(#sh)"/>
+  <rect fill="#0ea5e9" x="375" y="130" width="70" height="16" rx="4"/>
+  <text class="nd" x="410" y="142" text-anchor="middle">Node 13</text>
+  <text class="dev" x="410" y="160" text-anchor="middle">SV630</text>
+  <text class="dev" x="410" y="172" text-anchor="middle">1Axis_03713</text>
+  <text font-size="8" fill="#0369a1" x="410" y="182" text-anchor="middle">汇川单轴伺服</text>
+
+  <line x1="490" y1="90" x2="490" y2="130" stroke="#d97706" stroke-width="2"/>
+  <rect fill="#f0f9ff" stroke="#0ea5e9" stroke-width="1.5" x="455" y="130" width="70" height="56" rx="4" filter="url(#sh)"/>
+  <rect fill="#0ea5e9" x="455" y="130" width="70" height="16" rx="4"/>
+  <text class="nd" x="490" y="142" text-anchor="middle">Node 14</text>
+  <text class="dev" x="490" y="160" text-anchor="middle">SV630</text>
+  <text class="dev" x="490" y="172" text-anchor="middle">1Axis_03713</text>
+  <text font-size="8" fill="#0369a1" x="490" y="182" text-anchor="middle">汇川单轴伺服</text>
+
+  <line x1="570" y1="90" x2="570" y2="130" stroke="#d97706" stroke-width="2"/>
+  <rect fill="#f0f9ff" stroke="#0ea5e9" stroke-width="1.5" x="535" y="130" width="70" height="56" rx="4" filter="url(#sh)"/>
+  <rect fill="#0ea5e9" x="535" y="130" width="70" height="16" rx="4"/>
+  <text class="nd" x="570" y="142" text-anchor="middle">Node 16</text>
+  <text class="dev" x="570" y="160" text-anchor="middle">SV630</text>
+  <text class="dev" x="570" y="172" text-anchor="middle">1Axis_03713</text>
+  <text font-size="8" fill="#0369a1" x="570" y="182" text-anchor="middle">汇川单轴伺服</text>
+
+  <line x1="650" y1="90" x2="650" y2="130" stroke="#d97706" stroke-width="2"/>
+  <rect fill="#f0f9ff" stroke="#0ea5e9" stroke-width="1.5" x="615" y="130" width="70" height="56" rx="4" filter="url(#sh)"/>
+  <rect fill="#0ea5e9" x="615" y="130" width="70" height="16" rx="4"/>
+  <text class="nd" x="650" y="142" text-anchor="middle">Node 17</text>
+  <text class="dev" x="650" y="160" text-anchor="middle">SV630</text>
+  <text class="dev" x="650" y="172" text-anchor="middle">1Axis_03713</text>
+  <text font-size="8" fill="#0369a1" x="650" y="182" text-anchor="middle">汇川单轴伺服</text>
+
+  <line x1="730" y1="90" x2="730" y2="130" stroke="#d97706" stroke-width="2"/>
+  <rect fill="#f0f9ff" stroke="#0ea5e9" stroke-width="1.5" x="695" y="130" width="80" height="56" rx="4" filter="url(#sh)"/>
+  <rect fill="#0ea5e9" x="695" y="130" width="80" height="16" rx="4"/>
+  <text class="nd" x="735" y="142" text-anchor="middle">Node 18</text>
+  <text class="dev" x="735" y="160" text-anchor="middle">SV630</text>
+  <text class="dev" x="735" y="172" text-anchor="middle">1Axis_03713</text>
+  <text font-size="8" fill="#0369a1" x="735" y="182" text-anchor="middle">汇川单轴伺服</text>
+
+  <!-- entity.json sample -->
+  <rect fill="#1a2635" stroke="#2a3a50" stroke-width="1" x="12" y="220" width="776" height="70" rx="6" filter="url(#sh)"/>
+  <text font-size="9" font-weight="600" fill="#7baed4" font-family="Consolas,monospace" x="400" y="238" text-anchor="middle">entity.json — config:EtherCAT</text>
+  <line x1="16" y1="242" x2="784" y2="242" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+  <text font-size="9" fill="#c8d8e8" font-family="Consolas,monospace" x="20" y="256">"id": "config:EtherCAT",  "kind": "ethercat_configuration",  "restore": &#123; "order": 20,  "strategy": "configure_ethercat",  "depends_on": ["config:单元"] &#125;</text>
+  <text font-size="9" fill="#c8d8e8" font-family="Consolas,monospace" x="20" y="272">"artifacts": &#123; "topology": "配置/EtherCAT/topology.json" &#125;,  "status": &#123; "configuration": "complete" &#125;</text>
+
+  <!-- Callout -->
+  <rect fill="#fef3c7" stroke="#d97706" stroke-width="1" x="12" y="308" width="776" height="52" rx="6"/>
+  <text font-size="11" font-weight="700" fill="#7c5800" x="400" y="328" text-anchor="middle">AI 读取拓扑后，知道节点 11-18 均为汇川 SV630，节点 1 为安川 SERVOPACK</text>
+  <text font-size="10" fill="#92400e" x="400" y="348" text-anchor="middle">配置轴参数时直接按节点编号关联驱动器型号，不会因为接线顺序而搞错从站</text>
+
+  <rect fill="#0e3d6b" x="12" y="374" width="776" height="32" rx="5"/>
+  <text font-size="10" font-weight="700" fill="#fff" x="400" y="390" text-anchor="middle">总线拓扑快照 · restore order 20 · depends on config:单元</text>
+  <text font-size="9" fill="rgba(255,255,255,.7)" x="400" y="402" text-anchor="middle">strategy: configure_ethercat — AI 可按此顺序自动配置整个 EtherCAT 网络</text>
+</svg>

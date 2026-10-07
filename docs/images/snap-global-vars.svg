@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" preserveAspectRatio="xMidYMid meet" role="img" aria-label="全局变量设备地址映射">
+  <defs>
+    <style>
+      text { font-family: "Microsoft YaHei","PingFang SC","Segoe UI",Arial,sans-serif; }
+      .ttl { font-size:14px; font-weight:700; fill:#1a2635; }
+      .sub { font-size:10px; fill:#5a7080; }
+      .hdr { font-size:11px; font-weight:700; fill:#fff; }
+      .col { font-size:9px; font-weight:600; fill:#7c5800; }
+      .cod { font-size:9px; font-family:"Consolas","Courier New",monospace; fill:#1a2635; }
+      .adr { font-size:9px; font-family:"Consolas","Courier New",monospace; fill:#b45309; font-weight:700; }
+      .cmt { font-size:9px; fill:#5a7080; }
+    </style>
+    <filter id="sh"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#00000014"/></filter>
+  </defs>
+
+  <text class="ttl" x="400" y="22" text-anchor="middle">全局变量 — 变量名与基恩士设备地址映射</text>
+  <text class="sub" x="400" y="38" text-anchor="middle">variables.tsv 将每个变量名与 KV PLC 的寄存器地址一一绑定，AI 写程序时无需翻阅硬件手册</text>
+
+  <rect fill="#7c5800" x="12" y="48" width="776" height="20" rx="5"/>
+  <text class="hdr" x="400" y="62" text-anchor="middle">配置/全局变量/variables.tsv</text>
+
+  <rect fill="#fffbf0" stroke="#fde68a" stroke-width="1" x="12" y="68" width="776" height="330" rx="5" filter="url(#sh)"/>
+
+  <!-- Col headers -->
+  <text class="col" x="20" y="84">变量名</text>
+  <text class="col" x="240" y="84">类型</text>
+  <text class="col" x="400" y="84">设备地址</text>
+  <text class="col" x="480" y="84">注释</text>
+  <line x1="16" y1="88" x2="784" y2="88" stroke="#fde68a" stroke-width="1"/>
+
+  <!-- Rows: 18px apart -->
+  <text class="cod" x="20"  y="104">_CurrentDateTime</text>  <text class="cod" x="240" y="104">ARRAY[0..5] OF UINT</text>  <text class="adr" x="400" y="104">CM700</text>   <text class="cmt" x="480" y="104">日期时间(年月日时分秒)</text>
+  <text class="cod" x="20"  y="122">_DayOfWeek</text>         <text class="cod" x="240" y="122">UINT</text>                <text class="adr" x="400" y="122">CM706</text>   <text class="cmt" x="480" y="122">周几</text>
+  <line x1="16" y1="128" x2="784" y2="128" stroke="#fef3c7" stroke-width="1"/>
+  <text class="cod" x="20"  y="144">_AlwaysOn</text>          <text class="cod" x="240" y="144">BOOL</text>               <text class="adr" x="400" y="144">CR2002</text>  <text class="cmt" x="480" y="144">始终 ON</text>
+  <text class="cod" x="20"  y="162">_AlwaysOff</text>         <text class="cod" x="240" y="162">BOOL</text>               <text class="adr" x="400" y="162">CR2003</text>  <text class="cmt" x="480" y="162">始终 OFF</text>
+  <text class="cod" x="20"  y="180">_Clock10ms</text>         <text class="cod" x="240" y="180">BOOL</text>               <text class="adr" x="400" y="180">CR2004</text>  <text class="cmt" x="480" y="180">10ms 时钟脉冲 duty50%</text>
+  <text class="cod" x="20"  y="198">_Clock100ms</text>        <text class="cod" x="240" y="198">BOOL</text>               <text class="adr" x="400" y="198">CR2005</text>  <text class="cmt" x="480" y="198">100ms 时钟脉冲 duty50%</text>
+  <text class="cod" x="20"  y="216">_Clock1s</text>           <text class="cod" x="240" y="216">BOOL</text>               <text class="adr" x="400" y="216">CR2006</text>  <text class="cmt" x="480" y="216">1s 时钟脉冲 duty50%</text>
+  <text class="cod" x="20"  y="234">_FirstScanOff</text>      <text class="cod" x="240" y="234">BOOL</text>               <text class="adr" x="400" y="234">CR2007</text>  <text class="cmt" x="480" y="234">仅首次扫描 OFF</text>
+  <text class="cod" x="20"  y="252">_FirstScanOn</text>       <text class="cod" x="240" y="252">BOOL</text>               <text class="adr" x="400" y="252">CR2008</text>  <text class="cmt" x="480" y="252">仅首次扫描 ON</text>
+  <line x1="16" y1="258" x2="784" y2="258" stroke="#fef3c7" stroke-width="1"/>
+  <text class="cod" x="20"  y="274">_ProgramInfo</text>       <text class="cod" x="240" y="274">_PROGRAM_INFO</text>      <text class="adr" x="400" y="274">CM1000</text>  <text class="cmt" x="480" y="274">程序信息</text>
+  <text class="cod" x="20"  y="292">_FreeRunCounter1ms</text> <text class="cod" x="240" y="292">UDINT</text>              <text class="adr" x="400" y="292">CM1030</text>  <text class="cmt" x="480" y="292">自由运行计数器 (1ms)</text>
+  <text class="cod" x="20"  y="310">_FreeRunCounter10us</text><text class="cod" x="240" y="310">UDINT</text>              <text class="adr" x="400" y="310">CM1032</text>  <text class="cmt" x="480" y="310">自由运行计数器 (10μs)</text>
+  <text class="cod" x="20"  y="328">_FreeRunCounter1us</text> <text class="cod" x="240" y="328">UDINT</text>              <text class="adr" x="400" y="328">CM1034</text>  <text class="cmt" x="480" y="328">自由运行计数器 (1μs)</text>
+  <text class="cod" x="20"  y="346">_ErrorCtrl</text>         <text class="cod" x="240" y="346">_ERROR_CTRL</text>        <text class="adr" x="400" y="346">CM1050</text>  <text class="cmt" x="480" y="346">错误控制</text>
+  <text class="sub" x="20"  y="364">… 及用户自定义全局变量（含类型、初值、注释）</text>
+
+  <!-- Callout -->
+  <rect fill="#fef3c7" stroke="#d97706" stroke-width="1" x="12" y="410" width="776" height="52" rx="6"/>
+  <text font-size="11" font-weight="700" fill="#7c5800" x="400" y="430" text-anchor="middle">AI 写程序时可直接引用 _Clock10ms，而非 CR2004</text>
+  <text font-size="10" fill="#92400e" x="400" y="448" text-anchor="middle">快照把变量名与寄存器地址的对应关系永久记录下来，AI 生成的代码不会出现硬编码地址</text>
+</svg>

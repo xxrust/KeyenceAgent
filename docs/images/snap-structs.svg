@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 640" preserveAspectRatio="xMidYMid meet" role="img" aria-label="结构体定义嵌套层级">
+  <defs>
+    <style>
+      text { font-family: "Microsoft YaHei","PingFang SC","Segoe UI",Arial,sans-serif; }
+      .ttl { font-size:14px; font-weight:700; fill:#1a2635; }
+      .sub { font-size:10px; fill:#5a7080; }
+      .hdr { font-size:11px; font-weight:700; fill:#fff; }
+      .sn  { font-size:11px; font-weight:700; fill:#1a2635; }
+      .mn  { font-size:9px; font-family:"Consolas","Courier New",monospace; fill:#1a2635; }
+      .mt  { font-size:9px; font-family:"Consolas","Courier New",monospace; fill:#1a5fa0; }
+      .mc  { font-size:9px; fill:#5a7080; }
+      .more{ font-size:9px; fill:#9ca3af; font-style:italic; }
+      .cnt { font-size:9px; fill:#6b7280; }
+    </style>
+    <filter id="sh"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#00000014"/></filter>
+    <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 z" fill="#9ca3af"/>
+    </marker>
+  </defs>
+
+  <text class="ttl" x="400" y="22" text-anchor="middle">结构体定义 — 26个结构体，嵌套层级清晰</text>
+  <text class="sub" x="400" y="38" text-anchor="middle">structure_definitions.json · AI 理解嵌套关系后，生成代码时变量路径完全正确</text>
+
+  <!-- ── strCylinder family (left column) ── -->
+  <!-- Root: strCylinder -->
+  <rect fill="#1a5fa0" x="12" y="52" width="380" height="22" rx="5"/>
+  <text class="hdr" x="202" y="67" text-anchor="middle">strCylinder  —  顶层气缸结构体  (4 members)</text>
+
+  <!-- strCylinderCtrl -->
+  <line x1="40" y1="96" x2="40" y2="184" stroke="#c8d8f0" stroke-width="1.5"/>
+  <line x1="40" y1="106" x2="60" y2="106" stroke="#c8d8f0" stroke-width="1.5"/>
+  <rect fill="#dce8f5" stroke="#1a5fa0" stroke-width="1" x="60" y="94" width="330" height="88" rx="4" filter="url(#sh)"/>
+  <text class="mn" x="68" y="108">Ctrl : <tspan class="mt">strCylinderCtrl</tspan>  <tspan class="cnt">(4 members)</tspan></text>
+  <line x1="64" y1="112" x2="386" y2="112" stroke="#c8d8f0" stroke-width="1"/>
+  <text class="mn" x="76" y="124">bExeToHomeManual</text><text class="mt" x="220" y="124">BOOL</text><text class="mc" x="270" y="124">回原位_手动</text>
+  <text class="mn" x="76" y="138">bExeToWorkManual</text><text class="mt" x="220" y="138">BOOL</text><text class="mc" x="270" y="138">去工作位_手动</text>
+  <text class="mn" x="76" y="152">bExeToHomeAuto</text>  <text class="mt" x="220" y="152">BOOL</text><text class="mc" x="270" y="152">回原位_自动</text>
+  <text class="mn" x="76" y="166">bExeToWorkAuto</text>  <text class="mt" x="220" y="166">BOOL</text><text class="mc" x="270" y="166">去工作位_自动</text>
+
+  <!-- strCylinderParam -->
+  <line x1="40" y1="200" x2="60" y2="200" stroke="#c8d8f0" stroke-width="1.5"/>
+  <rect fill="#dce8f5" stroke="#1a5fa0" stroke-width="1" x="60" y="188" width="330" height="106" rx="4" filter="url(#sh)"/>
+  <text class="mn" x="68" y="202">Param : <tspan class="mt">strCylinderParam</tspan>  <tspan class="cnt">(9 members)</tspan></text>
+  <line x1="64" y1="206" x2="386" y2="206" stroke="#c8d8f0" stroke-width="1"/>
+  <text class="mn" x="76" y="218">diHomeFilterTime</text><text class="mt" x="220" y="218">DINT</text><text class="mc" x="270" y="218">原位滤波时间(1ms)</text>
+  <text class="mn" x="76" y="232">diWorkFilterTime</text><text class="mt" x="220" y="232">DINT</text><text class="mc" x="270" y="232">到位滤波时间(1ms)</text>
+  <text class="mn" x="76" y="246">diTimeOut</text>       <text class="mt" x="220" y="246">DINT</text><text class="mc" x="270" y="246">超时时间(1ms)</text>
+  <text class="mn" x="76" y="260">bBanWorkAlarm</text>   <text class="mt" x="220" y="260">BOOL</text><text class="mc" x="270" y="260">禁止到位报警</text>
+  <text class="mn" x="76" y="274">bBanHomeAlarm</text>   <text class="mt" x="220" y="274">BOOL</text><text class="mc" x="270" y="274">禁止原位报警</text>
+  <text class="more" x="76" y="288">… +4 more members</text>
+
+  <!-- strCylinderStatus + IO -->
+  <line x1="40" y1="310" x2="60" y2="310" stroke="#c8d8f0" stroke-width="1.5"/>
+  <rect fill="#dce8f5" stroke="#1a5fa0" stroke-width="1" x="60" y="300" width="330" height="22" rx="4"/>
+  <text class="mn" x="68" y="314">Status : <tspan class="mt">strCylinderStatus</tspan>  <tspan class="mc">气缸状态（含传感器、故障码等）</tspan></text>
+
+  <line x1="40" y1="340" x2="60" y2="340" stroke="#c8d8f0" stroke-width="1.5"/>
+  <rect fill="#dce8f5" stroke="#1a5fa0" stroke-width="1" x="60" y="330" width="330" height="22" rx="4"/>
+  <text class="mn" x="68" y="344">IO : <tspan class="mt">strCylIO</tspan>  <tspan class="mc">气缸 IO 映射</tspan></text>
+
+  <!-- ── strAxis family (right column) ── -->
+  <rect fill="#5a3a8a" x="408" y="52" width="380" height="22" rx="5"/>
+  <text class="hdr" x="598" y="67" text-anchor="middle">strAxis  —  轴控制结构体  (3 members)</text>
+
+  <!-- strAxisCtrl -->
+  <line x1="436" y1="96" x2="436" y2="310" stroke="#d8c8f8" stroke-width="1.5"/>
+  <line x1="436" y1="106" x2="456" y2="106" stroke="#d8c8f8" stroke-width="1.5"/>
+  <rect fill="#f2ecfb" stroke="#5a3a8a" stroke-width="1" x="456" y="94" width="330" height="106" rx="4" filter="url(#sh)"/>
+  <text class="mn" x="464" y="108">Ctrl : <tspan style="fill:#5a3a8a">strAxisCtrl</tspan>  <tspan class="cnt">(16 members)</tspan></text>
+  <line x1="460" y1="112" x2="782" y2="112" stroke="#d8c8f8" stroke-width="1"/>
+  <text class="mn" x="472" y="124">bServoON</text>    <text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="580" y="124">BOOL</text><text class="mc" x="630" y="124">伺服使能</text>
+  <text class="mn" x="472" y="138">bHomeManual</text> <text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="580" y="138">BOOL</text><text class="mc" x="630" y="138">原点复位_手动</text>
+  <text class="mn" x="472" y="152">bHomeAuto</text>   <text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="580" y="152">BOOL</text><text class="mc" x="630" y="152">原点复位_自动</text>
+  <text class="mn" x="472" y="166">bJogFwd</text>     <text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="580" y="166">BOOL</text><text class="mc" x="630" y="166">正向JOG</text>
+  <text class="mn" x="472" y="180">bJogBwd</text>     <text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="580" y="180">BOOL</text><text class="mc" x="630" y="180">反向JOG</text>
+  <text class="more" x="472" y="194">… +11 more members</text>
+
+  <!-- strAxisParam -->
+  <line x1="436" y1="214" x2="456" y2="214" stroke="#d8c8f8" stroke-width="1.5"/>
+  <rect fill="#f2ecfb" stroke="#5a3a8a" stroke-width="1" x="456" y="202" width="330" height="106" rx="4" filter="url(#sh)"/>
+  <text class="mn" x="464" y="216">Param : <tspan style="fill:#5a3a8a">strAxisParam</tspan>  <tspan class="cnt">(10 members)</tspan></text>
+  <line x1="460" y1="220" x2="782" y2="220" stroke="#d8c8f8" stroke-width="1"/>
+  <text class="mn" x="472" y="232">rOriginCoordinate</text><text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="620" y="232">REAL</text><text class="mc" x="660" y="232">原点坐标</text>
+  <text class="mn" x="472" y="246">rManualVelocity</text>  <text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="620" y="246">REAL</text><text class="mc" x="660" y="246">手动定位速度</text>
+  <text class="mn" x="472" y="260">rAutoVel[0..16]</text>  <text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="620" y="260">REAL[]</text><text class="mc" x="660" y="260">自动定位速度</text>
+  <text class="mn" x="472" y="274">rCmdPos[0..16]</text>   <text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="620" y="274">REAL[]</text><text class="mc" x="660" y="274">目标位置</text>
+  <text class="mn" x="472" y="288">rAcc</text>             <text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="620" y="288">REAL</text><text class="mc" x="660" y="288">加速度</text>
+  <text class="more" x="472" y="302">… +5 more members</text>
+
+  <!-- strAxisStatus -->
+  <line x1="436" y1="322" x2="456" y2="322" stroke="#d8c8f8" stroke-width="1.5"/>
+  <rect fill="#f2ecfb" stroke="#5a3a8a" stroke-width="1" x="456" y="310" width="330" height="106" rx="4" filter="url(#sh)"/>
+  <text class="mn" x="464" y="324">Status : <tspan style="fill:#5a3a8a">strAxisStatus</tspan>  <tspan class="cnt">(29 members)</tspan></text>
+  <line x1="460" y1="328" x2="782" y2="328" stroke="#d8c8f8" stroke-width="1"/>
+  <text class="mn" x="472" y="340">bServoReady</text><text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="590" y="340">BOOL</text><text class="mc" x="640" y="340">伺服就绪</text>
+  <text class="mn" x="472" y="354">bAxisBusy</text>  <text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="590" y="354">BOOL</text><text class="mc" x="640" y="354">轴运动中</text>
+  <text class="mn" x="472" y="368">bInJOG</text>     <text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="590" y="368">BOOL</text><text class="mc" x="640" y="368">JOG中</text>
+  <text class="mn" x="472" y="382">bHomeBusy</text>  <text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="590" y="382">BOOL</text><text class="mc" x="640" y="382">原点复位中</text>
+  <text class="mn" x="472" y="396">bHomeDone</text>  <text style="fill:#5a3a8a;font-size:9px;font-family:Consolas,monospace" x="590" y="396">BOOL</text><text class="mc" x="640" y="396">原点复位完成</text>
+  <text class="more" x="472" y="410">… +24 more members</text>
+
+  <!-- Summary stats -->
+  <rect fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" x="12" y="436" width="776" height="40" rx="5"/>
+  <text font-size="10" fill="#5a7080" x="400" y="452" text-anchor="middle">共 26 个结构体 · 涵盖气缸、真空、轴控、Modbus、设备状态等全部设备类型</text>
+  <text font-size="10" fill="#5a7080" x="400" y="468" text-anchor="middle">AI 理解嵌套关系后，生成代码时变量路径完全正确：<tspan font-family="Consolas,monospace" fill="#1a5fa0">CylinderCtrl.bExeToWorkAuto</tspan></text>
+
+  <!-- Bottom bar -->
+  <rect fill="#0e3d6b" x="12" y="488" width="776" height="36" rx="5"/>
+  <text font-size="11" font-weight="700" fill="#fff" x="400" y="506" text-anchor="middle">结构体定义完整提取 — AI 不会写出 CylinderCtrl.bWorkAuto 这样的错误路径</text>
+  <text font-size="10" fill="rgba(255,255,255,.75)" x="400" y="520" text-anchor="middle">26 structs · restore order 40 · depends on: (none — 先于所有 FB 和程序恢复)</text>
+</svg>
