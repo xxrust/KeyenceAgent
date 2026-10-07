@@ -89,10 +89,42 @@ AI Agent 自动完成：
 
 ### 快照：让 AI 看到项目全貌
 
-调用 `export_kv_project_text_snapshot` 工作流，将散落在 KV STUDIO 各处的信息统一导出为结构化语义快照。下图来自一个真实项目（KVX样例程序，含多品牌伺服电机库、ModbusTCP、工站程序）：
+调用 `export_kv_project_text_snapshot` 工作流，将散落在 KV STUDIO 各处的信息统一导出为结构化语义快照。以下六张图展示了一个真实项目（KVX样例程序，含多品牌伺服电机库、ModbusTCP、工站程序）快照的实际内容：
+
+**快照目录结构**
 
 <p align="center">
-  <img src="docs/images/kv-snapshot-demo.svg" alt="快照结构演示" width="860"/>
+  <img src="docs/images/snap-folder-tree.svg" alt="快照目录结构" width="800"/>
+</p>
+
+**功能块完整内容：自变量 + 局部变量 + 程序体**
+
+<p align="center">
+  <img src="docs/images/snap-fb-overview.svg" alt="FB完整内容" width="800"/>
+</p>
+
+**全局变量与基恩士设备地址映射**
+
+<p align="center">
+  <img src="docs/images/snap-global-vars.svg" alt="全局变量设备地址" width="800"/>
+</p>
+
+**结构体定义（26个，含嵌套层级）**
+
+<p align="center">
+  <img src="docs/images/snap-structs.svg" alt="结构体定义" width="800"/>
+</p>
+
+**EtherCAT 总线拓扑**
+
+<p align="center">
+  <img src="docs/images/snap-ethercat.svg" alt="EtherCAT拓扑" width="800"/>
+</p>
+
+**实体依赖与恢复顺序**
+
+<p align="center">
+  <img src="docs/images/snap-restore-order.svg" alt="恢复顺序" width="800"/>
 </p>
 
 ---
