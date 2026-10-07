@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="460" viewBox="0 0 900 460" role="img" aria-label="KeyenceAgent 三技能协作架构">
+  <defs>
+    <style>
+      text { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; }
+      .title { font-size: 18px; font-weight: 700; fill: #1e2d3d; }
+      .skill-title { font-size: 14px; font-weight: 700; fill: #fff; }
+      .skill-body { font-size: 12px; fill: #d6eaff; }
+      .skill-num { font-size: 22px; font-weight: 700; fill: rgba(255,255,255,0.3); }
+      .label { font-size: 12px; fill: #1e2d3d; }
+      .sublabel { font-size: 11px; fill: #5a7080; }
+      .arrow-label { font-size: 11px; fill: #3a6080; }
+      .engineer { fill: #e8f4e8; stroke: #2a8a55; stroke-width: 2; }
+      .kb-skill { fill: #1a5fa0; stroke: #0e3d6b; stroke-width: 1.5; }
+      .prog-skill { fill: #2a6e4a; stroke: #1a4a30; stroke-width: 1.5; }
+      .op-skill { fill: #5a3a8a; stroke: #3a1a6a; stroke-width: 1.5; }
+      .output { fill: #fff3e0; stroke: #d97706; stroke-width: 2; }
+      .arrow { stroke: #3a6080; stroke-width: 2; fill: none; }
+    </style>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#3a6080"/>
+    </marker>
+    <marker id="arrGreen" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#2a8a55"/>
+    </marker>
+    <filter id="shadow" x="-5%" y="-5%" width="115%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#00000022"/>
+    </filter>
+  </defs>
+
+  <!-- Title -->
+  <text class="title" x="450" y="32" text-anchor="middle">KeyenceAgent 三技能协作架构</text>
+  <text class="sublabel" x="450" y="52" text-anchor="middle" font-size="12">电气工程师用自然语言描述需求 → AI 自动完成查询、编程、写入 KV STUDIO</text>
+
+  <!-- Engineer box -->
+  <rect class="engineer" x="20" y="150" width="110" height="130" rx="12" filter="url(#shadow)"/>
+  <text x="75" y="190" text-anchor="middle" font-size="28">👨‍🔧</text>
+  <text class="label" x="75" y="220" text-anchor="middle" font-weight="600" fill="#1a4a28">电气</text>
+  <text class="label" x="75" y="238" text-anchor="middle" font-weight="600" fill="#1a4a28">工程师</text>
+  <text class="sublabel" x="75" y="262" text-anchor="middle">自然语言描述</text>
+  <text class="sublabel" x="75" y="278" text-anchor="middle">需求</text>
+
+  <!-- Arrow 0: Engineer -> KB Skill -->
+  <path class="arrow" d="M130 215 L175 215" marker-end="url(#arr)"/>
+
+  <!-- Skill 1: KB Query -->
+  <rect class="kb-skill" x="180" y="110" width="155" height="220" rx="14" filter="url(#shadow)"/>
+  <text class="skill-num" x="318" y="155">1</text>
+  <text x="185" y="175" font-size="22">📚</text>
+  <text class="skill-title" x="257" y="165" text-anchor="middle">知识库技能</text>
+  <text class="skill-title" x="257" y="185" text-anchor="middle">KB Skill</text>
+  <line x1="195" y1="196" x2="320" y2="196" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <text class="skill-body" x="257" y="216" text-anchor="middle">查询本地</text>
+  <text class="skill-body" x="257" y="234" text-anchor="middle">Wiki V2 数据库</text>
+  <text class="skill-body" x="257" y="256" text-anchor="middle">• 基恩士指令语法</text>
+  <text class="skill-body" x="257" y="274" text-anchor="middle">• 设备地址映射</text>
+  <text class="skill-body" x="257" y="292" text-anchor="middle">• 功能块参数</text>
+  <text class="skill-body" x="257" y="310" text-anchor="middle">• 运动控制手册</text>
+
+  <!-- Arrow 1: KB -> Programmer -->
+  <path class="arrow" d="M335 215 L380 215" marker-end="url(#arr)"/>
+  <text class="arrow-label" x="357" y="208" text-anchor="middle">语法</text>
+  <text class="arrow-label" x="357" y="222" text-anchor="middle">证据</text>
+
+  <!-- Skill 2: PLC Programmer -->
+  <rect class="prog-skill" x="385" y="110" width="155" height="220" rx="14" filter="url(#shadow)"/>
+  <text class="skill-num" x="523" y="155">2</text>
+  <text x="390" y="175" font-size="22">⚙️</text>
+  <text class="skill-title" x="462" y="165" text-anchor="middle">编程技能</text>
+  <text class="skill-title" x="462" y="185" text-anchor="middle">Programmer</text>
+  <line x1="400" y1="196" x2="525" y2="196" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <text class="skill-body" x="462" y="216" text-anchor="middle">生成程序资产</text>
+  <text class="skill-body" x="462" y="234" text-anchor="middle">MNM 格式</text>
+  <text class="skill-body" x="462" y="256" text-anchor="middle">• ST / 梯形图程序</text>
+  <text class="skill-body" x="462" y="274" text-anchor="middle">• 变量声明</text>
+  <text class="skill-body" x="462" y="292" text-anchor="middle">• 功能块接口</text>
+  <text class="skill-body" x="462" y="310" text-anchor="middle">• 数据类型定义</text>
+
+  <!-- Arrow 2: Programmer -> Operator -->
+  <path class="arrow" d="M540 215 L585 215" marker-end="url(#arr)"/>
+  <text class="arrow-label" x="562" y="208" text-anchor="middle">MNM</text>
+  <text class="arrow-label" x="562" y="222" text-anchor="middle">文件</text>
+
+  <!-- Skill 3: Operator -->
+  <rect class="op-skill" x="590" y="110" width="155" height="220" rx="14" filter="url(#shadow)"/>
+  <text class="skill-num" x="728" y="155">3</text>
+  <text x="595" y="175" font-size="22">🖥️</text>
+  <text class="skill-title" x="667" y="165" text-anchor="middle">操作技能</text>
+  <text class="skill-title" x="667" y="185" text-anchor="middle">Operator</text>
+  <line x1="605" y1="196" x2="730" y2="196" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <text class="skill-body" x="667" y="216" text-anchor="middle">控制 KV STUDIO</text>
+  <text class="skill-body" x="667" y="234" text-anchor="middle">桌面自动化</text>
+  <text class="skill-body" x="667" y="256" text-anchor="middle">• 创建/导入项目</text>
+  <text class="skill-body" x="667" y="274" text-anchor="middle">• 设置变量/参数</text>
+  <text class="skill-body" x="667" y="292" text-anchor="middle">• 配置硬件</text>
+  <text class="skill-body" x="667" y="310" text-anchor="middle">• 编译 / 快照</text>
+
+  <!-- Arrow 3: Operator -> Output -->
+  <path class="arrow" d="M745 215 L790 215" marker-end="url(#arr)"/>
+
+  <!-- Output box -->
+  <rect class="output" x="795" y="150" width="90" height="130" rx="12" filter="url(#shadow)"/>
+  <text x="840" y="185" text-anchor="middle" font-size="22">📋</text>
+  <text class="label" x="840" y="210" text-anchor="middle" font-size="12" font-weight="600">可验证</text>
+  <text class="label" x="840" y="228" text-anchor="middle" font-size="12" font-weight="600">证据</text>
+  <text class="sublabel" x="840" y="252" text-anchor="middle">run.log</text>
+  <text class="sublabel" x="840" y="268" text-anchor="middle">result.json</text>
+  <text class="sublabel" x="840" y="284" text-anchor="middle">快照</text>
+
+  <!-- Wiki V2 database annotation below KB Skill -->
+  <rect fill="#fffbe6" stroke="#d97706" stroke-width="1" x="195" y="348" width="125" height="46" rx="8"/>
+  <text font-size="12" fill="#7c5800" x="257" y="368" text-anchor="middle">本地 Wiki V2</text>
+  <text font-size="11" fill="#7c5800" x="257" y="386" text-anchor="middle">SQLite 知识库</text>
+  <path d="M257 348 L257 330" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4,3" fill="none"/>
+
+  <!-- KV STUDIO annotation below Operator Skill -->
+  <rect fill="#f0e8ff" stroke="#5a3a8a" stroke-width="1" x="600" y="348" width="125" height="46" rx="8"/>
+  <text font-size="12" fill="#3a1a6a" x="662" y="368" text-anchor="middle">KV STUDIO</text>
+  <text font-size="11" fill="#3a1a6a" x="662" y="386" text-anchor="middle">KVS12 本地安装</text>
+  <path d="M662 348 L662 330" stroke="#5a3a8a" stroke-width="1.5" stroke-dasharray="4,3" fill="none"/>
+
+  <!-- Bottom note -->
+  <text class="sublabel" x="450" y="420" text-anchor="middle" font-size="11" fill="#5a7080">
+    所有 UI 操作通过互斥锁串行化 · 每步输出可验证的 run.log / receipt JSON · 快照可读回供下一轮使用
+  </text>
+</svg>

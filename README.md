@@ -1,167 +1,166 @@
+<div align="center">
+
 # KeyenceAgent
 
-KeyenceAgent 是面向 KEYENCE KV STUDIO 的 Codex skill 套件。它把 KEYENCE 专有知识查询、PLC 程序设计和 KV STUDIO 桌面执行分成三个独立责任边界。
+**让 AI 真正读懂、写入 KV STUDIO**
 
-```text
-自然语言任务
-    |
-    v
-知识查询 -> PLC 程序与脚手架 -> 客户态 workflow -> 同次运行 artifacts
-    |              |                    |                 |
-    v              v                    v                 v
-官方证据      MNM/变量/FB          KV STUDIO UI      result.json
+*专为使用基恩士 PLC 的电气工程师设计 — 让 AI Agent 代你操作 KV STUDIO，你只需描述需求*
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-lightgrey)](#requirements)
+[![KV STUDIO](https://img.shields.io/badge/KV%20STUDIO-KVS12-orange)](#requirements)
+
+</div>
+
+---
+
+## 这个项目是为谁准备的
+
+如果你是使用**基恩士 KV 系列 PLC** 的电气工程师，你一定遇到过这些情况：
+
+- 想让 AI 帮你写 ST 程序或梯形图，但 AI 根本不知道 `Z.RSTB`、`MC_MoveAbsolute` 这些基恩士专有指令怎么用
+- KV STUDIO 的变量在一个地方，功能块接口在另一个地方，EtherCAT 配置又在别处 — AI 看不到这些，根本没法给出准确的方案
+- 你想要的不是"AI 建议我怎么做"，而是 **AI 直接帮我把程序写进 KV STUDIO**
+
+**KeyenceAgent 就是为解决这三个问题而生的。**
+
+它不是给开发者搭 AI 框架用的，它是给**电气工程师**用的 — 一套让 AI Agent 能够真正理解基恩士知识、读取项目全局状态、并直接写入 KV STUDIO 的工具集。
+
+---
+
+## 问题：KV STUDIO 是面向人设计的
+
+<p align="center">
+  <img src="docs/images/kv-problem.svg" alt="KV STUDIO 信息散落示意" width="820"/>
+</p>
+
+KV STUDIO 的设计目标是让**工程师通过鼠标操作**完成工作。这意味着：
+
+- **全局变量**在变量编辑器里，**局部变量**藏在每个程序块内部
+- **功能块接口**需要逐个打开才能看到
+- **EtherCAT 配置**在独立的拓扑编辑器中
+- **扩展单元**在另一个硬件配置界面
+
+没有任何一个地方能让 AI 看到项目的全貌。加上基恩士有大量专有指令（如 `Z.RSTB`、`MC_MoveAbsolute` 的 KV 特定用法），AI 仅凭通用 IEC 61131-3 知识根本无法给出正确代码。
+
+---
+
+## 解决方案：三个技能协同工作
+
+<p align="center">
+  <img src="docs/images/kv-architecture.svg" alt="KeyenceAgent 三技能协作架构" width="860"/>
+</p>
+
+KeyenceAgent 把问题分成三层，每层一个技能：
+
+| 技能 | 职责 | 解决什么问题 |
+|------|------|-------------|
+| **知识库技能** `kv-studio-kb-programming` | 查询本地基恩士 Wiki V2 数据库 | AI 不知道基恩士专有指令 |
+| **编程技能** `keyence-plc-programmer` | 生成 MNM 格式程序文件、变量声明、功能块接口 | AI 无法生成正确的 KV STUDIO 程序格式 |
+| **操作技能** `kv-studio-operator` | 直接操作 KV STUDIO 桌面 | AI 无法读取/写入散落各处的项目信息 |
+
+三个技能配合形成完整的闭环：**查 → 写 → 导入 → 验证**，每一步都产生可检查的证据文件（`run.log`、`result.json`、项目快照）。
+
+---
+
+## 典型工作流
+
+```
+电气工程师说：
+  "给 KV-X310 新建一个项目，实现一个 FB：
+   输入轴当前位置，输出是否在目标范围内的 BOOL 信号"
+
+AI Agent 自动完成：
+  1. [知识库技能] 查 MC_MoveAbsolute、位置比较指令的基恩士专有用法
+  2. [编程技能]   生成 ST 程序体 + 变量声明，打包成 MNM 文件
+  3. [操作技能]   ① 创建项目  ② 导入 MNM  ③ 设置全局变量  ④ 编译
+  4. 输出：run.log + 编译结果 JSON + 项目快照
+
+工程师检查结果，KV STUDIO 里已经有了完整的程序。
 ```
 
-## 组成
+---
 
-| Skill | 职责 |
-| --- | --- |
-| `kv-studio-kb-programming` | 查询本机 KEYENCE Wiki V2，提供语法、模块、地址和通信证据。 |
-| `keyence-plc-programmer` | 设计和修复 PLC 程序、MNM、变量、用户 FB 与项目复刻方案。 |
-| `kv-studio-operator` | 通过已发布 workflow、scaffold tool 和 Gate 操作 KV STUDIO。 |
+## 快速开始
 
-## 当前能力边界与验证状态
+### 环境要求 {#requirements}
 
-| 能力 | 状态 |
-| --- | --- |
-| 新建 KV-X310 项目、导入 MNM、写入变量、转换并复制结果 | 已发布客户态 workflow |
-| 多 MNM、用户功能块、功能块自变量、已有项目修复 | 已发布或受 Gate 约束 |
-| MNM 导出和项目 inventory | 已发布入口 |
-| 扩展单元插入 | 已发布接口；计划/契约已测，整理后真实 UI 回归待补 |
-| EtherCAT 节点配置 | 已发布接口；计划/契约已测，整理后真实 UI 回归待补 |
-| 单元首地址独立修改 | 尚无公开 workflow（`ROUTE_RESEARCH_REQUIRED`） |
-| EtherNet/IP 设备配置 | 尚无公开 workflow（成员查询工具不等于配置） |
-| EtherCAT ESI 注册 | `KV_ETHERCAT_ESI_REGISTRATION_UNSTABLE`，研究中 |
-
-客户态入口只来自 [`kv-studio-operator/scripts/script_manifest.json`](kv-studio-operator/scripts/script_manifest.json) 中 `customer_callable=true` 的条目。`runner_children`、`workflow_tools`、`guards`、`probes` 和根级 `configure_kv_*.ps1` 属于内部实现或研究路线。
-
-## 运行条件
-
-- Windows 10/11
+- Windows 10 / 11
 - Windows PowerShell 5.1
-- KEYENCE KV STUDIO KVS12
-- Codex
-- 本机 KEYENCE Wiki V2 知识库；大型数据库不包含在本 Git 仓库中
+- KEYENCE KV STUDIO KVS12（已安装 `Kvs.exe`）
+- Codex AI Agent 运行时
+- 基恩士本地 Wiki V2 数据库（联系项目维护者获取）
 
-## 普通安装
-
-仓库放在独立目录，安装脚本把三个 skill 复制到 Codex skills 目录。
+### 安装
 
 ```powershell
-git clone --branch main https://github.com/xxrust/KeyenceAgent.git `
-  "$env:USERPROFILE\KeyenceAgent"
+# 克隆项目
+git clone https://github.com/LiangYH/KeyenceAgent.git
+cd KeyenceAgent
 
-cd "$env:USERPROFILE\KeyenceAgent"
-
-powershell -NoProfile -ExecutionPolicy Bypass `
-  -File .\setup_keyence_agent.ps1
+# 一键安装检查
+powershell -ExecutionPolicy Bypass -File setup_keyence_agent.ps1
 ```
 
-The initial `Bypass` is required only for a ZIP-downloaded checkout: Windows
-may mark its unsigned PowerShell files with `Zone.Identifier`. The setup
-script removes that download mark from the repository and installed skills
-while leaving `RemoteSigned` unchanged. Later script calls can run normally.
+### 配置
 
-不要把仓库直接克隆到 `%USERPROFILE%\.codex\skills`。安装脚本会配置：
-
-- 三个 KEYENCE skills
-- KV STUDIO `Kvs.exe` 路径
-- 一次性工作目录
-- Wiki V2 根目录
-- 可选的 Windows DPAPI 管理员凭据
-
-检查安装状态：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass `
-  -File .\setup_keyence_agent.ps1 -Status
-```
-
-## 开发模式
-
-开发机使用目录联接。独立仓库是唯一物理源码，Codex 仍从 `.codex\skills` 自动发现三个 skill。
-
-```powershell
-cd "$env:USERPROFILE\KeyenceAgent"
-
-powershell -NoProfile -ExecutionPolicy Bypass `
-  -File .\scripts\install_keyence_dev_links.ps1 `
-  -BackupExisting
-
-powershell -NoProfile -ExecutionPolicy Bypass `
-  -File .\scripts\assert_keyence_dev_links.ps1
-```
-
-开发链路：
-
-```text
-编辑独立仓库
-    -> 目录联接即时呈现到 .codex\skills
-    -> Codex 调用真实 skill
-    -> Gate 与 artifacts 验证
-    -> Git commit
-    -> GitHub push
-```
-
-目录联接消除了仓库与测试副本之间的双向同步。新增或修改 skill 元数据后，启动新 Codex 会话以重新加载。
-
-完整开发规则见 [CONTRIBUTING.md](CONTRIBUTING.md)。
-
-## 知识库配置
-
-Wiki V2 保持为外部数据资产，例如：
-
-```text
-C:\Users\Public\Documents\KEYENCE\KVS12\ManualHelp\2052\htmlhelp\llm-wiki-v2-keyence
-```
-
-本机配置文件位于：
-
-```text
-%APPDATA%\Codex\kv-studio-operator\config.json
-```
-
-核心字段：
+在 `%APPDATA%\Codex\kv-studio-operator\` 下创建 `config.json`：
 
 ```json
 {
-  "kvs_exe": "D:\\KEYENCE\\KVS12G\\KVS12\\KVS\\Kvs.exe",
+  "kvs_exe": "C:\\Program Files\\KEYENCE\\KV STUDIO\\Kvs.exe",
   "work_root": "C:\\KvAgentWork",
-  "wiki_root": "C:\\path\\to\\llm-wiki-v2-keyence",
-  "timeout_seconds": 600,
-  "local_paste_format": "NameType"
+  "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
+  "admin_user_default": "Administrator",
+  "wiki_root": "D:\\KeyenceWiki"
 }
 ```
 
-`kvs_exe` 是机器相关配置。README 中的路径仅用于展示字段格式。
+> 参考模板：[`kv-studio-operator/config/kv-studio-operator.example.json`](kv-studio-operator/config/kv-studio-operator.example.json)
 
-## 验证
+---
 
-修改 operator 后至少运行：
+## 项目结构
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass `
-  -File .\scripts\test_keyence_agent.ps1
+```
+KeyenceAgent/
+├── kv-studio-kb-programming/   技能1：查询基恩士知识库
+├── keyence-plc-programmer/     技能2：生成 PLC 程序文件
+├── kv-studio-operator/         技能3：操作 KV STUDIO 桌面
+│   ├── scripts/workflows/      对外发布的工作流（Agent 唯一入口）
+│   ├── scripts/guards/         UI 原子操作防护层
+│   ├── scripts/runner_children/ 底层 UI 执行器（内部）
+│   └── config/                 配置模板
+├── docs/                       文档、指南、架构图
+├── scripts/                    安装与开发辅助脚本
+└── tests/                      回归测试
 ```
 
-该检查把开发联接、agent boundary Gate、UI guard Gate 和 `git diff --check` 汇总到同次运行的 `result.json`。PLC 项目成功仍以同次运行的结果、转换文本和 clean-state 证据为准。当前已确认的回归证据与缺口见 [项目状态 Wiki](docs/wiki/project-status.md)。
+详细的技能说明和工作流文档见 **[Wiki](docs/wiki/)**。
 
-## 文档与证据
+---
 
-- [项目状态与核对清单](docs/wiki/project-status.md)
-- [接口与验收细则](docs/wiki/operator-details.md)
-- [可视化架构图](docs/wiki/index.html)
-- [Harness 总览图](docs/images/keyenceagent-harness-overview.png)
-- [修复闭环图](docs/images/kv-repair-loop.png)
+## 当前能力状态
 
-## 文档
+| 功能 | 状态 |
+|------|------|
+| 创建项目、导入 MNM、设置变量 | ✅ 已验证发布 |
+| 用户功能块 (FB) 导入与参数配置 | ✅ 已验证发布 |
+| ST 数值型 FB 创建（KV-X520） | ✅ 已验证发布 |
+| BOOL 梯形图完整模块 | ✅ 已验证发布 |
+| 项目快照（全量语义读取） | ✅ 已验证发布 |
+| MNM 导出 | ✅ 已验证发布 |
+| 结构体类型定义 | ✅ 已验证发布 |
+| 扩展单元配置 | ⚠️ 接口已发布，桌面回归待完成 |
+| EtherCAT 节点配置 | ⚠️ 接口已发布，桌面回归待完成 |
+| 新建项目 / 编译（独立工作流） | 🔄 pending_validation |
 
-- [安装说明](docs/installation.md)
-- [快速开始](docs/quick-start.md)
-- [开发与同步](CONTRIBUTING.md)
-- [配置说明](docs/configuration.md)
-- [项目结构](docs/project-structure.md)
+---
 
-## 许可证
+## 贡献
 
-仓库代码采用 [MIT License](LICENSE)。KEYENCE、KV STUDIO 和相关产品名称归其权利人所有。KEYENCE 官方手册和本地 Wiki 数据库不随本仓库再分发。
+见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## License
+
+[MIT](LICENSE)

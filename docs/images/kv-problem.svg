@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="420" viewBox="0 0 860 420" role="img" aria-label="传统KV STUDIO辅助编程的困境">
+  <defs>
+    <style>
+      text { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; }
+      .title { font-size: 18px; font-weight: 700; fill: #1e2d3d; }
+      .label { font-size: 13px; fill: #1e2d3d; }
+      .sublabel { font-size: 11px; fill: #5a7080; }
+      .ai-label { font-size: 13px; fill: #7c3a00; }
+      .box-kvs { fill: #dce8f5; stroke: #1a5fa0; stroke-width: 2; }
+      .box-fragment { fill: #f0f7ff; stroke: #7baed4; stroke-width: 1.5; }
+      .box-ai { fill: #fff7ed; stroke: #d97706; stroke-width: 2; }
+      .dashed { stroke: #7baed4; stroke-width: 1.2; stroke-dasharray: 5,4; fill: none; }
+      .arrow-cross { stroke: #c0392b; stroke-width: 2.5; }
+    </style>
+    <marker id="arrDash" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,0 L7,3.5 L0,7 z" fill="#7baed4"/>
+    </marker>
+    <marker id="arrRed" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,0 L7,3.5 L0,7 z" fill="#c0392b"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text class="title" x="430" y="32" text-anchor="middle">传统AI辅助PLC编程的困境</text>
+
+  <!-- KV STUDIO center box -->
+  <rect class="box-kvs" x="315" y="155" width="150" height="80" rx="10"/>
+  <text class="label" x="390" y="190" text-anchor="middle" font-weight="600">KV STUDIO</text>
+  <text class="sublabel" x="390" y="210" text-anchor="middle">面向人设计的UI</text>
+  <text class="sublabel" x="390" y="226" text-anchor="middle">KVS12</text>
+
+  <!-- Fragment boxes around KV STUDIO -->
+  <!-- Top left: 全局变量 -->
+  <rect class="box-fragment" x="60" y="70" width="120" height="52" rx="8"/>
+  <text class="label" x="120" y="92" text-anchor="middle">全局变量</text>
+  <text class="sublabel" x="120" y="110" text-anchor="middle">分散在变量编辑器</text>
+  <path class="dashed" d="M180 96 Q250 96 315 175" marker-end="url(#arrDash)"/>
+
+  <!-- Top center: 局部变量/FB接口 -->
+  <rect class="box-fragment" x="305" y="60" width="130" height="52" rx="8"/>
+  <text class="label" x="370" y="82" text-anchor="middle">功能块接口</text>
+  <text class="sublabel" x="370" y="100" text-anchor="middle">每个FB独立定义</text>
+  <path class="dashed" d="M370 112 L370 155" marker-end="url(#arrDash)"/>
+
+  <!-- Top right: 程序逻辑 -->
+  <rect class="box-fragment" x="510" y="70" width="120" height="52" rx="8"/>
+  <text class="label" x="570" y="92" text-anchor="middle">程序逻辑</text>
+  <text class="sublabel" x="570" y="110" text-anchor="middle">梯形图/ST分开管理</text>
+  <path class="dashed" d="M510 96 Q460 96 465 175" marker-end="url(#arrDash)"/>
+
+  <!-- Bottom left: EtherCAT -->
+  <rect class="box-fragment" x="60" y="290" width="130" height="52" rx="8"/>
+  <text class="label" x="125" y="312" text-anchor="middle">EtherCAT 配置</text>
+  <text class="sublabel" x="125" y="330" text-anchor="middle">独立的拓扑编辑器</text>
+  <path class="dashed" d="M190 316 Q260 316 315 225" marker-end="url(#arrDash)"/>
+
+  <!-- Bottom center: 扩展单元 -->
+  <rect class="box-fragment" x="315" y="300" width="130" height="52" rx="8"/>
+  <text class="label" x="380" y="322" text-anchor="middle">扩展单元</text>
+  <text class="sublabel" x="380" y="340" text-anchor="middle">硬件配置界面</text>
+  <path class="dashed" d="M380 300 L380 235" marker-end="url(#arrDash)"/>
+
+  <!-- Bottom right: 局部变量 -->
+  <rect class="box-fragment" x="510" y="290" width="130" height="52" rx="8"/>
+  <text class="label" x="575" y="312" text-anchor="middle">局部变量</text>
+  <text class="sublabel" x="575" y="330" text-anchor="middle">分散在各程序块内</text>
+  <path class="dashed" d="M510 316 Q460 316 465 235" marker-end="url(#arrDash)"/>
+
+  <!-- AI box on right - confused -->
+  <rect class="box-ai" x="680" y="150" width="150" height="110" rx="12"/>
+  <text class="ai-label" x="755" y="178" text-anchor="middle" font-weight="700">AI 助手</text>
+  <text class="ai-label" x="755" y="200" text-anchor="middle">不了解基恩士</text>
+  <text class="ai-label" x="755" y="218" text-anchor="middle">专有指令集</text>
+  <text class="ai-label" x="755" y="242" text-anchor="middle" font-size="22">😵</text>
+
+  <!-- Cross arrow from AI to KV STUDIO -->
+  <path d="M680 195 L475 195" stroke="#c0392b" stroke-width="2" stroke-dasharray="6,3" fill="none" marker-end="url(#arrRed)"/>
+  <!-- X mark -->
+  <line x1="583" y1="185" x2="597" y2="199" stroke="#c0392b" stroke-width="2.5"/>
+  <line x1="597" y1="185" x2="583" y2="199" stroke="#c0392b" stroke-width="2.5"/>
+
+  <!-- Bottom note -->
+  <text class="sublabel" x="430" y="395" text-anchor="middle" font-size="12" fill="#5a7080">
+    信息散落在UI各处，AI既看不到全局，也不懂基恩士专有语法 — 这正是 KeyenceAgent 要解决的问题
+  </text>
+</svg>

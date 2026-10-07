@@ -1,13 +1,876 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>KeyenceAgent workflow overview</title>
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="260" viewBox="0 0 900 260" role="img" aria-label="workflow evidence flow">
-  <style>text{font:16px sans-serif;fill:#17324d} .b{fill:#e9f2fb;stroke:#2b6ca3;stroke-width:2} .a{stroke:#2b6ca3;stroke-width:2;marker-end:url(#m)}</style>
-  <defs><marker id="m" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#2b6ca3"/></marker></defs>
-  <rect class="b" x="20" y="90" width="170" height="70" rx="10"/><text x="48" y="120">Agent 输入</text><text x="35" y="145">项目 + 目标 + 配置</text>
-  <rect class="b" x="250" y="90" width="170" height="70" rx="10"/><text x="278" y="120">Customer workflow</text><text x="280" y="145">manifest 入口</text>
-  <rect class="b" x="480" y="90" width="170" height="70" rx="10"/><text x="530" y="120">Flat executor</text><text x="505" y="145">Gate + runner child</text>
-  <rect class="b" x="710" y="90" width="170" height="70" rx="10"/><text x="755" y="120">证据</text><text x="728" y="145">run.log / receipt</text>
-  <path class="a" d="M190 125h60M420 125h60M650 125h60" fill="none"/>
-  <text x="300" y="45">计划测试 ≠ 桌面实测 ≠ 发布验收</text>
-</svg>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>KeyenceAgent Wiki — 电气工程师的 AI PLC 编程指南</title>
+<style>
+:root {
+  --bg:          #f7f9fc;
+  --surface:     #ffffff;
+  --surface-2:   #f0f4f9;
+  --border:      #d8e2ee;
+  --text:        #1a2635;
+  --text-muted:  #5a7080;
+  --accent:      #1a5fa0;
+  --accent-2:    #2a6e4a;
+  --accent-3:    #5a3a8a;
+  --accent-warn: #b45309;
+  --accent-ok:   #166534;
+  --radius-sm:   6px;
+  --radius:      12px;
+  --radius-lg:   18px;
+  --space-1:     4px;
+  --space-2:     8px;
+  --space-3:     16px;
+  --space-4:     24px;
+  --space-5:     40px;
+  --space-6:     64px;
+  font-size: 16px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Layout ─────────────────────────────────────────── */
+.site-header {
+  background: linear-gradient(135deg, #0e3d6b 0%, #1a5fa0 60%, #2a6e4a 100%);
+  color: #fff;
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+.site-header h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.02em; }
+.site-header .tagline {
+  font-size: 1.1rem;
+  color: rgba(255,255,255,0.82);
+  margin-top: var(--space-2);
+  max-width: 640px;
+  margin-left: auto; margin-right: auto;
+}
+.badge-row { display: flex; gap: var(--space-2); justify-content: center; flex-wrap: wrap; margin-top: var(--space-3); }
+.badge {
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  font-size: 0.78rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+nav {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  padding: 0 var(--space-4);
+}
+nav a {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+nav a:hover { color: var(--accent); border-bottom-color: var(--accent); text-decoration: none; }
+
+main { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--space-4); }
+
+section { margin-bottom: var(--space-6); scroll-margin-top: 60px; }
+h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--border);
+  color: var(--text);
+}
+h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: var(--space-2); color: var(--text); }
+p { margin-bottom: var(--space-3); max-width: 72ch; }
+
+/* ── Cards ─────────────────────────────────────────── */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.card.skill-1 { border-top: 4px solid var(--accent); }
+.card.skill-2 { border-top: 4px solid var(--accent-2); }
+.card.skill-3 { border-top: 4px solid var(--accent-3); }
+.card-icon { font-size: 2rem; margin-bottom: var(--space-2); }
+.card h3 { margin-bottom: var(--space-1); }
+.card .subtitle { font-size: 0.82rem; color: var(--text-muted); margin-bottom: var(--space-3); }
+.card ul { padding-left: var(--space-3); font-size: 0.9rem; }
+.card ul li { margin-bottom: var(--space-1); }
+
+/* ── Status table ───────────────────────────────────── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+th {
+  background: var(--surface-2);
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+}
+td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+tr:last-child td { border-bottom: none; }
+.pill {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.pill-ok   { background: #dcfce7; color: var(--accent-ok); }
+.pill-warn { background: #fef3c7; color: var(--accent-warn); }
+.pill-pend { background: #f0f4f9; color: var(--text-muted); }
+
+/* ── Code ───────────────────────────────────────────── */
+pre {
+  background: #1a2635;
+  color: #c8d8e8;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin-bottom: var(--space-3);
+}
+code {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: 0.85em;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+}
+pre code { background: none; border: none; padding: 0; font-size: 1em; }
+
+/* ── Callout ────────────────────────────────────────── */
+.callout {
+  border-left: 4px solid var(--accent);
+  background: #eef4fb;
+  padding: var(--space-3) var(--space-4);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  margin-bottom: var(--space-3);
+  font-size: 0.9rem;
+}
+.callout strong { color: var(--accent); }
+
+/* ── Steps ──────────────────────────────────────────── */
+.steps { display: flex; flex-direction: column; gap: var(--space-3); }
+.step {
+  display: flex;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  align-items: flex-start;
+}
+.step-num {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.9rem; color: #fff;
+  background: var(--accent);
+}
+.step.s2 .step-num { background: var(--accent-2); }
+.step.s3 .step-num { background: var(--accent-3); }
+.step.s4 .step-num { background: var(--accent-warn); }
+.step-body h4 { font-size: 0.95rem; margin-bottom: 2px; }
+.step-body p  { font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0; }
+
+/* ── SVG diagram container ──────────────────────────── */
+.diagram {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  text-align: center;
+  margin-bottom: var(--space-4);
+  overflow-x: auto;
+}
+.diagram svg { max-width: 100%; height: auto; }
+
+footer {
+  text-align: center;
+  padding: var(--space-5) var(--space-4);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+}
+
+/* ── Workflow steps visual ──────────────────────────── */
+.workflow-pipeline {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  margin-bottom: var(--space-4);
+}
+.wf-step {
+  flex: 1;
+  min-width: 160px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-right: none;
+  padding: var(--space-3);
+  position: relative;
+}
+.wf-step:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.wf-step:last-child  { border-right: 1px solid var(--border); border-radius: 0 var(--radius) var(--radius) 0; }
+.wf-step::after {
+  content: "›";
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.4rem;
+  color: var(--text-muted);
+  z-index: 1;
+}
+.wf-step:last-child::after { display: none; }
+.wf-num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 999px;
+  width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-bottom: var(--space-1);
+}
+.wf-step.s2 .wf-num { background: var(--accent-2); }
+.wf-step.s3 .wf-num { background: var(--accent-3); }
+.wf-step.s4 .wf-num { background: #7c5800; }
+.wf-step h4 { font-size: 0.85rem; margin-bottom: 2px; }
+.wf-step p  { font-size: 0.8rem; color: var(--text-muted); margin: 0; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <h1>KeyenceAgent</h1>
+  <p class="tagline">让 AI Agent 真正读懂并写入 KV STUDIO — 专为基恩士 PLC 电气工程师设计</p>
+  <div class="badge-row">
+    <span class="badge">KV STUDIO KVS12</span>
+    <span class="badge">Windows 10 / 11</span>
+    <span class="badge">PowerShell 5.1</span>
+    <span class="badge">MIT License</span>
+  </div>
+</header>
+
+<nav>
+  <a href="#problem">为什么需要它</a>
+  <a href="#architecture">架构</a>
+  <a href="#skills">三个技能</a>
+  <a href="#workflow">工作流</a>
+  <a href="#snapshot">项目快照</a>
+  <a href="#capabilities">能力状态</a>
+  <a href="#quickstart">快速开始</a>
+  <a href="#config">配置</a>
+</nav>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="problem">
+  <h2>为什么电气工程师需要这个项目</h2>
+  <p>KV STUDIO 是一款面向人设计的 PLC 开发工具，工程师通过鼠标点击完成所有操作。这对人来说很直观，但对 AI Agent 来说是一堵墙：项目的关键信息散落在 UI 的各个角落，没有任何 API 可以读写。</p>
+
+  <div class="diagram">
+    <!-- Problem diagram -->
+    <svg xmlns="http://www.w3.org/2000/svg" width="800" height="380" viewBox="0 0 800 380" role="img" aria-label="KV STUDIO信息散落问题">
+      <defs>
+        <style>
+          .pd-title{font:700 17px "Microsoft YaHei",sans-serif;fill:#1a2635}
+          .pd-label{font:600 13px "Microsoft YaHei",sans-serif;fill:#1a2635}
+          .pd-sub{font:12px "Microsoft YaHei",sans-serif;fill:#5a7080}
+          .pd-ai{font:600 13px "Microsoft YaHei",sans-serif;fill:#7c3a00}
+        </style>
+        <marker id="pd-arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+          <path d="M0,0 L7,3.5 L0,7 z" fill="#7baed4"/>
+        </marker>
+        <marker id="pd-arrR" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+          <path d="M0,0 L7,3.5 L0,7 z" fill="#c0392b"/>
+        </marker>
+        <filter id="pd-sh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000018"/></filter>
+      </defs>
+      <!-- Title -->
+      <text class="pd-title" x="400" y="28" text-anchor="middle">KV STUDIO 信息散落在 UI 各处</text>
+      <!-- Center KVS box -->
+      <rect fill="#dce8f5" stroke="#1a5fa0" stroke-width="2" x="300" y="140" width="140" height="75" rx="10" filter="url(#pd-sh)"/>
+      <text class="pd-label" x="370" y="171" text-anchor="middle">KV STUDIO</text>
+      <text class="pd-sub"   x="370" y="191" text-anchor="middle">面向人的 UI 操作</text>
+      <text class="pd-sub"   x="370" y="208" text-anchor="middle">无法被脚本直接访问</text>
+      <!-- Fragment boxes -->
+      <!-- TL -->
+      <rect fill="#f0f7ff" stroke="#7baed4" stroke-width="1.5" x="30"  y="65"  width="130" height="50" rx="8"/>
+      <text class="pd-label" x="95"  y="86"  text-anchor="middle">全局变量</text>
+      <text class="pd-sub"   x="95"  y="103" text-anchor="middle">变量编辑器</text>
+      <path d="M160 90 Q240 90 300 162" stroke="#7baed4" stroke-width="1.2" stroke-dasharray="5,4" fill="none" marker-end="url(#pd-arr)"/>
+      <!-- TC -->
+      <rect fill="#f0f7ff" stroke="#7baed4" stroke-width="1.5" x="305" y="55"  width="130" height="50" rx="8"/>
+      <text class="pd-label" x="370" y="76"  text-anchor="middle">功能块接口</text>
+      <text class="pd-sub"   x="370" y="93"  text-anchor="middle">每个 FB 独立定义</text>
+      <path d="M370 105 L370 140" stroke="#7baed4" stroke-width="1.2" stroke-dasharray="5,4" fill="none" marker-end="url(#pd-arr)"/>
+      <!-- TR -->
+      <rect fill="#f0f7ff" stroke="#7baed4" stroke-width="1.5" x="580" y="65"  width="130" height="50" rx="8"/>
+      <text class="pd-label" x="645" y="86"  text-anchor="middle">程序逻辑</text>
+      <text class="pd-sub"   x="645" y="103" text-anchor="middle">梯形图 / ST 分开管理</text>
+      <path d="M580 90 Q510 90 440 162" stroke="#7baed4" stroke-width="1.2" stroke-dasharray="5,4" fill="none" marker-end="url(#pd-arr)"/>
+      <!-- BL -->
+      <rect fill="#f0f7ff" stroke="#7baed4" stroke-width="1.5" x="30"  y="270" width="130" height="50" rx="8"/>
+      <text class="pd-label" x="95"  y="291" text-anchor="middle">EtherCAT 配置</text>
+      <text class="pd-sub"   x="95"  y="308" text-anchor="middle">独立拓扑编辑器</text>
+      <path d="M160 295 Q240 295 300 215" stroke="#7baed4" stroke-width="1.2" stroke-dasharray="5,4" fill="none" marker-end="url(#pd-arr)"/>
+      <!-- BC -->
+      <rect fill="#f0f7ff" stroke="#7baed4" stroke-width="1.5" x="305" y="280" width="130" height="50" rx="8"/>
+      <text class="pd-label" x="370" y="301" text-anchor="middle">扩展单元</text>
+      <text class="pd-sub"   x="370" y="318" text-anchor="middle">硬件配置界面</text>
+      <path d="M370 280 L370 215" stroke="#7baed4" stroke-width="1.2" stroke-dasharray="5,4" fill="none" marker-end="url(#pd-arr)"/>
+      <!-- BR -->
+      <rect fill="#f0f7ff" stroke="#7baed4" stroke-width="1.5" x="580" y="270" width="130" height="50" rx="8"/>
+      <text class="pd-label" x="645" y="291" text-anchor="middle">局部变量</text>
+      <text class="pd-sub"   x="645" y="308" text-anchor="middle">分散在各程序块内</text>
+      <path d="M580 295 Q510 295 440 215" stroke="#7baed4" stroke-width="1.2" stroke-dasharray="5,4" fill="none" marker-end="url(#pd-arr)"/>
+      <!-- AI confused note -->
+      <rect fill="#fff7ed" stroke="#d97706" stroke-width="1.5" x="210" y="340" width="320" height="32" rx="8"/>
+      <text class="pd-ai" x="370" y="361" text-anchor="middle">😵  AI 既看不到全局，也不懂基恩士专有指令</text>
+    </svg>
+  </div>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-icon">🗂️</div>
+      <h3>信息极度分散</h3>
+      <p style="font-size:.9rem">全局变量、功能块接口、程序体、EtherCAT 配置、扩展单元分散在 UI 的五个不同区域，AI 无法获取项目全貌。</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">📖</div>
+      <h3>专有指令未被 AI 训练</h3>
+      <p style="font-size:.9rem">基恩士有大量私有指令（<code>Z.RSTB</code>、<code>MC_MoveAbsolute</code> 等专有用法），通用 IEC 61131-3 知识不够用。</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🖱️</div>
+      <h3>只有 UI，没有 API</h3>
+      <p style="font-size:.9rem">KV STUDIO 没有脚本 API，所有操作都必须模拟鼠标键盘，且需要处理各种弹窗和确认对话框。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="architecture">
+  <h2>整体架构</h2>
+  <p>KeyenceAgent 把三个困难分别交给三个技能解决，形成一条从<strong>查询 → 编程 → 写入 → 验证</strong>的完整流水线。</p>
+
+  <div class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" width="860" height="400" viewBox="0 0 860 400" role="img" aria-label="KeyenceAgent 架构流水线">
+      <defs>
+        <style>
+          .at{font:700 16px "Microsoft YaHei",sans-serif;fill:#1a2635}
+          .ast{font:12px "Microsoft YaHei",sans-serif;fill:#c8d8e8}
+          .aht{font:700 13px "Microsoft YaHei",sans-serif;fill:#fff}
+          .asub{font:11px "Microsoft YaHei",sans-serif;fill:rgba(255,255,255,.75)}
+          .alab{font:11px "Microsoft YaHei",sans-serif;fill:#3a6080}
+          .asm{font:12px "Microsoft YaHei",sans-serif;fill:#5a7080}
+          .adb{font:11px "Microsoft YaHei",sans-serif}
+        </style>
+        <marker id="at-arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" fill="#3a6080"/>
+        </marker>
+        <filter id="at-sh"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#00000022"/></filter>
+      </defs>
+
+      <text class="at" x="430" y="28" text-anchor="middle">三技能协作流水线</text>
+      <text class="asm" x="430" y="48" text-anchor="middle">电气工程师用自然语言描述需求 → AI 自动完成查询、编程、写入 KV STUDIO</text>
+
+      <!-- Engineer -->
+      <rect fill="#e8f4e8" stroke="#2a8a55" stroke-width="2" x="14" y="130" width="105" height="120" rx="12" filter="url(#at-sh)"/>
+      <text x="66" y="168" text-anchor="middle" font-size="28">👨‍🔧</text>
+      <text font-size="13" font-weight="600" fill="#1a4a28" x="66" y="196" text-anchor="middle">电气工程师</text>
+      <text font-size="11" fill="#3a6040" x="66" y="216" text-anchor="middle">描述需求</text>
+      <text font-size="11" fill="#3a6040" x="66" y="232" text-anchor="middle">（自然语言）</text>
+
+      <path d="M119 190 L162 190" stroke="#3a6080" stroke-width="2" fill="none" marker-end="url(#at-arr)"/>
+
+      <!-- Skill 1 KB -->
+      <rect fill="#1a5fa0" stroke="#0e3d6b" stroke-width="1.5" x="167" y="100" width="155" height="200" rx="14" filter="url(#at-sh)"/>
+      <text font-size="22" x="172" y="148">📚</text>
+      <text class="aht" x="244" y="138" text-anchor="middle">知识库技能</text>
+      <text class="asub" x="244" y="157" text-anchor="middle">kv-studio-kb</text>
+      <line x1="178" y1="168" x2="310" y2="168" stroke="rgba(255,255,255,.2)" stroke-width="1"/>
+      <text class="asub" x="244" y="186" text-anchor="middle">查询 Wiki V2</text>
+      <text class="asub" x="244" y="203" text-anchor="middle">SQLite 数据库</text>
+      <text class="asub" x="244" y="228" text-anchor="middle">• 指令语法</text>
+      <text class="asub" x="244" y="246" text-anchor="middle">• 设备地址</text>
+      <text class="asub" x="244" y="264" text-anchor="middle">• FB 参数</text>
+      <text class="asub" x="244" y="282" text-anchor="middle">• 运动控制</text>
+
+      <path d="M322 200 L360 200" stroke="#3a6080" stroke-width="2" fill="none" marker-end="url(#at-arr)"/>
+      <text class="alab" x="341" y="193" text-anchor="middle">语法</text>
+      <text class="alab" x="341" y="210" text-anchor="middle">证据</text>
+
+      <!-- Skill 2 Programmer -->
+      <rect fill="#2a6e4a" stroke="#1a4a30" stroke-width="1.5" x="365" y="100" width="155" height="200" rx="14" filter="url(#at-sh)"/>
+      <text font-size="22" x="370" y="148">⚙️</text>
+      <text class="aht" x="442" y="138" text-anchor="middle">编程技能</text>
+      <text class="asub" x="442" y="157" text-anchor="middle">plc-programmer</text>
+      <line x1="376" y1="168" x2="508" y2="168" stroke="rgba(255,255,255,.2)" stroke-width="1"/>
+      <text class="asub" x="442" y="186" text-anchor="middle">生成程序资产</text>
+      <text class="asub" x="442" y="203" text-anchor="middle">MNM 格式</text>
+      <text class="asub" x="442" y="228" text-anchor="middle">• ST / 梯形图体</text>
+      <text class="asub" x="442" y="246" text-anchor="middle">• 变量声明</text>
+      <text class="asub" x="442" y="264" text-anchor="middle">• FB 接口</text>
+      <text class="asub" x="442" y="282" text-anchor="middle">• 数据类型</text>
+
+      <path d="M520 200 L558 200" stroke="#3a6080" stroke-width="2" fill="none" marker-end="url(#at-arr)"/>
+      <text class="alab" x="539" y="193" text-anchor="middle">MNM</text>
+      <text class="alab" x="539" y="210" text-anchor="middle">文件</text>
+
+      <!-- Skill 3 Operator -->
+      <rect fill="#5a3a8a" stroke="#3a1a6a" stroke-width="1.5" x="563" y="100" width="155" height="200" rx="14" filter="url(#at-sh)"/>
+      <text font-size="22" x="568" y="148">🖥️</text>
+      <text class="aht" x="640" y="138" text-anchor="middle">操作技能</text>
+      <text class="asub" x="640" y="157" text-anchor="middle">kv-studio-operator</text>
+      <line x1="574" y1="168" x2="706" y2="168" stroke="rgba(255,255,255,.2)" stroke-width="1"/>
+      <text class="asub" x="640" y="186" text-anchor="middle">桌面自动化</text>
+      <text class="asub" x="640" y="203" text-anchor="middle">KV STUDIO</text>
+      <text class="asub" x="640" y="228" text-anchor="middle">• 创建/导入项目</text>
+      <text class="asub" x="640" y="246" text-anchor="middle">• 设置变量/参数</text>
+      <text class="asub" x="640" y="264" text-anchor="middle">• 配置硬件</text>
+      <text class="asub" x="640" y="282" text-anchor="middle">• 编译 / 快照</text>
+
+      <path d="M718 200 L755 200" stroke="#3a6080" stroke-width="2" fill="none" marker-end="url(#at-arr)"/>
+
+      <!-- Output -->
+      <rect fill="#fff3e0" stroke="#d97706" stroke-width="2" x="760" y="135" width="85" height="120" rx="12" filter="url(#at-sh)"/>
+      <text x="802" y="168" text-anchor="middle" font-size="22">📋</text>
+      <text font-size="12" font-weight="600" fill="#7c4a00" x="802" y="192" text-anchor="middle">可验证</text>
+      <text font-size="12" font-weight="600" fill="#7c4a00" x="802" y="208" text-anchor="middle">证据</text>
+      <text font-size="11" fill="#7c6040" x="802" y="228" text-anchor="middle">run.log</text>
+      <text font-size="11" fill="#7c6040" x="802" y="244" text-anchor="middle">result.json</text>
+
+      <!-- Annotations below -->
+      <rect fill="#fffbe6" stroke="#d97706" stroke-width="1" x="180" y="320" width="130" height="40" rx="8"/>
+      <text font-size="11" fill="#7c5800" x="245" y="337" text-anchor="middle">本地 Wiki V2</text>
+      <text font-size="11" fill="#7c5800" x="245" y="352" text-anchor="middle">SQLite 知识库</text>
+      <path d="M245 320 L245 300" stroke="#d97706" stroke-width="1.2" stroke-dasharray="4,3" fill="none"/>
+
+      <rect fill="#f0e8ff" stroke="#5a3a8a" stroke-width="1" x="580" y="320" width="130" height="40" rx="8"/>
+      <text font-size="11" fill="#3a1a6a" x="645" y="337" text-anchor="middle">KV STUDIO KVS12</text>
+      <text font-size="11" fill="#3a1a6a" x="645" y="352" text-anchor="middle">本地安装</text>
+      <path d="M645 320 L645 300" stroke="#5a3a8a" stroke-width="1.2" stroke-dasharray="4,3" fill="none"/>
+
+      <text class="asm" x="430" y="388" text-anchor="middle" font-size="11">所有 UI 操作通过互斥锁串行化 · 每步产出可验证的证据文件 · 快照可读回供下一轮使用</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="skills">
+  <h2>三个技能详解</h2>
+
+  <div class="card-grid">
+    <div class="card skill-1">
+      <div class="card-icon">📚</div>
+      <h3>技能 1 — 知识库技能</h3>
+      <p class="subtitle" style="color:var(--accent)">kv-studio-kb-programming</p>
+      <p style="font-size:.9rem;margin-bottom:var(--space-2)">在编写任何基恩士特有代码之前，必须先查询本地 Wiki V2 知识库。通用 IEC 61131-3 知识明确禁止作为基恩士专有语法的唯一来源。</p>
+      <ul>
+        <li>查询本地 SQLite 数据库（<code>wiki.v2.cleaned.db</code>）</li>
+        <li>按来源分类：<code>htmlhelp</code>（指令语法）、<code>table</code>（设备映射）、<code>dockinghelp</code>（运动参数）、<code>pdf</code>（手册）</li>
+        <li>输出 chunk ID 和 source anchor，确保可溯源</li>
+        <li>弱召回时有恢复策略（retrieval-playbook）</li>
+      </ul>
+    </div>
+
+    <div class="card skill-2">
+      <div class="card-icon">⚙️</div>
+      <h3>技能 2 — 编程技能</h3>
+      <p class="subtitle" style="color:var(--accent-2)">keyence-plc-programmer</p>
+      <p style="font-size:.9rem;margin-bottom:var(--space-2)">生成 KV STUDIO 可导入的 MNM 格式程序资产。不直接触碰桌面，所有写入操作由操作技能完成。</p>
+      <ul>
+        <li>ST / 梯形图程序体</li>
+        <li>变量声明（全局/局部）</li>
+        <li>功能块接口设计</li>
+        <li>用户数据类型（结构体）</li>
+        <li>MNM 编码：普通程序 CP936；KV-X520 域 ST 用 UTF-16LE BOM</li>
+        <li>包含 FB 设备泄漏检查（导入前预验证）</li>
+      </ul>
+    </div>
+
+    <div class="card skill-3">
+      <div class="card-icon">🖥️</div>
+      <h3>技能 3 — 操作技能</h3>
+      <p class="subtitle" style="color:var(--accent-3)">kv-studio-operator</p>
+      <p style="font-size:.9rem;margin-bottom:var(--space-2)">直接操作 KV STUDIO Windows 桌面应用。所有 UI 操作通过命名工作流统一入口，每步产出可验证的证据文件。</p>
+      <ul>
+        <li>仅接受 manifest 中 <code>customer_callable: true</code> 的工作流</li>
+        <li>全部 UI 原子操作通过 <code>kv_ui_guard.ps1</code> 防护层执行</li>
+        <li>机器级互斥锁，防止并发 UI 冲突</li>
+        <li>每步输出：<code>run.log</code>、step receipt JSON、结果 JSON</li>
+        <li>支持平面执行计划（flat execution plan）模式</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="margin-top:var(--space-4)">操作技能的内部分层</h3>
+  <div class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" width="820" height="310" viewBox="0 0 820 310" role="img" aria-label="操作技能内部分层架构">
+      <defs>
+        <style>
+          .lyt{font:700 15px "Microsoft YaHei",sans-serif;fill:#1a2635}
+          .ll{font:600 12px "Microsoft YaHei",sans-serif;fill:#1a2635}
+          .ls{font:11px "Microsoft YaHei",sans-serif;fill:#5a7080}
+          .lw{font:11px "Microsoft YaHei",sans-serif;fill:#fff}
+        </style>
+        <marker id="l-arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+          <path d="M0,0 L7,3.5 L0,7 z" fill="#5a7080"/>
+        </marker>
+        <filter id="l-sh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000015"/></filter>
+      </defs>
+
+      <text class="lyt" x="410" y="24" text-anchor="middle">kv-studio-operator 内部分层</text>
+
+      <!-- Layer labels on left -->
+      <text class="ls" x="8" y="75"  text-anchor="start" font-weight="600">Agent 入口</text>
+      <text class="ls" x="8" y="135" text-anchor="start" font-weight="600">编排层</text>
+      <text class="ls" x="8" y="205" text-anchor="start" font-weight="600">执行层</text>
+      <text class="ls" x="8" y="270" text-anchor="start" font-weight="600">防护层</text>
+
+      <!-- Layer 1: Workflows (customer-callable) -->
+      <rect fill="#e8f0fb" stroke="#1a5fa0" stroke-width="1.5" x="80" y="48" width="660" height="50" rx="8" filter="url(#l-sh)"/>
+      <text class="ll" x="410" y="70" text-anchor="middle">工作流层 workflows/ — 对外发布的唯一入口（customer_callable: true）</text>
+      <text class="ls" x="410" y="86" text-anchor="middle">import_kv_module · set_kv_variables · export_kv_project_text_snapshot · create_kv_st_module · 等 20+ 工作流</text>
+
+      <!-- Arrow down -->
+      <path d="M410 98 L410 118" stroke="#5a7080" stroke-width="1.5" fill="none" marker-end="url(#l-arr)"/>
+
+      <!-- Layer 2: Workflow tools -->
+      <rect fill="#eaf4ee" stroke="#2a6e4a" stroke-width="1.5" x="80" y="118" width="660" height="50" rx="8" filter="url(#l-sh)"/>
+      <text class="ll" x="410" y="140" text-anchor="middle">编排工具层 workflow_tools/ — 内部编排，Agent 不可直接调用</text>
+      <text class="ls" x="410" y="156" text-anchor="middle">平面执行器 · 计划构建器 · 步骤证据收集器 · 模块契约检查器 · 快照实例化器</text>
+
+      <!-- Arrow down -->
+      <path d="M410 168 L410 188" stroke="#5a7080" stroke-width="1.5" fill="none" marker-end="url(#l-arr)"/>
+
+      <!-- Layer 3: Runner children -->
+      <rect fill="#f2ecfb" stroke="#5a3a8a" stroke-width="1.5" x="80" y="188" width="660" height="50" rx="8" filter="url(#l-sh)"/>
+      <text class="ll" x="410" y="210" text-anchor="middle">Runner 子进程层 runner_children/ — 底层 UI 工作进程，仅内部调用</text>
+      <text class="ls" x="410" y="226" text-anchor="middle">create_project · import_mnm · set_variables · set_fb_arguments · 等，每个输出专属 result.json</text>
+
+      <!-- Arrow down -->
+      <path d="M410 238 L410 258" stroke="#5a7080" stroke-width="1.5" fill="none" marker-end="url(#l-arr)"/>
+
+      <!-- Layer 4: Guards -->
+      <rect fill="#1a2635" stroke="#1a2635" stroke-width="1.5" x="80" y="258" width="660" height="40" rx="8" filter="url(#l-sh)"/>
+      <text class="lw" x="410" y="276" text-anchor="middle">防护层 guards/ — 所有 UI 原子操作必须经过此层</text>
+      <text font-size="11" fill="rgba(255,255,255,.65)" x="410" y="292" text-anchor="middle">Invoke-KvGuardedMouseClick · Invoke-KvGuardedClipboardPaste · Invoke-KvGuardedSendKeys · 等 18 个已审批的原子动作</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="workflow">
+  <h2>端到端工作流</h2>
+  <p>以下是一个完整的例子：工程师描述任务，Agent 全程自动完成。</p>
+
+  <div class="callout">
+    <strong>任务示例：</strong> "给 KV-X310 新建项目，创建一个功能块，判断轴当前位置是否在目标范围内，输出 BOOL 信号"
+  </div>
+
+  <div class="workflow-pipeline">
+    <div class="wf-step">
+      <span class="wf-num">1</span>
+      <h4>查指令语法</h4>
+      <p>知识库技能查询 MC_MoveAbsolute、位置比较相关的基恩士专有用法与设备地址</p>
+    </div>
+    <div class="wf-step s2">
+      <span class="wf-num s2" style="background:var(--accent-2)">2</span>
+      <h4>生成程序资产</h4>
+      <p>编程技能生成 ST 程序体 + 变量声明，打包为 MNM 文件（CP936 编码）</p>
+    </div>
+    <div class="wf-step s3">
+      <span class="wf-num" style="background:var(--accent-3)">3</span>
+      <h4>创建项目 &amp; 导入</h4>
+      <p>操作技能创建 KV-X310 项目，导入 MNM，设置全局变量，导入 FB 模块</p>
+    </div>
+    <div class="wf-step s4">
+      <span class="wf-num" style="background:#7c5800">4</span>
+      <h4>编译 &amp; 验证</h4>
+      <p>执行编译，读回结果 JSON 确认 ok:true，生成项目快照供工程师查阅</p>
+    </div>
+  </div>
+
+  <p>每一步都产出独立的证据文件，失败时可精确定位到哪一步、哪个 UI 动作出错：</p>
+
+  <pre><code>work_root/
+  run-20261007-143200/
+    execution_plan.json       # 本次执行计划
+    run.log                   # 全流程日志
+    step_01_create/
+      receipt.json            # 步骤收据
+      create_project_result.json
+    step_02_import/
+      receipt.json
+      import_result.json
+    step_03_variables/
+      receipt.json
+      set_variables_result.json
+    step_04_compile/
+      receipt.json
+      compile_result.json
+    snapshot/
+      project/overview.md    # 语义项目概览
+      project/_index/entities.jsonl</code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="snapshot">
+  <h2>项目快照：让 AI 看到全局</h2>
+  <p>调用 <code>export_kv_project_text_snapshot</code> 工作流，可以将 KV STUDIO 项目中散落各处的信息统一导出为结构化的语义快照，供 AI 读取、分析、或作为下一轮编程的上下文。</p>
+
+  <div class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" width="760" height="300" viewBox="0 0 760 300" role="img" aria-label="项目快照结构">
+      <defs>
+        <style>
+          .st{font:700 14px "Microsoft YaHei",sans-serif;fill:#1a2635}
+          .sl{font:600 12px "Microsoft YaHei",sans-serif;fill:#1a2635}
+          .ss{font:11px "Microsoft YaHei",sans-serif;fill:#5a7080}
+        </style>
+        <filter id="s-sh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000015"/></filter>
+      </defs>
+
+      <text class="st" x="380" y="24" text-anchor="middle">语义项目快照结构</text>
+
+      <!-- Root -->
+      <rect fill="#e8f0fb" stroke="#1a5fa0" stroke-width="2" x="300" y="44" width="160" height="44" rx="8" filter="url(#s-sh)"/>
+      <text class="sl" x="380" y="62" text-anchor="middle">snapshot/</text>
+      <text class="ss" x="380" y="78" text-anchor="middle">快照根目录</text>
+
+      <!-- Lines from root -->
+      <path d="M380 88 L380 108" stroke="#7baed4" stroke-width="1.2" fill="none"/>
+      <path d="M380 108 L160 108 M380 108 L380 108 M380 108 L600 108" stroke="#7baed4" stroke-width="1.2" fill="none"/>
+      <path d="M160 108 L160 128" stroke="#7baed4" stroke-width="1.2" fill="none"/>
+      <path d="M380 108 L380 128" stroke="#7baed4" stroke-width="1.2" fill="none"/>
+      <path d="M600 108 L600 128" stroke="#7baed4" stroke-width="1.2" fill="none"/>
+
+      <!-- project/ -->
+      <rect fill="#eaf4ee" stroke="#2a6e4a" stroke-width="1.5" x="70" y="128" width="180" height="150" rx="8" filter="url(#s-sh)"/>
+      <text class="sl" x="160" y="148" text-anchor="middle">project/</text>
+      <text class="ss" x="160" y="166" text-anchor="middle">语义主入口</text>
+      <line x1="80" y1="174" x2="240" y2="174" stroke="#cce4d8" stroke-width="1"/>
+      <text class="ss" x="160" y="190" text-anchor="middle">overview.md</text>
+      <text class="ss" x="160" y="207" text-anchor="middle">entities.jsonl</text>
+      <text class="ss" x="160" y="224" text-anchor="middle">restore_plan.json</text>
+      <text class="ss" x="160" y="241" text-anchor="middle">功能块/ 程序/</text>
+      <text class="ss" x="160" y="258" text-anchor="middle">配置/ 类型/</text>
+
+      <!-- text/ -->
+      <rect fill="#f2ecfb" stroke="#5a3a8a" stroke-width="1.5" x="295" y="128" width="170" height="100" rx="8" filter="url(#s-sh)"/>
+      <text class="sl" x="380" y="148" text-anchor="middle">text/</text>
+      <text class="ss" x="380" y="166" text-anchor="middle">原子文本产物</text>
+      <line x1="305" y1="174" x2="455" y2="174" stroke="#ddd0f8" stroke-width="1"/>
+      <text class="ss" x="380" y="190" text-anchor="middle">各程序 MNM 文本</text>
+      <text class="ss" x="380" y="207" text-anchor="middle">变量 TSV 文件</text>
+      <text class="ss" x="380" y="224" text-anchor="middle">兼容性证据</text>
+
+      <!-- raw/ -->
+      <rect fill="#fff7ed" stroke="#d97706" stroke-width="1.5" x="510" y="128" width="180" height="100" rx="8" filter="url(#s-sh)"/>
+      <text class="sl" x="600" y="148" text-anchor="middle">raw/</text>
+      <text class="ss" x="600" y="166" text-anchor="middle">工作流原始产物</text>
+      <line x1="520" y1="174" x2="680" y2="174" stroke="#fde68a" stroke-width="1"/>
+      <text class="ss" x="600" y="190" text-anchor="middle">run.log</text>
+      <text class="ss" x="600" y="207" text-anchor="middle">step receipts</text>
+      <text class="ss" x="600" y="224" text-anchor="middle">UI 截图证据</text>
+    </svg>
+  </div>
+
+  <p><code>restore_plan.json</code> 给出依赖顺序的恢复序列，<code>entities.jsonl</code> 是机器可读的实体索引。快照里的 <code>semantic_project_status</code> 字段是完整性的权威指示器。</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="capabilities">
+  <h2>当前能力状态</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>功能</th>
+        <th>工作流</th>
+        <th>状态</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>创建项目 + 导入 MNM + 设置变量</td>
+        <td><code>import_kv_module</code> / <code>set_kv_variables</code></td>
+        <td><span class="pill pill-ok">✅ 已验证</span></td>
+        <td>KV-X310 已完整回归测试</td>
+      </tr>
+      <tr>
+        <td>用户 FB 导入 &amp; 参数配置</td>
+        <td><code>import_kv_fb_module</code> / <code>set_kv_fb_arguments</code></td>
+        <td><span class="pill pill-ok">✅ 已验证</span></td>
+        <td>含 FB 设备泄漏预检</td>
+      </tr>
+      <tr>
+        <td>ST 数值型 FB 创建</td>
+        <td><code>create_kv_st_module</code></td>
+        <td><span class="pill pill-ok">✅ 已验证</span></td>
+        <td>KV-X520 域 ST，UTF-16LE BOM</td>
+      </tr>
+      <tr>
+        <td>BOOL 梯形图完整模块</td>
+        <td><code>create_kv_complete_module</code></td>
+        <td><span class="pill pill-ok">✅ 已验证</span></td>
+      </tr>
+      <tr>
+        <td>项目全量语义快照</td>
+        <td><code>export_kv_project_text_snapshot</code></td>
+        <td><span class="pill pill-ok">✅ 已验证</span></td>
+        <td>含 entities.jsonl + restore_plan</td>
+      </tr>
+      <tr>
+        <td>MNM 导出 / 全局变量快照</td>
+        <td><code>export_kv_project_mnm</code> / <code>snapshot_kv_global_variables_all_groups</code></td>
+        <td><span class="pill pill-ok">✅ 已验证</span></td>
+      </tr>
+      <tr>
+        <td>结构体类型定义读写</td>
+        <td><code>export_kv_structure_definitions</code> / <code>mutate_kv_structure_definitions</code></td>
+        <td><span class="pill pill-ok">✅ 已验证</span></td>
+      </tr>
+      <tr>
+        <td>扩展单元配置</td>
+        <td><code>configure_kv_expansion_units</code></td>
+        <td><span class="pill pill-warn">⚠️ 接口已发布</span></td>
+        <td>桌面回归测试待完成</td>
+      </tr>
+      <tr>
+        <td>EtherCAT 节点配置</td>
+        <td><code>configure_kv_ethercat_nodes</code></td>
+        <td><span class="pill pill-warn">⚠️ 接口已发布</span></td>
+        <td>桌面回归测试待完成</td>
+      </tr>
+      <tr>
+        <td>新建项目（独立工作流）</td>
+        <td><code>create_kv_project</code></td>
+        <td><span class="pill pill-pend">🔄 pending</span></td>
+        <td>pending_validation，暂不对外</td>
+      </tr>
+      <tr>
+        <td>编译（独立工作流）</td>
+        <td><code>compile_kv_project</code></td>
+        <td><span class="pill pill-pend">🔄 pending</span></td>
+        <td>pending_validation，暂不对外</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<section id="quickstart">
+  <h2>快速开始</h2>
+
+  <h3>环境要求</h3>
+  <div class="card-grid" style="margin-bottom:var(--space-4)">
+    <div class="card">
+      <div class="card-icon">🖥️</div>
+      <h3>操作系统</h3>
+      <p style="font-size:.9rem">Windows 10 / 11（PowerShell 5.1）</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🔧</div>
+      <h3>KV STUDIO KVS12</h3>
+      <p style="font-size:.9rem">已安装 <code>Kvs.exe</code>，具体路径填入配置文件</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🤖</div>
+      <h3>Codex Agent 运行时</h3>
+      <p style="font-size:.9rem">用于驱动三个技能的 AI Agent 执行环境</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">📖</div>
+      <h3>基恩士 Wiki V2 数据库</h3>
+      <p style="font-size:.9rem">本地 SQLite 知识库，联系项目维护者获取</p>
+    </div>
+  </div>
+
+  <h3>安装</h3>
+  <pre><code># 克隆项目
+git clone https://github.com/LiangYH/KeyenceAgent.git
+cd KeyenceAgent
+
+# 一键安装与状态检查
+powershell -ExecutionPolicy Bypass -File setup_keyence_agent.ps1</code></pre>
+
+  <h3>配置文件</h3>
+  <p>在 <code>%APPDATA%\Codex\kv-studio-operator\</code> 下创建 <code>config.json</code>（参考 <code>kv-studio-operator/config/kv-studio-operator.example.json</code>）：</p>
+  <pre><code>{
+  "kvs_exe": "C:\\Program Files\\KEYENCE\\KV STUDIO\\Kvs.exe",
+  "work_root": "C:\\KvAgentWork",
+  "admin_credential_path": "%APPDATA%\\Codex\\kv-studio-operator\\credentials.xml",
+  "admin_user_default": "Administrator",
+  "wiki_root": "D:\\KeyenceWiki"
+}</code></pre>
+
+  <h3>调用工作流的方式</h3>
+  <p>所有工作流统一用以下方式调用（由 Agent 执行，不需要工程师手动输入）：</p>
+  <pre><code>powershell -STA -NoProfile -ExecutionPolicy Bypass -File `
+  kv-studio-operator\scripts\workflows\import_kv_module.ps1 `
+  -ProjectPath "C:\KvAgentWork\MyProject" `
+  -MnmPath "C:\KvAgentWork\output\main_program.mnm"</code></pre>
+
+  <div class="callout">
+    <strong>提示：</strong> 查询当前可用的工作流和参数说明，运行 <code>get_kv_capabilities.ps1</code>，它会读取 <code>script_manifest.json</code> 并返回所有已发布工作流的参数列表。
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <p>KeyenceAgent — MIT License — 为基恩士 PLC 电气工程师构建</p>
+  <p style="margin-top:4px"><a href="https://github.com/LiangYH/KeyenceAgent">GitHub</a> · <a href="project-status.md">能力状态详情</a> · <a href="operator-details.md">操作技能技术文档</a></p>
+</footer>
+
+</body>
+</html>
