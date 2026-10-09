@@ -17,6 +17,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\get_kv_
 powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\get_kv_capabilities.ps1 -Capability read_only_project_text_snapshot
 ```
 
+确认本机 KV STUDIO 是否可用用 `-Capability detect_kvstudio_install`
+（`get_kvstudio_install.ps1`，非 UI、只读；`-Probe` 只输出 `Kvs.exe` 路径并以退出码 0/1 表示有无）。
+它按 缓存 → 配置 → 注册表 → 快捷方式 → 搜索根 逐层查找并校验文件真实存在，安装目录不在 C 盘
+也能命中；不要用"某几个目录里没有"来判定未安装。
+
 运行查询返回的 `customer_callable=true` 入口。普通操作只需对应接口的输入，不需要构造 MVP 或复刻整个项目。需要多步时先准备完整计划；一个 workflow 内部通过同一 flat executor 调度子步骤。新建完整 FB 通常包含程序体导入、自变量写入、局部变量写入和编译；修改其中一项只调用对应接口。
 
 查询结果的 `regression_scenarios` 给出当前仓库中的匹配测试、README、固定输入和运行命令。

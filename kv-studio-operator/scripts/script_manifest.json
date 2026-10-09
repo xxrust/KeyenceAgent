@@ -298,6 +298,19 @@
                                                      "capabilities":  [
                                                                           "list_kv_operations"
                                                                       ]
+                                                 },
+                                                 {
+                                                     "path":  "get_kvstudio_install.ps1",
+                                                     "status":  "published",
+                                                     "customer_callable":  true,
+                                                     "capabilities":  [
+                                                         "detect_kvstudio_install",
+                                                         "locate_kvstudio_executable"
+                                                     ],
+                                                     "verification":  {
+                                                         "scope":  "non-UI read-only detection of the local Kvs.exe; verified on a non-C: install including config, registry, search-root and not-installed paths",
+                                                         "reference":  "tests/test_kvstudio_install_detection.ps1"
+                                                     }
                                                  }
                                              ],
                     "customer_workflow":  [

@@ -57,9 +57,12 @@ function Resolve-ConfiguredKvsExe {
     $cfg = & $loader -ConfigPath $ConfigPath -ScriptRoot $scriptRoot
     if ($cfg.found -and $cfg.kvs_exe) { return [IO.Path]::GetFullPath([string]$cfg.kvs_exe) }
   }
-  $resolver = Join-Path $scriptRoot 'resolve_kvstudio_local.ps1'
-  if (Test-Path -LiteralPath $resolver -PathType Leaf) {
-    $resolved = & powershell -NoProfile -ExecutionPolicy Bypass -File $resolver | ConvertFrom-Json
+  $skillsRoot = Split-Path -Parent (Split-Path -Parent $scriptRoot)
+  foreach ($candidate in @(
+      (Join-Path $skillsRoot 'keyence-plc-programmer\scripts\resolve_kvstudio_local.ps1'),
+      (Join-Path $scriptRoot 'resolve_kvstudio_local.ps1'))) {
+    if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { continue }
+    $resolved = & powershell -NoProfile -ExecutionPolicy Bypass -File $candidate | ConvertFrom-Json
     if ($resolved.KvsExe) { return [IO.Path]::GetFullPath([string]$resolved.KvsExe) }
   }
   return ''

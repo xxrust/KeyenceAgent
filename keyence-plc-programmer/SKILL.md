@@ -140,7 +140,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\validat
 可复用非 UI 工具包括 `init_project_snapshot_workspace.ps1`、
 `validate_fb_reuse_guard.ps1` 和 `new_mnm_smoke.ps1`。
 KV STUDIO 可执行文件解析仍由 `resolve_kvstudio_local.ps1` 提供给 operator；
-这不构成另一套 UI 路线。
+这不构成另一套 UI 路线。判断本机是否装了 KV STUDIO 先跑这个脚本（或 operator 的
+`get_kvstudio_install.ps1 -Probe`），不要自己列几个目录去猜。
+
+该脚本按 显式参数 → 结果缓存 → operator 配置 `kvs_exe` → 注册表（App Paths / KV STUDIO
+卸载项 / KEYENCE 键）→ 开始菜单快捷方式（机器级 + 用户级）→ 搜索根（`KvsVersionPath.txt`、
+`KVS<版本>` 布局、限定深度扫描）→ 旧版 C 盘路径 逐层查找；每一层都要求命中的对象真实存在
+且文件名为 `Kvs.exe`。命中返回 JSON（`KvsExe`、`WorkingDirectory`、`Source`、`Version`、
+`Cached`、`ElapsedMs`、`Checked`），全部落空才报 `KV STUDIO Kvs.exe not found` 并列出已检查项。
+
+安装目录不在 C 盘、快捷方式缺失或被改名时，不要据此判定"未安装"：注册表层与搜索根层仍能命中，
+缓存也会在命中后加速后续调用。`-SkipConfig/-SkipRegistry/-SkipStartMenu/-SkipDriveScan/-SkipCache`
+与 `-SearchRoots/-ShortcutRoots` 只用于隔离验证；正式判断不要带这些开关。
 
 报告修改范围、依据、声明/依赖完成度、当前编译结果、证据路径与剩余问题。
 细小修改只报告相关内容，无需套用整项目复刻报告。
