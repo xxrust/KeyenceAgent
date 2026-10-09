@@ -68,14 +68,14 @@ $manifestPath = Join-Path $RepoRoot 'kv-studio-operator\scripts\script_manifest.
 $manifestOk = $false
 try {
   $manifest = Get-Content -Raw -LiteralPath $manifestPath -Encoding UTF8 | ConvertFrom-Json
-  $manifestOk = ($manifest.schema_version -eq 1 -and @($manifest.classes.customer_workflow).Count -gt 0)
+  $manifestOk = ($manifest.schema_version -eq 2 -and @($manifest.classes.customer_workflow).Count -gt 0)
 } catch {
   $manifestOk = $false
 }
 $checks.Add([pscustomobject]@{
   name = 'operator_manifest_parse'
   ok = $manifestOk
-  expected = 'schema_version=1 with customer_workflow entries'
+  expected = 'schema_version=2 with customer_workflow entries'
   actual = $manifestPath
 })
 

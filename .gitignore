@@ -118,3 +118,6 @@ $RECYCLE.BIN/
 .fuse_hidden*
 .directory
 .Trash-*
+
+# Operator work root written inside the repository by mistake (run output, not source)
+/kvOp/
