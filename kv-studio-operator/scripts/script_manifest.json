@@ -314,6 +314,19 @@
                                                          "scope":  "non-UI read-only detection of the local Kvs.exe; verified on a non-C: install including config, registry, search-root and not-installed paths",
                                                          "reference":  "tests/test_kvstudio_install_detection.ps1"
                                                      }
+                                                 },
+                                                 {
+                                                     "path":  "annotate_kv_program_with_comments.ps1",
+                                                     "status":  "published",
+                                                     "customer_callable":  true,
+                                                     "capabilities":  [
+                                                                          "annotate_program_with_device_comments",
+                                                                          "device_comment_coverage"
+                                                                      ],
+                                                     "verification":  {
+                                                                          "scope":  "non-UI read-only join of the exported device comment table with MNM program bodies; device key normalisation, comment classes, program/library body scope, gap lists and unchanged inputs verified",
+                                                                          "reference":  "tests/test_kv_program_comment_join.ps1"
+                                                                      }
                                                  }
                                              ],
                     "customer_workflow":  [
@@ -550,6 +563,20 @@
                                                       "scope":  "read-only device comment list export through the File menu save-as dialog; CSV shape, program selector, unique artifact and folder verified",
                                                       "reference":  "tests/kv-interface-regression/21_export_device_comments/README.md"
                                                   }
+                                              },
+                                              {
+                                                  "path":  "workflows/annotate_kv_program_with_comments.ps1",
+                                                  "status":  "published",
+                                                  "customer_callable":  true,
+                                                  "capabilities":  [
+                                                                       "annotate_program_with_device_comments",
+                                                                       "device_comment_coverage"
+                                                                   ],
+                                                  "execution":  "composed_non_ui_join",
+                                                  "verification":  {
+                                                                       "scope":  "non-UI regression scenario over synthetic fixtures: coverage numbers, gap lists, input hashes and library body scope",
+                                                                       "reference":  "tests/kv-interface-regression/22_annotate_program_comments/README.md"
+                                                                   }
                                               },
                                               {
                                                   "path": "workflows/import_kv_module.ps1",

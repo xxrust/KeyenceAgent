@@ -1,0 +1,10 @@
+{
+  "name": "22_annotate_program_comments",
+  "enabled": true,
+  "open_project": false,
+  "project_mode": "fixture_copy",
+  "source_project": "fixtures\\JoinSample\\JoinSample.kpr",
+  "workflow": "scripts/workflows/annotate_kv_program_with_comments.ps1",
+  "result_file": "workflow\\workflow_result.json",
+  "arguments": ["-CommentsPath", "${project_dir}\\comments.csv", "-MnmPath", "${project_dir}", "-OutDir", "${out}\\workflow"]
+}

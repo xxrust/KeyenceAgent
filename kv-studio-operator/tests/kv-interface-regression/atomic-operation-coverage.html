@@ -48,12 +48,12 @@
 <body>
 <header>
   <h1>KV STUDIO 原子操作覆盖审核</h1>
-  <p>测试目录的去重审计页：把 01-21 场景映射到可复用的语义原子操作，区分真实运行证据、静态覆盖、间接覆盖和缺口。此页面是审核证据，不是新的工作流。</p>
+  <p>测试目录的去重审计页：把 01-22 场景映射到可复用的语义原子操作，区分真实运行证据、静态覆盖、间接覆盖和缺口。此页面是审核证据，不是新的工作流。</p>
 </header>
 <main>
   <section>
     <h2>审核范围与口径</h2>
-    <p class="note">生成日期：2026-10-10　|　目录：<code>tests/kv-interface-regression</code>　|　场景：21 个（正常成功 20，预期编译失败 1）。同一语义动作只在操作目录出现一次；场景表和矩阵只引用操作 ID。<code>live</code> 表示已有实际运行证据，<code>static</code> 表示脚本/契约已覆盖但本页没有宣称本轮实跑，<code>indirect</code> 表示由完整流程间接使用，<code>gap</code> 表示当前未覆盖。</p>
+    <p class="note">生成日期：2026-10-10　|　目录：<code>tests/kv-interface-regression</code>　|　场景：22 个（正常成功 21，预期编译失败 1）。同一语义动作只在操作目录出现一次；场景表和矩阵只引用操作 ID。<code>live</code> 表示已有实际运行证据，<code>static</code> 表示脚本/契约已覆盖但本页没有宣称本轮实跑，<code>indirect</code> 表示由完整流程间接使用，<code>gap</code> 表示当前未覆盖。</p>
     <div class="stats" id="stats"></div>
   </section>
 
@@ -113,7 +113,8 @@ const scenarios = [
   S('18_st_numeric_fb','scripts/workflows/create_kv_st_module.ps1','fixture_copy','success',['LIFE-02','LIFE-03','FOCUS-01','TREE-01','TREE-02','INPUT-01','CLIP-01','CLIP-02','MNM-01','MNM-02','FB-ARG-01','FB-ARG-04','FB-ARG-05','VAR-01','VAR-03','COMPILE-01','COMPILE-02','COMPILE-03','COMPILE-04','MNM-03','MNM-04','PROJECT-01','GATE-01','GATE-02','GATE-03'],'ST 数值 FB 与自定义类型绑定'),
   S('19_compile_error','scripts/workflows/compile_kv_project.ps1','fixture_copy','expected-failure',['LIFE-02','LIFE-03','FOCUS-01','COMPILE-01','COMPILE-02','COMPILE-03','COMPILE-04','COMPILE-05','GATE-03','GATE-04','CLEAN-01'],'预期 NG；harness 逐行核对 4 错误和 4 警告'),
   S('20_global_variable_groups','scripts/workflows/snapshot_kv_global_variables_all_groups.ps1','sample_copy','success',['LIFE-02','LIFE-03','FOCUS-01','VAR-01','VAR-05','CLIP-02','CLIP-03','GATE-01','GATE-03'],'变量组选择器全选所有组，复制完整全局变量表；已完成真实 KV STUDIO 回归'),
-  S('21_export_device_comments','scripts/workflows/export_kv_device_comments.ps1','fixture_copy','success',['LIFE-02','LIFE-03','FOCUS-01','INPUT-01','INPUT-02','CMT-01','CMT-02','CMT-03','CMT-04','GATE-01','GATE-03'],'文件菜单导出软元件注释 CSV：另存为对话框状态校验、文件名读回、当次产物收集')
+  S('21_export_device_comments','scripts/workflows/export_kv_device_comments.ps1','fixture_copy','success',['LIFE-02','LIFE-03','FOCUS-01','INPUT-01','INPUT-02','CMT-01','CMT-02','CMT-03','CMT-04','GATE-01','GATE-03'],'文件菜单导出软元件注释 CSV：另存为对话框状态校验、文件名读回、当次产物收集'),
+  S('22_annotate_program_comments','scripts/workflows/annotate_kv_program_with_comments.ps1','fixture_copy','success',['CMT-05','CMT-06','CMT-07','GATE-01','GATE-03'],'非 UI：注释表 x MNM 程序体 join，程序体只读，产出独立的注释/覆盖率文件')
 ];
 const O = (id, cat, name, impl, status, scenes, limit='') => ({id,cat,name,impl,status,scenes,limit});
 const operations = [
@@ -161,7 +162,10 @@ const operations = [
   O('CMT-01','注释导出','展开文件菜单并调用以 CSV/TXT 格式保存软元件注释(K)','guarded accelerators + UIA menu evidence','live',['21_export_device_comments'],'live evidence: runs/21_export_device_comments_20261010_092257_130_ef324211；菜单项按名称中的 CSV/TXT 与 (K) 加速键匹配，失败回退 Alt+F,K')
   O('CMT-02','注释导出','校验另存为对话框的保存类型与程序选择器，输入唯一文件名并读回','save dialog guard','live',['21_export_device_comments'],'保存类型须含 CSV；程序选择器须为请求值（默认 全局）；读回不一致即失败')
   O('CMT-03','注释导出','按运行时间收集本次导出的 CSV，校验表头列数与行数并计算 hash','artifact freshness guard','live',['21_export_device_comments'],'目标同名即失败；仅接受本次运行生成且结构合法的文件')
-  O('CMT-04','注释导出','用 IDOK BM_CLICK 保存并确认无残留模态对话框','dialog button helper','live',['21_export_device_comments'],'保存后仍存在 32770 对话框即失败')
+  O('CMT-04','注释导出','用 IDOK BM_CLICK 保存并确认无残留模态对话框','dialog button helper','live',['21_export_device_comments'],'保存后仍存在 32770 对话框即失败'),
+  O('CMT-05','注释导出','从 MNM 程序体提取软元件引用并归一化键（补零、B/W 十六进制、去掉 .F/.DF 后缀）','device reference extraction','live',['22_annotate_program_comments'],'TMR 20、#1、_MC_Axis[#1] 不是软元件；MR013/MR13、W012/W12 归一为同一键')
+  O('CMT-06','注释导出','注释分类（手写/型号档/系统）与程序体/库体作用域区分','comment classification and scope','live',['22_annotate_program_comments'],'默认只统计用户程序体；库 FB 体需 -IncludeLibraryBodies 才纳入')
+  O('CMT-07','注释导出','产出独立覆盖率文件（不修改 MNM）并记录输入 sha256 供陈旧检测','coverage report and input fingerprints','live',['22_annotate_program_comments'],'runs/22_annotate_program_comments_20261010_094250_914_0a0ee3a2；输入文件 sha256 不变证明程序体只读')
  O('CONFIG-01','配置','筛选并插入扩展单元、保存、回读 UnitSet.ue2','unit configuration','live',['06_expansion_units']),
  O('CONFIG-02','配置','唯一定位 EtherCAT catalog model、设节点地址并回读拓扑','EtherCAT configuration','live',['07_ethercat_nodes']),
  O('SNAP-01','文本快照','读取树、全部全局变量组、locals、FB args/body、结构和配置','snapshot workflow','live',['13_project_text_snapshot']),

@@ -1,0 +1,12 @@
+{
+  "note": "Device areas and comment classification terms for annotate_kv_program_with_comments.ps1. Kept out of the .ps1 so the script stays ASCII-only and cannot be broken by ANSI decoding.",
+  "devicePattern": "\\b(MR|LR|CR|DM|EM|FM|CM|ZF|R|B|W|T|C)\\d[0-9A-F]*\\b",
+  "hexAreas": [ "B", "W" ],
+  "documentableAreas": [ "R", "MR", "LR", "B", "W", "ZF", "CR", "DM", "EM", "FM", "CM" ],
+  "nonDocumentableAreas": [ "T", "C" ],
+  "systemAreas": [ "CM", "CR", "W", "B", "ZF" ],
+  "profilePattern": "Series\\[|InDat\\(|ToolJudge|TRGACK|BUF OVER|OutImgStatus|^Cmd |^Result |^TIM OFF|^ZR OFF|RST_ALL|^EXT$|^READY$|^BUSY$",
+  "programBodyPattern": "程序__|(^|[\\\\/])(program|prog)__",
+  "libraryBodyPattern": "功能块__库__|(^|[\\\\/])(library|lib)__",
+  "systemCommentPattern": "常时|时钟脉冲|次扫描|扫描时间|END 处理|自由运行计数器|日历定时器|记录/跟踪|运转记录|梯形图工程项目名|项目版本|项目保存|项目加载|配方|AutoLoad|RunLoad|存储|单元错误|系统区域|运算执行错误|传感器设定命令|项目密码|CPU 功能版本|VT传感器|RUN-PROG|软元件记录|访问窗口|项目信息|扩展单元|单元间同步|最新严重错误|最新一般错误|单元编号|输入\\d|输出\\d|批量传输|批量备份|批量恢复|分别备份|分别恢复|隐式|适配器|显式报文|节点状态|PORT1|FTP|MAC 地址|发送次数|接收次数|时钟调整|PLC状态|PLC错误|错误代码|错误详细信息|正常节点表|停止节点表"
+}

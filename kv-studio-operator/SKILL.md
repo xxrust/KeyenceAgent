@@ -29,6 +29,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\get_kv_
 `BM_CLICK` 保存后只接受**本次运行**生成、结构合法的 CSV。注释表里型号档/系统注释占多数，
 需要"他的程序用了哪些软元件"时应与 MNM 程序体交叉过滤；`.cm1` 反解只能作为后备且必须标注推断。
 
+"程序体 ↔ 注释"对照与覆盖率用 `-Capability device_comment_coverage`
+（`annotate_kv_program_with_comments.ps1`，纯非 UI 计算）：输入是上面导出的注释 CSV 与 MNM 程序体目录，
+**MNM 只读不改**，join 结果单独落盘 `comments.tsv`/`usage.tsv`/`coverage.json`/`program_annotations.md`。
+默认只统计用户程序体（库 FB 体另计，加 `-IncludeLibraryBodies` 才纳入）；设备键按"去前导零、保留进制"归一
+（`MR013`=`MR13`、`W012`=`W12`，B/W 是十六进制），`TMR 20`、`#1`、`_MC_Axis[#1]` 不算软元件，
+MNM 中以 `;` 开头的 ST 行算使用、`BOOKMARK` 标签不算。`coverage.json` 记录注释表与每个程序体的 sha256，
+可据此判断报告是否已陈旧。数字含义：`used_unannotated` 是真正的文档缺口，`annotated_unused` 多为 HMI/上位机专用位。
+
 运行查询返回的 `customer_callable=true` 入口。普通操作只需对应接口的输入，不需要构造 MVP 或复刻整个项目。需要多步时先准备完整计划；一个 workflow 内部通过同一 flat executor 调度子步骤。新建完整 FB 通常包含程序体导入、自变量写入、局部变量写入和编译；修改其中一项只调用对应接口。
 
 查询结果的 `regression_scenarios` 给出当前仓库中的匹配测试、README、固定输入和运行命令。
