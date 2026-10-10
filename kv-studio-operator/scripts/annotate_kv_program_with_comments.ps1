@@ -238,6 +238,10 @@ Write-Utf8 'usage.tsv' ($usageOut -join "`n")
 # treated as user bodies and reported as 'unknown'.  -IncludeLibraryBodies widens
 # the scope to every exported body.
 $inScope = $(if ($IncludeLibraryBodies -or ($programBodyCount + $unknownBodyCount) -eq 0) { 'all' } else { 'program' })
+# The exporter can name bodies in ways the patterns do not recognise; the old code
+# silently counted those as program bodies.  Say so instead.
+$classificationWarning = $(if ($unknownBodyCount -gt 0) { "module_kind_unresolved: $unknownBodyCount of $(($programBodyCount + $unknownBodyCount + $libraryBodyCount)) bodies matched neither the program nor the library naming pattern; scope is reported as unverified" } else { '' })
+if ($unknownBodyCount -gt 0) { $inScope = $inScope + '(unverified)' }
 $documentable = @($usage.Keys | Where-Object { ($script:DocumentableAreas -contains (Get-DeviceArea $_)) -and ($inScope -eq 'all' -or $usage[$_].program_refs -gt 0) })
 $usedAnnotated = @($documentable | Where-Object { $usage[$_].class -ne 'unannotated' })
 $usedUnannotated = @($documentable | Where-Object { $usage[$_].class -eq 'unannotated' })
@@ -271,6 +275,7 @@ $coverage = [ordered]@{}
 $coverage['ok'] = $true
 $coverage['generated_at'] = (Get-Date).ToString('o')
 $coverage['scope'] = $inScope
+$coverage['classification_warning'] = $classificationWarning
 $coverage['scope_note'] = 'program = user program bodies (plus bodies whose name identifies no class); all = program plus exported library FB bodies.'
 $coverage['body_counts'] = [ordered]@{ program = $programBodyCount; unknown = $unknownBodyCount; library = $libraryBodyCount }
 $coverage['comments_source'] = [ordered]@{ path = $commentsPathResolved; sha256 = $commentsSha; entries = [int]$commentRows.Count }

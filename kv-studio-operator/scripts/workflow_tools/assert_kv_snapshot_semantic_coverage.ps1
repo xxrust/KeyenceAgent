@@ -44,13 +44,42 @@ foreach ($u in $unresolved) {
 }
 if (-not $symbols.counts.by_class) { $failures.Add('symbol_classes_missing') | Out-Null }
 
+# Entity layer: a ready snapshot can still carry missing/partial entities (program locals
+# are not captured by the current variables route).  Count them so that ok can never be
+# read as "the analysis is complete".
+$programEntities = New-Object System.Collections.Generic.List[object]
+$projectRoot = Join-Path $snapshotRoot 'project'
+foreach ($p in @($structure.programs)) {
+  $hit = @(Get-ChildItem -LiteralPath $projectRoot -Recurse -Filter 'entity.json' -ErrorAction SilentlyContinue | Where-Object { $_.Directory.Name -eq $p.name } | Select-Object -First 1)
+  if ($hit.Count -eq 0) {
+    $programEntities.Add([pscustomobject]@{ module = $p.name; entity = ''; degraded = $true; reason = 'entity_missing' }) | Out-Null
+    continue
+  }
+  $entityText = Get-Content -Raw -LiteralPath $hit[0].FullName -Encoding UTF8
+  $degraded = ($entityText -match 'missing|partial|failed|unresolved|not_captured|not_applicable')
+  $programEntities.Add([pscustomobject]@{ module = $p.name; entity = $hit[0].FullName; degraded = $degraded; reason = $(if ($degraded) { 'entity_reports_missing_or_partial' } else { '' }) }) | Out-Null
+}
+$degradedPrograms = @($programEntities | Where-Object { $_.degraded })
+$limitations = New-Object System.Collections.Generic.List[string]
+if ($degradedPrograms.Count -gt 0) {
+  $limitations.Add("$($degradedPrograms.Count) of $(@($structure.programs).Count) program entities report missing/partial content; symbol resolution cannot be complete while locals or arguments are not captured, so unresolved=0 does not prove the program layer is fully resolved.") | Out-Null
+}
+if ([int]$symbols.counts.unresolved_in_bodies -gt 0) {
+  $limitations.Add("$($symbols.counts.unresolved_in_bodies) symbols are unresolved inside library FB bodies; their declarations are not exported by any snapshot route.") | Out-Null
+}
+$analysisComplete = ($degradedPrograms.Count -eq 0 -and [int]$symbols.counts.unresolved_in_programs -eq 0)
 $result = [ordered]@{
+  ok_means = 'no internal contradiction was found; it does NOT mean the analysis is complete'
+  analysis_complete = $analysisComplete
+  limitations = [object[]]$limitations.ToArray()
+  program_entities = [object[]]$programEntities.ToArray()
   schema_version = 1
   generated_at = (Get-Date).ToUniversalTime().ToString('o')
   ok = ($failures.Count -eq 0)
   snapshot_root = $snapshotRoot
   categories = [ordered]@{
     programs = [int]$structure.program_count
+    program_entities_degraded = $degradedPrograms.Count
     function_blocks = @($structure.function_blocks).Count
     user_data_types = [int]$structure.data_type_counts.user
     system_data_types = [int]$structure.data_type_counts.system
