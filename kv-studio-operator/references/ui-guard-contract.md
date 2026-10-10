@@ -71,3 +71,12 @@ Failure action:
 | `KV_FOCUS_LOST` | `kv_ui_guard.ps1` | Foreground belongs to an unrelated window. | Stop and inspect foreground owner. |
 | `KV_FOCUS_LOST_TERMINAL` | `kv_ui_guard.ps1` | Foreground is a shell/terminal. | Stop; this prevents pasting variables into the agent terminal. |
 | `KV_MODAL_PRESENT` | `kv_ui_guard.ps1` | A modal dialog is foreground or blocking. | Handle the modal with a dialog-specific route, or fail. |
+
+## Foreground activation is refused after the input session starts
+
+A dialog or embedded editor owns the focus once the runner's input session has begun.
+Activating the main window in that state moves the focus off the dialog, which leaves the
+panel on screen and makes every later keystroke land in the editor. The rule is therefore
+enforced in code, not only documented: Invoke-KvUiGuardForceForeground throws
+KV_FOREGROUND_FORBIDDEN_AFTER_INPUT_SESSION in that state, and a workflow that meets a
+confirmation panel must answer that panel (its own buttons or keys), never the main window.

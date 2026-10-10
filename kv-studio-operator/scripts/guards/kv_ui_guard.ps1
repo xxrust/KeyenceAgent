@@ -13,6 +13,19 @@ public class KvSharedUiGuardWin32 {
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
   [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+  public delegate bool KvEnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(KvEnumWindowsProc lpEnumFunc, IntPtr lParam);
+  public static System.Collections.Generic.List<long> VisibleTopLevelWindows(uint pid) {
+    var list = new System.Collections.Generic.List<long>();
+    EnumWindows((h, l) => {
+      uint p = 0;
+      GetWindowThreadProcessId(h, out p);
+      if (p == pid && IsWindowVisible(h)) { list.Add(h.ToInt64()); }
+      return true;
+    }, IntPtr.Zero);
+    return list;
+  }
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
@@ -267,6 +280,39 @@ function Invoke-KvUiGuardForceForeground {
   param(
     [Parameter(Mandatory=$true)][IntPtr]$TargetHwnd
   )
+  # Foreground activation is the action that has broken in-process dialogs: it steals
+  # focus from the dialog back to the main window, and every later keystroke then lands
+  # in the wrong place (a dialog left on screen that no click can dismiss).  Documenting
+  # the rule is not enough - this session proved that - so the guard refuses the action
+  # outright once the runner's input session has started.  Neither this agent nor any
+  # future agent can call it in that state; the only way forward is to handle the dialog
+  # itself.
+  # Second unsafe state: the target is the process's main window while that process still
+  # owns another visible top-level window (a confirmation panel).  Activating the main
+  # window there moves focus off the panel, which is what left an undismissable prompt on
+  # screen in this session.  Refuse, and let the caller answer the panel itself.
+  $panelCheckPid = [uint32]0
+  [void][KvSharedUiGuardWin32]::GetWindowThreadProcessId($TargetHwnd, [ref]$panelCheckPid)
+  $panelCheckProc = Get-Process -Id $panelCheckPid -ErrorAction SilentlyContinue
+  if ($targetIsMainWindow) {
+    $panelOthers = @([KvSharedUiGuardWin32]::VisibleTopLevelWindows($panelCheckPid) | Where-Object { $_ -ne $TargetHwnd.ToInt64() })
+    if ($panelOthers.Count -gt 0) {
+      Write-KvUiGuardRunLog -Event 'foreground_recovery_refused' -Data @{ target_hwnd = $TargetHwnd.ToInt64(); reason = 'other_visible_top_level_window'; windows = ($panelOthers -join ','); policy = 'answer the panel, never the main window' }
+      Stop-KvUiGuard -ErrorCode 'KV_FOREGROUND_FORBIDDEN_WITH_DIALOG_OPEN' -Step 'force foreground' -Message ('Refusing to activate the main window while this process owns ' + $panelOthers.Count + ' other visible top-level window(s); answer that panel instead of the main window.')
+    }
+  }
+  # Activating the *main* window mid-session is what steals focus from an in-process
+  # dialog or embedded editor.  Activating a dialog, panel or editor window itself stays
+  # allowed, so the rule is scoped to the process's main window rather than to every
+  # target.
+  $mainCheckPid = [uint32]0
+  [void][KvSharedUiGuardWin32]::GetWindowThreadProcessId($TargetHwnd, [ref]$mainCheckPid)
+  $mainCheckProc = Get-Process -Id $mainCheckPid -ErrorAction SilentlyContinue
+  $targetIsMainWindow = ($mainCheckProc -and $mainCheckProc.MainWindowHandle -ne [IntPtr]::Zero -and $mainCheckProc.MainWindowHandle -eq $TargetHwnd)
+  if ($targetIsMainWindow -and $script:KvUiGuardInputSessionStarted) {
+    Write-KvUiGuardRunLog -Event 'foreground_recovery_refused' -Data @{ target_hwnd = $TargetHwnd.ToInt64(); reason = 'input_session_already_started'; policy = 'main window focus must not be stolen from a dialog' }
+    Stop-KvUiGuard -ErrorCode 'KV_FOREGROUND_FORBIDDEN_AFTER_INPUT_SESSION' -Step 'force foreground' -Message 'Refusing to activate the process main window after the input session started: that steals focus from an in-process dialog or embedded editor. Operate on the dialog itself instead of the main window.'
+  }
   if ($TargetHwnd -eq [IntPtr]::Zero -or -not [KvSharedUiGuardWin32]::IsWindow($TargetHwnd)) { return $false }
   if ([KvSharedUiGuardWin32]::IsIconic($TargetHwnd)) {
     # SW_RESTORE: never change a normally sized or maximized KV STUDIO window.
