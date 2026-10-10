@@ -79,11 +79,28 @@ BOOL 梯形图按 [complete-module.md](references/complete-module.md) 使用 ope
 ## MNM 与声明
 
 - 普通用户程序为 `;MODULE_TYPE:0`，用户 FB 为 `;MODULE_TYPE:2`。
-- 保持接近 KV STUDIO 导出的格式，按目标 Windows ANSI 编码写含中文的 MNM；
-  中文 Windows 通常为 CP936。
-  该旧路线不适用于 KV-X520 域 ST 导入：已实测使用 `DEVICE:60` 与 UTF-16LE BOM。
-  用 `scripts/new_kv_st_mnm.ps1 -DeviceCode 60 -OutputEncoding Utf16LE` 从 UTF-8 ST 封装，
-  不直接复用 BOOL 示例的 DEVICE/编码；导出读回用同脚本 `-ExportPath` 精确比较全部 ST 行。
+- **DEVICE 码与编码按目标 CPU 系列分支**，不要跨系列套用。实测（同一台机器、KV STUDIO 12G 导出）：
+
+  | 目标项目 | 导出 MNM 首行 | 编码 | ST 导入验证状态 |
+  | --- | --- | --- | --- |
+  | KV-X520（KVX 样例） | `DEVICE:60` | UTF-16LE + BOM | 已实测导入成功（`-DeviceCode 60 -OutputEncoding Utf16LE`） |
+  | KV-X310（台州检测机） | `DEVICE:59`（工程自身导出） | UTF-16LE + BOM | 已实测：把 `DEVICE` 改成 `60` 导入 + 登记变量后**编译通过** |
+
+  程序体导入通过 ≠ 能编译。实测（KV-X310 工程副本，导入改写后的 Main）补两条硬要求：
+  - **FB 调用要另外登记实例变量**：程序体里的 `FBEXEC/FBEAND <FB名> <实例名>` 必须在"局部变量"里声明
+    `scope=local, owner_program=<模块>, name=<实例名>, data_type=<FB名>`，否则报
+    `[错误214] 梯形图中存在未注册变量`；导出程序体本身不含这些声明。
+  - **改写副本与原模块共存时不得复用定时器编号**：同一 `TMR` 号出现在两个模块会报
+    `[错误61] 同一定时器编号在多个 TMR/TMH/TMS/TMU 指令中使用`；正式切换时删除原模块，或把副本的
+    定时器移到专用号段。
+  - 编译路由要求**目标工程已打开**（它只绑定现成的 `Kvs.exe` 进程，不自己启动），所以顺序是
+    导入 → 声明变量 → 编译，中途不要把 KVS 关掉；两个同名工程同时在跑会报
+    `KV_COMPILE_PROJECT_PROCESS_AMBIGUOUS`。
+
+  规则：**DEVICE 码取目标工程自己的导出证据**（先导出一次目标程序体读首行），不要按本表直接假设；
+  含中文的 MNM 一律用目标编码写，BOOLD 示例的 `DEVICE:63`/ANSI 组合不要用于 ST 路线。
+  用 `scripts/new_kv_st_mnm.ps1 -DeviceCode <证据值> -OutputEncoding Utf16LE` 从 UTF-8 ST 封装，
+  导出读回用同脚本 `-ExportPath` 精确比较全部 ST 行。
 - ST 程序体只写 KV STUDIO 接受的可执行语句。变量声明位于编辑器变量表，
   不把通用 IEC 声明块直接塞进程序体。
 - 普通 ST 问答只列出需要登记的变量，不因未要求工程交付而补 MNM 封装、TSV 或固定 contract。

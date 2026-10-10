@@ -19,11 +19,25 @@ native-ST creation dialog based on another PLC vendor's conventions.
 Use programmer's `scripts/new_kv_st_mnm.ps1` to compare exported source or prepare
 offline serialization. Export capability alone does not prove re-import works.
 MNM reading restrictions differ between KVS11 and current X-series manuals;
-resolve the target version and require actual import evidence. KV-X520 domain ST
-was actually imported using `DEVICE:60` and UTF-16LE BOM. The same task with
-Windows ANSI encoding did not create a module; do not reuse the BOOL fixture's
-DEVICE:63/59 or ANSI encoding for this ST route. Use the pack helper with
-`-DeviceCode 60 -OutputEncoding Utf16LE`. `;MODULE_TYPE:0` is a normal program and
+resolve the target version and require actual import evidence. The MNM `DEVICE`
+code and the encoding are **per CPU family; branch on the target export**:
+
+| Target project | Exported MNM header | Encoding | ST import evidence |
+| --- | --- | --- | --- |
+| KV-X520 (KVX sample) | `DEVICE:60` | UTF-16LE + BOM | actually imported with `-DeviceCode 60 -OutputEncoding Utf16LE` |
+| KV-X310 (Taizhou machine) | `DEVICE:59` (own export) | UTF-16LE + BOM | verified: imported as `DEVICE:60` plus declared variables, then compiled OK |
+
+Read the first line of the target project's own export to pick the code instead of
+copying this table. An imported body does not compile on its own: FB calls need
+their instance variables declared as local variables of the module
+(`name=<instance>, data_type=<FB name>`, otherwise `[错误214]`), and a rewritten
+copy that coexists with the original module must not reuse timer numbers
+(`[错误61]` on the same `TMR` number). The compile route binds to an already open
+project (it never launches KVS), so the order is import, declare, compile, and two
+live projects with the same name make it report `KV_COMPILE_PROJECT_PROCESS_AMBIGUOUS`. The same task with Windows ANSI encoding did not create a
+module; do not reuse the BOOL fixture's DEVICE:63/ANSI combination for this ST
+route. Use the pack helper with the evidence-derived device code and
+`-OutputEncoding Utf16LE`. `;MODULE_TYPE:0` is a normal program and
 `2` a user FB. The header is not itself a declaration of the module category.
 
 ## Preparation and Preflight
