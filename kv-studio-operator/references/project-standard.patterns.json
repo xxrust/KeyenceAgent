@@ -37,5 +37,10 @@
       "meaning": "平台功能：IO 映射、初始化、设备状态、报警、HMI、版本管理"
     }
   ],
+  "motion": {
+    "treeRootPattern": "运动设定",
+    "axisPattern": "轴\\d+[:：]([A-Za-z_][A-Za-z0-9_]*)",
+    "note": "The motion subtree lives in the project's WsTreeEnv.xml; no snapshot route materializes it, so its absence in a snapshot is a route gap, not evidence that the project has no motion settings."
+  },
   "backup_categories": [ "后备模块", "固定周期模块", "中断模块", "单元间同步模块" ]
 }

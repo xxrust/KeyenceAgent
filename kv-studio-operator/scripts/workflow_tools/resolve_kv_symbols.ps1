@@ -24,6 +24,8 @@ if (Test-Path -LiteralPath $globalsPath -PathType Leaf) {
 }
 $userTypes = @(@($inventory.data_types) | Where-Object { $_.path_text -notmatch '\(System\)' } | ForEach-Object { [string]$_.name })
 $systemTypes = @(@($inventory.data_types) | Where-Object { $_.path_text -match '\(System\)' } | ForEach-Object { [string]$_.name })
+$programNames = @(@($inventory.program_modules) | ForEach-Object { [string]$_.module_name })
+$invocations = New-Object System.Collections.Generic.List[object]
 
 $fbInstances = [ordered]@{}
 $mnmPre = @(Get-ChildItem -LiteralPath (Join-Path $snapshotRoot 'text\mnm') -Filter '*.mnm' -File -Recurse -ErrorAction SilentlyContinue)
@@ -42,6 +44,7 @@ foreach ($file in @(Get-ChildItem -LiteralPath $mnmDir -Filter '*.mnm' -File -Re
   for ($n = 0; $n -lt $lines.Count; $n++) {
     $line = $lines[$n]
     foreach ($m in [regex]::Matches($line, '(?m)^(FBEXEC|FBEAND|FUNAND)\s+(\S+)\s+(\S+)')) { $fbInstances[$m.Groups[3].Value] = $m.Groups[2].Value }
+    foreach ($m in [regex]::Matches($line, '(?m)^(FBEXEC|FBEAND|FUNAND)\s+(\S+)\s+(\S+)')) { $invocations.Add([pscustomobject]@{ module = $file.BaseName; line = $n + 1; kind = $m.Groups[1].Value; fb_type = $m.Groups[2].Value; instance = $m.Groups[3].Value; scope = $(if ($programNames -contains $file.BaseName) { 'program' } else { 'body' }) }) | Out-Null }
     foreach ($m in [regex]::Matches($line, '([A-Za-z_][A-Za-z0-9_]*)((?:\s*(?:\[[^\]]*\]|\.[A-Za-z_][A-Za-z0-9_]*))+)')) {
       $root = $m.Groups[1].Value
       if ($mnemonics -contains $root) { continue }
@@ -84,9 +87,13 @@ $result = [ordered]@{
     unresolved = $unresolved.Count
     unresolved_in_programs = @($unresolved | Where-Object { $_.scope -eq 'program' }).Count
     unresolved_in_bodies = @($unresolved | Where-Object { $_.scope -ne 'program' }).Count
+    fb_invocations = $invocations.Count
+    fb_types_called = @($invocations | ForEach-Object { $_.fb_type } | Sort-Object -Unique).Count
+    fb_types_called_in_programs = @($invocations | Where-Object { $_.scope -eq 'program' } | ForEach-Object { $_.fb_type } | Sort-Object -Unique).Count
   }
   unresolved_symbols = $unresolved
   symbols = @($symbols.Keys | ForEach-Object { $symbols[$_] })
+  invocations = [object[]]$invocations.ToArray()
   member_paths = $memberPaths.ToArray()
   omissions = @(
     'system object member lists are not exported by any snapshot route; the member path is recorded from usage and must be confirmed against the manual',

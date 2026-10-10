@@ -1,7 +1,8 @@
 param(
   [Parameter(Mandatory=$true)][string]$SnapshotRoot,
   [Parameter(Mandatory=$true)][string]$OutPath,
-  [string]$PatternMapPath = ''
+  [string]$PatternMapPath = '',
+  [string]$ProjectSourcePath = ''
 )
 $ErrorActionPreference = 'Stop'
 
@@ -51,7 +52,33 @@ $userTypes = @(@($inventory.data_types) | Where-Object { $_.path_text -notmatch 
 # They are now reported explicitly, together with what the type routes do NOT export.
 $systemTypes = @(@($inventory.data_types) | Where-Object { $_.path_text -match '\(System\)' } | ForEach-Object { [string]$_.name })
 
-$structure = [ordered]@{
+# Motion settings live in the project's WsTreeEnv.xml and are not materialized by any
+# snapshot route, so a bare not_found would be a false statement about the project.
+$motionStatus = 'unknown_route_not_populated'
+$motionAxes = New-Object System.Collections.Generic.List[string]
+$motionEvidence = New-Object System.Collections.Generic.List[string]
+$motionChecked = New-Object System.Collections.Generic.List[string]
+$motionChecked.Add('inventory.topology.motion') | Out-Null
+if ($inventory.topology.motion.status) { $motionChecked.Add('inventory.topology.motion.status=' + [string]$inventory.topology.motion.status) | Out-Null }
+$motionChecked.Add('snapshot_project_tree_entities') | Out-Null
+if ($ProjectSourcePath) {
+  $wsTree = Join-Path $ProjectSourcePath 'WsTreeEnv.xml'
+  if (Test-Path -LiteralPath $wsTree -PathType Leaf) {
+    $motionChecked.Add('project_ws_tree_env') | Out-Null
+    $xml = Get-Content -Raw -LiteralPath $wsTree -Encoding UTF8
+    if ($xml -match [string]$patterns.motion.treeRootPattern) {
+      $motionStatus = 'tree_summary_extracted'
+      $motionEvidence.Add('WsTreeEnv.xml') | Out-Null
+      foreach ($m in [regex]::Matches($xml, [string]$patterns.motion.axisPattern)) {
+        if (-not $motionAxes.Contains($m.Groups[1].Value)) { $motionAxes.Add($m.Groups[1].Value) | Out-Null }
+      }
+    }
+  } else {
+    $motionChecked.Add('project_ws_tree_env_missing') | Out-Null
+  }
+} else {
+  $motionChecked.Add('project_source_path_not_supplied') | Out-Null
+}$structure = [ordered]@{
   schema_version = 1
   generated_at = (Get-Date).ToUniversalTime().ToString('o')
   source = [ordered]@{
@@ -68,7 +95,14 @@ $structure = [ordered]@{
     ethernet_ip_devices = @($inventory.topology.ethernet_ip.devices | ForEach-Object { [string]$_.device_name })
     ethernet_ip_relay_start = [string]$inventory.topology.ethernet_ip.relay_start
     ethernet_ip_dm_start = [string]$inventory.topology.ethernet_ip.dm_start
-    motion_status = [string]$inventory.topology.motion.status
+    motion_status = $motionStatus
+    motion = [ordered]@{
+      status = $motionStatus
+      axes = [string[]]$motionAxes.ToArray()
+      evidence = [string[]]$motionEvidence.ToArray()
+      checked_sources = [string[]]$motionChecked.ToArray()
+      note = 'snapshot routes do not materialize the motion subtree; pass -ProjectSourcePath to read WsTreeEnv.xml'
+    }
   }
   programs = $programs.ToArray()
   program_count = $programs.Count
