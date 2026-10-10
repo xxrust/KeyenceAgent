@@ -105,7 +105,7 @@ const scenarios = [
   S('10_export_mnm','scripts/workflows/export_mnm_project_copy_default_folder.ps1','fixture_copy','success',['LIFE-02','LIFE-03','FOCUS-01','MNM-03','MNM-04','PROJECT-01','GATE-01','GATE-03'],'MNM 导出并检查新鲜文件/hash'),
   S('11_structure_mutation','scripts/workflows/mutate_kv_structure_definitions.ps1','fixture_copy','success',['LIFE-02','LIFE-03','FOCUS-01','TREE-01','STRUCT-01','STRUCT-03','STRUCT-04','STRUCT-05','PROJECT-01','GATE-03'],'创建、修改、删除用户数据类型'),
   S('12_structure_targets','scripts/workflows/export_kv_structure_definitions.ps1','fixture_copy','success',['LIFE-02','LIFE-03','FOCUS-01','TREE-01','STRUCT-01','STRUCT-02','GATE-03'],'指定结构目标导出'),
-  S('13_project_text_snapshot','scripts/workflows/export_kv_project_text_snapshot.ps1','fixture_copy','success',['LIFE-02','LIFE-03','FOCUS-01','TREE-01','SNAP-01','SNAP-02','SNAP-03','VAR-05','CLIP-03','GATE-01','GATE-03'],'完整项目快照：全局变量组全选复制，并保留空工作站/文件夹'),
+  S('13_project_text_snapshot','scripts/workflows/export_kv_project_text_snapshot.ps1','fixture_copy','success',['LIFE-02','LIFE-03','FOCUS-01','TREE-01','SNAP-01','SNAP-02','SNAP-03','VAR-05','CLIP-03','CMT-01','CMT-02','CMT-03','CMT-04','CMT-05','CMT-06','CMT-07','GATE-01','GATE-03'],'完整项目快照（含注释层）：全局变量组全选复制，保留空工作站/文件夹，并导出软元件注释 + 程序体注释覆盖率'),
   S('14_complete_scan_module','scripts/workflows/create_kv_complete_module.ps1','fixture_copy','success',['LIFE-02','LIFE-03','FOCUS-01','TREE-01','TREE-02','INPUT-01','CLIP-01','CLIP-02','VAR-01','VAR-02','VAR-03','FB-BODY-03','PROJECT-01','GATE-02','GATE-03'],'每次扫描执行型模块完整块、代码和局部变量'),
   S('15_complete_station_fb','scripts/workflows/create_kv_complete_module.ps1','fixture_copy','success',['LIFE-02','LIFE-03','FOCUS-01','TREE-01','TREE-02','INPUT-01','CLIP-01','CLIP-02','FB-ARG-01','FB-ARG-02','FB-ARG-04','FB-ARG-05','VAR-01','VAR-03','FB-BODY-03','PROJECT-01','GATE-02','GATE-03'],'Level2 工站完整 FB、代码、自变量和变量'),
   S('16_create_project','scripts/workflows/create_kv_project.ps1','new_project','success',['LIFE-01','LIFE-02','LIFE-03','FOCUS-01','PROJECT-01','PROJECT-03','GATE-03','CLEAN-01'],'从零创建工程并绑定新项目'),
@@ -159,13 +159,13 @@ const operations = [
  O('MNM-02','MNM','打开导入菜单、文件选择、导入并验证树位置','MNM import workflow','live',['09_import_fb','17_st_numeric_scan','18_st_numeric_fb']),
  O('MNM-03','MNM','打开导出菜单并选择默认/浏览文件夹','MNM export workflow','live',['10_export_mnm','17_st_numeric_scan','18_st_numeric_fb']),
  O('MNM-04','MNM','清理旧文件、收集新鲜导出并比较 hash/文本','MNM export assertions','live',['10_export_mnm','17_st_numeric_scan','18_st_numeric_fb']),
-  O('CMT-01','注释导出','展开文件菜单并调用以 CSV/TXT 格式保存软元件注释(K)','guarded accelerators + UIA menu evidence','live',['21_export_device_comments'],'live evidence: runs/21_export_device_comments_20261010_092257_130_ef324211；菜单项按名称中的 CSV/TXT 与 (K) 加速键匹配，失败回退 Alt+F,K')
-  O('CMT-02','注释导出','校验另存为对话框的保存类型与程序选择器，输入唯一文件名并读回','save dialog guard','live',['21_export_device_comments'],'保存类型须含 CSV；程序选择器须为请求值（默认 全局）；读回不一致即失败')
-  O('CMT-03','注释导出','按运行时间收集本次导出的 CSV，校验表头列数与行数并计算 hash','artifact freshness guard','live',['21_export_device_comments'],'目标同名即失败；仅接受本次运行生成且结构合法的文件')
-  O('CMT-04','注释导出','用 IDOK BM_CLICK 保存并确认无残留模态对话框','dialog button helper','live',['21_export_device_comments'],'保存后仍存在 32770 对话框即失败'),
-  O('CMT-05','注释导出','从 MNM 程序体提取软元件引用并归一化键（补零、B/W 十六进制、去掉 .F/.DF 后缀）','device reference extraction','live',['22_annotate_program_comments'],'TMR 20、#1、_MC_Axis[#1] 不是软元件；MR013/MR13、W012/W12 归一为同一键')
-  O('CMT-06','注释导出','注释分类（手写/型号档/系统）与程序体/库体作用域区分','comment classification and scope','live',['22_annotate_program_comments'],'默认只统计用户程序体；库 FB 体需 -IncludeLibraryBodies 才纳入')
-  O('CMT-07','注释导出','产出独立覆盖率文件（不修改 MNM）并记录输入 sha256 供陈旧检测','coverage report and input fingerprints','live',['22_annotate_program_comments'],'runs/22_annotate_program_comments_20261010_094250_914_0a0ee3a2；输入文件 sha256 不变证明程序体只读')
+  O('CMT-01','注释导出','展开文件菜单并调用以 CSV/TXT 格式保存软元件注释(K)','guarded accelerators + UIA menu evidence','live',['13_project_text_snapshot','21_export_device_comments'],'live evidence: runs/21_export_device_comments_20261010_092257_130_ef324211；菜单项按名称中的 CSV/TXT 与 (K) 加速键匹配，失败回退 Alt+F,K')
+  O('CMT-02','注释导出','校验另存为对话框的保存类型与程序选择器，输入唯一文件名并读回','save dialog guard','live',['13_project_text_snapshot','21_export_device_comments'],'保存类型须含 CSV；程序选择器须为请求值（默认 全局）；读回不一致即失败')
+  O('CMT-03','注释导出','按运行时间收集本次导出的 CSV，校验表头列数与行数并计算 hash','artifact freshness guard','live',['13_project_text_snapshot','21_export_device_comments'],'目标同名即失败；仅接受本次运行生成且结构合法的文件')
+  O('CMT-04','注释导出','用 IDOK BM_CLICK 保存并确认无残留模态对话框','dialog button helper','live',['13_project_text_snapshot','21_export_device_comments'],'保存后仍存在 32770 对话框即失败'),
+  O('CMT-05','注释导出','从 MNM 程序体提取软元件引用并归一化键（补零、B/W 十六进制、去掉 .F/.DF 后缀）','device reference extraction','live',['13_project_text_snapshot','22_annotate_program_comments'],'TMR 20、#1、_MC_Axis[#1] 不是软元件；MR013/MR13、W012/W12 归一为同一键')
+  O('CMT-06','注释导出','注释分类（手写/型号档/系统）与程序体/库体作用域区分','comment classification and scope','live',['13_project_text_snapshot','22_annotate_program_comments'],'默认只统计用户程序体；库 FB 体需 -IncludeLibraryBodies 才纳入')
+  O('CMT-07','注释导出','产出独立覆盖率文件（不修改 MNM）并记录输入 sha256 供陈旧检测','coverage report and input fingerprints','live',['13_project_text_snapshot','22_annotate_program_comments'],'runs/22_annotate_program_comments_20261010_094250_914_0a0ee3a2；输入文件 sha256 不变证明程序体只读')
  O('CONFIG-01','配置','筛选并插入扩展单元、保存、回读 UnitSet.ue2','unit configuration','live',['06_expansion_units']),
  O('CONFIG-02','配置','唯一定位 EtherCAT catalog model、设节点地址并回读拓扑','EtherCAT configuration','live',['07_ethercat_nodes']),
  O('SNAP-01','文本快照','读取树、全部全局变量组、locals、FB args/body、结构和配置','snapshot workflow','live',['13_project_text_snapshot']),

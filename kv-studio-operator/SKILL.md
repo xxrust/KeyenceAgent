@@ -37,6 +37,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\get_kv_
 MNM 中以 `;` 开头的 ST 行算使用、`BOOKMARK` 标签不算。`coverage.json` 记录注释表与每个程序体的 sha256，
 可据此判断报告是否已陈旧。数字含义：`used_unannotated` 是真正的文档缺口，`annotated_unused` 多为 HMI/上位机专用位。
 
+要"一条命令拿到完整项目映射"用 `-Capability read_only_project_text_snapshot`（场景 13）：它在同一次隔离 UI 会话里
+一并导出注释表并与程序体 join，产物落在 `text/comments/`，`architecture/project_map.json` 的
+`extension_points.comments` 直接给出作用域、统计和未注释软元件清单；`status=ready` 且
+`missing_capabilities` 为空才代表这份映射完整（缺注释层会如实报 `partial`）。
+
 运行查询返回的 `customer_callable=true` 入口。普通操作只需对应接口的输入，不需要构造 MVP 或复刻整个项目。需要多步时先准备完整计划；一个 workflow 内部通过同一 flat executor 调度子步骤。新建完整 FB 通常包含程序体导入、自变量写入、局部变量写入和编译；修改其中一项只调用对应接口。
 
 查询结果的 `regression_scenarios` 给出当前仓库中的匹配测试、README、固定输入和运行命令。

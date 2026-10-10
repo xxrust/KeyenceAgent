@@ -131,6 +131,35 @@ if($mnmStep.ok){
   foreach($f in @(Get-ChildItem -LiteralPath $mnmExportDir -Filter '*.mnm' -File -Recurse -ErrorAction SilentlyContinue)){ Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $mnmTextDir $f.Name) -Force }
 }
 
+# Device comment layer: export the comment table through the same isolated UI
+# session the MNM route opened, then join it with the exported program bodies so a
+# single command yields the comment map as well.  The program bodies themselves are
+# only read: the join writes separate files under text/comments.
+$commentsOut=Join-Path $rawRoot 'comments'
+$commentsExportDir=Join-Path $rawRoot 'comments_export'
+$commentsTextDir=Join-Path $textRoot 'comments'
+$commentsWorkflow=Join-Path $scriptRoot 'workflows\export_kv_device_comments.ps1'
+$commentsResult=Join-Path $commentsOut 'workflow_result.json'
+$commentsArgs=@('-ProjectPath',$uiProjectPath,'-CommentsDir',$commentsExportDir,'-OutDir',$commentsOut,'-FileBaseName','device_comments','-TimeoutSeconds',[string]$TimeoutSeconds)
+$commentsStep=Invoke-Child $commentsWorkflow $commentsArgs $commentsResult 'device_comments'
+$commentsCsv=Join-Path $commentsExportDir 'device_comments.csv'
+if($commentsStep.ok -and (Test-Path -LiteralPath $commentsCsv -PathType Leaf)){
+  New-Item -ItemType Directory -Force -Path $commentsTextDir | Out-Null
+  Copy-Item -LiteralPath $commentsCsv -Destination (Join-Path $commentsTextDir 'device_comments.csv') -Force
+}
+$annotateStep=[ordered]@{ok=$true;status='skipped';label='device_comment_coverage';result_path='';reason='comment table or program bodies unavailable'}
+$annotateSummary=$null
+if($commentsStep.ok -and $mnmStep.ok -and (Test-Path -LiteralPath $commentsCsv -PathType Leaf)){
+  $annotateScript=Join-Path $scriptRoot 'annotate_kv_program_with_comments.ps1'
+  $annotateResult=Join-Path $commentsTextDir 'annotate_result.json'
+  $annotateArgs=@('-CommentsPath',$commentsCsv,'-MnmPath',$mnmExportDir,'-OutDir',$commentsTextDir)
+  $annotateStep=if($PlanOnly){[ordered]@{ok=$true;status='planned';label='device_comment_coverage';result_path=$annotateResult}}else{Invoke-Child $annotateScript $annotateArgs $annotateResult 'device_comment_coverage'}
+  if($annotateStep.ok -and $annotateStep.result){$annotateSummary=$annotateStep.result}
+}
+$commentCoverage=$null
+$annotateCoveragePath=Join-Path $commentsTextDir 'coverage.json'
+if(Test-Path -LiteralPath $annotateCoveragePath -PathType Leaf){try{$commentCoverage=Get-Content -Raw -LiteralPath $annotateCoveragePath -Encoding UTF8|ConvertFrom-Json}catch{}}
+
 # Discover FB modules before the variable snapshot so their local-variable
 # tables are captured by the same read-only variables route as program modules.
 $fbModules=@()
@@ -232,8 +261,8 @@ $index=@(); foreach($f in @(Get-ChildItem -LiteralPath $textRoot -File -Recurse 
   $index += [ordered]@{path=(Rel $snapshotRoot $f.FullName);format=$f.Extension.TrimStart('.');length=$f.Length;sha256=(Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 }
 Write-Json (Join-Path $snapshotRoot 'text_index.json') $index 8
-$statuses=@($inventoryStep,$mnmStep,$structureStep,$variablesStep)+@($fbVariableSteps)+@($fbSteps)+@($inventoryFinalStep,$materializationStep)
-$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($fbVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}
+$statuses=@($inventoryStep,$mnmStep,$structureStep,$variablesStep)+@($fbVariableSteps)+@($fbSteps)+@($inventoryFinalStep,$materializationStep,$commentsStep,$annotateStep)
+$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($fbVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}
 $semanticStatus=if($materializationStep.ok){'complete'}else{'failed'}
 $semanticWarnings=@()
 if($materializationStep.result -and $materializationStep.result.warnings){$semanticWarnings=@($materializationStep.result.warnings)}
@@ -244,12 +273,29 @@ $manifest=[ordered]@{
   schema_version=2; snapshot_schema='kv_project_text_snapshot'; status=$status; generated_at=(Get-Date).ToUniversalTime().ToString('o')
   project=[ordered]@{path=$ProjectPath;root=$projectRoot;fingerprint=$fingerprint}
   layout=[ordered]@{snapshot_root='.';project='project';text='text';raw='raw';architecture='architecture';text_index='text_index.json'}
-  artifacts=[ordered]@{semantic_project='project';inventory='text/project_inventory.json';mnm='text/mnm';variables='text/variables';structures='text/structure_definitions.json';fb_arguments='text/fb_arguments'}
+  artifacts=[ordered]@{semantic_project='project';inventory='text/project_inventory.json';mnm='text/mnm';variables='text/variables';structures='text/structure_definitions.json';fb_arguments='text/fb_arguments';comments='text/comments'}
   workflow_status=$statuses; discovered_modules=$moduleNames; discovered_fb_modules=@($fbModules|Sort-Object -Unique)
   semantic_project_status=$semanticStatus; semantic_warnings=$semanticWarnings; missing_capabilities=@($missing); skipped_capabilities=$fbSkipped; version_control=[ordered]@{deterministic_index='text_index.json';file_hashes='sha256';binary_project_files='referenced_by_project.fingerprint_only';generated_files='isolated_snapshot_directory'}
 }
 Write-Json (Join-Path $snapshotRoot 'source_snapshot_manifest.json') $manifest 20
-$architecture=[ordered]@{schema_version=1;project=$manifest.project;source_snapshot=[ordered]@{manifest='source_snapshot_manifest.json';text_root='text';raw_root='raw'};extension_points=[ordered]@{modules=@();variables=@();io_map=@();units=@();ethercat=@();motion=@();data_types=@();fb_instances=@();comments=@();acceptance=@();extra_config=[ordered]@{}}}
+$commentLayer=@()
+if($commentCoverage){
+  $commentLayer=@([ordered]@{
+    device_comments='text/comments/device_comments.csv'
+    comments_index='text/comments/comments.tsv'
+    usage_index='text/comments/usage.tsv'
+    coverage='text/comments/coverage.json'
+    annotated_program='text/comments/program_annotations.md'
+    scope=[string]$commentCoverage.scope
+    referenced_documentable=[int]$commentCoverage.summary.referenced_documentable
+    used_annotated=[int]$commentCoverage.summary.used_annotated
+    used_unannotated=[int]$commentCoverage.summary.used_unannotated
+    unannotated_devices=@($commentCoverage.used_unannotated)
+  })
+}elseif($commentsStep.ok){
+  $commentLayer=@([ordered]@{device_comments='text/comments/device_comments.csv';coverage='';note='program bodies were unavailable for the join'})
+}
+$architecture=[ordered]@{schema_version=1;project=$manifest.project;source_snapshot=[ordered]@{manifest='source_snapshot_manifest.json';text_root='text';raw_root='raw'};extension_points=[ordered]@{modules=@();variables=@();io_map=@();units=@();ethercat=@();motion=@();data_types=@();fb_instances=@();comments=$commentLayer;acceptance=@();extra_config=[ordered]@{}}}
 Write-Json (Join-Path $architectureRoot 'project_map.json') $architecture 12
 $readme=@"
 # KV Project Text Snapshot
@@ -260,6 +306,10 @@ This directory is a read-only, Agent-oriented projection of one KV STUDIO projec
 - `project/` is the canonical semantic tree: function blocks, program modules,
   configuration and data types each carry an `entity.json` plus restore payloads.
 - `text/` contains UTF-8 JSON, TSV, MNM and XML that can be reviewed and versioned.
+- `text/comments/` is the device comment layer: the table exported through the File
+  menu (`device_comments.csv`), the join with the program bodies (`comments.tsv`,
+  `usage.tsv`) and the coverage report (`coverage.json`, `program_annotations.md`).
+  The program bodies under `text/mnm/` are only read; the join never edits them.
 - `text_index.json` is sorted and contains a SHA-256 for every text artifact.
 - `raw/` preserves same-run workflow receipts and UI evidence.
 - `architecture/project_map.json` is the stable extension point for future categories.

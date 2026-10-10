@@ -363,9 +363,13 @@ try {
   }
   $lines = @(Get-Content -LiteralPath $artifact.FullName -Encoding Default)
   $fieldCount = @(($lines[0] -split ',')).Count
-  if ($lines.Count -lt 2 -or $fieldCount -lt 9) { throw "KV_COMMENTS_ARTIFACT_INVALID: lines=$($lines.Count) fields=$fieldCount" }
-  $script:ArtifactRows = $lines.Count
-  Log "artifact=$($artifact.FullName) size=$($artifact.Length) lines=$($lines.Count)"
+  # A project without any comment still exports a valid header-only table, so the
+  # comment row count is recorded instead of treating that as a failure; only a
+  # missing header or an unreadable shape is an error.
+  if ($lines.Count -lt 1 -or $fieldCount -lt 9) { throw "KV_COMMENTS_ARTIFACT_INVALID: lines=$($lines.Count) fields=$fieldCount" }
+  $script:ArtifactRows = $lines.Count - 1
+  $script:ArtifactHasComments = ($script:ArtifactRows -gt 0)
+  Log "artifact=$($artifact.FullName) size=$($artifact.Length) lines=$($lines.Count) comment_rows=$($script:ArtifactRows)"
 
   Move-Item -LiteralPath $artifact.FullName -Destination $finalArtifact -Force
   $script:ArtifactSha = (Get-FileHash -LiteralPath $finalArtifact -Algorithm SHA256).Hash
