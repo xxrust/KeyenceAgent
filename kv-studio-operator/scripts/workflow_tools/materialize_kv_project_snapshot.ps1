@@ -1,4 +1,4 @@
-﻿<#
+<#
   Materialize the semantic, human-readable project tree for a completed
   read-only snapshot. The text/raw trees remain immutable evidence; this step
   creates the canonical project model from the same-run atomic outputs.
@@ -327,12 +327,12 @@ foreach ($fb in @($fbInventory | Sort-Object module_name)) {
   $argResult=Read-Json (Join-Path $argFolder 'fb_snapshot_result.json')
   $argTarget=Join-Path $folder 'arguments.tsv'
   $argOk=Copy-Artifact $argSource $argTarget
-  $argStatus=if ($argOk -and $argResult -and $argResult.ok -eq $true) {'complete'} elseif ($argResult -and $argResult.ok -eq $false) {'failed'} elseif ($isOfficial) {'not_applicable'} else {'missing'}
+  $argStatus=if ($argOk -and $argResult -and $argResult.ok -eq $true) {'complete'} elseif ($argResult -and $argResult.ok -eq $false) {'failed'} elseif ($isOfficial) {'not_captured'} else {'missing'}
   $localSnapshot=Get-LocalSnapshot $name
   $localSource=Get-LocalFile $name $localSnapshot
   $localTarget=Join-Path $folder 'locals.tsv'
   $localOk=Copy-Artifact $localSource $localTarget
-  $localStatus=if ($localOk -and $localSnapshot -and $localSnapshot.row_count -ge 0) {'complete'} elseif ($isOfficial) {'not_applicable'} else {'missing'}
+  $localStatus=if ($localOk -and $localSnapshot -and $localSnapshot.row_count -ge 0) {'complete'} elseif ($isOfficial) {'not_captured'} else {'missing'}
   $status=[ordered]@{placement=if($node){'complete'}else{'unresolved'};body=if($bodyOk){'complete'}else{'missing'};arguments=$argStatus;locals=$localStatus}
   $artifacts=[ordered]@{body=if($bodyOk){(Rel $projectRoot $bodyTarget).Replace('\','/')}else{$null};arguments=if($argOk){(Rel $projectRoot $argTarget).Replace('\','/')}else{$null};locals=if($localOk){(Rel $projectRoot $localTarget).Replace('\','/')}else{$null}}
   $entity=[ordered]@{id=('fb:'+($folderParts -join '/'));kind='function_block';source_name=$name;display_name=if($node -and [string]$node.text -match ':'){([string]$node.text -split ':',2)[1]}else{$name};tree_path=if($node){@($node.path)}else{@()};path=(Rel $projectRoot $folder).Replace('\','/');artifacts=$artifacts;status=$status;restore=[ordered]@{order=50;strategy='import_body_then_set_arguments_then_set_locals';depends_on=@('types:structure_definitions','config:全局变量');source_sha256=[ordered]@{body=Hash $body;arguments=Hash $argSource;locals=Hash $localSource}}}

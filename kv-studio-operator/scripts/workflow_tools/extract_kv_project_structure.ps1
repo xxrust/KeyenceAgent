@@ -46,6 +46,8 @@ foreach ($m in @($inventory.program_modules)) {
 }
 
 $fbNames = @($inventory.official_or_library_names_from_tree | Where-Object { $_ -notmatch '^_' })
+$systemTypeNamesInTree = @($inventory.official_or_library_names_from_tree | Where-Object { $_ -match '^_' })
+$fbNameSourceNote = 'official_or_library_names_from_tree mixes FB names with system data type names: function_blocks keeps the non-underscore entries, system_type_names_in_tree keeps the underscore ones, and neither list contains the built-in motion FBs that programs call (see resolve_kv_symbols invocations)'
 $userTypes = @(@($inventory.data_types) | Where-Object { $_.path_text -notmatch '\(System\)' } | ForEach-Object { [string]$_.name })
 # System types were previously filtered out of the extractor, which hid the most
 # important semantic layer of a motion project (_MC_POINT_PARAM, _MC_AXIS_*, _EC_*).
@@ -107,6 +109,8 @@ if ($ProjectSourcePath) {
   programs = $programs.ToArray()
   program_count = $programs.Count
   function_blocks = $fbNames
+  system_type_names_in_tree = $systemTypeNamesInTree
+  fb_name_source_note = $fbNameSourceNote
   user_data_types = $userTypes
   system_data_types = $systemTypes
   data_type_counts = [ordered]@{ user = $userTypes.Count; system = $systemTypes.Count }

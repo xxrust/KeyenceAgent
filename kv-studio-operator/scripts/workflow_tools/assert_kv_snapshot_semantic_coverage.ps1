@@ -59,11 +59,25 @@ foreach ($p in @($structure.programs)) {
   $degraded = ($entityText -match 'missing|partial|failed|unresolved|not_captured|not_applicable')
   $programEntities.Add([pscustomobject]@{ module = $p.name; entity = $hit[0].FullName; degraded = $degraded; reason = $(if ($degraded) { 'entity_reports_missing_or_partial' } else { '' }) }) | Out-Null
 }
+$fbEntities = New-Object System.Collections.Generic.List[object]
+foreach ($fb in @($structure.function_blocks)) {
+  $hit = @(Get-ChildItem -LiteralPath $projectRoot -Recurse -Filter 'entity.json' -ErrorAction SilentlyContinue | Where-Object { $_.Directory.Name -eq $fb } | Select-Object -First 1)
+  if ($hit.Count -eq 0) { $fbEntities.Add([pscustomobject]@{ fb = $fb; degraded = $true; reason = 'entity_missing' }) | Out-Null; continue }
+  $entityText = Get-Content -Raw -LiteralPath $hit[0].FullName -Encoding UTF8
+  $degraded = ($entityText -match 'not_captured|missing|partial|failed|unresolved')
+  $fbEntities.Add([pscustomobject]@{ fb = $fb; degraded = $degraded; reason = $(if ($degraded) { 'arguments_or_locals_not_captured' } else { '' }) }) | Out-Null
+}
+$degradedFbs = @($fbEntities | Where-Object { $_.degraded })
+$calledInPrograms = @($symbols.invocations | Where-Object { $_.scope -eq 'program' } | ForEach-Object { $_.fb_type } | Sort-Object -Unique)
+$listedFbs = @($structure.function_blocks)
+$calledButNotListed = @($calledInPrograms | Where-Object { $listedFbs -notcontains $_ })
 $degradedPrograms = @($programEntities | Where-Object { $_.degraded })
 $limitations = New-Object System.Collections.Generic.List[string]
 if ($degradedPrograms.Count -gt 0) {
   $limitations.Add("$($degradedPrograms.Count) of $(@($structure.programs).Count) program entities report missing/partial content; symbol resolution cannot be complete while locals or arguments are not captured, so unresolved=0 does not prove the program layer is fully resolved.") | Out-Null
 }
+if ($degradedFbs.Count -gt 0) { $limitations.Add("$($degradedFbs.Count) of $(@($structure.function_blocks).Count) FB entities report not_captured arguments or locals; FB interface analysis and instance declaration checks are therefore impossible from this snapshot.") | Out-Null }
+if ($calledButNotListed.Count -gt 0) { $limitations.Add("$($calledButNotListed.Count) FB types are called by programs but absent from the project tree listing (built-in FBs): " + ($calledButNotListed -join ', ')) | Out-Null }
 if ([int]$symbols.counts.unresolved_in_bodies -gt 0) {
   $limitations.Add("$($symbols.counts.unresolved_in_bodies) symbols are unresolved inside library FB bodies; their declarations are not exported by any snapshot route.") | Out-Null
 }
@@ -73,6 +87,8 @@ $result = [ordered]@{
   analysis_complete = $analysisComplete
   limitations = [object[]]$limitations.ToArray()
   program_entities = [object[]]$programEntities.ToArray()
+  fb_entities = [object[]]$fbEntities.ToArray()
+  fb_types_called_but_not_listed = [string[]]$calledButNotListed
   schema_version = 1
   generated_at = (Get-Date).ToUniversalTime().ToString('o')
   ok = ($failures.Count -eq 0)
@@ -80,6 +96,9 @@ $result = [ordered]@{
   categories = [ordered]@{
     programs = [int]$structure.program_count
     program_entities_degraded = $degradedPrograms.Count
+    fb_entities_degraded = $degradedFbs.Count
+    fb_types_called_in_programs = $calledInPrograms.Count
+    fb_types_called_but_not_listed = $calledButNotListed.Count
     function_blocks = @($structure.function_blocks).Count
     user_data_types = [int]$structure.data_type_counts.user
     system_data_types = [int]$structure.data_type_counts.system
