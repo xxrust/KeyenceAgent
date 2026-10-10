@@ -74,7 +74,10 @@ function Get-DeviceArea([string]$Device) {
   return $prefix.ToUpperInvariant()
 }
 function Get-DeviceKey([string]$Device) {
-  # Canonical join key: prefix + number without leading zeros, base preserved.
+  # Canonical join key: drop any bit/type suffix first (a comment table can spell a
+  # word device as DM10090.0 while the program body writes DM10090), then strip
+  # leading zeros while keeping the base.
+  $Device = ($Device -replace '\.[A-Za-z0-9]+$', '')
   if ($Device -notmatch '^([A-Za-z]+)0*([0-9A-Fa-f]+)$') { return $Device.ToUpperInvariant() }
   $prefix = $Matches[1].ToUpperInvariant()
   $digits = $Matches[2].ToUpperInvariant()
@@ -118,6 +121,7 @@ if ($mnmFiles.Count -eq 0) { throw "KV_COMMENTS_MNM_INPUT_EMPTY: $MnmPath" }
 # ---------------------------------------------------------------- comments
 $commentRows = [ordered]@{}
 $blankCommentRows = 0
+$commentRowCount = 0
 $commentText = Read-KvText $CommentsPath
 $lines = $commentText -split "`r?`n"
 foreach ($line in $lines) {
@@ -137,6 +141,7 @@ foreach ($line in $lines) {
     $blankCommentRows++
     continue
   }
+  $commentRowCount++
   if (-not $commentRows.Contains($key)) {
     $area = Get-DeviceArea $device
     $commentRows[$key] = [pscustomobject]@{
@@ -278,6 +283,8 @@ $coverage['summary'] = [ordered]@{
   annotated_unused_handwritten = [int]$handwrittenUnused.Count
   timers_or_counters_referenced = [int]$timersUsed.Count
   comment_entries_total = [int]$commentRows.Count
+  comment_rows_total = [int]$commentRowCount
+  comment_rows_merged_by_device = [int]($commentRowCount - $commentRows.Count)
   device_rows_without_comment = [int]$blankCommentRows
   comment_entries_by_class = [ordered]@{ handwritten = $handwrittenCount; system = $systemCount; profile = $profileCount }
 }
