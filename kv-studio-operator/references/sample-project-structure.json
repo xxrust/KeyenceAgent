@@ -1,0 +1,412 @@
+{
+    "schema_version":  1,
+    "generated_at":  "2026-10-10T04:50:46.7531181Z",
+    "source":  {
+                   "snapshot_root":  "H:\\KeyenceAgent\\kv-studio-operator\\tests\\kv-interface-regression\\runs\\13_project_text_snapshot_20261010_094944_484_63d9358b\\workflow\\snapshot",
+                   "project_path":  "H:\\KeyenceAgent\\kv-studio-operator\\tests\\kv-interface-regression\\runs\\13_project_text_snapshot_20261010_094944_484_63d9358b\\project\\KVX样例程序_v100\\KVX样例程序_v100.kpr",
+                   "project_fingerprint":  "01061138aa9e569ae41eb5bd54b48990ff4cb073123706045856ec07e7956125",
+                   "snapshot_status":  "ready",
+                   "pattern_map":  "H:\\KeyenceAgent\\kv-studio-operator\\references\\project-standard.patterns.json"
+               },
+    "hardware":  {
+                     "cpu":  "KV-X520",
+                     "expansion_units":  [
+                                             "",
+                                             "",
+                                             ""
+                                         ],
+                     "ethercat_nodes":  [
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SGDXS-xxxxA0x EtherCAT(CoE) SERVOPACK Rev01.05",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "CL3C-EC503(COE)",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "YAKO MS-MINI3E",
+                                            "KV-EC01",
+                                            "KV-EC01",
+                                            "KV-EC01",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713",
+                                            "SV630_1Axis_03713"
+                                        ],
+                     "ethernet_ip_devices":  [
+
+                                             ],
+                     "ethernet_ip_relay_start":  "R30000",
+                     "ethernet_ip_dm_start":  "DM10000",
+                     "motion_status":  "not_found"
+                 },
+    "programs":  [
+                     {
+                         "name":  "版本管理",
+                         "category":  "后备模块",
+                         "execution_order":  24,
+                         "bucket":  "platform",
+                         "tree_path":  [
+                                           "程序",
+                                           "后备模块",
+                                           "版本管理"
+                                       ]
+                     },
+                     {
+                         "name":  "A1_气缸控制",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  19,
+                         "bucket":  "axis_or_device",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "A1_气缸控制"
+                                       ]
+                     },
+                     {
+                         "name":  "A2_真空控制",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  20,
+                         "bucket":  "axis_or_device",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "A2_真空控制"
+                                       ]
+                     },
+                     {
+                         "name":  "A3_轴控制",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  21,
+                         "bucket":  "axis_or_device",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "A3_轴控制"
+                                       ]
+                     },
+                     {
+                         "name":  "A4_ModbusTCP",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  22,
+                         "bucket":  "axis_or_device",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "A4_ModbusTCP"
+                                       ]
+                     },
+                     {
+                         "name":  "A5_手自动",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  23,
+                         "bucket":  "axis_or_device",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "A5_手自动"
+                                       ]
+                     },
+                     {
+                         "name":  "Alarm报警",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  16,
+                         "bucket":  "other",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "Alarm报警"
+                                       ]
+                     },
+                     {
+                         "name":  "HMI",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  17,
+                         "bucket":  "platform",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "HMI"
+                                       ]
+                     },
+                     {
+                         "name":  "IO输入",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  1,
+                         "bucket":  "platform",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "IO输入"
+                                       ]
+                     },
+                     {
+                         "name":  "IO输出",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  18,
+                         "bucket":  "platform",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "IO输出"
+                                       ]
+                     },
+                     {
+                         "name":  "ST00_插针_演示",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  8,
+                         "bucket":  "station",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "ST00_插针_演示"
+                                       ]
+                     },
+                     {
+                         "name":  "ST01_上料区A",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  9,
+                         "bucket":  "station",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "ST01_上料区A"
+                                       ]
+                     },
+                     {
+                         "name":  "ST02_上料区B",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  10,
+                         "bucket":  "station",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "ST02_上料区B"
+                                       ]
+                     },
+                     {
+                         "name":  "ST03_上料区C",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  11,
+                         "bucket":  "station",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "ST03_上料区C"
+                                       ]
+                     },
+                     {
+                         "name":  "ST04_传送带",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  12,
+                         "bucket":  "station",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "ST04_传送带"
+                                       ]
+                     },
+                     {
+                         "name":  "ST05_旋转点胶",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  13,
+                         "bucket":  "station",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "ST05_旋转点胶"
+                                       ]
+                     },
+                     {
+                         "name":  "ST06_下料区",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  14,
+                         "bucket":  "station",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "ST06_下料区"
+                                       ]
+                     },
+                     {
+                         "name":  "初始化",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  4,
+                         "bucket":  "platform",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "初始化"
+                                       ]
+                     },
+                     {
+                         "name":  "模拟量输入",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  3,
+                         "bucket":  "platform",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "模拟量输入"
+                                       ]
+                     },
+                     {
+                         "name":  "设备状态",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  15,
+                         "bucket":  "platform",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "设备状态"
+                                       ]
+                     },
+                     {
+                         "name":  "调用气缸FB",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  5,
+                         "bucket":  "caller",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "调用气缸FB"
+                                       ]
+                     },
+                     {
+                         "name":  "调用真空FB",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  6,
+                         "bucket":  "caller",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "调用真空FB"
+                                       ]
+                     },
+                     {
+                         "name":  "调用轴控FB",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  7,
+                         "bucket":  "caller",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "调用轴控FB"
+                                       ]
+                     },
+                     {
+                         "name":  "高速计数器输入",
+                         "category":  "每次扫描执行型模块",
+                         "execution_order":  2,
+                         "bucket":  "platform",
+                         "tree_path":  [
+                                           "程序",
+                                           "每次扫描执行型模块",
+                                           "高速计数器输入"
+                                       ]
+                     }
+                 ],
+    "program_count":  24,
+    "function_blocks":  [
+                            "MC_ABSEncoderSetup_INOVA_SV630N_V100",
+                            "MC_ABSEncoderSetup_PANAS_A6BE_V100",
+                            "MC_ABSEncoderSetup_YASKA_SigmaXS_V100",
+                            "MC_ATParameterRead_INOVA_SV630N_V100",
+                            "MC_ATParameterRead_PANAS_A6BE_V100",
+                            "MC_ATParameterRead_YASKA_SigmaXS_V100",
+                            "MC_ATParameterWrite_INOVA_SV630N_V100",
+                            "MC_ATParameterWrite_PANAS_A6BE_V100",
+                            "MC_ATParameterWrite_YASKA_SigmaXS_V100",
+                            "MC_ModelCheck_INOVA_SV630N_V100",
+                            "MC_ModelCheck_LEADS_CL3C_EC_V100",
+                            "MC_ModelCheck_PANAS_A6BE_V100",
+                            "MC_ModelCheck_YAKO_MS_MINI_E_V100",
+                            "MC_ModelCheck_YASKA_SigmaXS_V100",
+                            "MC_MultiParameterRead_INOVA_SV630N_V100",
+                            "MC_MultiParameterRead_LEADS_CL3C_EC_V100",
+                            "MC_MultiParameterRead_PANAS_A6BE_V100",
+                            "MC_MultiParameterRead_YAKO_MS_MINI_E_V100",
+                            "MC_MultiParameterRead_YASKA_SigmaXS_V100",
+                            "MC_MultiParameterWrite_INOVA_SV630N_V100",
+                            "MC_MultiParameterWrite_LEADS_CL3C_EC_V100",
+                            "MC_MultiParameterWrite_PANAS_A6BE_V100",
+                            "MC_MultiParameterWrite_YAKO_MS_MINI_E_V100",
+                            "MC_MultiParameterWrite_YASKA_SigmaXS_V100",
+                            "MC_ParameterInitialize_INOVA_SV630N_V100",
+                            "MC_ParameterInitialize_LEADS_CL3C_EC_V100",
+                            "MC_ParameterInitialize_YAKO_MS_MINI_E_V100",
+                            "MC_ParameterInitialize_YASKA_SigmaXS_V100",
+                            "MC_ParameterSave_LEADS_CL3C_EC_V100",
+                            "MC_ParameterSave_PANAS_A6BE_V100",
+                            "MC_ParameterSave_YAKO_MS_MINI_E_V100",
+                            "MC_ParameterSave_YASKA_SigmaXS_V100",
+                            "MC_SoftwareReset_INOVA_SV630N_V100",
+                            "MC_SoftwareReset_YASKA_SigmaXS_V100",
+                            "ModbusTCPClient_Command",
+                            "ModbusTCPClient_Connect"
+                        ],
+    "user_data_types":  [
+                            "strAxis",
+                            "strAxisCtrl",
+                            "strAxisParam",
+                            "strAxisStatus",
+                            "strAxisSysInfo",
+                            "strCylIO",
+                            "strCylinder",
+                            "strCylinderCtrl",
+                            "strCylinderParam",
+                            "strCylinderStatus",
+                            "strSignalLamps",
+                            "strVacuum",
+                            "strVacuumCtrl",
+                            "strVacuumIO",
+                            "strVacuumParam",
+                            "strVacuumStatus",
+                            "strStation",
+                            "strStationCtrl",
+                            "strStationParam",
+                            "strStationStatus",
+                            "strMachine",
+                            "strMachineCtrl",
+                            "strMachineParam",
+                            "strMachineStatus",
+                            "uni_UDINT_BOOL",
+                            "uni_UINT_BOOL"
+                        ],
+    "stations":  [
+                     "ST00_插针_演示",
+                     "ST01_上料区A",
+                     "ST02_上料区B",
+                     "ST03_上料区C",
+                     "ST04_传送带",
+                     "ST05_旋转点胶",
+                     "ST06_下料区"
+                 ],
+    "naming_buckets":  {
+                           "platform":  8,
+                           "axis_or_device":  5,
+                           "other":  1,
+                           "station":  7,
+                           "caller":  3
+                       },
+    "notes":  [
+                  "Buckets come from references/project-standard.patterns.json; other means the name matches no house convention.",
+                  "This file is derived evidence, not the standard itself; the standard is references/project-standard.json."
+              ]
+}

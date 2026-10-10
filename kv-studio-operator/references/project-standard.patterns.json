@@ -1,0 +1,41 @@
+{
+  "note": "Name buckets for the house project standard. Kept as data so the extractor script stays ASCII-only (PowerShell 5.1 decodes BOM-less scripts as ANSI, so Chinese literals inside a .ps1 corrupt its syntax).",
+  "buckets": [
+    {
+      "bucket": "station",
+      "pattern": "^ST\\d{2}_",
+      "kind": "station_program",
+      "expected_category": "每次扫描执行型模块",
+      "meaning": "工站/工序程序；一台设备的每一个工位或工序一段"
+    },
+    {
+      "bucket": "axis_or_device",
+      "pattern": "^A\\d_",
+      "kind": "device_control_program",
+      "expected_category": "每次扫描执行型模块",
+      "meaning": "设备/轴控制程序（气缸、真空、轴、通信、手自动）"
+    },
+    {
+      "bucket": "caller",
+      "pattern": "^调用.*FB$",
+      "kind": "fb_caller_program",
+      "expected_category": "每次扫描执行型模块",
+      "meaning": "功能块调用层；把全局设备映射接到可复用 FB"
+    },
+    {
+      "bucket": "fb_prefixed",
+      "pattern": "^FB_",
+      "kind": "function_block",
+      "expected_category": "功能块",
+      "meaning": "可复用功能块本体"
+    },
+    {
+      "bucket": "platform",
+      "pattern": "^(IO输入|IO输出|高速计数器输入|模拟量输入|初始化|设备状态|Alarm|报警|HMI|版本管理|安全|配方)$",
+      "kind": "platform_program",
+      "expected_category": "每次扫描执行型模块",
+      "meaning": "平台功能：IO 映射、初始化、设备状态、报警、HMI、版本管理"
+    }
+  ],
+  "backup_categories": [ "后备模块", "固定周期模块", "中断模块", "单元间同步模块" ]
+}

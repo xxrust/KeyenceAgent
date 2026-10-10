@@ -327,6 +327,19 @@
                                                                           "scope":  "non-UI read-only join of the exported device comment table with MNM program bodies; device key normalisation, comment classes, program/library body scope, gap lists and unchanged inputs verified",
                                                                           "reference":  "tests/test_kv_program_comment_join.ps1"
                                                                       }
+                                                 },
+                                                 {
+                                                     "path":  "workflow_tools/extract_kv_project_structure.ps1",
+                                                     "status":  "published",
+                                                     "customer_callable":  true,
+                                                     "capabilities":  [
+                                                                      "extract_project_structure",
+                                                                      "project_standard_conformance_input"
+                                                                  ],
+                                                     "verification":  {
+                                                                      "scope":  "non-UI structural extraction from a read-only snapshot: hardware summary, program modules with category and execution order, naming buckets, stations, function blocks and user data types; derived evidence for the house project standard",
+                                                                      "reference":  "references/project-standard.json"
+                                                                  }
                                                  }
                                              ],
                     "customer_workflow":  [
