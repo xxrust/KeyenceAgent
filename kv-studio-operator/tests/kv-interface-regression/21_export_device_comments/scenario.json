@@ -1,0 +1,7 @@
+{
+  "name": "21_export_device_comments",
+  "enabled": true,
+  "workflow": "scripts/workflows/export_kv_device_comments.ps1",
+  "result_file": "workflow\\workflow_result.json",
+  "arguments": ["-ProjectPath", "${project}", "-CommentsDir", "${out}\\comments", "-OutDir", "${out}\\workflow", "-FileBaseName", "device_comments_regression", "-TimeoutSeconds", "300"]
+}

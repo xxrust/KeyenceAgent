@@ -48,12 +48,12 @@
 <body>
 <header>
   <h1>KV STUDIO 原子操作覆盖审核</h1>
-  <p>测试目录的去重审计页：把 01-20 场景映射到可复用的语义原子操作，区分真实运行证据、静态覆盖、间接覆盖和缺口。此页面是审核证据，不是新的工作流。</p>
+  <p>测试目录的去重审计页：把 01-21 场景映射到可复用的语义原子操作，区分真实运行证据、静态覆盖、间接覆盖和缺口。此页面是审核证据，不是新的工作流。</p>
 </header>
 <main>
   <section>
     <h2>审核范围与口径</h2>
-    <p class="note">生成日期：2026-09-22　|　目录：<code>tests/kv-interface-regression</code>　|　场景：20 个（正常成功 19，预期编译失败 1）。同一语义动作只在操作目录出现一次；场景表和矩阵只引用操作 ID。<code>live</code> 表示已有实际运行证据，<code>static</code> 表示脚本/契约已覆盖但本页没有宣称本轮实跑，<code>indirect</code> 表示由完整流程间接使用，<code>gap</code> 表示当前未覆盖。</p>
+    <p class="note">生成日期：2026-10-10　|　目录：<code>tests/kv-interface-regression</code>　|　场景：21 个（正常成功 20，预期编译失败 1）。同一语义动作只在操作目录出现一次；场景表和矩阵只引用操作 ID。<code>live</code> 表示已有实际运行证据，<code>static</code> 表示脚本/契约已覆盖但本页没有宣称本轮实跑，<code>indirect</code> 表示由完整流程间接使用，<code>gap</code> 表示当前未覆盖。</p>
     <div class="stats" id="stats"></div>
   </section>
 
@@ -112,18 +112,19 @@ const scenarios = [
   S('17_st_numeric_scan','scripts/workflows/create_kv_st_module.ps1','fixture_copy','success',['LIFE-02','LIFE-03','FOCUS-01','TREE-01','TREE-02','INPUT-01','CLIP-01','CLIP-02','MNM-01','MNM-02','VAR-01','VAR-03','COMPILE-01','COMPILE-02','COMPILE-03','COMPILE-04','MNM-03','MNM-04','PROJECT-01','GATE-01','GATE-02','GATE-03'],'ST 数值扫描模块导入、编译、导出对照'),
   S('18_st_numeric_fb','scripts/workflows/create_kv_st_module.ps1','fixture_copy','success',['LIFE-02','LIFE-03','FOCUS-01','TREE-01','TREE-02','INPUT-01','CLIP-01','CLIP-02','MNM-01','MNM-02','FB-ARG-01','FB-ARG-04','FB-ARG-05','VAR-01','VAR-03','COMPILE-01','COMPILE-02','COMPILE-03','COMPILE-04','MNM-03','MNM-04','PROJECT-01','GATE-01','GATE-02','GATE-03'],'ST 数值 FB 与自定义类型绑定'),
   S('19_compile_error','scripts/workflows/compile_kv_project.ps1','fixture_copy','expected-failure',['LIFE-02','LIFE-03','FOCUS-01','COMPILE-01','COMPILE-02','COMPILE-03','COMPILE-04','COMPILE-05','GATE-03','GATE-04','CLEAN-01'],'预期 NG；harness 逐行核对 4 错误和 4 警告'),
-  S('20_global_variable_groups','scripts/workflows/snapshot_kv_global_variables_all_groups.ps1','sample_copy','success',['LIFE-02','LIFE-03','FOCUS-01','VAR-01','VAR-05','CLIP-02','CLIP-03','GATE-01','GATE-03'],'变量组选择器全选所有组，复制完整全局变量表；已完成真实 KV STUDIO 回归')
+  S('20_global_variable_groups','scripts/workflows/snapshot_kv_global_variables_all_groups.ps1','sample_copy','success',['LIFE-02','LIFE-03','FOCUS-01','VAR-01','VAR-05','CLIP-02','CLIP-03','GATE-01','GATE-03'],'变量组选择器全选所有组，复制完整全局变量表；已完成真实 KV STUDIO 回归'),
+  S('21_export_device_comments','scripts/workflows/export_kv_device_comments.ps1','fixture_copy','success',['LIFE-02','LIFE-03','FOCUS-01','INPUT-01','INPUT-02','CMT-01','CMT-02','CMT-03','CMT-04','GATE-01','GATE-03'],'文件菜单导出软元件注释 CSV：另存为对话框状态校验、文件名读回、当次产物收集')
 ];
 const O = (id, cat, name, impl, status, scenes, limit='') => ({id,cat,name,impl,status,scenes,limit});
 const operations = [
  O('LIFE-01','生命周期','获取 UI mutex / 检查同名工程冲突','workflow_tools / harness','static',['16_create_project'],'多实例和既有用户进程需保留'),
- O('LIFE-02','生命周期','启动 Kvs.exe 并等待主窗口','runner / process binding','live',['01_fb_arguments','02_fb_program_body','03_variables_snapshot','04_structures_snapshot','05_compile','06_expansion_units','07_ethercat_nodes','08_save_as','09_import_fb','10_export_mnm','11_structure_mutation','12_structure_targets','13_project_text_snapshot','14_complete_scan_module','15_complete_station_fb','16_create_project','17_st_numeric_scan','18_st_numeric_fb','19_compile_error','20_global_variable_groups']),
- O('LIFE-03','生命周期','按完整项目路径绑定 PID、启动时间、命令行、HWND、标题','process guard / receipt','live',['01_fb_arguments','02_fb_program_body','03_variables_snapshot','04_structures_snapshot','05_compile','06_expansion_units','07_ethercat_nodes','08_save_as','09_import_fb','10_export_mnm','11_structure_mutation','12_structure_targets','13_project_text_snapshot','14_complete_scan_module','15_complete_station_fb','16_create_project','17_st_numeric_scan','18_st_numeric_fb','19_compile_error','20_global_variable_groups']),
- O('FOCUS-01','焦点与门禁','精确激活窗口并验证前台 PID/HWND、标题、弹窗','ui guard','live',['01_fb_arguments','02_fb_program_body','03_variables_snapshot','04_structures_snapshot','05_compile','06_expansion_units','07_ethercat_nodes','08_save_as','09_import_fb','10_export_mnm','11_structure_mutation','12_structure_targets','13_project_text_snapshot','14_complete_scan_module','15_complete_station_fb','16_create_project','17_st_numeric_scan','18_st_numeric_fb','19_compile_error','20_global_variable_groups']),
+ O('LIFE-02','生命周期','启动 Kvs.exe 并等待主窗口','runner / process binding','live',['01_fb_arguments','02_fb_program_body','03_variables_snapshot','04_structures_snapshot','05_compile','06_expansion_units','07_ethercat_nodes','08_save_as','09_import_fb','10_export_mnm','11_structure_mutation','12_structure_targets','13_project_text_snapshot','14_complete_scan_module','15_complete_station_fb','16_create_project','17_st_numeric_scan','18_st_numeric_fb','19_compile_error','20_global_variable_groups','21_export_device_comments']),
+ O('LIFE-03','生命周期','按完整项目路径绑定 PID、启动时间、命令行、HWND、标题','process guard / receipt','live',['01_fb_arguments','02_fb_program_body','03_variables_snapshot','04_structures_snapshot','05_compile','06_expansion_units','07_ethercat_nodes','08_save_as','09_import_fb','10_export_mnm','11_structure_mutation','12_structure_targets','13_project_text_snapshot','14_complete_scan_module','15_complete_station_fb','16_create_project','17_st_numeric_scan','18_st_numeric_fb','19_compile_error','20_global_variable_groups','21_export_device_comments']),
+ O('FOCUS-01','焦点与门禁','精确激活窗口并验证前台 PID/HWND、标题、弹窗','ui guard','live',['01_fb_arguments','02_fb_program_body','03_variables_snapshot','04_structures_snapshot','05_compile','06_expansion_units','07_ethercat_nodes','08_save_as','09_import_fb','10_export_mnm','11_structure_mutation','12_structure_targets','13_project_text_snapshot','14_complete_scan_module','15_complete_station_fb','16_create_project','17_st_numeric_scan','18_st_numeric_fb','19_compile_error','20_global_variable_groups','21_export_device_comments']),
  O('TREE-01','项目树','按路径查找、选择模块并验证类别/父路径','tree helpers','indirect',['01_fb_arguments','02_fb_program_body','03_variables_snapshot','04_structures_snapshot','06_expansion_units','07_ethercat_nodes','09_import_fb','11_structure_mutation','12_structure_targets','13_project_text_snapshot','14_complete_scan_module','15_complete_station_fb','17_st_numeric_scan','18_st_numeric_fb'],'模块树查找 1 秒门禁需独立扩展'),
  O('TREE-02','项目树','逐层定位精确父节点并处理同名/歧义','tree path guard','static',['01_fb_arguments','02_fb_program_body','03_variables_snapshot','04_structures_snapshot','14_complete_scan_module','15_complete_station_fb','17_st_numeric_scan','18_st_numeric_fb'],'场景复用路径守卫，尚无专门歧义负例'),
- O('INPUT-01','输入门禁','键盘动作前验证前台窗口、焦点和单次恢复预算','guarded keyboard actions','static',['01_fb_arguments','02_fb_program_body','03_variables_snapshot','04_structures_snapshot','14_complete_scan_module','15_complete_station_fb','17_st_numeric_scan','18_st_numeric_fb'],'失败时拒绝跨进程输入'),
- O('INPUT-02','输入门禁','通过 UIA Invoke/Selection 执行控件动作','UIA helpers','indirect',['06_expansion_units','07_ethercat_nodes','08_save_as','09_import_fb','10_export_mnm'],'部分配置动作依赖 UIA，缺少独立控件覆盖'),
+ O('INPUT-01','输入门禁','键盘动作前验证前台窗口、焦点和单次恢复预算','guarded keyboard actions','static',['01_fb_arguments','02_fb_program_body','03_variables_snapshot','04_structures_snapshot','14_complete_scan_module','15_complete_station_fb','17_st_numeric_scan','18_st_numeric_fb','21_export_device_comments'],'失败时拒绝跨进程输入'),
+ O('INPUT-02','输入门禁','通过 UIA Invoke/Selection 执行控件动作','UIA helpers','indirect',['06_expansion_units','07_ethercat_nodes','08_save_as','09_import_fb','10_export_mnm','21_export_device_comments'],'部分配置动作依赖 UIA，缺少独立控件覆盖'),
  O('CLIP-01','剪贴板','fresh clipboard sequence 后粘贴 TSV/文本','clipboard write helper','static',['01_fb_arguments','02_fb_program_body','03_variables_snapshot','14_complete_scan_module','15_complete_station_fb','17_st_numeric_scan','18_st_numeric_fb']),
  O('CLIP-02','剪贴板','复制完整表格/诊断并校验新鲜性与 hash','clipboard read helper','live',['01_fb_arguments','03_variables_snapshot','04_structures_snapshot','10_export_mnm','17_st_numeric_scan','18_st_numeric_fb']),
  O('CLIP-03','剪贴板','从多变量组复制完整全局变量网格并写出 TSV','snapshot_global_variables_all_groups_guarded.ps1','static',['20_global_variable_groups'],'当前新场景的专用复制路径，需验证组列/行完整性'),
@@ -157,14 +158,18 @@ const operations = [
  O('MNM-02','MNM','打开导入菜单、文件选择、导入并验证树位置','MNM import workflow','live',['09_import_fb','17_st_numeric_scan','18_st_numeric_fb']),
  O('MNM-03','MNM','打开导出菜单并选择默认/浏览文件夹','MNM export workflow','live',['10_export_mnm','17_st_numeric_scan','18_st_numeric_fb']),
  O('MNM-04','MNM','清理旧文件、收集新鲜导出并比较 hash/文本','MNM export assertions','live',['10_export_mnm','17_st_numeric_scan','18_st_numeric_fb']),
+  O('CMT-01','注释导出','展开文件菜单并调用以 CSV/TXT 格式保存软元件注释(K)','guarded accelerators + UIA menu evidence','live',['21_export_device_comments'],'live evidence: runs/21_export_device_comments_20261010_092257_130_ef324211；菜单项按名称中的 CSV/TXT 与 (K) 加速键匹配，失败回退 Alt+F,K')
+  O('CMT-02','注释导出','校验另存为对话框的保存类型与程序选择器，输入唯一文件名并读回','save dialog guard','live',['21_export_device_comments'],'保存类型须含 CSV；程序选择器须为请求值（默认 全局）；读回不一致即失败')
+  O('CMT-03','注释导出','按运行时间收集本次导出的 CSV，校验表头列数与行数并计算 hash','artifact freshness guard','live',['21_export_device_comments'],'目标同名即失败；仅接受本次运行生成且结构合法的文件')
+  O('CMT-04','注释导出','用 IDOK BM_CLICK 保存并确认无残留模态对话框','dialog button helper','live',['21_export_device_comments'],'保存后仍存在 32770 对话框即失败')
  O('CONFIG-01','配置','筛选并插入扩展单元、保存、回读 UnitSet.ue2','unit configuration','live',['06_expansion_units']),
  O('CONFIG-02','配置','唯一定位 EtherCAT catalog model、设节点地址并回读拓扑','EtherCAT configuration','live',['07_ethercat_nodes']),
  O('SNAP-01','文本快照','读取树、全部全局变量组、locals、FB args/body、结构和配置','snapshot workflow','live',['13_project_text_snapshot']),
  O('SNAP-02','文本快照','物化语义树、空文件夹实体，并区分 FB 模块名与显示标签','snapshot materializer','live',['13_project_text_snapshot']),
  O('SNAP-03','文本快照','生成 restore_plan 并按依赖排序','snapshot restore plan','static',['13_project_text_snapshot'],'计划生成已覆盖；完整恢复仍需后续验收'),
- O('GATE-01','门禁','输入文件 hash、MNM 新鲜性和 clipboard fresh sequence','hash/clipboard guards','static',['01_fb_arguments','03_variables_snapshot','09_import_fb','10_export_mnm','13_project_text_snapshot','17_st_numeric_scan','18_st_numeric_fb','20_global_variable_groups']),
+ O('GATE-01','门禁','输入文件 hash、MNM 新鲜性和 clipboard fresh sequence','hash/clipboard guards','static',['01_fb_arguments','03_variables_snapshot','09_import_fb','10_export_mnm','13_project_text_snapshot','17_st_numeric_scan','18_st_numeric_fb','20_global_variable_groups','21_export_device_comments']),
  O('GATE-02','门禁','代码指纹与每步冻结检查','code fingerprint guard','static',['02_fb_program_body','14_complete_scan_module','15_complete_station_fb','17_st_numeric_scan','18_st_numeric_fb']),
- O('GATE-03','门禁','记录 workflow/run.log/receipt 并绑定证据','workflow harness','static',['01_fb_arguments','02_fb_program_body','03_variables_snapshot','04_structures_snapshot','05_compile','06_expansion_units','07_ethercat_nodes','08_save_as','09_import_fb','10_export_mnm','11_structure_mutation','12_structure_targets','13_project_text_snapshot','14_complete_scan_module','15_complete_station_fb','16_create_project','17_st_numeric_scan','18_st_numeric_fb','19_compile_error','20_global_variable_groups'],'20_global_variable_groups 尚未列出 live acceptance evidence'),
+ O('GATE-03','门禁','记录 workflow/run.log/receipt 并绑定证据','workflow harness','static',['01_fb_arguments','02_fb_program_body','03_variables_snapshot','04_structures_snapshot','05_compile','06_expansion_units','07_ethercat_nodes','08_save_as','09_import_fb','10_export_mnm','11_structure_mutation','12_structure_targets','13_project_text_snapshot','14_complete_scan_module','15_complete_station_fb','16_create_project','17_st_numeric_scan','18_st_numeric_fb','19_compile_error','20_global_variable_groups','21_export_device_comments'],'20_global_variable_groups 尚未列出 live acceptance evidence'),
  O('GATE-04','门禁','将 expected compile failure 与 workflow fail 分离判定','expected failure harness','live',['19_compile_error'],'workflow 保持 fail；测试 harness 判定 expected failure 通过'),
  O('CLEAN-01','清理','只清理当前测试拥有的进程并验证 PID 未复用','lifecycle cleanup','live',['16_create_project','19_compile_error'],'不触碰用户既有 KV STUDIO 进程'),
  O('RUNTIME-01','运行时','连接真实 PLC、下载程序并验证在线扫描/I/O','未实现','gap',[],'当前仅覆盖工程编辑、导入导出和编译'),

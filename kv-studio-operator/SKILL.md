@@ -22,6 +22,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\get_kv_
 它按 缓存 → 配置 → 注册表 → 快捷方式 → 搜索根 逐层查找并校验文件真实存在，安装目录不在 C 盘
 也能命中；不要用"某几个目录里没有"来判定未安装。
 
+导出工程软元件注释表用 `-Capability snapshot_kv_device_comments`
+（`export_kv_device_comments.ps1`）：以受保护的 Alt+F、K 加速键走
+「文件(F) → 以 CSV/TXT 格式保存软元件注释(K)...」，校验另存为对话框的保存类型（须含 CSV）与
+程序选择器（默认 `全局`），输入唯一文件名并用 `WM_GETTEXT` 读回（跨进程控件不能用 `GetWindowText` 读），
+`BM_CLICK` 保存后只接受**本次运行**生成、结构合法的 CSV。注释表里型号档/系统注释占多数，
+需要"他的程序用了哪些软元件"时应与 MNM 程序体交叉过滤；`.cm1` 反解只能作为后备且必须标注推断。
+
 运行查询返回的 `customer_callable=true` 入口。普通操作只需对应接口的输入，不需要构造 MVP 或复刻整个项目。需要多步时先准备完整计划；一个 workflow 内部通过同一 flat executor 调度子步骤。新建完整 FB 通常包含程序体导入、自变量写入、局部变量写入和编译；修改其中一项只调用对应接口。
 
 查询结果的 `regression_scenarios` 给出当前仓库中的匹配测试、README、固定输入和运行命令。

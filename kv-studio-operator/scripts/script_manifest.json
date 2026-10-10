@@ -155,6 +155,9 @@
                                                                                                                      "browse_folder_export_result.json"
                                                                                                                  ]
                                                                                                    },
+                                                                                                   "runner_children/export_device_comments_guarded.ps1":  {
+                                                                                                       "files":  [ "device_comments_export_result.json" ]
+                                                                                                   },
                                   "runner_children/configure_expansion_units_guarded.ps1":  {
                                                                                                 "files":  [
                                                                                                               "result.json"
@@ -533,6 +536,22 @@
                                                   "execution": "flat_manifest_steps"
                                               },
                                               {
+                                                  "path":  "workflows/export_kv_device_comments.ps1",
+                                                  "status":  "published",
+                                                  "customer_callable":  true,
+                                                  "capabilities":  [
+                                                      "snapshot_kv_device_comments"
+                                                  ],
+                                                  "runner_children":  [
+                                                      "runner_children/export_device_comments_guarded.ps1"
+                                                  ],
+                                                  "execution":  "flat_manifest_steps",
+                                                  "verification":  {
+                                                      "scope":  "read-only device comment list export through the File menu save-as dialog; CSV shape, program selector, unique artifact and folder verified",
+                                                      "reference":  "tests/kv-interface-regression/21_export_device_comments/README.md"
+                                                  }
+                                              },
+                                              {
                                                   "path": "workflows/import_kv_module.ps1",
                                                   "status": "published",
                                                   "customer_callable": true,
@@ -634,6 +653,12 @@
                                                   },
                                                   {
                                                       "path":  "runner_children/export_mnm_browse_default_folder_guarded.ps1",
+                                                      "status":  "approved",
+                                                      "customer_callable":  false,
+                                                      "ui_guard_required":  true
+                                                  },
+                                                  {
+                                                      "path":  "runner_children/export_device_comments_guarded.ps1",
                                                       "status":  "approved",
                                                       "customer_callable":  false,
                                                       "ui_guard_required":  true
