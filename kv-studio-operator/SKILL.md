@@ -94,9 +94,11 @@ MNM 中以 `;` 开头的 ST 行算使用、`BOOKMARK` 标签不算。`coverage.j
 - `-AllowUnresolved` 只影响"**用户程序内**未解析符号"的判定（库 FB 体内的未解析本来就只记 info）。
   元素是**符号名**，例如 `-AllowUnresolved 'SocketTCP_Send_Inst','SocketTCP_Recv_Inst'`；被豁免的符号
   仍会出现在 `unresolved_symbols` 里，但不再计入 `failures`，理由是"该符号的声明不在任何快照路由中"。
-- 读 MNM 必须显式 `-Encoding Unicode`（UTF-16LE + BOM）。Windows PowerShell 5.1 不会自动识别 BOM，
-  不加编码会得到**假空的"程序体里没有 X"**；快照另提供 `text\mnm_utf8\` 供不方便设编码的工具阅读
-  （那只为阅读方便，权威副本始终是 `text\mnm\`）。
+- MNM 是 UTF-16LE + BOM。**PowerShell 自己的 cmdlet 通常安全**：`Get-Content`/`Select-String` 因 BOM 检测，
+  即使不写 `-Encoding` 也能正确读取（实测 5.1.26100 下 ascii 与中文命中都与显式 `-Encoding Unicode` 一致）。
+  **真正会"假空"的是非 PowerShell 读取路径**：`findstr` 会报 "input file … is in Unicode format" 且两种查询
+  都 0 命中；Python 默认 `open()` 直接 `UnicodeDecodeError`（gbk）。这类工具请显式指定编码，或读快照提供的
+  `text\mnm_utf8\`（UTF-8 无 BOM，仅供阅读；权威、可导入的副本始终是 `text\mnm\`）。
 
 运行查询返回的 `customer_callable=true` 入口。普通操作只需对应接口的输入，不需要构造 MVP 或复刻整个项目。需要多步时先准备完整计划；一个 workflow 内部通过同一 flat executor 调度子步骤。新建完整 FB 通常包含程序体导入、自变量写入、局部变量写入和编译；修改其中一项只调用对应接口。
 

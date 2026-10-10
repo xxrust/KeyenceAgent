@@ -69,7 +69,7 @@ $motionChecked = New-Object System.Collections.Generic.List[string]
 $motionChecked.Add('inventory.topology.motion') | Out-Null
 if ($inventory.topology.motion.status) { $motionChecked.Add('inventory.topology.motion.status=' + [string]$inventory.topology.motion.status) | Out-Null }
 $motionChecked.Add('snapshot_project_tree_entities') | Out-Null
-if ($ProjectSourcePath) {
+if ($ProjectSourcePath -and (Test-Path -LiteralPath $ProjectSourcePath -PathType Container)) {
   $wsTree = Join-Path $ProjectSourcePath 'WsTreeEnv.xml'
   if (Test-Path -LiteralPath $wsTree -PathType Leaf) {
     $motionChecked.Add('project_ws_tree_env') | Out-Null

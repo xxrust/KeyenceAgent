@@ -1,6 +1,7 @@
 param(
   [Parameter(Mandatory=$true)][string]$SnapshotRoot,
   [Parameter(Mandatory=$true)][string]$OutDir,
+  [string]$ProjectSourcePath = '',
   [string[]]$AllowUnresolved = @()
 )
 $ErrorActionPreference = 'Stop'
@@ -21,7 +22,7 @@ $skillRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 # is treated as an analysis defect rather than noise.
 $structurePath = Join-Path $outRoot 'structure.json'
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'extract_kv_project_structure.ps1') `
-  -SnapshotRoot $snapshotRoot -OutPath $structurePath | Out-Null
+  -SnapshotRoot $snapshotRoot -OutPath $structurePath -ProjectSourcePath $ProjectSourcePath | Out-Null
 $structure = Get-Content -Raw -LiteralPath $structurePath -Encoding UTF8 | ConvertFrom-Json
 
 $symbolsPath = Join-Path $outRoot 'symbols.json'

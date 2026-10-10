@@ -1,6 +1,7 @@
 param(
   [Parameter(Mandatory=$true)][string]$SnapshotRoot,
   [Parameter(Mandatory=$true)][string]$OutDir,
+  [string]$ProjectSourcePath = '',
   [string]$StandardPath = '',
   [string]$PatternMapPath = ''
 )
@@ -25,7 +26,7 @@ $patterns = Get-Content -Raw -LiteralPath $PatternMapPath -Encoding UTF8 | Conve
 
 $structurePath = Join-Path $outRoot 'structure.json'
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'extract_kv_project_structure.ps1') `
-  -SnapshotRoot $snapshotRoot -OutPath $structurePath -PatternMapPath $PatternMapPath | Out-Null
+  -SnapshotRoot $snapshotRoot -OutPath $structurePath -PatternMapPath $PatternMapPath -ProjectSourcePath $ProjectSourcePath | Out-Null
 if (-not (Test-Path -LiteralPath $structurePath -PathType Leaf)) { throw 'KV_STANDARD_STRUCTURE_FAILED' }
 $structure = Get-Content -Raw -LiteralPath $structurePath -Encoding UTF8 | ConvertFrom-Json
 

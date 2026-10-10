@@ -1,6 +1,7 @@
 param(
   [Parameter(Mandatory=$true)][string]$SnapshotRoot,
   [Parameter(Mandatory=$true)][string]$OutDir,
+  [string]$ProjectSourcePath = '',
   [string]$LabelsPath = ''
 )
 $ErrorActionPreference = 'Stop'
@@ -22,7 +23,7 @@ $labels = Get-Content -Raw -LiteralPath $LabelsPath -Encoding UTF8 | ConvertFrom
 # of buckets, stations and module shape.
 $structurePath = Join-Path $outRoot 'structure.json'
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'extract_kv_project_structure.ps1') `
-  -SnapshotRoot $snapshotRoot -OutPath $structurePath | Out-Null
+  -SnapshotRoot $snapshotRoot -OutPath $structurePath -ProjectSourcePath $ProjectSourcePath | Out-Null
 if (-not (Test-Path -LiteralPath $structurePath -PathType Leaf)) { throw 'KV_SUMMARY_STRUCTURE_FAILED' }
 $structure = Get-Content -Raw -LiteralPath $structurePath -Encoding UTF8 | ConvertFrom-Json
 $manifest = Get-Content -Raw -LiteralPath (Join-Path $snapshotRoot 'source_snapshot_manifest.json') -Encoding UTF8 | ConvertFrom-Json
