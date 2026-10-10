@@ -46,6 +46,10 @@ foreach ($m in @($inventory.program_modules)) {
 
 $fbNames = @($inventory.official_or_library_names_from_tree | Where-Object { $_ -notmatch '^_' })
 $userTypes = @(@($inventory.data_types) | Where-Object { $_.path_text -notmatch '\(System\)' } | ForEach-Object { [string]$_.name })
+# System types were previously filtered out of the extractor, which hid the most
+# important semantic layer of a motion project (_MC_POINT_PARAM, _MC_AXIS_*, _EC_*).
+# They are now reported explicitly, together with what the type routes do NOT export.
+$systemTypes = @(@($inventory.data_types) | Where-Object { $_.path_text -match '\(System\)' } | ForEach-Object { [string]$_.name })
 
 $structure = [ordered]@{
   schema_version = 1
@@ -70,6 +74,9 @@ $structure = [ordered]@{
   program_count = $programs.Count
   function_blocks = $fbNames
   user_data_types = $userTypes
+  system_data_types = $systemTypes
+  data_type_counts = [ordered]@{ user = $userTypes.Count; system = $systemTypes.Count }
+  data_type_notes = 'structure_definitions.json exports user-defined types only; system type member lists (for example _MC_POINT_PARAM fields) are not exported by that route and must come from the manual or from program usage'
   stations = @($programs | Where-Object { $_.bucket -eq 'station' } | ForEach-Object { $_.name })
   naming_buckets = $bucketCounts
   notes = @(

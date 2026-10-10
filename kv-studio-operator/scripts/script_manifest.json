@@ -365,6 +365,30 @@
                                                                       "scope":  "non-UI advisory conformance report (STD-01..STD-06) over a read-only snapshot; calibrated so the sample project yields no warnings while a flat project reports deviations, and always sets requires_user_decision before any restructuring",
                                                                       "reference":  "references/project-standard.json"
                                                                   }
+                                                 },
+                                                 {
+                                                     "path":  "workflow_tools/resolve_kv_symbols.ps1",
+                                                     "status":  "published",
+                                                     "customer_callable":  true,
+                                                     "capabilities":  [
+                                                                      "resolve_project_symbols"
+                                                                  ],
+                                                     "verification":  {
+                                                                      "scope":  "non-UI symbol layer from a read-only snapshot: every identifier used with member or index access resolves to a variable, device, FB instance or system object, with type, full member path, source line, and an unresolved list split into program scope (defect) and library-body scope (expected)",
+                                                                      "reference":  "references/project-standard.json"
+                                                                  }
+                                                 },
+                                                 {
+                                                     "path":  "workflow_tools/assert_kv_snapshot_semantic_coverage.ps1",
+                                                     "status":  "published",
+                                                     "customer_callable":  true,
+                                                     "capabilities":  [
+                                                                      "assert_snapshot_semantic_coverage"
+                                                                  ],
+                                                     "verification":  {
+                                                                      "scope":  "non-UI semantic coverage gate: every category reports counts, system data types must be reported when declared, and unresolved symbols inside user programs fail the gate while library-body internals are reported separately",
+                                                                      "reference":  "references/project-standard.json"
+                                                                  }
                                                  }
                                              ],
                     "customer_workflow":  [
