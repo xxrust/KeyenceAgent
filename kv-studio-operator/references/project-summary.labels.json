@@ -1,0 +1,48 @@
+{
+  "note": "Human-facing labels for summarize_kv_project.ps1. Data, not code: the script stays ASCII-only.",
+  "title": "项目总结",
+  "sections": {
+    "identity": "1. 项目标识",
+    "hardware": "2. 设备构成",
+    "stations": "3. 工站与结构分层",
+    "modules": "4. 程序模块与功能",
+    "interfaces": "5. 对外接口",
+    "data_map": "6. 数据地图要点",
+    "dependencies": "7. 依赖",
+    "gaps": "8. 缺口与待确认",
+    "standard": "9. 与房规的差距（建议，需询问后再改）"
+  },
+  "fields": {
+    "project": "工程",
+    "fingerprint": "指纹",
+    "snapshot_status": "快照状态",
+    "cpu": "CPU",
+    "expansion_units": "扩展单元",
+    "ethercat": "EtherCAT 节点",
+    "ethernet_ip": "EtherNet-IP 设备",
+    "ethernet_ip_area": "EtherNet-IP 地址区",
+    "motion": "运动设定",
+    "station_count": "工站数量",
+    "station_list": "工站清单",
+    "no_stations": "（没有任何工站分区；范例用 ST00..ST06 表示工位/工序）",
+    "bucket_counts": "命名分桶统计",
+    "module": "模块",
+    "category": "类别",
+    "order": "执行顺序",
+    "bucket": "命名分桶",
+    "functions": "功能块",
+    "user_types": "用户数据类型",
+    "external_writers": "有注释但程序体未引用的手写软元件（外部/上位机在写的候选）",
+    "unit_io": "单元 I/O 地址区",
+    "modbus_area": "Modbus 数据区",
+    "unannotated": "被引用但无注释的软元件数量",
+    "comment_rows": "注释表行数",
+    "comment_devices": "归一后的软元件数",
+    "empty_note": "（无）",
+    "standard_deviations": "与房规的差距（详见 standard_report.json）"
+  },
+  "notes": [
+    "本总结全部由只读快照派生，不含推测；无法从证据得到的内容会明确写“未提供”。",
+    "缺口一节只列可核对的数字与清单，是否要改由项目所有者决定。"
+  ]
+}

@@ -42,6 +42,19 @@ MNM 中以 `;` 开头的 ST 行算使用、`BOOKMARK` 标签不算。`coverage.j
 `extension_points.comments` 直接给出作用域、统计和未注释软元件清单；`status=ready` 且
 `missing_capabilities` 为空才代表这份映射完整（缺注释层会如实报 `partial`）。
 
+扫描一个既有工程后，按这个顺序**先给结论、不擅自改工程**：
+
+1. `read_only_project_text_snapshot` —— 只读完整映射。
+2. `summarize_kv_project`（`summarize_kv_project.ps1`，非 UI）—— 产出 `project_summary.json` 与 `项目总结.md`：
+   设备构成、工站分层、每个模块的功能与执行顺序、对外接口（外部在写的位、单元 I/O、Modbus）、缺口。
+3. `assert_project_standard`（`assert_kv_project_standard.ps1`，非 UI）—— 产出 `standard_report.json`，
+   按 `references/project-standard.json` 报 STD-01..06（命名/分层/类型/注释/同实例复用）。
+4. **把 2、3 的结论交给用户，并明确询问是否按房规调整**。报告的 `requires_user_decision=true` 时，
+   必须先拿到回答，再生成迁移计划，并在工程**副本**上执行（原件不动），逐步编译验证。
+
+房规只是本仓库从范例程序归纳的内部约定（KV STUDIO 不强制任何命名或分区），因此永远只作建议，
+不得据此判定项目"错误"，也不得在未获同意时改结构。
+
 运行查询返回的 `customer_callable=true` 入口。普通操作只需对应接口的输入，不需要构造 MVP 或复刻整个项目。需要多步时先准备完整计划；一个 workflow 内部通过同一 flat executor 调度子步骤。新建完整 FB 通常包含程序体导入、自变量写入、局部变量写入和编译；修改其中一项只调用对应接口。
 
 查询结果的 `regression_scenarios` 给出当前仓库中的匹配测试、README、固定输入和运行命令。

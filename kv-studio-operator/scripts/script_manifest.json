@@ -340,6 +340,31 @@
                                                                       "scope":  "non-UI structural extraction from a read-only snapshot: hardware summary, program modules with category and execution order, naming buckets, stations, function blocks and user data types; derived evidence for the house project standard",
                                                                       "reference":  "references/project-standard.json"
                                                                   }
+                                                 },
+                                                 {
+                                                     "path":  "workflow_tools/summarize_kv_project.ps1",
+                                                     "status":  "published",
+                                                     "customer_callable":  true,
+                                                     "capabilities":  [
+                                                                      "summarize_kv_project"
+                                                                  ],
+                                                     "verification":  {
+                                                                      "scope":  "non-UI project summary from a read-only snapshot: identity, hardware, stations, program modules with bucket and execution order, function blocks, user data types, external-writer candidates and gap counts; written as project_summary.json plus a Markdown report",
+                                                                      "reference":  "references/project-summary.labels.json"
+                                                                  }
+                                                 },
+                                                 {
+                                                     "path":  "workflow_tools/assert_kv_project_standard.ps1",
+                                                     "status":  "published",
+                                                     "customer_callable":  true,
+                                                     "capabilities":  [
+                                                                      "assert_project_standard",
+                                                                      "advisory_project_conformance"
+                                                                  ],
+                                                     "verification":  {
+                                                                      "scope":  "non-UI advisory conformance report (STD-01..STD-06) over a read-only snapshot; calibrated so the sample project yields no warnings while a flat project reports deviations, and always sets requires_user_decision before any restructuring",
+                                                                      "reference":  "references/project-standard.json"
+                                                                  }
                                                  }
                                              ],
                     "customer_workflow":  [
