@@ -46,8 +46,18 @@
     "caller_pattern": "^调用.*FB$",
     "expects": "FB 只依赖自变量与局部状态；真实设备映射、轴/单元绑定、全局实例留在调用方"
   },
+  "reuse_principle": {
+    "decision": "owner decision 2026-10: reusable logic, and any standard program that must be ported to other machines, belongs in a function block (功能块/FB_*); scan programs keep only site mapping, sequencing and the call layer",
+    "basis": "house convention recorded by the project owner, not a KEYENCE requirement",
+    "candidate_classes": [
+      { "class": "A", "name": "official_fb_available_but_unused", "evidence_requirement": "Wiki or manual evidence required; without it the candidate must be reported as unverified", "checks": [ "STD-07" ] },
+      { "class": "B", "name": "portable_logic_should_become_user_fb", "evidence_requirement": "house standard plus reuse evidence (the same logic repeated per axis or per station, or needing migration to another machine); no KEYENCE document is required", "checks": [ "STD-01" ] }
+    ],
+    "instance_rule": "the reusable unit is the axis or station, so one FB instance per axis or station; sharing a single instance across axes (for example one MC_Power instance driving three axes, or MC_Home2 used for axes 2 and 3) is a defect, not a style question, consistent with the vendor rule that each axis needs its own MC_Power",
+    "example": "Axis_FB in the Taizhou machine: three axes repeat the same enable/home/jog/reset/stop and signal-mapping logic inside one scan program, so it is class B"
+  },
   "advisory_checks": [
-    { "id": "STD-01", "severity": "warn", "check": "program_named_like_fb", "meaning": "模块名看起来是 FB，但类别是程序（;MODULE_TYPE:0）", "suggest": "把可复用逻辑移到 功能块/FB_*，调用方放在 程序/.../调用*FB" },
+    { "id": "STD-01", "severity": "warn", "check": "program_named_like_fb", "meaning": "模块名看起来是 FB，但类别是程序（;MODULE_TYPE:0）", "suggest": "把可复用逻辑移到 功能块/FB_*，调用方放在 程序/.../调用*FB；按房规，可复用或需移植的标准程序都必须做成 FB（见 reuse_principle）" },
     { "id": "STD-02", "severity": "info", "check": "no_station_partition", "meaning": "没有任何 ST##_* 工站程序", "suggest": "按工序拆分，或确认本项目确实无工位概念" },
     { "id": "STD-03", "severity": "info", "check": "missing_platform_programs", "meaning": "缺少 初始化/设备状态/Alarm/HMI/IO 等平台功能分区", "suggest": "按需补齐，或在总结里说明由上位机/HMI 承担" },
     { "id": "STD-04", "severity": "warn", "check": "flat_data_types", "meaning": "自定义类型没有按 str<域>+Ctrl/Param/Status 分层", "suggest": "整理类型，便于复用与跨项目迁移" },
