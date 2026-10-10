@@ -4,6 +4,12 @@ param(
   [string]$LabelsPath = ''
 )
 $ErrorActionPreference = 'Stop'
+# -SnapshotRoot must be the directory that directly contains text\ and project\.
+# Say so here instead of letting callers guess the level from a downstream error.
+$snapshotRootPath = [IO.Path]::GetFullPath($SnapshotRoot)
+if (-not (Test-Path -LiteralPath (Join-Path $snapshotRootPath 'text') -PathType Container) -or -not (Test-Path -LiteralPath (Join-Path $snapshotRootPath 'project') -PathType Container)) {
+  throw "KV_SNAPSHOT_ROOT_LEVEL_WRONG: -SnapshotRoot must be the directory that directly contains 'text' and 'project'. Received: $SnapshotRoot . Example: <work>\snapshot-run\snapshot (the level holding text, project, raw and architecture)."
+}
 $snapshotRoot = [IO.Path]::GetFullPath($SnapshotRoot)
 $outRoot = [IO.Path]::GetFullPath($OutDir)
 New-Item -ItemType Directory -Force -Path $outRoot | Out-Null
@@ -28,12 +34,45 @@ if (Test-Path -LiteralPath $coveragePath -PathType Leaf) { try { $coverage = Get
 $externalWriters = @()
 if ($coverage) { $externalWriters = @($coverage.annotated_unused_handwritten) }
 
+# Resolve the Modbus data area from the program bodies instead of pointing at another file.
+$modbusInfo = [ordered]@{
+  status = 'not_found'; fb = ''; instance = ''; data_area = ''; arguments = @()
+  reason = 'no ModbusTCPClient_* invocation found in the snapshot bodies'
+}
+$modbusMnmDir = Join-Path $snapshotRoot 'text\mnm'
+foreach ($mbFile in @(Get-ChildItem -LiteralPath $modbusMnmDir -Filter '*.mnm' -File -Recurse -ErrorAction SilentlyContinue)) {
+  $mbBytes = [IO.File]::ReadAllBytes($mbFile.FullName)
+  $mbText = if ($mbBytes.Length -ge 2 -and $mbBytes[0] -eq 0xFF -and $mbBytes[1] -eq 0xFE) { [Text.Encoding]::Unicode.GetString($mbBytes, 2, $mbBytes.Length - 2) } else { [Text.Encoding]::GetEncoding(936).GetString($mbBytes) }
+  foreach ($mbMatch in [regex]::Matches($mbText, '(?m)^(FBEXEC|FBEAND)\s+(ModbusTCPClient_\w+)\s+(\S+)\s*(.*)$')) {
+    $fbArgs = @($mbMatch.Groups[4].Value -split '\s+' | Where-Object { $_ })
+    $dmArg = @($fbArgs | Where-Object { $_ -match '^DM\d+$' } | Select-Object -First 1)
+    if ($dmArg.Count -eq 0) {
+      # keep the first invocation as a fallback, but prefer one that carries the data area
+      if ($modbusInfo.status -eq 'not_found') {
+        $modbusInfo.status = 'resolved_without_data_area'
+        $modbusInfo.fb = $mbMatch.Groups[2].Value
+        $modbusInfo.instance = $mbMatch.Groups[3].Value
+        $modbusInfo.arguments = $fbArgs
+        $modbusInfo.reason = 'no DM data area argument found in any ModbusTCPClient_* invocation'
+      }
+      continue
+    }
+    $modbusInfo.status = 'resolved'
+    $modbusInfo.fb = $mbMatch.Groups[2].Value
+    $modbusInfo.instance = $mbMatch.Groups[3].Value
+    $modbusInfo.data_area = $dmArg[0]
+    $modbusInfo.arguments = $fbArgs
+    $modbusInfo.reason = ''
+    break
+  }
+}
 $interfaces = [ordered]@{
   external_writer_candidates = $externalWriters
   external_writer_count = $externalWriters.Count
   unit_io_relay_start = [string]$structure.hardware.ethernet_ip_relay_start
   unit_io_dm_start = [string]$structure.hardware.ethernet_ip_dm_start
-  modbus_area = $(if ($coverage) { 'see usage.tsv for the Modbus FB data area' } else { '' })
+  modbus_area = $modbusInfo.data_area
+  modbus = $modbusInfo
 }
 $gaps = [ordered]@{
   unannotated_referenced = $(if ($coverage) { [int]$coverage.summary.used_unannotated } else { $null })

@@ -3,6 +3,12 @@ param(
   [Parameter(Mandatory=$true)][string]$OutPath
 )
 $ErrorActionPreference = 'Stop'
+# -SnapshotRoot must be the directory that directly contains text\ and project\.
+# Say so here instead of letting callers guess the level from a downstream error.
+$snapshotRootPath = [IO.Path]::GetFullPath($SnapshotRoot)
+if (-not (Test-Path -LiteralPath (Join-Path $snapshotRootPath 'text') -PathType Container) -or -not (Test-Path -LiteralPath (Join-Path $snapshotRootPath 'project') -PathType Container)) {
+  throw "KV_SNAPSHOT_ROOT_LEVEL_WRONG: -SnapshotRoot must be the directory that directly contains 'text' and 'project'. Received: $SnapshotRoot . Example: <work>\snapshot-run\snapshot (the level holding text, project, raw and architecture)."
+}
 $snapshotRoot = [IO.Path]::GetFullPath($SnapshotRoot)
 $inventoryPath = Join-Path $snapshotRoot 'text\project_inventory.json'
 if (-not (Test-Path -LiteralPath $inventoryPath -PathType Leaf)) { throw "KV_SYMBOLS_INVENTORY_MISSING: $inventoryPath" }

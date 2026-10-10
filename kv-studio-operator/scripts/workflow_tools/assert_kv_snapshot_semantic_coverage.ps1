@@ -4,6 +4,12 @@ param(
   [string[]]$AllowUnresolved = @()
 )
 $ErrorActionPreference = 'Stop'
+# -SnapshotRoot must be the directory that directly contains text\ and project\.
+# Say so here instead of letting callers guess the level from a downstream error.
+$snapshotRootPath = [IO.Path]::GetFullPath($SnapshotRoot)
+if (-not (Test-Path -LiteralPath (Join-Path $snapshotRootPath 'text') -PathType Container) -or -not (Test-Path -LiteralPath (Join-Path $snapshotRootPath 'project') -PathType Container)) {
+  throw "KV_SNAPSHOT_ROOT_LEVEL_WRONG: -SnapshotRoot must be the directory that directly contains 'text' and 'project'. Received: $SnapshotRoot . Example: <work>\snapshot-run\snapshot (the level holding text, project, raw and architecture)."
+}
 $snapshotRoot = [IO.Path]::GetFullPath($SnapshotRoot)
 $outRoot = [IO.Path]::GetFullPath($OutDir)
 New-Item -ItemType Directory -Force -Path $outRoot | Out-Null
@@ -67,6 +73,10 @@ foreach ($fb in @($structure.function_blocks)) {
   $degraded = (($entityText -match 'not_captured|not_applicable|missing|partial|failed|unresolved') -or ($entityText -match '"arguments"\s*:\s*null'))
   $fbEntities.Add([pscustomobject]@{ fb = $fb; degraded = $degraded; reason = $(if ($degraded) { 'arguments_or_locals_not_captured' } else { '' }) }) | Out-Null
 }
+$mnmBodies = @(Get-ChildItem -LiteralPath (Join-Path $snapshotRoot 'text\mnm') -Filter '*.mnm' -File -Recurse -ErrorAction SilentlyContinue)
+$utf16Bodies = 0
+foreach ($mb in $mnmBodies) { $mbBytes = [IO.File]::ReadAllBytes($mb.FullName); if ($mbBytes.Length -ge 2 -and $mbBytes[0] -eq 0xFF -and $mbBytes[1] -eq 0xFE) { $utf16Bodies++ } }
+$utf8Copies = @(Get-ChildItem -LiteralPath (Join-Path $snapshotRoot 'text\mnm_utf8') -Filter '*.mnm' -File -ErrorAction SilentlyContinue).Count
 $restorePlanPath = Join-Path $snapshotRoot 'project\_index\restore_plan.json'
 $restorePlanGaps = 0
 if (Test-Path -LiteralPath $restorePlanPath -PathType Leaf) {
@@ -82,6 +92,7 @@ $limitations = New-Object System.Collections.Generic.List[string]
 if ($degradedPrograms.Count -gt 0) {
   $limitations.Add("$($degradedPrograms.Count) of $(@($structure.programs).Count) program entities report missing/partial content; symbol resolution cannot be complete while locals or arguments are not captured, so unresolved=0 does not prove the program layer is fully resolved.") | Out-Null
 }
+if ($utf16Bodies -gt $utf8Copies) { $limitations.Add("$utf16Bodies MNM bodies are UTF-16LE but only $utf8Copies UTF-8 reading copies exist; a tool that defaults to ANSI will read those bodies as empty and conclude the program does not contain a symbol.") | Out-Null }
 if ($degradedFbs.Count -gt 0) { $limitations.Add("$($degradedFbs.Count) of $(@($structure.function_blocks).Count) FB entities report not_captured arguments or locals; FB interface analysis and instance declaration checks are therefore impossible from this snapshot.") | Out-Null }
 if ($calledButNotListed.Count -gt 0) { $limitations.Add("$($calledButNotListed.Count) FB types are called by programs but absent from the project tree listing (built-in library FBs and functions): " + ($calledButNotListed -join ', ')) | Out-Null }
 if ([int]$symbols.counts.unresolved_in_bodies -gt 0) {
@@ -104,6 +115,8 @@ $result = [ordered]@{
     programs = [int]$structure.program_count
     program_entities_degraded = $degradedPrograms.Count
     fb_entities_degraded = $degradedFbs.Count
+    mnm_utf16le_bodies = $utf16Bodies
+    mnm_utf8_copies = $utf8Copies
     declaration_gaps_in_restore_plan = $restorePlanGaps
     fb_types_called_in_programs = $calledInPrograms.Count
     fb_types_called_but_not_listed = $calledButNotListed.Count

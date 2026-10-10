@@ -78,6 +78,26 @@ MNM 中以 `;` 开头的 ST 行算使用、`BOOKMARK` 标签不算。`coverage.j
 `assert_kv_snapshot_semantic_coverage`（门禁）→ `summarize_kv_project`（总结）→
 `assert_project_standard`（房规）→ **把结论交给用户并询问是否调整**。
 
+### 快照根目录与数据文件（默认路径）
+
+- `-SnapshotRoot` 必须指向**直接包含 `text` 与 `project` 的那一层**，例如
+  `<work>\snapshot-run\snapshot`（该层同时含 `text`、`project`、`raw`、`architecture`）。
+  指错层会立刻报 `KV_SNAPSHOT_ROOT_LEVEL_WRONG`，不要靠下游的"文件找不到"去猜。
+- 三份数据文件（都可被项目所有者直接编辑，改文件即改口径）：
+
+  | 文件 | 作用 | 参数 |
+  | --- | --- | --- |
+  | `references/project-standard.json` | 房规本体：层次、命名、类型分层、STD-01..06 与流程 | `-StandardPath` |
+  | `references/project-standard.patterns.json` | 命名分桶与 motion 模式（数据形式，脚本保持 ASCII） | `-PatternMapPath` |
+  | `references/project-summary.labels.json` | 项目总结的中文标签 | `-LabelsPath` |
+
+- `-AllowUnresolved` 只影响"**用户程序内**未解析符号"的判定（库 FB 体内的未解析本来就只记 info）。
+  元素是**符号名**，例如 `-AllowUnresolved 'SocketTCP_Send_Inst','SocketTCP_Recv_Inst'`；被豁免的符号
+  仍会出现在 `unresolved_symbols` 里，但不再计入 `failures`，理由是"该符号的声明不在任何快照路由中"。
+- 读 MNM 必须显式 `-Encoding Unicode`（UTF-16LE + BOM）。Windows PowerShell 5.1 不会自动识别 BOM，
+  不加编码会得到**假空的"程序体里没有 X"**；快照另提供 `text\mnm_utf8\` 供不方便设编码的工具阅读
+  （那只为阅读方便，权威副本始终是 `text\mnm\`）。
+
 运行查询返回的 `customer_callable=true` 入口。普通操作只需对应接口的输入，不需要构造 MVP 或复刻整个项目。需要多步时先准备完整计划；一个 workflow 内部通过同一 flat executor 调度子步骤。新建完整 FB 通常包含程序体导入、自变量写入、局部变量写入和编译；修改其中一项只调用对应接口。
 
 查询结果的 `regression_scenarios` 给出当前仓库中的匹配测试、README、固定输入和运行命令。

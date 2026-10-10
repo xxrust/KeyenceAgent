@@ -108,6 +108,11 @@ BOOL 梯形图按 [complete-module.md](references/complete-module.md) 使用 ope
   导出读回用同脚本 `-ExportPath` 精确比较全部 ST 行。
 - ST 程序体只写 KV STUDIO 接受的可执行语句。变量声明位于编辑器变量表，
   不把通用 IEC 声明块直接塞进程序体。
+- **读 MNM 必须显式指定编码**：MNM 是 UTF-16LE + BOM（首两字节 `FF FE`）。Windows PowerShell 5.1
+  不会自动识别 BOM，`Get-Content`/`Select-String` 不写 `-Encoding Unicode` 会按系统 ANSI 代码页读，
+  中文变乱码、按关键字可能**返回 0 条且不报错**，从而得出"程序体里没有 X"的假空结论
+  （PowerShell 7 会自动识别 BOM，所以同一个命令在两个 shell 下结果不同——不要凭一次成功就当成通用）。
+  快照另提供 `text\mnm_utf8\`（UTF-8 无 BOM，仅供阅读；权威可导入副本始终是 `text\mnm\`）。
 - 普通 ST 问答只列出需要登记的变量，不因未要求工程交付而补 MNM 封装、TSV 或固定 contract。
 - 数值 ST/数组/算法 FB 按 operator 的 `references/st-programs.md` 组合接口。
   官方域类型 ST 导出为 `AREA_ST`，不要求另建一种模块语言；能导出不证明能反向导入。

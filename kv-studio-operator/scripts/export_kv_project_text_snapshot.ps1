@@ -131,6 +131,18 @@ if($mnmStep.ok){
   foreach($f in @(Get-ChildItem -LiteralPath $mnmExportDir -Filter '*.mnm' -File -Recurse -ErrorAction SilentlyContinue)){ Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $mnmTextDir $f.Name) -Force }
 }
 
+# Reading convenience: UTF-8 copies for tools that cannot be told an encoding.  The
+# authoritative importable bodies remain in text/mnm (UTF-16LE + BOM).
+if($mnmStep.ok){
+  $mnmUtf8Dir=Join-Path $textRoot 'mnm_utf8'
+  New-Item -ItemType Directory -Force -Path $mnmUtf8Dir | Out-Null
+  foreach($f in @(Get-ChildItem -LiteralPath $mnmExportDir -Filter '*.mnm' -File -Recurse -ErrorAction SilentlyContinue)){
+    $bytes=[IO.File]::ReadAllBytes($f.FullName)
+    $bodyText=if($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE){[Text.Encoding]::Unicode.GetString($bytes,2,$bytes.Length-2)}else{[Text.Encoding]::GetEncoding(936).GetString($bytes)}
+    [IO.File]::WriteAllText((Join-Path $mnmUtf8Dir $f.Name),$bodyText,(New-Object System.Text.UTF8Encoding($false)))
+  }
+  Set-Content -LiteralPath (Join-Path $mnmUtf8Dir 'README.txt') -Value 'Reading convenience only (UTF-8, no BOM). The authoritative importable bodies are in text/mnm (UTF-16LE + BOM).' -Encoding UTF8
+}
 # Device comment layer: export the comment table through the same isolated UI
 # session the MNM route opened, then join it with the exported program bodies so a
 # single command yields the comment map as well.  The program bodies themselves are

@@ -5,6 +5,12 @@ param(
   [string]$PatternMapPath = ''
 )
 $ErrorActionPreference = 'Stop'
+# -SnapshotRoot must be the directory that directly contains text\ and project\.
+# Say so here instead of letting callers guess the level from a downstream error.
+$snapshotRootPath = [IO.Path]::GetFullPath($SnapshotRoot)
+if (-not (Test-Path -LiteralPath (Join-Path $snapshotRootPath 'text') -PathType Container) -or -not (Test-Path -LiteralPath (Join-Path $snapshotRootPath 'project') -PathType Container)) {
+  throw "KV_SNAPSHOT_ROOT_LEVEL_WRONG: -SnapshotRoot must be the directory that directly contains 'text' and 'project'. Received: $SnapshotRoot . Example: <work>\snapshot-run\snapshot (the level holding text, project, raw and architecture)."
+}
 $snapshotRoot = [IO.Path]::GetFullPath($SnapshotRoot)
 $outRoot = [IO.Path]::GetFullPath($OutDir)
 New-Item -ItemType Directory -Force -Path $outRoot | Out-Null
@@ -91,6 +97,25 @@ $checks.Add([pscustomobject]@{
 
 $deviations = @($checks | Where-Object { $_.status -eq 'deviation' })
 $warnings = @($checks | Where-Object { $_.status -eq 'deviation' -and $_.severity -eq 'warn' })
+# Enrich every check so a reader can tell severity, where the evidence came from, and
+# how much of the conclusion depends on data this snapshot does not capture.
+$stdMeta = @{
+  'STD-01' = @{ src = 'snapshot: structure.json (program category)'; conf = 'partial_missing_locals'; human = 'programs with an FB-style name: ' + $(if ($fbNamedPrograms.Count) { $fbNamedPrograms -join ', ' } else { 'none' }) }
+  'STD-02' = @{ src = 'snapshot: structure.json (station bucket)'; conf = 'confirmed'; human = 'station_programs=' + $stationPrograms.Count }
+  'STD-03' = @{ src = 'snapshot: structure.json (platform bucket)'; conf = 'confirmed'; human = 'platform_programs=' + $platformBucket + ' (expected at least one of init/device-state/alarm/HMI/IO)' }
+  'STD-04' = @{ src = 'snapshot: project_inventory.json data_types'; conf = 'confirmed'; human = 'unlayered user types: ' + $(if ($flatTypes.Count) { $flatTypes -join ', ' } else { 'none' }) }
+  'STD-05' = @{ src = 'snapshot: text/comments/coverage.json'; conf = $(if ($null -eq $usedUnannotated) { 'not_available' } else { 'confirmed' }); human = 'used_unannotated=' + $(if ($null -eq $usedUnannotated) { 'n/a' } else { $usedUnannotated }) }
+  'STD-06' = @{ src = 'snapshot: text/mnm bodies'; conf = 'confirmed'; human = 'shared instances: ' + $(if ($sharedInstances.Count) { (@($sharedInstances | ForEach-Object { $_.module + ':' + $_.instance + ' x' + $_.calls }) -join '; ') } else { 'none' }) }
+}
+foreach ($c in $checks) {
+  $m = $stdMeta[$c.id]
+  if ($m) {
+    $c | Add-Member -NotePropertyName evidence_source -NotePropertyValue $m.src -Force
+    $c | Add-Member -NotePropertyName confidence -NotePropertyValue $m.conf -Force
+    $c | Add-Member -NotePropertyName evidence_human -NotePropertyValue $m.human -Force
+  }
+}
+$bySeverity = [ordered]@{ warn = @($deviations | Where-Object { $_.severity -eq 'warn' }).Count; info = @($deviations | Where-Object { $_.severity -eq 'info' }).Count }
 $report = [ordered]@{
   schema_version = 1
   generated_at = (Get-Date).ToUniversalTime().ToString('o')
@@ -104,6 +129,7 @@ $report = [ordered]@{
   requires_user_decision = $true
   next_action = 'show this report and the project summary to the project owner and ask whether to restructure; never change the project without that answer'
 }
+$report['deviation_count_by_severity'] = $bySeverity
 $json = $report | ConvertTo-Json -Depth 10
 [IO.File]::WriteAllText((Join-Path $outRoot 'standard_report.json'), $json, (New-Object System.Text.UTF8Encoding($false)))
 Write-Output $json
