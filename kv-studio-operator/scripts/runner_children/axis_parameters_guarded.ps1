@@ -205,14 +205,61 @@ function Read-Cell {
     }
     return '(multi-cell)'
 }
-function Go-Cell([int]$row, [int]$col) {
-    Focus-Grid
-    Send-G '^{HOME}' 'cell home' 180
-    Start-Sleep -Milliseconds 200
-    for ($i = 0; $i -lt $row; $i++) { Send-G '{DOWN}' ('down ' + $i) 70 }
-    Start-Sleep -Milliseconds 150
-    for ($i = 1; $i -lt $col; $i++) { Send-G '{RIGHT}' ('right ' + $i) 70 }
-    Start-Sleep -Milliseconds 250
+# ---- 网格几何（点格定位 + 读回校验 + 自动校准）----
+$script:RowOffset0 = 82      # 第一行（参数行 0）距网格顶部的偏移
+$script:RowHeight = 17.4     # 行高（会按实测校准）
+$script:ColOffset1 = 443     # 第 1 列（轴1）的中心 x 偏移
+$script:ColWidth = 0         # 列宽（0 = 按网格宽度均分）
+
+function Column-X([int]$col) {
+    if ($script:ColWidth -gt 0) { return [int]($g.X + $script:ColOffset1 + ($col - 1) * $script:ColWidth) }
+    # 表格右侧：轴列从 ColOffset1 开始，占 (宽度 - ColOffset1) 的均分
+    $span = [int](($g.Width - $script:ColOffset1) / [Math]::Max(1, $header.Count))
+    return [int]($g.X + $script:ColOffset1 + ($col - 1) * $span + [int]($span / 2))
+}
+function Row-Y([int]$row) { return [int]($g.Y + $script:RowOffset0 + $row * $script:RowHeight) }
+
+# 点一格并读回；返回读到的值
+function Click-Read([int]$row, [int]$col) {
+    [AxGrid]::Click((Column-X $col), (Row-Y $row))
+    Start-Sleep -Milliseconds 300
+    Send-G '^c' 'cell copy' 350
+    return ((Get-Clipboard -Raw) -replace "`r?`n", '')
+}
+
+# 校准：用"最高运转速度"（行 38，值很独特）找出真正的 RowOffset0 / RowHeight
+function Calibrate-Grid {
+    $probeRow = 38
+    $col = 1
+    $want = (Cell $probeRow 1)
+    if (-not $want) { W 'calibrate: reference row empty, skip'; return }
+    W ('calibrate: reference row ' + $probeRow + ' col 1 = [' + $want + ']')
+    foreach ($h in @(17.4, 21.6, 10.9, 26.0, 13.0)) {
+        foreach ($off in @(82, 96, 110, 68, 55)) {
+            $script:RowOffset0 = $off
+            $script:RowHeight = $h
+            $v = Click-Read $probeRow $col
+            if ($v -eq $want) {
+                W ('calibrate OK: offset=' + $off + ' rowHeight=' + $h)
+                Shot('calibrated_' + $off + '_' + $h + '.png')
+                return
+            }
+        }
+    }
+    W 'calibrate FAILED: falling back to offset=82 height=17.4'
+    $script:RowOffset0 = 82
+    $script:RowHeight = 17.4
+}
+
+# 定位到 (row,col)：点格 → 读回 → 必须等于期望值 ✓
+function Go-Cell([int]$row, [int]$col, [string]$expect) {
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        $v = Click-Read $row $col
+        if ($v -eq $expect) { if ($attempt -gt 1) { W ('  located on attempt ' + $attempt) }; return $true }
+        W ('  locate attempt ' + $attempt + ' got [' + $v + '] expected [' + $expect + ']')
+        Start-Sleep -Milliseconds 200
+    }
+    return $false
 }
 
 # ================= 读整表 → 矩阵 =================
@@ -249,6 +296,8 @@ function Cell([int]$row, [int]$col) {
     if ($col -lt 1 -or $col -gt $cells.Count) { return '' }
     return $cells[$col - 1].Trim()
 }
+
+Calibrate-Grid
 
 if ($Mode -eq 'Dump') {
     $out = Join-Path $OutDir 'axes_params.tsv'
@@ -312,14 +361,14 @@ function Diff-Cells([string[]]$beforeLines, [string[]]$afterLines) {
 }
 
 # 定位 + 读回校验（指哪打哪 ✓）
-Go-Cell $t.i $Axis
+Go-Cell $t.i $Axis $before
 $cur = Read-Cell
 W ('located cell = [' + $cur + ']')
 Shot 'w1_selected.png'
 if ($cur -ne $before) { throw ('KV_AXIS_PARAM_LOCATE_MISMATCH: selected=[' + $cur + '] expected=[' + $before + ']') }
 
 # ---- 方式 1：键入（数值/文本类 ✓）----
-Go-Cell $t.i $Axis
+Go-Cell $t.i $Axis $before
 Send-G '{F2}' 'edit mode' 250
 Send-G '^a' 'select cell text' 150
 Send-G $Value 'type value' 250
@@ -334,7 +383,7 @@ if (-not $mode) {
     W 'typed write did not take -> try combo cycling'
     # 先回滚（若已被改动 ✗）
     if ($v1 -ne $before) {
-        Go-Cell $t.i $Axis
+        Go-Cell $t.i $Axis $before
         Send-G '{F2}' 'revert edit' 200
         Send-G '^a' 'revert select' 120
         Send-G $before 'revert type' 200
@@ -345,7 +394,7 @@ if (-not $mode) {
     for ($try = 0; $try -lt 2 -and -not $hit; $try++) {
         $keys = if ($try -eq 0) { '{DOWN}' } else { '{UP}' }
         for ($n = 1; $n -le 24; $n++) {
-            Go-Cell $t.i $Axis
+            Go-Cell $t.i $Axis $before
             Send-G '{F2}' ('combo edit ' + $try + '/' + $n) 200
             Send-G $keys ('combo step ' + $try + '/' + $n) 200
             Send-G '{ENTER}' ('combo commit ' + $try + '/' + $n) 450
@@ -355,7 +404,7 @@ if (-not $mode) {
     }
     if (-not $hit) {
         # 回滚并报不可写
-        Go-Cell $t.i $Axis
+        Go-Cell $t.i $Axis $before
         Send-G '{F2}' 'final revert' 200
         Send-G '^a' 'final revert select' 120
         Send-G $before 'final revert type' 200
