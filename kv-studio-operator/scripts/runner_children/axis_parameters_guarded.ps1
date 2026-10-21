@@ -184,24 +184,33 @@ if (-not $grid) { throw 'KV_AXIS_PARAM_GRID_NOT_FOUND' }
 $g = $grid.Current.BoundingRectangle
 W ('grid = ' + [int]$g.X + ',' + [int]$g.Y + ' ' + [int]$g.Width + 'x' + [int]$g.Height)
 
-function Focus-Grid { [AxGrid]::Click([int]($g.X + 460), [int]($g.Y + 220)); Start-Sleep -Milliseconds 300; Send-G '{RIGHT}' 'collapse right' 90; Send-G '{LEFT}' 'collapse left' 90 }
+function Focus-Grid { Start-Sleep -Milliseconds 120 }
+# 值比较：数值能解析就按数值比（6 == 6.000 ✓），否则按字符串比
+function Same-Value([string]$a, [string]$b) {
+    if ($null -eq $a) { $a = '' }
+    if ($null -eq $b) { $b = '' }
+    $a = $a.Trim(); $b = $b.Trim()
+    if ($a -eq $b) { return $true }
+    $da = 0.0; $db = 0.0
+    if ([double]::TryParse($a, [ref]$da) -and [double]::TryParse($b, [ref]$db)) {
+        return ([Math]::Abs($da - $db) -le [Math]::Abs($db) * 1e-9 + 1e-9)
+    }
+    return $false
+}
+
 function Read-All {
-    Focus-Grid
-    Send-G '^a' 'grid select all'
-    Start-Sleep -Milliseconds 250
-    Send-G '^c' 'grid copy all'
-    Start-Sleep -Milliseconds 700
+    Send-G '^a' 'select all' 250
+    Send-G '^c' 'copy all' 700
     return (Get-Clipboard -Raw)
 }
+
 function Read-Cell {
     for ($attempt = 1; $attempt -le 3; $attempt++) {
-        Focus-Grid
-        Send-G '^c' ('cell copy ' + $attempt)
-        Start-Sleep -Milliseconds 450
+        Send-G '^c' ('cell copy ' + $attempt) 400
         $v = ((Get-Clipboard -Raw) -replace "`r?`n", '')
         if ($v -notmatch "`t") { return $v }
         W ('  copy returned multiple cells (len=' + $v.Length + '), retry')
-        Send-G '{ESC}' 'escape selection' 150
+        Start-Sleep -Milliseconds 200
     }
     return '(multi-cell)'
 }
@@ -229,37 +238,80 @@ function Click-Read([int]$row, [int]$col) {
 
 # 校准：用"最高运转速度"（行 38，值很独特）找出真正的 RowOffset0 / RowHeight
 function Calibrate-Grid {
+    # 参考行 38 = 最高运转速度（值大、直观），用于：
+    #   1) 行几何（offset / rowHeight）—— 读回校验唯一确定 ✓
+    #   2) 列几何（colOffset1 / colWidth）—— **有界**搜索 + 两个已知格双重验证 ✓
     $probeRow = 38
-    $col = 1
-    $want = (Cell $probeRow 1)
-    if (-not $want) { W 'calibrate: reference row empty, skip'; return }
-    W ('calibrate: reference row ' + $probeRow + ' col 1 = [' + $want + ']')
-    foreach ($h in @(17.4, 21.6, 10.9, 26.0, 13.0)) {
-        foreach ($off in @(82, 96, 110, 68, 55)) {
+    $want1 = (Cell $probeRow 1)
+    if (-not $want1) { W 'calibrate: reference row empty, skip'; return }
+
+    # ---- 行 ----
+    $rowHit = $null
+    foreach ($h in @(17.4, 16.5, 18.0, 21.6, 10.9)) {
+        foreach ($off in @(110, 96, 82, 124, 138)) {
             $script:RowOffset0 = $off
             $script:RowHeight = $h
-            $v = Click-Read $probeRow $col
-            if ($v -eq $want) {
-                W ('calibrate OK: offset=' + $off + ' rowHeight=' + $h)
-                Shot('calibrated_' + $off + '_' + $h + '.png')
-                return
-            }
+            if ((Click-Read $probeRow 1) -eq $want1) { $rowHit = @{ off = $off; h = $h }; break }
         }
+        if ($rowHit) { break }
     }
-    W 'calibrate FAILED: falling back to offset=82 height=17.4'
-    $script:RowOffset0 = 82
-    $script:RowHeight = 17.4
+    if (-not $rowHit) { W 'calibrate ROW failed; keep 110/17.4' } else {
+        $script:RowOffset0 = $rowHit.off
+        $script:RowHeight = $rowHit.h
+        W ('calibrate ROW ok: offset=' + $rowHit.off + ' rowHeight=' + $rowHit.h)
+    }
+
+    # ---- 列（有界搜索：中心偏移 × 列宽）----
+    $probeCol2 = 4
+    $want2 = (Cell $probeRow $probeCol2)
+    $y = Row-Y $probeRow
+    $best = $null
+    foreach ($w in @(30.6, 31.0, 30.0, 29.5, 32.0, 29.0, 31.5, 28.5)) {
+        foreach ($c1 in @(380, 372, 388, 364, 396)) {
+            $x1 = [int]($g.X + $c1)
+            [AxGrid]::Click($x1, $y)
+            Start-Sleep -Milliseconds 150
+            Send-G '^c' 'col probe 1' 220
+            if (((Get-Clipboard -Raw) -replace "`r?`n", '') -ne $want1) { continue }
+            $x2 = [int]($g.X + $c1 + ($probeCol2 - 1) * $w)
+            [AxGrid]::Click($x2, $y)
+            Start-Sleep -Milliseconds 150
+            Send-G '^c' 'col probe 2' 220
+            if (((Get-Clipboard -Raw) -replace "`r?`n", '') -eq $want2) { $best = @{ c1 = $c1; w = $w }; break }
+        }
+        if ($best) { break }
+    }
+    if ($best) {
+        $script:ColOffset1 = $best.c1
+        $script:ColWidth = $best.w
+        W ('calibrate COL ok: colOffset1=' + $best.c1 + ' colWidth=' + $best.w)
+        # 抽验：中间列 + 最后一列
+        foreach ($c in @([int]($header.Count / 2), $header.Count)) {
+            $want = (Cell $probeRow $c)
+            $got = Click-Read $probeRow $c
+            W ('  spot col ' + $c + ': want=[' + $want + '] got=[' + $got + '] ' + $(if ($want -eq $got) { 'OK' } else { 'MISMATCH' }))
+        }
+    } else {
+        W 'calibrate COL failed; keep 380/30.6'
+        $script:ColOffset1 = 380
+        $script:ColWidth = 30.6
+    }
 }
 
 # 定位到 (row,col)：点格 → 读回 → 必须等于期望值 ✓
 function Go-Cell([int]$row, [int]$col, [string]$expect) {
     for ($attempt = 1; $attempt -le 3; $attempt++) {
-        $v = Click-Read $row $col
-        if ($v -eq $expect) { if ($attempt -gt 1) { W ('  located on attempt ' + $attempt) }; return $true }
-        W ('  locate attempt ' + $attempt + ' got [' + $v + '] expected [' + $expect + ']')
+        Send-G '^{HOME}' 'home to (1,1)' 250
+        for ($i = 1; $i -lt $col; $i++) { Send-G '{RIGHT}' ('right ' + $i) 90 }
+        for ($i = 0; $i -lt $row; $i++) { Send-G '{DOWN}' ('down ' + $i) 90 }
+        Start-Sleep -Milliseconds 200
+        $v = Read-Cell
+        if ($expect -eq $null -or $expect -eq '') { return @{ ok = $true; value = $v } }
+        if (Same-Value $v $expect) { W ('  located (' + ($col) + ',' + ($row) + ') = [' + $v + ']'); return @{ ok = $true; value = $v } }
+        W ('  locate attempt ' + $attempt + ': got [' + $v + '] expected [' + $expect + ']')
         Start-Sleep -Milliseconds 200
     }
-    return $false
+    return @{ ok = $false; value = (Read-Cell) }
 }
 
 # ================= 读整表 → 矩阵 =================
@@ -297,7 +349,6 @@ function Cell([int]$row, [int]$col) {
     return $cells[$col - 1].Trim()
 }
 
-Calibrate-Grid
 
 if ($Mode -eq 'Dump') {
     $out = Join-Path $OutDir 'axes_params.tsv'
@@ -340,94 +391,64 @@ if ($Mode -eq 'Read') {
     exit 0
 }
 
-# ================= 写（任意轴 × 任意可写属性）=================
+# ================= 写（线性、无循环、无重试）=================
+# 流程：Ctrl+Home → →×(轴-1) → ↓×(行) → Ctrl+C 校验 → Enter → 键入 → Enter → 整表 diff → Ctrl+S
 if (-not $Value) { throw 'KV_AXIS_PARAM_VALUE_REQUIRED' }
 if ($targets.Count -ne 1) { throw 'KV_AXIS_PARAM_WRITE_ONE_AT_A_TIME' }
 $t = $targets[0]
 $before = Cell $t.i $Axis
 W ('target: axis=' + $Axis + ' (' + $axisNames[$Axis - 1] + ')  param=' + $t.n + '  before=[' + $before + ']  -> value=[' + $Value + ']')
 
-function Read-Target { return (Cell $t.i $Axis) }
-function Diff-Cells([string[]]$beforeLines, [string[]]$afterLines) {
-    $out = @()
-    for ($i = 0; $i -lt [Math]::Min($beforeLines.Count, $afterLines.Count); $i++) {
-        $a = @(($beforeLines[$i] -replace "`r", '') -split "`t")
-        $b = @(($afterLines[$i] -replace "`r", '') -split "`t")
-        for ($c = 0; $c -lt [Math]::Min($a.Count, $b.Count); $c++) {
-            if ($a[$c] -ne $b[$c]) { $out += [pscustomobject]@{ row = $i; col = $c + 1; before = $a[$c]; after = $b[$c] } }
-        }
-    }
-    return $out
+# ---- 1. 导航（仅此一次 ✓）----
+W ('navigate: Ctrl+Home -> RIGHT x' + ($Axis - 1) + ' -> DOWN x' + $t.i)
+Send-G '^{HOME}' 'home' 250
+for ($i = 1; $i -lt $Axis; $i++) { Send-G '{RIGHT}' ('right ' + $i) 80 }
+for ($i = 0; $i -lt $t.i; $i++) { Send-G '{DOWN}' ('down ' + $i) 80 }
+Start-Sleep -Milliseconds 250
+
+# ---- 2. 校验定位（一次 ✓ 不符即停 ✗）----
+Send-G '^c' 'read located cell' 400
+$located = ((Get-Clipboard -Raw) -replace "`r?`n", '')
+W ('located = [' + $located + ']  expected = [' + $before + ']')
+Shot 'w1_located.png'
+if (-not (Same-Value $located $before)) {
+    throw ('KV_AXIS_PARAM_LOCATE_MISMATCH: located=[' + $located + '] expected=[' + $before + '] axis=' + $Axis + ' row=' + $t.i)
 }
 
-# 定位 + 读回校验（指哪打哪 ✓）
-Go-Cell $t.i $Axis $before
-$cur = Read-Cell
-W ('located cell = [' + $cur + ']')
-Shot 'w1_selected.png'
-if ($cur -ne $before) { throw ('KV_AXIS_PARAM_LOCATE_MISMATCH: selected=[' + $cur + '] expected=[' + $before + ']') }
-
-# ---- 方式 1：键入（数值/文本类 ✓）----
-Go-Cell $t.i $Axis $before
-Send-G '{F2}' 'edit mode' 250
-Send-G '^a' 'select cell text' 150
-Send-G $Value 'type value' 250
+# ---- 3. 改值（Enter → 键入 → Enter，各一次 ✓ 无 Ctrl+A ✗）----
+Send-G '{ENTER}' 'enter edit' 300
+Send-G '^a' 'select cell content' 200
+Send-G $Value 'type value' 300
 Send-G '{ENTER}' 'commit' 600
-$v1 = Read-Target
-W ('after typed write = [' + $v1 + ']')
-$mode = ''
-if ($v1 -eq $Value -or ($v1 -ne $before -and $v1.Replace('0.000', '0') -eq $Value)) { $mode = 'typed' }
+Shot 'w2_after_type.png'
+W ('after write: title=[' + [string]$p.MainWindowTitle + ']')
 
-# ---- 方式 2：下拉循环（选择型 ✓：逻辑系/线性/使用/减速停止/负方向/SIN…）----
-if (-not $mode) {
-    W 'typed write did not take -> try combo cycling'
-    # 先回滚（若已被改动 ✗）
-    if ($v1 -ne $before) {
-        Go-Cell $t.i $Axis $before
-        Send-G '{F2}' 'revert edit' 200
-        Send-G '^a' 'revert select' 120
-        Send-G $before 'revert type' 200
-        Send-G '{ENTER}' 'revert commit' 500
-        W ('reverted to [' + (Read-Target) + ']')
-    }
-    $hit = $false
-    for ($try = 0; $try -lt 2 -and -not $hit; $try++) {
-        $keys = if ($try -eq 0) { '{DOWN}' } else { '{UP}' }
-        for ($n = 1; $n -le 24; $n++) {
-            Go-Cell $t.i $Axis $before
-            Send-G '{F2}' ('combo edit ' + $try + '/' + $n) 200
-            Send-G $keys ('combo step ' + $try + '/' + $n) 200
-            Send-G '{ENTER}' ('combo commit ' + $try + '/' + $n) 450
-            $vn = Read-Target
-            if ($vn -eq $Value) { $hit = $true; $mode = ('combo ' + $keys + ' x' + $n); W ('combo hit after ' + $n + ' step(s)'); break }
-        }
-    }
-    if (-not $hit) {
-        # 回滚并报不可写
-        Go-Cell $t.i $Axis $before
-        Send-G '{F2}' 'final revert' 200
-        Send-G '^a' 'final revert select' 120
-        Send-G $before 'final revert type' 200
-        Send-G '{ENTER}' 'final revert commit' 500
-        $now = Read-Target
-        W ('final value = [' + $now + ']')
-        Shot 'w_notwritable.png'
-        [ordered]@{ ok = $false; reason = 'KV_AXIS_PARAM_NOT_WRITABLE'; axis = $Axis; axis_label = $axisNames[$Axis - 1]; param = $t.n; param_index = $t.i; before = $before; after = $now } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'axis_param_write.json') -Encoding UTF8
-        throw ('KV_AXIS_PARAM_NOT_WRITABLE: ' + $t.n + ' (value stayed ' + $now + ')')
-    }
-}
-W ('write mode = ' + $mode)
-
-# ---- 校验：整表 diff 恰好 1 格且位置正确 ✓ ----
+# ---- 4. 整表 diff（一次 ✓ 必须恰好 1 格 ✓）----
 $afterAll = Read-All
 $afterLines = @($afterAll -split "`r?`n" | Where-Object { $_.Trim() })
-$diffs = @(Diff-Cells $lines $afterLines)
+$diffs = @()
+for ($r = 0; $r -lt [Math]::Min($lines.Count, $afterLines.Count); $r++) {
+    $a = @(($lines[$r] -replace "`r", '') -split "`t")
+    $b = @(($afterLines[$r] -replace "`r", '') -split "`t")
+    for ($c = 0; $c -lt [Math]::Min($a.Count, $b.Count); $c++) {
+        if ($a[$c] -ne $b[$c]) { $diffs += [pscustomobject]@{ row = $r; col = $c + 1; before = $a[$c]; after = $b[$c] } }
+    }
+}
 W ('cell diffs = ' + $diffs.Count)
 $diffs | ForEach-Object { W ('  diff r' + $_.row + ' c' + $_.col + ': [' + $_.before + '] -> [' + $_.after + ']') }
 Shot 'w3_after_read.png'
-$ok = ($diffs.Count -eq 1 -and $diffs[0].row -eq $t.i -and $diffs[0].col -eq $Axis)
+$okOne = ($diffs.Count -eq 1 -and $diffs[0].row -eq $t.i -and $diffs[0].col -eq $Axis)
+$okIdem = ($diffs.Count -eq 0 -and (Same-Value $located $Value))
+$ok = ($okOne -or $okIdem)
 W ('exactly one cell changed at target = ' + $ok)
-if ($ok -and -not $NoSave) { Send-G '^s' 'save axis param' 4000; Start-Sleep -Seconds 2; W ('title=[' + [string]$p.MainWindowTitle + ']'); Shot 'w4_saved.png' }
-[ordered]@{ ok = $ok; mode = $mode; axis = $Axis; axis_label = $axisNames[$Axis - 1]; param = $t.n; param_index = $t.i; before = $before; after = (Cell $t.i $Axis); diffs = $diffs } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutDir 'axis_param_write.json') -Encoding UTF8
+
+# ---- 5. 保存（仅在通过时 ✓）----
+if ($ok -and -not $NoSave) {
+    Send-G '^s' 'save' 4000
+    Start-Sleep -Seconds 2
+    W ('title=[' + [string]$p.MainWindowTitle + ']')
+    Shot 'w4_saved.png'
+}
+[ordered]@{ ok = $ok; axis = $Axis; axis_label = $axisNames[$Axis - 1]; param = $t.n; param_index = $t.i; before = $before; located = $located; after = (Cell $t.i $Axis); diffs = $diffs } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutDir 'axis_param_write.json') -Encoding UTF8
 W 'done'
 exit 0
