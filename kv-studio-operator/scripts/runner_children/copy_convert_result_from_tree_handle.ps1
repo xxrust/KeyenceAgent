@@ -27,6 +27,7 @@ Add-Type -AssemblyName System.Windows.Forms
 $sharedUiGuard = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'guards\kv_ui_guard.ps1'
 . $sharedUiGuard
 Initialize-KvUiGuard -OutDir $OutDir -CheckpointSubdir 'shared_ui_guard_checkpoints'
+. (Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'kv_window_binding.ps1')
 Add-Type @"
 using System;
 using System.Collections.Generic;
@@ -164,7 +165,7 @@ function Copy-ResultTreeThroughMenu {
   param($Candidate, $Process)
   $watch = [Diagnostics.Stopwatch]::StartNew()
   $beforeSequence = [KvTreeHandleWin32]::GetClipboardSequenceNumber()
-  Invoke-KvGuardedMouseRightClick -TargetHwnd $Process.MainWindowHandle -Step 'open conversion result copy menu' -X ([int]$Candidate.left+80) -Y ([int]$Candidate.top+12) -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*"
+  Invoke-KvGuardedMouseRightClick -TargetHwnd $script:KvEditorHwnd -Step 'open conversion result copy menu' -X ([int]$Candidate.left+80) -Y ([int]$Candidate.top+12) -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*"
   $copyName = (-join [char[]](0x590D,0x5236)) + '(C)'
   $copyItems = @()
   $windows = [Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children,[Windows.Automation.Condition]::TrueCondition)
@@ -182,12 +183,12 @@ function Copy-ResultTreeThroughMenu {
     if ([KvTreeHandleWin32]::GetClipboardSequenceNumber() -ne $beforeSequence) { break }
     Start-Sleep -Milliseconds 50
   } while ($watch.ElapsedMilliseconds -lt 3000)
-  Assert-KvUiForegroundHwnd -ExpectedHwnd $Process.MainWindowHandle -Step 'conversion copy menu returned to project' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" | Out-Null
+  Assert-KvUiForegroundHwnd -ExpectedHwnd $script:KvEditorHwnd -Step 'conversion copy menu returned to project' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" | Out-Null
   if ([KvTreeHandleWin32]::GetClipboardSequenceNumber() -eq $beforeSequence) { throw 'KV_COMPILE_CLIPBOARD_NOT_UPDATED' }
   $copied = [Windows.Forms.Clipboard]::GetText()
   $header = (-join [char[]](0x8F6C,0x6362,0x7ED3,0x679C)) + ' (OK|NG)'
   if ($copied -notmatch ('^'+$header)) { throw 'KV_COMPILE_CLIPBOARD_INVALID: Missing result header.' }
-  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step 'copy full conversion result through menu' -Action 'scoped Copy menu plus fresh clipboard result' -TargetHwnd $Process.MainWindowHandle -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" | Out-Null
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step 'copy full conversion result through menu' -Action 'scoped Copy menu plus fresh clipboard result' -TargetHwnd $script:KvEditorHwnd -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" | Out-Null
   Log "result_menu_copy_ms=$($watch.ElapsedMilliseconds) characters=$($copied.Length) clipboard_sequence_changed=true"
   return $copied
 }
@@ -197,7 +198,7 @@ $currentResult = $null
 try {
   $processes=@()
   if($ProjectPath){$fullPath=[IO.Path]::GetFullPath($ProjectPath);$processes=@(Get-CimInstance Win32_Process -Filter "Name='Kvs.exe'" -ErrorAction SilentlyContinue | Where-Object {$_.CommandLine -and $_.CommandLine.IndexOf($fullPath,[StringComparison]::OrdinalIgnoreCase) -ge 0} | ForEach-Object {Get-Process -Id ([int]$_.ProcessId) -ErrorAction SilentlyContinue} | Where-Object {$_.MainWindowHandle -ne 0})}
-  if($processes.Count -eq 0){$processes = @(Get-Process Kvs -ErrorAction Stop | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectNeedle*" })}
+  if($processes.Count -eq 0){$processes = @(Get-KvProcessesByCommandLine -Needle $ProjectNeedle)}
   if ($processes.Count -eq 0) {
     throw "No visible Kvs process found for project needle $ProjectNeedle."
   }
@@ -207,12 +208,12 @@ try {
   }
   if ($processes.Count -ne 1) { throw 'KV_TARGET_WINDOW_AMBIGUOUS: More than one project matches.' }
   $process = $processes[0]
+  $script:KvEditorHwnd = Get-KvProjectEditorHwnd -ProcessId $process.Id -Needle $ProjectNeedle
+  if ($script:KvEditorHwnd -eq [IntPtr]::Zero) { throw "KV_PROJECT_EDITOR_WINDOW_NOT_FOUND: $ProjectNeedle" }
+  Log "editor_hwnd=$($script:KvEditorHwnd) resolved_by=ProjectTreeView_anchor process_id=$($process.Id)"
 
-  $mainTitle = Get-WindowTitle $process.MainWindowHandle
-  Log "main_hwnd=$($process.MainWindowHandle) title=$mainTitle"
-  if ($mainTitle -notlike "KV STUDIO*$ProjectNeedle*") {
-    throw "Main window title mismatch: $mainTitle"
-  }
+  $mainTitle = Get-WindowTitle $script:KvEditorHwnd
+  Log "editor_hwnd=$($script:KvEditorHwnd) editor_title=$mainTitle"
 
   # Dismiss only the proven conversion-failed modal before result lookup.
   # Owner-drawn error rows may still expose empty UIA names after dismissal.
@@ -225,11 +226,11 @@ try {
     $dialogHwnd = [IntPtr]$window.Current.NativeWindowHandle
     Log "conversion_failed_modal_detected hwnd=$dialogHwnd text=$failedMessage"
     Invoke-KvGuardedVkTapCallerOracle -TargetHwnd $dialogHwnd -Step 'dismiss proven conversion failure before result readback' -Vk 0x0D -ExpectedTitleLike 'KV STUDIO' -SleepMs 200
-    Assert-KvUiForegroundHwnd -ExpectedHwnd $process.MainWindowHandle -Step 'conversion failure dismissed to target project' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" | Out-Null
+    Assert-KvUiForegroundHwnd -ExpectedHwnd $script:KvEditorHwnd -Step 'conversion failure dismissed to target project' -ExpectedTitleLike "KV STUDIO*$ProjectNeedle*" | Out-Null
   }
 
   $lookupWatch = [Diagnostics.Stopwatch]::StartNew()
-  $mainRect = Get-WindowRectObject $process.MainWindowHandle
+  $mainRect = Get-WindowRectObject $script:KvEditorHwnd
   $treeCandidates = @()
   $allVisibleChildren = @()
   $conversionDialog = $null
@@ -238,7 +239,7 @@ try {
     # it first; the main window's bottom SysTreeView32 is often a blank shell.
     $conversionDialog = Get-ConversionResultDialog $process.Id
     if ($conversionDialog) { break }
-    $children = [KvTreeHandleWin32]::EnumChildren($process.MainWindowHandle)
+    $children = [KvTreeHandleWin32]::EnumChildren($script:KvEditorHwnd)
     $candidateList = [System.Collections.Generic.List[object]]::new()
     $visibleList = [System.Collections.Generic.List[object]]::new()
     foreach ($child in $children) {

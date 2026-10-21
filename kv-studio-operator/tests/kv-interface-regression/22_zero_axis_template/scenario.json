@@ -1,0 +1,19 @@
+﻿{
+    "name":  "22_zero_axis_template",
+    "enabled":  true,
+    "project_mode":  "fixture_copy",
+    "project_name":  "QA_BlankProject",
+    "source_project":  "fixtures\\QA_BlankProject\\QA_BlankProject.kpr",
+    "workflow":  "scripts/workflows/compile_kv_project.ps1",
+    "result_file":  "workflow\\workflow_result.json",
+    "expected_compile_result":  "expected_compile_result.txt",
+    "arguments":  [
+                      "-ProjectPath",
+                      "${project}",
+                      "-OutDir",
+                      "${out}\\workflow",
+                      "-TimeoutSeconds",
+                      "180"
+                  ],
+    "note":  "0-axis template fixture: compile must stay OK while the project has 0 axes, 0 EtherCAT slaves and only the KV-X520 CPU."
+}

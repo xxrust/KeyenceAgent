@@ -1,4 +1,4 @@
-$script:KvScalarVariableDataTypes = @(
+﻿$script:KvScalarVariableDataTypes = @(
   'BOOL',
   'INT',
   'DINT',
@@ -65,8 +65,16 @@ function Test-KvVariableStringDataType([string]$DataType) {
   return $false
 }
 
-function Test-KvVariableArrayDataType([string]$DataType) {
+function Test-KvVariableArrayDataType([string]$DataType, [string[]]$AllowedCustomDataTypes = @()) {
   $type = ([string]$DataType).Trim()
+  # KV STUDIO also accepts an unsized array of a custom FB/struct type (ARRAY[*] OF strStation),
+  # which is what FB_McMode's Station argument uses in the shipped sample.  Accept it here so the
+  # variable/argument routes can carry the interface through unchanged.
+  if ($type -match '(?i)^ARRAY\[\s*\*\s*\]\s+OF\s+(.+)$') {
+    $unbounded = ([string]$matches[1]).Trim()
+    if ($unbounded -match '(?i)^ARRAY\[') { return $false }
+    return (Test-KvVariableScalarDataType $unbounded) -or (Test-KvVariableStringDataType $unbounded) -or (Test-KvVariableCustomDataType $unbounded $AllowedCustomDataTypes)
+  }
   if ($type -notmatch '(?i)^ARRAY\[\s*(-?\d+)\s*\.\.\s*(-?\d+)\s*\]\s+OF\s+(.+)$') {
     return $false
   }
@@ -75,7 +83,7 @@ function Test-KvVariableArrayDataType([string]$DataType) {
   $elementType = ([string]$matches[3]).Trim()
   if ($upper -lt $lower) { return $false }
   if ($elementType -match '(?i)^ARRAY\[') { return $false }
-  return (Test-KvVariableScalarDataType $elementType) -or (Test-KvVariableStringDataType $elementType)
+  return (Test-KvVariableScalarDataType $elementType) -or (Test-KvVariableStringDataType $elementType) -or (Test-KvVariableCustomDataType $elementType $AllowedCustomDataTypes)
 }
 
 function Test-KvVariableCustomDataType([string]$DataType, [string[]]$AllowedCustomDataTypes = @()) {
@@ -88,7 +96,7 @@ function Test-KvVariableDataType([string]$DataType, [string[]]$AllowedCustomData
   if ([string]::IsNullOrWhiteSpace($DataType)) { return $false }
   return (Test-KvVariableScalarDataType $DataType) -or
     (Test-KvVariableStringDataType $DataType) -or
-    (Test-KvVariableArrayDataType $DataType) -or
+    (Test-KvVariableArrayDataType $DataType $AllowedCustomDataTypes) -or
     (Test-KvVariableCustomDataType $DataType $AllowedCustomDataTypes)
 }
 

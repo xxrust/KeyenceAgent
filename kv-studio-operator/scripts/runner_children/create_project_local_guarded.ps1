@@ -501,11 +501,16 @@ try {
   Restore-KvStudioForeground $process 'Ctrl+N'
 
   Log 'invoke new project button by window-scoped UIA'
-  $uiaInvoked = Invoke-NewProjectButtonByUia $process
+  # UIA Invoke 点「新建项目」按钮在本机实测会挂死（FromHandle Operation timed out ✗）
+  # 直接走守卫的 Ctrl+N 路径（已验证 ✓）
+  $uiaInvoked = $false
+  Log 'UIA new-project button disabled (hangs on this build); using guarded Ctrl+N'
   if (-not $uiaInvoked) {
+    if (Find-NewProjectDialog 2) { Log 'new project dialog already open; skipping Ctrl+N fallback' } else {
     Log 'UIA invoke unavailable; fallback requires verified foreground'
     Assert-KvStudioForeground 'Ctrl+N'
     Invoke-KvGuardedCtrlChord -TargetHwnd $process.MainWindowHandle -Step 'create project Ctrl+N' -Vk 0x4E -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+N opens new project dialog' -AllowModalAfter -SleepMs 200
+    }
   }
   $newProjectDialog = Find-NewProjectDialog 45
   if (-not $newProjectDialog) {

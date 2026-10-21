@@ -215,12 +215,13 @@ workflow 的已验证执行计划就是前置操作清单；不必另写只含�
 - 变量/结构体 schema、FB 表格状态及持久化范围：[variable-editor.md](references/variable-editor.md)。
 - 硬件、EtherCAT、EtherNet/IP 和 ESI 边界：[project-configuration.md](references/project-configuration.md)。
 - 复刻工程和语义快照的资产/恢复契约：[project-replication.md](references/project-replication.md)；官方/用户 FB 区分：[fb-filter.md](references/fb-filter.md)。
+- 定位/遍历工程树（程序、功能块、书签）：[tree-resolution.md](references/tree-resolution.md)。**按结构解析**（父路径 + 直接子项 + `局部变量`/`书签` 指纹）；禁止 `-like` 匹配树项名（`[ ]` 是通配符），禁止全树按名搜索（`变量/HMI` 与程序 `HMI` 同名）。
 - 样例项目位置和副本规则：[sample-project.md](references/sample-project.md)。修改性测试使用测试工程或独立副本。
 - 维护脚本：[script-layout-checklist.md](references/script-layout-checklist.md) 与 [ui-guard-contract.md](references/ui-guard-contract.md)；验证标签含义：[capability-status.md](references/capability-status.md)。
 
 仓库代码是维护源；本机安装链接到该源。输出目录只保存输入与运行证据，不从历史运行目录寻找或执行替代脚本。已退役实现放在仓库 archive 中，以文本保留，不再安装为 skill。
 
-UI probe 和原子操作必须复用仓库现有的进程/HWND 绑定、窗口解析和标题谓词。禁止临时写中文项目标题字面量，禁止让控制台编码转换项目名；优先按 PID/HWND 绑定并使用稳定的 `KV STUDIO*` 谓词。无法复用现有解析助手时，必须在发送输入前停止。
+UI probe 和原子操作必须复用仓库现有的进程/HWND 绑定、窗口解析和标题谓词。禁止临时写中文项目标题字面量，禁止让控制台编码转换项目名；优先按 PID/HWND 绑定并使用稳定的 `KV STUDIO*` 谓词。无法复用现有解析助手时，必须在发送输入前停止。树解析一律用 `scripts/kv_tree_resolver.ps1`（见 [tree-resolution.md](references/tree-resolution.md)）。改动内容优先用最细层级：能改字段就不改程序体，能改程序体就不删/重建模块。
 
 ## 强制真实桌面验收
 

@@ -80,3 +80,11 @@ panel on screen and makes every later keystroke land in the editor. The rule is 
 enforced in code, not only documented: Invoke-KvUiGuardForceForeground throws
 KV_FOREGROUND_FORBIDDEN_AFTER_INPUT_SESSION in that state, and a workflow that meets a
 confirmation panel must answer that panel (its own buttons or keys), never the main window.
+## 实测：删除 + 导入是两段式（delete-then-import）必然被拒
+
+- 现象：`DELETE` 模块 → 确认框按名应答成功 → **4 ms** 后导入即报
+  `Refusing MNM import route: foreground window is not KV STUDIO`；
+  主动补一次置前则被守卫以 `KV_FOREGROUND_FORBIDDEN_AFTER_INPUT_SESSION`（`input_session_already_started`）拒绝。
+- 原因：确认框关闭后前台交还第三方窗口，而输入会话已开始，守卫禁止再取前台（本文件既有条款）。
+- 结论：**不要用"删除 + 重建"去改内容**。改程序体用 `set_fb_program_body`（就地编辑，对扫描程序同样有效）；
+  确需移除模块时单独删除，并与后续导入分成两次独立运行。

@@ -1,4 +1,4 @@
-﻿{
+{
     "schema_version":  2,
     "layout_policy":  "role_directories",
     "notes":  [
@@ -60,6 +60,9 @@
                                           ]
                           },
     "step_result_contracts":  {
+    "runner_children/set_axis_pitch_guarded.ps1": {"files":["axis_pitch_result.json"]},
+    "runner_children/set_axis_table_cell_guarded.ps1": {"files":["table_edit_result.json"]},
+    "runner_children/complete_axis_registration_guarded.ps1": {"files":["axis_registration_result.json"]},
                                   "gates/assert_kv_mvp_ui_guard_usage.ps1":  {
                                                                                  "files":  [
                                                                                                "ui_guard_usage_result.json"
@@ -392,6 +395,9 @@
                                                  }
                                              ],
                     "customer_workflow":  [
+    {"path":"workflows/complete_kv_axis_registration.ps1","status":"pending_validation","customer_callable":true},
+    {"path":"workflows/set_kv_axis_pitch.ps1","status":"pending_validation","customer_callable":true},
+    {"path":"workflows/set_kv_axis_table_cell.ps1","status":"pending_validation","customer_callable":true},
                                               {
                                                   "path":  "workflows/save_kv_project_as.ps1",
                                                   "status":  "published",
@@ -692,6 +698,9 @@
                                                }
                                            ],
                     "runner_child_approved":  [
+    {"path":"runner_children/complete_axis_registration_guarded.ps1","status":"approved","customer_callable":false,"ui_guard_required":true},
+    {"path":"runner_children/set_axis_pitch_guarded.ps1","status":"approved","customer_callable":false,"ui_guard_required":true},
+    {"path":"runner_children/set_axis_table_cell_guarded.ps1","status":"approved","customer_callable":false,"ui_guard_required":false},
                                                   {
                                                       "path":  "runner_children/create_project_local_guarded.ps1",
                                                       "status":  "approved",

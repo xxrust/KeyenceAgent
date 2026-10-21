@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory=$true)]
   [string]$ProjectPath,
 
@@ -652,6 +652,21 @@ function Clear-FbArgumentGridIfNeeded([IntPtr]$FormHwnd, [string]$ProjectNeedle,
 
 function Resolve-FbArgumentOverwriteConfirmation($Modal, [IntPtr]$MainHwnd, [string]$ProjectNeedle, [string]$Stage) {
   $overwriteButton = Find-DescByAid $Modal '_buttonOverwrite'
+  if (-not $overwriteButton) {
+    # This KV STUDIO build renders the overwrite prompt inside the editor window and its
+    # buttons carry no stable AutomationId; match the visible button name from a data file
+    # so this route stays ASCII-only.
+    $panelNamesFile = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'references\kv-panel-buttons.json'
+    if (Test-Path -LiteralPath $panelNamesFile -PathType Leaf) {
+      $panelNames = Get-Content -Raw -LiteralPath $panelNamesFile -Encoding UTF8 | ConvertFrom-Json
+      foreach ($nm in @([string]$panelNames.overwriteAll, [string]$panelNames.overwrite, [string]$panelNames.ok)) {
+        if (-not $nm) { continue }
+        $nameCond = New-Object Windows.Automation.PropertyCondition -ArgumentList ([Windows.Automation.AutomationElement]::NameProperty), $nm
+        $cand = $Modal.FindFirst([Windows.Automation.TreeScope]::Descendants, $nameCond)
+        if ($cand) { $overwriteButton = $cand; break }
+      }
+    }
+  }
   if (-not $overwriteButton) {
     $dump = Write-ElementDescendantDump $Modal 'fb_argument_overwrite_button_missing.json'
     Fail-Step 'KV_FB_ARGUMENT_OVERWRITE_BUTTON_MISSING' $Stage 'FB argument overwrite confirmation did not expose the 覆盖 button.' @($dump)

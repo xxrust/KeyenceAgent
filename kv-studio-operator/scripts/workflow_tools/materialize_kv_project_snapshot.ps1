@@ -1,4 +1,4 @@
-<#
+﻿<#
   Materialize the semantic, human-readable project tree for a completed
   read-only snapshot. The text/raw trees remain immutable evidence; this step
   creates the canonical project model from the same-run atomic outputs.

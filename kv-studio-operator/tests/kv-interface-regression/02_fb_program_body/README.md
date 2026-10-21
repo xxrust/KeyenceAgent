@@ -27,3 +27,9 @@
 ## 日志与结果
 
 输出位于 `../runs/02_fb_program_body_<时间戳>/`。统一日志为 `workflow/run.log`；原子结果、实际粘贴文本、声明头及 receipt 位于 `workflow/artifacts/program_body/`；总结果和控制台输出位于运行目录根部。
+## 适用范围（2026-10 补充）
+
+`set_kv_fb_program_body` 的机制是"选树项 → 打开编辑器 → `Ctrl+D` 编辑列表 → 粘贴 → Tab → Enter"，
+**与 FB 无关**：对**扫描程序**同样有效（本会话对 `ST00…ST06`、`IO输入`、`IO输出`、`初始化` 实测成功，
+工程步数 40448 → 40316，全程未删除模块、未重建变量）。参数名 `-FbModuleName` 属历史命名，
+实际含义是"目标模块名"；定位节点请按 `references/tree-resolution.md` 的结构解析。

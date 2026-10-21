@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory=$true)][string]$ProjectPath,
   [Parameter(Mandatory=$true)][string[]]$Models,
   [string]$OutDir = '',

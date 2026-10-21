@@ -23,6 +23,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+. (Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'kv_window_binding.ps1')
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 $sharedUiGuard = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'guards\kv_ui_guard.ps1'
@@ -332,13 +333,16 @@ try {
 
   Assert-NoBlockingPopup $process.Id
   Log "selected target KV STUDIO pid=$($process.Id) title=$($process.MainWindowTitle) without changing window size"
+  $script:KvEditorHwnd = Get-KvProjectEditorHwnd -ProcessId $process.Id -Needle $projectNeedle
+  if ($script:KvEditorHwnd -eq [IntPtr]::Zero) { throw "KV_PROJECT_EDITOR_WINDOW_NOT_FOUND: $projectNeedle" }
+  Log "editor_hwnd=$($script:KvEditorHwnd) resolved_by=ProjectTreeView_anchor"
   for ($i = 1; $i -le 10; $i++) {
     Invoke-KvUiGuardAltForegroundUnlock
-    [void](Invoke-KvUiGuardForceForeground -TargetHwnd ([IntPtr]$process.MainWindowHandle))
+    [void](Invoke-KvUiGuardForceForeground -TargetHwnd ([IntPtr]$script:KvEditorHwnd))
     Start-Sleep -Milliseconds 150
     $title = Get-ForegroundTitle
     Log "foreground compile try=$i title=$title"
-    if ($title -like 'KV STUDIO*' -and $title -like "*$projectNeedle*" -and -not [KvCompileBoundedWin32]::IsIconic($process.MainWindowHandle)) {
+    if ($title -like 'KV STUDIO*' -and $title -like "*$projectNeedle*" -and -not [KvCompileBoundedWin32]::IsIconic($script:KvEditorHwnd)) {
       break
     }
   }
@@ -354,10 +358,10 @@ try {
   # the synthetic Ctrl+F9 chord without starting conversion.
   Log 'kept the verified KV STUDIO main window focus before conversion'
 
-  Ensure-CapsLockOn $process.MainWindowHandle "KV STUDIO*$projectNeedle*"
+  Ensure-CapsLockOn $script:KvEditorHwnd "KV STUDIO*$projectNeedle*"
   Save-Screenshot '00_before_compile.png'
-  Invoke-CompileAction $process.MainWindowHandle $projectNeedle 'attempt1'
-  $resultTreeVisible = Wait-VisibleResultTree $process.MainWindowHandle $WaitSeconds 'after_attempt1'
+  Invoke-CompileAction $script:KvEditorHwnd $projectNeedle 'attempt1'
+  $resultTreeVisible = Wait-VisibleResultTree $script:KvEditorHwnd $WaitSeconds 'after_attempt1'
   if (-not $resultTreeVisible) {
     throw 'Visible conversion result tree did not appear after guarded compile actions.'
   }

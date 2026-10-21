@@ -1,0 +1,22 @@
+{
+    "note":  "Edit one cell of the custom-drawn axis control table on the shared sample project copy by OBJECT selection (Ctrl+Home, Down x row, Right x col), F2, type, Enter; the whole-table diff must show exactly one changed row at the target index.",
+    "name":  "25_table_cell_edit",
+    "arguments":  [
+                      "-ProjectPath",
+                      "${project}",
+                      "-OutDir",
+                      "${out}\\workflow",
+                      "-RowIndex",
+                      "39",
+                      "-Column",
+                      "1",
+                      "-Value",
+                      "1500",
+                      "-TimeoutSeconds",
+                      "240"
+                  ],
+    "result_file":  "workflow\\workflow_result.json",
+    "workflow":  "scripts/workflows/set_kv_axis_table_cell.ps1",
+    "enabled":  false,
+    "disabled_reason":  "TODO: set_axis_table_cell_guarded.ps1 has no navigation step; the harness only opens the project, so the axis control settings page is not open and the table copy returns 1 row. Port the navigation block from set_axis_pitch_guarded.ps1 (expand 单元配置 -\u003e [0] KV-X520 -\u003e 运动设定 -\u003e 轴设定, double-click 轴控制设定) and re-enable."
+}

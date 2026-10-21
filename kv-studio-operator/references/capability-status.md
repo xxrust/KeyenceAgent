@@ -22,7 +22,7 @@ EtherNet/IP 或 ESI 注册 workflow 时返回 ROUTE_RESEARCH_REQUIRED。
 修改脚本后，先跑解析、manifest 分类、结果负例和计划检查，再用公开
 workflow 做受影响的实测。失败必须保留，成功必须关联实际输入、代码
 依赖和语义断言；旧日志不能自动认证新版本。具体覆盖和剩余工作见仓库
-`docs/system-reliability-plan.md`，不要在此复制易过期的通过次数。
+``work/系统缺口报告.md`（会话级证据；仓库内暂无 docs/ 目录）`，不要在此复制易过期的通过次数。
 
 结构体 plan schema 和焦点/空白行规则统一见 variable-editor.md；
 原子动作的注册与守卫规则统一见 ui-guard-contract.md。

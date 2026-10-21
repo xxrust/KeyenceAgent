@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory=$true)]
   [string]$ProjectPath,
 
@@ -482,10 +482,17 @@ try {
   }
   if ($bound.Count -gt 1) { throw 'KV_EXPORT_PROJECT_PROCESS_AMBIGUOUS' }
   if ($RestartKvs) {
-    $toStop = @($bound)
-    $script:StoppedProcessIds = @($toStop | ForEach-Object { $_.Id })
-    $toStop | Stop-Process -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 2
+    # 重启：杀掉**所有**匹配的 KVS 并**等它们真正退出**（否则下一段会看到"正在退出"的进程并误判 ✗）
+    $allMatching = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })
+    $script:StoppedProcessIds = @($allMatching | ForEach-Object { $_.Id })
+    $allMatching | Stop-Process -Force -ErrorAction SilentlyContinue
+    $waitDeadline = (Get-Date).AddSeconds(20)
+    while ((Get-Date) -lt $waitDeadline) {
+      $aliveKvs = @(Get-Process Kvs -ErrorAction SilentlyContinue)
+      if ($aliveKvs.Count -eq 0) { break }
+      Start-Sleep -Milliseconds 400
+    }
+    Start-Sleep -Milliseconds 800
     $bound=@()
   }
 

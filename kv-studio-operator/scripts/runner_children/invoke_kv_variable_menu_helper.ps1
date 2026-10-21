@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory=$true)][int]$ExpectedProcessId,
   [Parameter(Mandatory=$true)][string]$ExpectedProjectNeedle,
   [Parameter(Mandatory=$true)][string]$ResultPath

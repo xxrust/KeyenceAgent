@@ -1,0 +1,7 @@
+{
+    "schema_version":  1,
+    "allow_no_bom_with_non_ascii":  [
+
+                                    ],
+    "note":  "Known debt is empty: the syntax and encoding gate is strict. Any .ps1 that fails to parse, or that contains non-ASCII without a UTF-8 BOM, fails the gate."
+}

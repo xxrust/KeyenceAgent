@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][long]$MainWindowHandle,[Parameter(Mandatory=$true)][int]$ExpectedProcessId,[Parameter(Mandatory=$true)][string]$ResultPath)
+﻿param([Parameter(Mandatory=$true)][long]$MainWindowHandle,[Parameter(Mandatory=$true)][int]$ExpectedProcessId,[Parameter(Mandatory=$true)][string]$ResultPath)
 $ErrorActionPreference='Stop'
 try {
   Add-Type -AssemblyName UIAutomationClient

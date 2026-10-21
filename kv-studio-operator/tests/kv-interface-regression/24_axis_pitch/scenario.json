@@ -1,0 +1,19 @@
+{
+    "name":  "24_axis_pitch",
+    "arguments":  [
+                      "-ProjectPath",
+                      "${project}",
+                      "-OutDir",
+                      "${out}\\workflow",
+                      "-AxisLabel",
+                      "轴4:上料1拨料",
+                      "-Pitch",
+                      "15",
+                      "-TimeoutSeconds",
+                      "240"
+                  ],
+    "result_file":  "workflow\\workflow_result.json",
+    "workflow":  "scripts/workflows/set_kv_axis_pitch.ps1",
+    "enabled":  true,
+    "note":  "Change an axis parameter on the shared sample copy. Axis 轴2 is a rotary-table axis (no moving-amount field), so the legal parameter is the reduction ratio n/m; the script selects the axis COLUMN in the axis control table (multi-axis grid), sets ratio n=2, 执行计算 proves the model took it, OK(W) applies, 是(Y) confirms, save. Wizard title is asserted to be the requested axis."
+}
