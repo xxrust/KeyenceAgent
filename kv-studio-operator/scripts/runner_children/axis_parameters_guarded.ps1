@@ -184,7 +184,7 @@ if (-not $grid) { throw 'KV_AXIS_PARAM_GRID_NOT_FOUND' }
 $g = $grid.Current.BoundingRectangle
 W ('grid = ' + [int]$g.X + ',' + [int]$g.Y + ' ' + [int]$g.Width + 'x' + [int]$g.Height)
 
-function Focus-Grid { [AxGrid]::Click([int]($g.X + 300), [int]($g.Y + 60)); Start-Sleep -Milliseconds 400 }
+function Focus-Grid { [AxGrid]::Click([int]($g.X + 460), [int]($g.Y + 220)); Start-Sleep -Milliseconds 300; Send-G '{RIGHT}' 'collapse right' 90; Send-G '{LEFT}' 'collapse left' 90 }
 function Read-All {
     Focus-Grid
     Send-G '^a' 'grid select all'
@@ -194,10 +194,16 @@ function Read-All {
     return (Get-Clipboard -Raw)
 }
 function Read-Cell {
-    Focus-Grid
-    Send-G '^c' 'cell copy'
-    Start-Sleep -Milliseconds 450
-    return ((Get-Clipboard -Raw) -replace "`r?`n", '')
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        Focus-Grid
+        Send-G '^c' ('cell copy ' + $attempt)
+        Start-Sleep -Milliseconds 450
+        $v = ((Get-Clipboard -Raw) -replace "`r?`n", '')
+        if ($v -notmatch "`t") { return $v }
+        W ('  copy returned multiple cells (len=' + $v.Length + '), retry')
+        Send-G '{ESC}' 'escape selection' 150
+    }
+    return '(multi-cell)'
 }
 function Go-Cell([int]$row, [int]$col) {
     Focus-Grid
@@ -285,40 +291,94 @@ if ($Mode -eq 'Read') {
     exit 0
 }
 
-# ================= 写 =================
+# ================= 写（任意轴 × 任意可写属性）=================
 if (-not $Value) { throw 'KV_AXIS_PARAM_VALUE_REQUIRED' }
 if ($targets.Count -ne 1) { throw 'KV_AXIS_PARAM_WRITE_ONE_AT_A_TIME' }
 $t = $targets[0]
 $before = Cell $t.i $Axis
 W ('target: axis=' + $Axis + ' (' + $axisNames[$Axis - 1] + ')  param=' + $t.n + '  before=[' + $before + ']  -> value=[' + $Value + ']')
+
+function Read-Target { return (Cell $t.i $Axis) }
+function Diff-Cells([string[]]$beforeLines, [string[]]$afterLines) {
+    $out = @()
+    for ($i = 0; $i -lt [Math]::Min($beforeLines.Count, $afterLines.Count); $i++) {
+        $a = @(($beforeLines[$i] -replace "`r", '') -split "`t")
+        $b = @(($afterLines[$i] -replace "`r", '') -split "`t")
+        for ($c = 0; $c -lt [Math]::Min($a.Count, $b.Count); $c++) {
+            if ($a[$c] -ne $b[$c]) { $out += [pscustomobject]@{ row = $i; col = $c + 1; before = $a[$c]; after = $b[$c] } }
+        }
+    }
+    return $out
+}
+
+# 定位 + 读回校验（指哪打哪 ✓）
 Go-Cell $t.i $Axis
 $cur = Read-Cell
-W ('selected cell now = [' + $cur + ']')
+W ('located cell = [' + $cur + ']')
 Shot 'w1_selected.png'
 if ($cur -ne $before) { throw ('KV_AXIS_PARAM_LOCATE_MISMATCH: selected=[' + $cur + '] expected=[' + $before + ']') }
 
+# ---- 方式 1：键入（数值/文本类 ✓）----
 Go-Cell $t.i $Axis
-Send-G '{F2}' 'cell edit' 250
-Send-G '^a' 'cell select' 150
-Send-G $Value 'cell type' 250
-Send-G '{ENTER}' 'cell commit' 600
-Shot 'w2_after_typing.png'
-$afterAll = Read-All
-$afterLines = @($afterAll -split "`r?`n" | Where-Object { $_.Trim() })
-$diffs = @()
-for ($i = 0; $i -lt [Math]::Min($lines.Count, $afterLines.Count); $i++) {
-    $a = @(($lines[$i] -replace "`r", '') -split "`t")
-    $b = @(($afterLines[$i] -replace "`r", '') -split "`t")
-    for ($c = 0; $c -lt [Math]::Min($a.Count, $b.Count); $c++) {
-        if ($a[$c] -ne $b[$c]) { $diffs += [pscustomobject]@{ row = $i; col = $c + 1; before = $a[$c]; after = $b[$c] } }
+Send-G '{F2}' 'edit mode' 250
+Send-G '^a' 'select cell text' 150
+Send-G $Value 'type value' 250
+Send-G '{ENTER}' 'commit' 600
+$v1 = Read-Target
+W ('after typed write = [' + $v1 + ']')
+$mode = ''
+if ($v1 -eq $Value -or ($v1 -ne $before -and $v1.Replace('0.000', '0') -eq $Value)) { $mode = 'typed' }
+
+# ---- 方式 2：下拉循环（选择型 ✓：逻辑系/线性/使用/减速停止/负方向/SIN…）----
+if (-not $mode) {
+    W 'typed write did not take -> try combo cycling'
+    # 先回滚（若已被改动 ✗）
+    if ($v1 -ne $before) {
+        Go-Cell $t.i $Axis
+        Send-G '{F2}' 'revert edit' 200
+        Send-G '^a' 'revert select' 120
+        Send-G $before 'revert type' 200
+        Send-G '{ENTER}' 'revert commit' 500
+        W ('reverted to [' + (Read-Target) + ']')
+    }
+    $hit = $false
+    for ($try = 0; $try -lt 2 -and -not $hit; $try++) {
+        $keys = if ($try -eq 0) { '{DOWN}' } else { '{UP}' }
+        for ($n = 1; $n -le 24; $n++) {
+            Go-Cell $t.i $Axis
+            Send-G '{F2}' ('combo edit ' + $try + '/' + $n) 200
+            Send-G $keys ('combo step ' + $try + '/' + $n) 200
+            Send-G '{ENTER}' ('combo commit ' + $try + '/' + $n) 450
+            $vn = Read-Target
+            if ($vn -eq $Value) { $hit = $true; $mode = ('combo ' + $keys + ' x' + $n); W ('combo hit after ' + $n + ' step(s)'); break }
+        }
+    }
+    if (-not $hit) {
+        # 回滚并报不可写
+        Go-Cell $t.i $Axis
+        Send-G '{F2}' 'final revert' 200
+        Send-G '^a' 'final revert select' 120
+        Send-G $before 'final revert type' 200
+        Send-G '{ENTER}' 'final revert commit' 500
+        $now = Read-Target
+        W ('final value = [' + $now + ']')
+        Shot 'w_notwritable.png'
+        [ordered]@{ ok = $false; reason = 'KV_AXIS_PARAM_NOT_WRITABLE'; axis = $Axis; axis_label = $axisNames[$Axis - 1]; param = $t.n; param_index = $t.i; before = $before; after = $now } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'axis_param_write.json') -Encoding UTF8
+        throw ('KV_AXIS_PARAM_NOT_WRITABLE: ' + $t.n + ' (value stayed ' + $now + ')')
     }
 }
+W ('write mode = ' + $mode)
+
+# ---- 校验：整表 diff 恰好 1 格且位置正确 ✓ ----
+$afterAll = Read-All
+$afterLines = @($afterAll -split "`r?`n" | Where-Object { $_.Trim() })
+$diffs = @(Diff-Cells $lines $afterLines)
 W ('cell diffs = ' + $diffs.Count)
 $diffs | ForEach-Object { W ('  diff r' + $_.row + ' c' + $_.col + ': [' + $_.before + '] -> [' + $_.after + ']') }
 Shot 'w3_after_read.png'
 $ok = ($diffs.Count -eq 1 -and $diffs[0].row -eq $t.i -and $diffs[0].col -eq $Axis)
 W ('exactly one cell changed at target = ' + $ok)
-if ($ok -and -not $NoSave) { Send-G '^s' 'save' 4000; Start-Sleep -Seconds 2; W ('title=[' + [string]$p.MainWindowTitle + ']'); Shot 'w4_saved.png' }
-[ordered]@{ ok = $ok; axis = $Axis; axis_label = $axisNames[$Axis - 1]; param = $t.n; param_index = $t.i; before = $before; after = (Cell $t.i $Axis); diffs = $diffs } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutDir 'axis_param_write.json') -Encoding UTF8
+if ($ok -and -not $NoSave) { Send-G '^s' 'save axis param' 4000; Start-Sleep -Seconds 2; W ('title=[' + [string]$p.MainWindowTitle + ']'); Shot 'w4_saved.png' }
+[ordered]@{ ok = $ok; mode = $mode; axis = $Axis; axis_label = $axisNames[$Axis - 1]; param = $t.n; param_index = $t.i; before = $before; after = (Cell $t.i $Axis); diffs = $diffs } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutDir 'axis_param_write.json') -Encoding UTF8
 W 'done'
 exit 0
