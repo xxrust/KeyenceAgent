@@ -444,6 +444,7 @@ W ('exactly one cell changed at target = ' + $ok)
 
 # ---- 5. 保存（仅在通过时 ✓）----
 if ($ok -and -not $NoSave) {
+    Send-G '{ESC}' 'leave grid before save' 300
     Send-G '^s' 'save' 4000
     Start-Sleep -Seconds 2
     W ('title=[' + [string]$p.MainWindowTitle + ']')
