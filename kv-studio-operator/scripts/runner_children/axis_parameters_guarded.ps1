@@ -372,27 +372,6 @@ if ($Mode -eq 'Dump') {
 }
 
 if ($Mode -ne 'Apply' -and ($Axis -lt 1 -or $Axis -gt $header.Count)) { throw ('KV_AXIS_PARAM_AXIS_OUT_OF_RANGE: axis=' + $Axis + ' max=' + $header.Count) }
-$targets = @()
-if ($AllParams) { $targets = @($script:ParamTable) }
-else {
-    $prm = Find-Param $Param
-    if (-not $prm) { throw ('KV_AXIS_PARAM_UNKNOWN: ' + $Param + ' | known: ' + (Param-Names)) }
-    $targets = @($prm)
-}
-
-if ($Mode -eq 'Read') {
-    $rowsOut = @()
-    foreach ($t in $targets) {
-        $v = Cell $t.i $Axis
-        $rowsOut += [pscustomobject]@{ axis = $Axis; axis_label = $axisNames[$Axis - 1]; param_index = $t.i; param = $t.n; alias = $t.a; group = $t.g; value = $v }
-        W ('  [' + $Axis + '] ' + $t.n + ' = ' + $v)
-    }
-    $rowsOut | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'axis_param_read.json') -Encoding UTF8
-    W 'read done'
-    exit 0
-}
-
-# ================= 批量改写（Apply）：轴1 上→下，再轴2 …（左→右）=================
 if ($Mode -eq 'Apply') {
     if (-not $PlanPath -or -not (Test-Path -LiteralPath $PlanPath)) { throw 'KV_AXIS_PARAM_PLAN_REQUIRED' }
     $plan = Get-Content -Raw -LiteralPath $PlanPath -Encoding UTF8 | ConvertFrom-Json
@@ -475,6 +454,27 @@ if ($Mode -eq 'Apply') {
     W 'batch done'
     exit 0
 }
+$targets = @()
+if ($AllParams) { $targets = @($script:ParamTable) }
+else {
+    $prm = Find-Param $Param
+    if (-not $prm) { throw ('KV_AXIS_PARAM_UNKNOWN: ' + $Param + ' | known: ' + (Param-Names)) }
+    $targets = @($prm)
+}
+
+if ($Mode -eq 'Read') {
+    $rowsOut = @()
+    foreach ($t in $targets) {
+        $v = Cell $t.i $Axis
+        $rowsOut += [pscustomobject]@{ axis = $Axis; axis_label = $axisNames[$Axis - 1]; param_index = $t.i; param = $t.n; alias = $t.a; group = $t.g; value = $v }
+        W ('  [' + $Axis + '] ' + $t.n + ' = ' + $v)
+    }
+    $rowsOut | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'axis_param_read.json') -Encoding UTF8
+    W 'read done'
+    exit 0
+}
+
+# ================= 批量改写（Apply）：轴1 上→下，再轴2 …（左→右）=================
 
 # ================= 写（线性、无循环、无重试）=================
 # 流程：Ctrl+Home → →×(轴-1) → ↓×(行) → Ctrl+C 校验 → Enter → 键入 → Enter → 整表 diff → Ctrl+S
