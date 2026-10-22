@@ -1,6 +1,7 @@
 ﻿param(
     [Parameter(Mandatory = $true)][string]$OutDir,
-    [ValidateSet('Read', 'Write', 'Dump')][string]$Mode = 'Read',
+    [ValidateSet('Read', 'Write', 'Dump', 'Apply')][string]$Mode = 'Read',
+    [string]$PlanPath = '',
     [int]$Axis = 0,
     [string]$Param = '',
     [string]$Value = '',
@@ -370,7 +371,7 @@ if ($Mode -eq 'Dump') {
     exit 0
 }
 
-if ($Axis -lt 1 -or $Axis -gt $header.Count) { throw ('KV_AXIS_PARAM_AXIS_OUT_OF_RANGE: axis=' + $Axis + ' max=' + $header.Count) }
+if ($Mode -ne 'Apply' -and ($Axis -lt 1 -or $Axis -gt $header.Count)) { throw ('KV_AXIS_PARAM_AXIS_OUT_OF_RANGE: axis=' + $Axis + ' max=' + $header.Count) }
 $targets = @()
 if ($AllParams) { $targets = @($script:ParamTable) }
 else {
@@ -388,6 +389,90 @@ if ($Mode -eq 'Read') {
     }
     $rowsOut | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'axis_param_read.json') -Encoding UTF8
     W 'read done'
+    exit 0
+}
+
+# ================= 批量改写（Apply）：轴1 上→下，再轴2 …（左→右）=================
+if ($Mode -eq 'Apply') {
+    if (-not $PlanPath -or -not (Test-Path -LiteralPath $PlanPath)) { throw 'KV_AXIS_PARAM_PLAN_REQUIRED' }
+    $plan = Get-Content -Raw -LiteralPath $PlanPath -Encoding UTF8 | ConvertFrom-Json
+    # 展开成有序任务：按轴升序、同轴内按参数行升序 ✓
+    $jobs = @()
+    foreach ($ax in @($plan.axes)) {
+        foreach ($ch in @($ax.changes)) {
+            $prm = Find-Param ([string]$ch.param)
+            if (-not $prm) { throw ('KV_AXIS_PARAM_UNKNOWN: ' + $ch.param + ' | known: ' + (Param-Names)) }
+            $jobs += [pscustomobject]@{ axis = [int]$ax.axis; row = [int]$prm.i; param = $prm.n; value = [string]$ch.value }
+        }
+    }
+    $jobs = @($jobs | Sort-Object axis, row)
+    W ('batch jobs = ' + $jobs.Count)
+    $jobs | ForEach-Object { W ('  axis ' + $_.axis + '  row ' + $_.row + '  ' + $_.param + ' = ' + $_.value) }
+
+    $results = @()
+    $curAxis = -1
+    $curRow = -1
+    foreach ($j in $jobs) {
+        $before = Cell $j.row $j.axis
+        W ('[' + $j.axis + '] ' + $j.param + '  before=[' + $before + '] -> ' + $j.value)
+        if ($j.axis -ne $curAxis) {
+            # 换轴：回到左上角，再右移到目标轴 ✓
+            Send-G '^{HOME}' 'home' 250
+            for ($i = 1; $i -lt $j.axis; $i++) { Send-G '{RIGHT}' ('right ' + $i) 70 }
+            $curAxis = $j.axis
+            $curRow = 0
+            Start-Sleep -Milliseconds 150
+        }
+        # 同轴内：向下走到目标行（Enter 提交后会多在下一行，所以这里按差值走 ✓）
+        $delta = $j.row - $curRow
+        if ($delta -lt 0) { throw ('KV_AXIS_PARAM_ORDER_VIOLATION: row ' + $j.row + ' < current ' + $curRow) }
+        for ($i = 0; $i -lt $delta; $i++) { Send-G '{DOWN}' ('down ' + $i) 70 }
+        Start-Sleep -Milliseconds 120
+
+        # 校验定位 ✓
+        Send-G '^c' 'read located' 350
+        $located = ((Get-Clipboard -Raw) -replace "`r?`n", '')
+        if (-not (Same-Value $located $before)) { throw ('KV_AXIS_PARAM_LOCATE_MISMATCH: axis=' + $j.axis + ' row=' + $j.row + ' located=[' + $located + '] expected=[' + $before + ']') }
+
+        # 改值 ✓
+        Send-G '{ENTER}' 'enter edit' 250
+        Send-G '^a' 'select content' 180
+        Send-G $j.value 'type value' 250
+        Send-G '{ENTER}' 'commit' 500
+        $curRow = $j.row + 1   # Enter 提交后自动下移一格 ✓
+
+        # 单格校验：↑ 回到该格读回 ✓
+        Send-G '{UP}' 'back to cell' 200
+        Send-G '^c' 'verify cell' 350
+        $after = ((Get-Clipboard -Raw) -replace "`r?`n", '')
+        $good = Same-Value $after $j.value
+        W ('  after=[' + $after + ']  ok=' + $good)
+        if (-not $good) { throw ('KV_AXIS_PARAM_WRITE_NOT_APPLIED: axis=' + $j.axis + ' row=' + $j.row + ' value=[' + $j.value + '] read=[' + $after + ']') }
+        Send-G '{DOWN}' 'resume' 120
+        $results += [pscustomobject]@{ axis = $j.axis; axis_label = $axisNames[$j.axis - 1]; row = $j.row; param = $j.param; before = $before; after = $after; ok = $good }
+        Shot ('batch_' + $j.axis + '_' + $j.row + '.png')
+    }
+
+    # 最终整表核对：变化格数必须 = 实际改动格数 ✓
+    $afterAll = Read-All
+    $afterLines = @($afterAll -split "`r?`n" | Where-Object { $_.Trim() })
+    $diffCount = 0
+    for ($r = 0; $r -lt [Math]::Min($lines.Count, $afterLines.Count); $r++) {
+        $a = @(($lines[$r] -replace "`r", '') -split "`t")
+        $b = @(($afterLines[$r] -replace "`r", '') -split "`t")
+        for ($c = 0; $c -lt [Math]::Min($a.Count, $b.Count); $c++) { if ($a[$c] -ne $b[$c]) { $diffCount++ } }
+    }
+    W ('final whole-table changed cells = ' + $diffCount)
+    $okAll = ($results.Count -eq $jobs.Count)
+    if ($okAll -and -not $NoSave) {
+        Send-G '{ESC}' 'leave grid' 300
+        Send-G '^s' 'save' 4000
+        Start-Sleep -Seconds 2
+        W ('title=[' + [string]$p.MainWindowTitle + ']')
+        Shot 'batch_saved.png'
+    }
+    [ordered]@{ ok = $okAll; jobs = $jobs.Count; changed = $results.Count; diff_cells = $diffCount; results = $results } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'axis_param_batch.json') -Encoding UTF8
+    W 'batch done'
     exit 0
 }
 
