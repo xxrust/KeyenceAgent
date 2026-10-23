@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory=$true)][string]$ProjectPath,
   [Parameter(Mandatory=$true)][string]$OutDir,
   [string]$AxisLabel = '轴1:Axis_1',

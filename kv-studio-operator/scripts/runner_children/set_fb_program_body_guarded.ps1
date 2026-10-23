@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$ProjectPath,[Parameter(Mandatory=$true)][string]$FbModuleName,[Parameter(Mandatory=$true)][string]$MnmPath,[Parameter(Mandatory=$true)][string]$OutDir)
+﻿param([Parameter(Mandatory=$true)][string]$ProjectPath,[Parameter(Mandatory=$true)][string]$FbModuleName,[Parameter(Mandatory=$true)][string]$MnmPath,[Parameter(Mandatory=$true)][string]$OutDir)
 $ErrorActionPreference='Stop';New-Item -ItemType Directory -Force $OutDir|Out-Null
 . (Join-Path (Split-Path -Parent $PSCommandPath) '..\guards\kv_ui_guard.ps1');Add-Type -AssemblyName System.Windows.Forms;Add-Type -AssemblyName UIAutomationClient;Add-Type -AssemblyName UIAutomationTypes
 Initialize-KvUiGuard -OutDir $OutDir -CheckpointSubdir 'program_body_ui'
