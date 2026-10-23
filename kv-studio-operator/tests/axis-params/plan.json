@@ -1,7 +1,7 @@
 ﻿{
     "axes":  [
                  {
-                     "axis":  4,
+                     "axis":  2,
                      "changes":  [
                                      {
                                          "param":  "JOG起动速度",
