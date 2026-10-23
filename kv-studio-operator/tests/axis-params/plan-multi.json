@@ -1,0 +1,26 @@
+﻿{
+    "axes":  [
+                 {
+                     "axis":  1,
+                     "changes":  [
+                                     {
+                                         "param":  "JOG起动速度",
+                                         "value":  "3"
+                                     },
+                                     {
+                                         "param":  "JOG高速速度",
+                                         "value":  "33"
+                                     }
+                                 ]
+                 },
+                 {
+                     "axis":  2,
+                     "changes":  [
+                                     {
+                                         "param":  "JOG起动速度",
+                                         "value":  "7"
+                                     }
+                                 ]
+                 }
+             ]
+}
