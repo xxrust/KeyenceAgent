@@ -72,7 +72,16 @@ plan 暴露 `project_inventory_path` 与 `scan_order_result_path`。
    9/9 通过，且 scaffold 产出的 merged TSV 已在真实工程上跑通
    （`R_Flag/R100`、`Init_Flag/TRUE`、`Note_Flag/comment` 均回读保留）。
    仍缺：retain/constant/group_name 与局部变量属性。
-2. **官方库依赖安装**：样例的 36 个官方/库 FB 仍无安装 workflow；复刻需要先装库。
+2. ~~**官方库依赖安装**~~：**2026-10-24 已澄清并关闭**。36 个官方/库 FB 是
+   Universal Library 的机型固有 FB，不是独立安装包：新建工程无
+   `功能块 > UniversalLibrary`；配置 `SV630_1Axis_03713` 节点后出现
+   `Motor > Inovance_SV630N_V100` 的 8 个 `MC_*` FB；`QA_BlankProject`
+   的 SV630N + YAKO 节点对应两套库。依赖顺序：装 `.ecsup`/ESI → 配 EtherCAT 节点
+   → 再导入用户 MNM。新增
+   `workflow_tools/assert_kv_library_dependencies.ps1` 做前置断言
+   （`KV_LIBRARY_TREE_MISSING` / `_VENDOR_MISSING` / `_FB_MISSING`），
+   `tests\library-dependencies` 7/7 通过；细节见
+   `references/library-dependencies.md`。系统库（SystemFB/DataUtilization）仍不在覆盖内。
 3. ~~**普通程序局部变量导出**~~：**2026-10-24 已关闭**。
    `export_kv_project_text_snapshot.ps1` 现在把普通程序模块加入同一个局部变量
    快照会话（`-SnapshotModules` 逗号连接；`-SkipProgramLocals` 可退回旧行为）。

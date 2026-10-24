@@ -152,7 +152,11 @@ fails the workflow. The plan exposes `project_inventory_path` and
 `scan_order_result_path`.
 
 Full reproduction still requires a variable/structure snapshot, library dependency
-evidence, and the same-run conversion result.
+evidence, and the same-run conversion result. Universal Library FBs are generated
+by the EtherCAT device configuration, not by a separate install step; use
+`workflow_tools/assert_kv_library_dependencies.ps1` before importing user MNMs
+that call them. See `references/library-dependencies.md` for the dependency
+order, failure codes and the 2026-10-24 live evidence.
 
 The flat workflow creates `<RunRoot>/run.log` before its first child and passes
 `KV_WORKFLOW_RUN_LOG` to children so guard actions and workflow stage results share

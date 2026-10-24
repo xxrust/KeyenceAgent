@@ -231,6 +231,11 @@
                                                                                                "scan_order_verification.json"
                                                                                            ]
                                                                              },
+                                  "workflow_tools/assert_kv_library_dependencies.ps1":  {
+                                                                                           "files":  [
+                                                                                                         "library_dependency_result.json"
+                                                                                                     ]
+                                                                                       },
                                   "export_kv_project_inventory.ps1":  {
                                                                           "files":  [
                                                                                         "project_inventory.json"
@@ -333,6 +338,14 @@
                                                      "capabilities":  [
                                                                           "verify_saved_scan_order",
                                                                           "verify_source_target_execution_order"
+                                                                      ]
+                                                 },
+                                                 {
+                                                     "path":  "workflow_tools/assert_kv_library_dependencies.ps1",
+                                                     "status":  "published",
+                                                     "customer_callable":  true,
+                                                     "capabilities":  [
+                                                                          "verify_universal_library_dependency"
                                                                       ]
                                                  },
                                                  {
