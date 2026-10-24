@@ -25,6 +25,9 @@
   # Optional override; scaffold.json variables.attributes=full also enables it.
   [switch]$FullGlobalAttributes,
   [switch]$DeleteExistingModulesBeforeImport,
+  # Optional mutation-plan JSON for user data types (structures). When present,
+  # the plan imports them after project creation and before module imports.
+  [string]$StructurePlanPath = '',
 
   [Parameter(Mandatory=$true)]
   [string]$OutDir
@@ -265,6 +268,13 @@ try {
   # command-line matching.
   $createdProjectResultPath = if ($Mode -eq 'new_project') { Join-Path (Join-Path $artifactRoot 'create_project') 'create_project_result.json' } else { '' }
 
+  if ($StructurePlanPath) {
+    $structurePlanFull = [IO.Path]::GetFullPath($StructurePlanPath)
+    if (-not (Test-Path -LiteralPath $structurePlanFull -PathType Leaf)) { throw "KV_STRUCTURE_PLAN_MISSING: $structurePlanFull" }
+    $structuresOut = Join-Path $artifactRoot 'structures'
+    $steps.Add((New-Step 'import_structures' 'mutate_structure_definitions_guarded.ps1' @('runner_child_approved') @('-ProjectPath',$projectPathForRun,'-PlanPath',$structurePlanFull,'-OutDir',$structuresOut) $structuresOut 'runner_child' 1800))
+  }
+
   $defaultProgramName = 'Main'
   $scaffoldModuleNames = @($resolvedMnmFiles | ForEach-Object { [string]$_.module_name })
   $scaffoldHasDefaultProgram = (@($scaffoldModuleNames | Where-Object { $_ -ieq $defaultProgramName }).Count -gt 0)
@@ -434,6 +444,7 @@ try {
     timeout_seconds = $TimeoutSeconds
     source_snapshot_manifest = $SourceSnapshotManifestPath
     delete_existing_modules_before_import = [bool]($DeleteExistingModulesBeforeImport -or $Mode -eq 'new_project')
+    structure_plan_path = $(if ($StructurePlanPath) { [IO.Path]::GetFullPath($StructurePlanPath) } else { '' })
     default_program_staging = [ordered]@{
       scaffold_contains_default_program = $scaffoldHasDefaultProgram
       stage_module_name = $stageModuleName

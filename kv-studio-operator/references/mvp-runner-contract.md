@@ -138,6 +138,20 @@ device-bound globals and motion axis/group reference types (`_MC_AXIS_REF`,
 `_MC_AXIS_GROUP_REF`) from the "referenced by the paired MNM" rule: those are
 configuration objects, not code references.
 
+### Structure (Data Type) Import
+
+`new_kv_mvp_execution_plan.ps1 -StructurePlanPath <mutation plan>` adds an
+`import_structures` step immediately after `create_project`. The plan uses the
+`mutate_structure_definitions_guarded.ps1` schema: `structure_operations[]` with
+`action=create`, `parent_path=["数据类型"]`, and `members[]`. Generate it from a
+snapshot's `structure_definitions.json` in dependency order (types whose members
+are scalars first, nested types after).
+
+The runner retries an empty member paste once, probes the grid without writing a
+failure artifact, and waits for the new tree item before opening it. Live
+2026-10-24: the 26 user data types of the KVX sample imported and verified in one
+flat plan run, followed by all 28 module imports and all 4 FB argument writes.
+
 The baseline variable writer proves `name` and `data_type`. The opt-in
 `-FullGlobalAttributes` route on `set_kv_variables.ps1` additionally writes and
 reads back the global `device`, `initial_value` and `comment` columns (live
