@@ -37,6 +37,37 @@ KV STUDIO 的编译是全局的，但 UI 写入必须按依赖顺序，**块里�
 先写顶层程序、后补变量，或者跳过结构体直接写 FB 自变量，都会在粘贴/编译阶段
 报“无效数据类型/未注册变量”。修改任何一步前先确认它依赖的层已经存在。
 
+## 弹窗之后先编译（编译结果是变量问题的权威清单）
+
+粘贴变量时若出现「粘贴数据中存在错误，已跳过部分数据粘贴。」，不要只盯着弹窗：
+
+1. 记录并关闭弹窗（runner 已自动处理三种确认/警告框）；
+2. **立即编译**（`compile_and_copy_result_bounded.ps1` + `copy_convert_result_from_tree_handle.ps1`），
+   把 `compile_result_copied.txt` 交给
+   `workflow_tools/parse_kv_compile_result.ps1`；
+3. 用结构化输出定位问题，而不是靠猜：
+
+```powershell
+powershell -File <skill-root>\scripts\workflow_tools\parse_kv_compile_result.ps1 `
+  -ResultPath <run>\artifacts\copy_result\compile_result_copied.txt -OutDir <run>\triage
+```
+
+输出 `compile_triage.json`：`state`、`errors_by_code`、`errors_by_module`、`error_symbols`、
+每条错误的 `{module,line,st_line,code,symbol,message}`。
+
+已知错误码含义（实机 2026-10-24）：
+
+| 代码 | 含义 | 典型原因 |
+|---|---|---|
+| 709 | 变量编辑窗口中存在不正确的变量定义 | 粘贴后类型/分配目标被写坏（如轴引用行），该变量仍留在表里 |
+| 214 | 梯形图中存在未注册变量 | 变量没写进表：局部变量未执行、或分组全局变量不在模型里 |
+| 1232 | ST 里发现非法的字符串 | ST 使用的标识符未定义（同样表现为变量没写进去） |
+| 602 | Pos 不在范围内 | ST 参数/点号越界 |
+| 33 | 可以省略 ENDH 命令 | 仅警告 |
+
+**经验：一个变量步骤失败会中止后续所有模块的变量写入**，所以编译里会出现大片
+1232/214。先修第一个失败点，再看编译；不要用“补一点变量再试”的方式绕过。
+
 ## 选择接口
 
 唯一能力清单是 [scripts/script_manifest.json](scripts/script_manifest.json)。用只读查询获得实际路径、参数类型、必填参数和验证范围：
