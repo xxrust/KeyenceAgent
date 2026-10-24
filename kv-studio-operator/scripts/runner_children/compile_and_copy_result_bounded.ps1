@@ -171,10 +171,18 @@ function Invoke-CompileAction {
     $flat = Get-WindowTextFlat $foreground
     $failed = -join [char[]](0x8F6C,0x6362,0x5931,0x8D25,0x3002)
     $succeeded = -join [char[]](0x8F6C,0x6362,0x6210,0x529F,0x3002)
-    if ($foreground.Current.ProcessId -ne $target.Current.ProcessId -or $foreground.Current.ClassName -ne '#32770' -or (-not $flat.Contains($failed) -and -not $flat.Contains($succeeded))) {
+    $resultTitle = -join [char[]](0x8F6C,0x6362,0x7ED3,0x679C)
+    # The conversion-result dialog is owner-drawn: its body text may be empty
+    # even when the dialog is the expected successor. Accept it by window
+    # identity (same process, #32770, result title) and defer text extraction
+    # to the collector step.
+    $isResultModal = ($foreground.Current.ProcessId -eq $target.Current.ProcessId) -and
+      ($foreground.Current.ClassName -eq '#32770') -and
+      ([string]$foreground.Current.Name).Contains($resultTitle)
+    if (-not $isResultModal -and ($foreground.Current.ProcessId -ne $target.Current.ProcessId -or $foreground.Current.ClassName -ne '#32770' -or (-not $flat.Contains($failed) -and -not $flat.Contains($succeeded)))) {
       throw "KV_COMPILE_UNEXPECTED_MODAL: $flat"
     }
-    Log "proven conversion result modal deferred to collector: $flat"
+    Log "conversion result modal accepted: title=$([string]$foreground.Current.Name) class=$($foreground.Current.ClassName) flat_is_empty=$([string]::IsNullOrWhiteSpace($flat))"
   }
 }
 

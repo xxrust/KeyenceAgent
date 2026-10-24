@@ -77,6 +77,34 @@ Existing-project repair has a hard pre-import gate:
 
 The gate reads the verified source snapshot MNM inventory and the incoming scaffold MNM list before KV STUDIO opens. If any incoming `module_name` already exists in the source snapshot, direct import is rejected with `KV_MNM_SAME_NAME_IMPORT_REQUIRES_PREDELETE` unless the runner was invoked with `-DeleteExistingModulesBeforeImport`. With that flag, the repair runner records the conflict and each affected import step must pre-delete the existing module before importing the replacement MNM. If the project fingerprint does not match the snapshot, `assert_kv_existing_project_snapshot.ps1` fails first and the current project must be exported again.
 
+### Default `Main` replacement in a new project
+
+KV STUDIO refuses to delete the last remaining program
+("不能删除。项目必须登录 1 个以上的程序。"), so a delete-first replacement of the
+fresh project's default `Main` cannot work. The runner now:
+
+- finds scan modules by their numbered tree label (`Main [1]`), not only by an
+  exact UIA name;
+- fails fast with `KV_MNM_DELETE_LAST_PROGRAM_FORBIDDEN` when the target is the
+  only program, before sending DELETE;
+- proves delete focus as "ProjectTreeView owns focus AND the target item is
+  selected" (a WinForms tree gives keyboard focus to the tree, not the item);
+- confirms the delete dialog through its control id (`BM_CLICK` on `IDOK`),
+  because the owner-drawn dialog does not expose InvokePattern and is not the
+  foreground window;
+- supports `-DeleteOnly` to remove one module and save without importing.
+
+Verified replacement sequence (2026-10-24, `MainReplaceTest`):
+
+1. import a staging program (`MainStage`) so the project has two programs;
+2. import `Main` with `-DeleteExistingModuleBeforeImport` (delete is allowed now);
+3. `-DeleteOnly -ExpectedModuleName MainStage`.
+
+The saved tree then contains exactly `Main [1]`, and the conversion result dialog
+shows `转换成功。` (0 errors, 4 steps). The execution plan passes the pre-delete
+flag for every new-project import; automating the staging import/cleanup in the
+plan is the remaining integration step.
+
 ## Scaffold Files
 
 Required files:

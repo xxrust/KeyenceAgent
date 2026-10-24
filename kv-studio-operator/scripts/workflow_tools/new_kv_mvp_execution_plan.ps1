@@ -265,7 +265,11 @@ try {
     Add-Arg -List $importArgs -Name '-ProjectSearchRoot' -Value $projectSearchRoot
     Add-Arg -List $importArgs -Name '-ChecklistPath' -Value $ChecklistPath
     Add-SwitchArg -List $importArgs -Name '-SaveAfterImport' -Enabled $true
-    if ($Mode -eq 'repair_existing_project' -and $DeleteExistingModulesBeforeImport) { Add-SwitchArg -List $importArgs -Name '-DeleteExistingModuleBeforeImport' -Enabled $true }
+    # A fresh KV STUDIO project already contains a default 'Main' module. Give
+    # every new-project import the pre-delete flag so a scaffold module named
+    # Main replaces that placeholder instead of failing on a same-name conflict;
+    # the runner no-ops when the name is absent. Repair keeps the explicit gate.
+    if ($Mode -eq 'new_project' -or $DeleteExistingModulesBeforeImport) { Add-SwitchArg -List $importArgs -Name '-DeleteExistingModuleBeforeImport' -Enabled $true }
     Add-Arg -List $importArgs -Name '-RestartKvs' -Value $(if ($Mode -eq 'repair_existing_project' -and $i -eq 0) { 'true' } else { 'false' })
     Add-Arg -List $importArgs -Name '-KvsExe' -Value $KvsExe
     $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })import_mnm_$($i + 1)" 'import_mnm_guarded.ps1' @('runner_child_approved') $importArgs.ToArray() (Join-Path $artifactRoot ("import_mnm_$($i + 1)")) 'runner_child'))
@@ -360,7 +364,7 @@ try {
     checklist_path = $ChecklistPath
     timeout_seconds = $TimeoutSeconds
     source_snapshot_manifest = $SourceSnapshotManifestPath
-    delete_existing_modules_before_import = [bool]$DeleteExistingModulesBeforeImport
+    delete_existing_modules_before_import = [bool]($DeleteExistingModulesBeforeImport -or $Mode -eq 'new_project')
     mnm_files = @($resolvedMnmFiles)
     merged_global_variables_tsv = $mergedGlobal.path
     executable_global_variable_count = $mergedGlobal.executable_global_variable_count

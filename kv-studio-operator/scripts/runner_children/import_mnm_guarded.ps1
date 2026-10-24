@@ -11,6 +11,10 @@
   [object]$FailOnMissingProjectPlainText = $false,
   [object]$FailOnMissingValidationNeedles = $false,
   [switch]$DeleteExistingModuleBeforeImport,
+  # Delete an existing module and save without importing anything. Used by the
+  # new-project sequence that stages a placeholder program, imports the real
+  # module over the default Main, then removes the placeholder.
+  [switch]$DeleteOnly,
   [object]$RestartKvs = $true,
   [string]$ExpectedCategory = '',
   [string[]]$ParentPath = @(),
@@ -92,6 +96,7 @@ public class W{
 [DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
 [DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
 [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr hDlg, int nIDDlgItem);
+[DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
 [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
 public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
@@ -615,9 +620,24 @@ function FindProjectModuleTreeItem([string]$moduleName,[string[]]$ExpectedPath=@
     $item=$current
   } else {
     $item = $tree.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $nameCondition)
+    if (-not $item) {
+      # Scan-executed modules are displayed as "<name> [<execution order>]"
+      # (for example "Main [1]"), so an exact UIA name query never matches the
+      # default project Main. Fall back to a bounded name-suffix match; this is
+      # what makes the pre-delete replacement route work for program modules.
+      $treeItemCondition = New-Object System.Windows.Automation.PropertyCondition(
+        [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+        [System.Windows.Automation.ControlType]::TreeItem)
+      $numberedCandidates = $tree.FindAll([System.Windows.Automation.TreeScope]::Descendants, $treeItemCondition)
+      $suffixPattern = '^' + [regex]::Escape($moduleName) + '(?:\s*\[\d+\])?$'
+      foreach ($candidate in $numberedCandidates) {
+        $candidateName = [string]$candidate.Current.Name
+        if ($candidateName -match $suffixPattern) { $item = $candidate; break }
+      }
+    }
   }
   $lookupElapsedMs = [int]$lookupTimer.ElapsedMilliseconds
-  LogContract 'module_lookup' @{ module_name=$moduleName; elapsed_ms=$lookupElapsedMs; tree_lookup_ms=$treeLookupMs; direct_name_query=$true; project_tree_found=$true; path_depth=$ExpectedPath.Count; path_strategy=if($ExpectedPath.Count){'unique category then direct children'}else{'direct name query'} }
+  LogContract 'module_lookup' @{ module_name=$moduleName; elapsed_ms=$lookupElapsedMs; tree_lookup_ms=$treeLookupMs; direct_name_query=$true; numbered_suffix_fallback=$true; project_tree_found=$true; path_depth=$ExpectedPath.Count; path_strategy=if($ExpectedPath.Count){'unique category then direct children'}else{'direct name query then numbered suffix'} }
   if($lookupElapsedMs -ge $maxLookupMs){
     $script:LastErrorCode = 'KV_MODULE_LOOKUP_TIMEOUT'
     throw "KV_MODULE_LOOKUP_TIMEOUT: target module lookup exceeded ${maxLookupMs}ms: $moduleName"
@@ -625,34 +645,92 @@ function FindProjectModuleTreeItem([string]$moduleName,[string[]]$ExpectedPath=@
   if($item){ return $item }
   return $null
 }
+function Send-DialogButtonClick([IntPtr]$DialogHandle,[int]$ControlId){
+  $buttonHandle=[W]::GetDlgItem($DialogHandle,$ControlId)
+  if($buttonHandle -eq [IntPtr]::Zero){ return $false }
+  # BM_CLICK targets the dialog's control id (IDOK=1, IDCANCEL=2). This is a
+  # window-message action on a proven object, not a coordinate click, and it
+  # does not depend on the dialog owning the foreground.
+  [void][W]::SendMessage($buttonHandle,0x00F5,[IntPtr]::Zero,[IntPtr]::Zero)
+  Log ('sent BM_CLICK control_id='+$ControlId+' hwnd='+$buttonHandle)
+  Start-Sleep -Seconds 2
+  return (-not [W]::IsWindow($DialogHandle))
+}
 function ConfirmDeleteDialogIfPresent(){
   $deadline=(Get-Date).AddSeconds(5)
   do{
-    foreach($dialog in @(GetVisibleDialogs)){
+    # EnumWindows can miss this owned message box, so always include the
+    # current foreground window when it is a #32770 dialog of the same process.
+    $dialogs=@(GetVisibleDialogs)
+    try{
+      $fgHwnd=[W]::GetForegroundWindow()
+      if($fgHwnd -ne [IntPtr]::Zero){
+        $fgElement=[System.Windows.Automation.AutomationElement]::FromHandle($fgHwnd)
+        if($fgElement -and [string]$fgElement.Current.ClassName -eq '#32770' -and
+           (-not $script:ImportTargetProcessId -or $fgElement.Current.ProcessId -eq $script:ImportTargetProcessId)){
+          if(-not (@($dialogs | Where-Object { $_.Current.NativeWindowHandle -eq $fgElement.Current.NativeWindowHandle }).Count)){
+            $dialogs += $fgElement
+          }
+        }
+      }
+    }catch{}
+    foreach($dialog in $dialogs){
       try{
-        $buttons=$dialog.FindAll(
+        # Stay inside the KVS process: other applications can also own #32770.
+        if($script:ImportTargetProcessId -and $dialog.Current.ProcessId -ne $script:ImportTargetProcessId){ continue }
+        $dialogHandle=[IntPtr]$dialog.Current.NativeWindowHandle
+        if(Send-DialogButtonClick $dialogHandle 1){ Log 'delete dialog closed by IDOK'; return $true }
+        # The deletion confirmation is an owner-drawn message box: its buttons
+        # report class_name=Button but ControlType.Pane, so filtering on
+        # ControlType.Button finds nothing. Match any descendant by name.
+        $all=$dialog.FindAll(
           [System.Windows.Automation.TreeScope]::Descendants,
-          (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Button))
+          (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty,$dialog.Current.ProcessId))
         )
-        for($i=0;$i -lt $buttons.Count;$i++){
-          $button=$buttons.Item($i)
-          $name=[string]$button.Current.Name
+        for($i=0;$i -lt $all.Count;$i++){
+          $button=$all.Item($i)
+          $name=([string]$button.Current.Name).Trim()
+          $className=[string]$button.Current.ClassName
+          $controlType=$button.Current.ControlType
+          $isButton=($controlType -eq [System.Windows.Automation.ControlType]::Button) -or ($className -eq 'Button')
+          if(-not $isButton){ continue }
           if($name -match '^(是|はい|Yes|OK|确定)'){
+            $controlId=0
+            if([int]::TryParse([string]$button.Current.AutomationId,[ref]$controlId) -and $controlId -gt 0){
+              if(Send-DialogButtonClick $dialogHandle $controlId){ Log ('confirmed delete dialog by '+$name); return $true }
+            }
             try{
               $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-            }catch{
-              ClickAutomationElementCenter $button ('delete confirm '+$name)
-            }
-            Log ('confirmed delete dialog by '+$name)
+            }catch{}
+            Log ('confirmed delete dialog by '+$name+' class='+$className+' control_type='+$controlType.ProgrammaticName)
             Start-Sleep -Seconds 2
             return $true
           }
         }
-      }catch{}
+      }catch{ Log ('delete confirm attempt error: '+$_.Exception.Message) }
     }
     Start-Sleep -Milliseconds 200
   }while((Get-Date) -lt $deadline)
   return $false
+}
+function Get-ProgramModuleTreeItems(){
+  $root=[System.Windows.Automation.AutomationElement]::FromHandle($script:KvGuardTargetHwnd)
+  if(-not $root){ return @() }
+  $tree=$root.FindFirst(
+    [System.Windows.Automation.TreeScope]::Descendants,
+    ([System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::AutomationIdProperty,'ProjectTreeView')))
+  if(-not $tree){ return @() }
+  $items=$tree.FindAll(
+    [System.Windows.Automation.TreeScope]::Descendants,
+    ([System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::TreeItem)))
+  $programItems=@()
+  for($i=0;$i -lt $items.Count;$i++){
+    $candidate=$items.Item($i)
+    # Scan-executed programs carry an execution-order suffix ("Main [1]").
+    # Unnumbered tree items are folders, units, or function blocks.
+    if([string]$candidate.Current.Name -match '^.+ \[\d+\]$'){ $programItems += $candidate }
+  }
+  return $programItems
 }
 function RemoveProjectModuleIfPresent([string]$moduleName){
   if(-not $moduleName){ return $false }
@@ -662,6 +740,13 @@ function RemoveProjectModuleIfPresent([string]$moduleName){
     return $true
   }
   $name=[string]$item.Current.Name
+  # KV STUDIO refuses to delete the only remaining program:
+  # "不能删除。项目必须登录 1 个以上的程序。" Fail before sending DELETE so the
+  # caller gets a precise reason instead of a modal timeout or a generic failure.
+  $programItems=@(Get-ProgramModuleTreeItems)
+  if($programItems.Count -le 1){
+    throw "KV_MNM_DELETE_LAST_PROGRAM_FORBIDDEN: '$name' is the only program in the project. KV STUDIO requires at least one program; import another module first or stage a placeholder before replacing this name."
+  }
   try{
     $select=$item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)
     $select.Select()
@@ -678,12 +763,27 @@ function RemoveProjectModuleIfPresent([string]$moduleName){
   if ($item.Current.IsOffscreen -or $bounds.Width -le 0 -or $bounds.Height -le 0) { throw 'KV_MNM_DELETE_ITEM_OFFSCREEN: no visible tree label bounds.' }
   Invoke-KvGuardedMouseClick -TargetHwnd $script:KvGuardTargetHwnd -Step ('focus project module before delete '+$name) -X ([int]($bounds.Left+$bounds.Width/2)) -Y ([int]($bounds.Top+$bounds.Height/2)) -ExpectedTitleLike $script:KvGuardExpectedTitleLike -SleepMs 100
   $focused=[System.Windows.Automation.AutomationElement]::FocusedElement
-  if ($focused.Current.ProcessId -ne $item.Current.ProcessId -or
-      $focused.Current.ControlType -ne [System.Windows.Automation.ControlType]::TreeItem -or
-      $focused.Current.Name -ne $name) {
-    throw "KV_MNM_DELETE_FOCUS_NOT_PROVEN: '$name' is not the focused project tree item."
+  # A WinForms tree gives keyboard focus to the ProjectTreeView control, not to
+  # the TreeItem element. Prove object identity instead: the tree itself owns
+  # focus AND the resolved item is the selected one. A direct TreeItem focus is
+  # also accepted when the toolkit reports it that way.
+  $selectionPattern=$null
+  try{ $selectionPattern=$item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern) }catch{}
+  $itemSelected=($selectionPattern -and $selectionPattern.Current.IsSelected)
+  $treeOwnsFocus=($focused.Current.ProcessId -eq $item.Current.ProcessId -and
+                   $focused.Current.ControlType -eq [System.Windows.Automation.ControlType]::Tree -and
+                   [string]$focused.Current.AutomationId -eq 'ProjectTreeView')
+  $itemOwnsFocus=($focused.Current.ProcessId -eq $item.Current.ProcessId -and
+                  $focused.Current.ControlType -eq [System.Windows.Automation.ControlType]::TreeItem -and
+                  $focused.Current.Name -eq $name)
+  if (-not (($treeOwnsFocus -and $itemSelected) -or $itemOwnsFocus)) {
+    throw "KV_MNM_DELETE_FOCUS_NOT_PROVEN: '$name' is not the focused/selected project tree item (focused=$($focused.Current.ControlType.ProgrammaticName)/$($focused.Current.AutomationId) selected=$itemSelected)."
   }
-  Invoke-KvGuardedSendKeys -TargetHwnd $script:KvGuardTargetHwnd -Step ('delete existing module '+$name) -Keys '{DELETE}' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Delete selected existing project module before MNM repair import' -SleepMs 700
+  Log ('delete focus proof: tree_focus='+$treeOwnsFocus+' item_focus='+$itemOwnsFocus+' selected='+$itemSelected)
+  # Delete opens a confirmation dialog whose window title is the product name,
+  # so a plain guarded send would treat the modal as a lost target. Allow the
+  # documented successor foreground (the delete-confirmation modal) instead.
+  Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $script:KvGuardTargetHwnd -Step ('delete existing module '+$name) -Keys '{DELETE}' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -SuccessTitleLike @('KV STUDIO','*确认*','*删除*') -Action 'Delete selected existing project module before MNM repair import' -SleepMs 700
   if(-not (ConfirmDeleteDialogIfPresent)){
     Log ('delete confirmation dialog not found for '+$name)
   }
@@ -2023,6 +2123,28 @@ try{
   Shot '00_before_import.png'
   DismissInstructionErrorDialogs 'before_import'
   DismissUnitConfigDialogIfPresent 'before_import' | Out-Null
+  if($DeleteOnly){
+    if(-not $ExpectedModuleName){ throw 'KV_IMPORT_DELETE_ONLY_REQUIRES_MODULE_NAME' }
+    if(-not (RemoveProjectModuleIfPresent $ExpectedModuleName)){
+      throw "KV_MNM_DELETE_ONLY_FAILED: module remained after delete: $ExpectedModuleName"
+    }
+    $deleteSaveProcess=Get-Process -Id $script:ImportTargetProcessId -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like 'KV STUDIO*' -and $_.MainWindowTitle -like ('*'+$expectedProjectNeedle+'*') }
+    if(-not $deleteSaveProcess){ throw "KV STUDIO target project window not found before Ctrl+S after module delete: $expectedProjectNeedle" }
+    [void](ForceKvStudioForeground ([IntPtr]$deleteSaveProcess.MainWindowHandle))
+    Start-Sleep -Milliseconds 300
+    AssertKvStudioForeground 'Ctrl+S after module delete' $expectedProjectNeedle
+    Invoke-KvGuardedSendKeys -TargetHwnd $deleteSaveProcess.MainWindowHandle -Step 'save after module delete Ctrl+S' -Keys '^s' -ExpectedTitleLike $script:KvGuardExpectedTitleLike -Action 'Ctrl+S saves project after module delete' -SleepMs 500
+    Start-Sleep -Milliseconds 800
+    Shot '05_after_delete_only_save.png'
+    [ordered]@{
+      ok=$true; project_path=$ProjectPath; mnm_path=''; expected_module_name=$ExpectedModuleName
+      mode='delete_only'; deleted_module=$ExpectedModuleName; save_requested=$true
+      verification='module deleted and project saved; caller must verify tree absence'
+    } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $out 'import_result.json') -Encoding UTF8
+    '0'|Set-Content -LiteralPath (Join-Path $out 'exit_code.txt') -Encoding ASCII
+    return
+  }
   if(-not $DeleteExistingModuleBeforeImport -and $ExpectedModuleName -and (FindProjectModuleTreeItem $ExpectedModuleName)) {
     throw "KV_MNM_SAME_NAME_IMPORT_REQUIRES_PREDELETE: target project already contains '$ExpectedModuleName'; no import input was sent."
   }
