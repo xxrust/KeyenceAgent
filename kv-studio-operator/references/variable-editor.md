@@ -42,8 +42,13 @@ data_type, device, initial_value and comment. Verified live on 2026-10-24:
 a `DM9002` device binding, an INT initial value `789` (read back as `+789`),
 a BOOL initial value `TRUE`, and a comment all survived editor close/reopen.
 
-- A global row that declares both `device` and `initial_value` is rejected with
-  `KV_VARIABLE_DEVICE_INITIAL_VALUE_CONFLICT`: KV STUDIO does not preserve an
+By default the nine columns start at the name cell, so every pasted row lands in
+the current storage group. Pass `-GlobalPasteWithGroupColumn` (workflow and
+runner) to prepend a `group` column and keep the group cell as the anchor: the
+payload is then ten columns (group, name, data_type, device, initial_value,
+retain, constant, public, hidden, comment) and each row keeps its group.
+
+- A global row that declares both `device` and `initial_value` is rejected with  `KV_VARIABLE_DEVICE_INITIAL_VALUE_CONFLICT`: KV STUDIO does not preserve an
   initial value for a device-assigned global variable.
 - `retain`, `constant` and `group_name` remain unsupported and fail closed.
 - Locals keep the name/type (or `Full` name/type/comment) route; local device and

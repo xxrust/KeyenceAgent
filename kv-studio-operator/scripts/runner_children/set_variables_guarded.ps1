@@ -25,6 +25,10 @@
   # comment columns. Off by default because a plain name/type paste is the
   # verified baseline; enabling this extends the paste payload to nine columns.
   [switch]$FullGlobalAttributes,
+  # Opt-in: the global TSV carries a leading group column and the paste starts at
+  # the group cell (ten columns), so rows keep their storage group instead of all
+  # landing in (Default).
+  [switch]$GlobalPasteWithGroupColumn,
 
   [switch]$AppendGlobalVariables,
   [string[]]$AllowedCustomDataTypes = @(),
@@ -954,7 +958,26 @@ function Convert-GlobalRows([string]$Path) {
       # Anchor is the name cell, so the payload starts at name. The saved grid
       # layout is group, name, data_type, device, initial_value, retain,
       # constant, public, hidden, comment; nine columns fill name..comment.
+      # With -GlobalPasteWithGroupColumn the anchor is the group cell and the
+      # payload starts with the row's storage group (ten columns).
       $publicToken = -join ([char[]](0x975E, 0x516C, 0x5F00))
+      if ($GlobalPasteWithGroupColumn) {
+        $groupName = [string]$row.group
+        if (-not $groupName) { throw "KV_GLOBAL_GROUP_REQUIRED: $($row.name)" }
+        @(
+          $groupName
+          $row.name
+          $row.data_type
+          $row.device
+          $row.initial_value
+          'False'
+          'False'
+          $publicToken
+          'False'
+          $row.comment
+        ) -join "`t"
+        continue
+      }
       @(
         $row.name
         $row.data_type
@@ -981,11 +1004,12 @@ function Assert-KvVariablePastePayloadSchema(
   [object[]]$Rows,
   [ValidateSet('global','local')][string]$Scope,
   [ValidateSet('Full','NameType')][string]$Format,
-  [string]$SourcePath
+  [string]$SourcePath,
+  [switch]$WithGroupColumn
 ) {
   $expectedRows = @(Get-KvExecutableVariableRows -Rows $Rows -Scope $Scope)
   $payloadLines = @($Text -split "`r?`n" | Where-Object { $_ -ne '' })
-  $expectedColumnCount = if ($Scope -eq 'global' -and $Format -eq 'Full') { 9 } elseif ($Scope -eq 'global' -or $Format -eq 'NameType') { 2 } else { 7 }
+  $expectedColumnCount = if ($Scope -eq 'global' -and $Format -eq 'Full' -and $WithGroupColumn) { 10 } elseif ($Scope -eq 'global' -and $Format -eq 'Full') { 9 } elseif ($Scope -eq 'global' -or $Format -eq 'NameType') { 2 } else { 7 }
   $errors = [System.Collections.Generic.List[object]]::new()
 
   if ($payloadLines.Count -ne $expectedRows.Count) {
@@ -1558,8 +1582,14 @@ function Paste-GlobalVariablesByFirstNameTab($Form, [string]$Text) {
 
   Focus-VariableGridArea $formNow '_tabPageGlobal' 'global variables'
   $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
-  $formNow = Invoke-GuardedVariableKeyAction $formNow 'global first-name Tab' '{TAB}' 'Tab to select first global variable name cell' 150
-  Log 'sent guarded Tab to select first global variable name cell'
+  if ($GlobalPasteWithGroupColumn) {
+    # The anchor stays on the group cell so the ten-column payload can carry the
+    # storage group for every row.
+    Log 'global paste keeps the group cell as anchor (group column payload)'
+  } else {
+    $formNow = Invoke-GuardedVariableKeyAction $formNow 'global first-name Tab' '{TAB}' 'Tab to select first global variable name cell' 150
+    Log 'sent guarded Tab to select first global variable name cell'
+  }
   if ($AppendGlobalVariables) {
     $formNow = Invoke-GuardedVariableKeyAction $formNow 'global last-row PgDn' '{PGDN}' 'PgDn to move to last global variable row before append paste' 250
     Log 'sent guarded PgDn to move to last global variable row for append paste'
@@ -1742,7 +1772,7 @@ try {
   Log "decoded executable local variable rows=$($definedLocalNames.Count): $($definedLocalNames -join ',')"
   Set-Content -LiteralPath (Join-Path $OutDir 'global_paste.tsv') -Value $globalText -Encoding UTF8
   Set-Content -LiteralPath (Join-Path $OutDir 'local_paste.tsv') -Value $localText -Encoding UTF8
-  Assert-KvVariablePastePayloadSchema $globalText $globalRows 'global' $globalPasteFormat $GlobalVariablesTsv
+  Assert-KvVariablePastePayloadSchema $globalText $globalRows 'global' $globalPasteFormat $GlobalVariablesTsv -WithGroupColumn:$GlobalPasteWithGroupColumn
   Assert-KvVariablePastePayloadSchema $localText $localRows 'local' $LocalPasteFormat $LocalVariablesTsv
 
   $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
