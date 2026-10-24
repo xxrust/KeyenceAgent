@@ -93,27 +93,68 @@ function ConvertTo-SafeInt([double]$Value) {
   return [int]$Value
 }
 
+function Expand-CollapsedProjectFolders($Tree, [string]$ModuleName) {
+  # UIA only realizes tree children after their parent is expanded. Sample
+  # projects can nest user FBs under folders (for example level3_设备), so a
+  # descendant search cannot see the FB until those folders are opened. Expand
+  # collapsed, non-description nodes (leaf FB items carry a ':description'
+  # suffix) a bounded number of times.
+  $expanded = 0
+  for ($pass = 0; $pass -lt 3; $pass++) {
+    $changed = $false
+    $items = $Tree.FindAll([Windows.Automation.TreeScope]::Descendants,
+      (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::TreeItem)))
+    for ($i = 0; $i -lt $items.Count -and $expanded -lt 40; $i++) {
+      $item = $items.Item($i)
+      $name = [string]$item.Current.Name
+      if ($name -and ($name.Contains(':') -or $name.Contains([char]0xFF1A))) { continue }
+      try {
+        $pattern = $null
+        if (-not $item.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$pattern)) { continue }
+        if ($pattern.Current.ExpandCollapseState -ne [Windows.Automation.ExpandCollapseState]::Collapsed) { continue }
+        $pattern.Expand()
+        $expanded++
+        $changed = $true
+      } catch {}
+    }
+    if (-not $changed) { break }
+    Start-Sleep -Milliseconds 150
+  }
+  if ($expanded -gt 0) { Log "expanded $expanded collapsed project tree folder(s) while looking for $ModuleName" }
+}
+
 function FindProjectModuleTreeItem([int]$ProcessIdValue, [string]$ModuleName) {
   $watch=[Diagnostics.Stopwatch]::StartNew()
   $root=[Windows.Automation.AutomationElement]::FromHandle((Get-Process -Id $ProcessIdValue).MainWindowHandle)
   $tree=Find-DescByAid $root 'ProjectTreeView'
   $item=$null
-  if($tree){
-    $item=$tree.FindFirst([Windows.Automation.TreeScope]::Descendants,
+  $find = {
+    param($t)
+    $found=$t.FindFirst([Windows.Automation.TreeScope]::Descendants,
       (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::NameProperty,$ModuleName)))
-    if(-not $item){
-      # KV STUDIO displays reusable FBs with a localized description suffix,
-      # for example `FB_Cylinder:...`; bind the stable module-name prefix.
-      $treeItems=$tree.FindAll([Windows.Automation.TreeScope]::Descendants,
-        (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::TreeItem)))
-      for($i=0;$i -lt $treeItems.Count;$i++){
-        $name=[string]$treeItems.Item($i).Current.Name
-        if($name -eq $ModuleName -or $name.StartsWith($ModuleName+':',[StringComparison]::Ordinal) -or $name.StartsWith($ModuleName+' [',[StringComparison]::Ordinal) -or $name.StartsWith($ModuleName+[char]0xFF1A,[StringComparison]::Ordinal)){$item=$treeItems.Item($i);break}
-      }
+    if($found){ return $found }
+    # KV STUDIO displays reusable FBs with a localized description suffix,
+    # for example `FB_Cylinder:...`; bind the stable module-name prefix.
+    $treeItems=$t.FindAll([Windows.Automation.TreeScope]::Descendants,
+      (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::TreeItem)))
+    for($i=0;$i -lt $treeItems.Count;$i++){
+      $name=[string]$treeItems.Item($i).Current.Name
+      if($name -eq $ModuleName -or $name.StartsWith($ModuleName+':',[StringComparison]::Ordinal) -or $name.StartsWith($ModuleName+' [',[StringComparison]::Ordinal) -or $name.StartsWith($ModuleName+[char]0xFF1A,[StringComparison]::Ordinal)){return $treeItems.Item($i)}
+    }
+    return $null
+  }
+  if($tree){
+    $item = & $find $tree
+    if(-not $item -and $watch.ElapsedMilliseconds -lt 1000){
+      # Nested user folders hide the FB from UIA until expanded.
+      Expand-CollapsedProjectFolders $tree $ModuleName
+      $item = & $find $tree
     }
   }
   Write-KvUiGuardRunLog -Event 'module_lookup' -Data @{module=$ModuleName;elapsed_ms=$watch.ElapsedMilliseconds;found=($null -ne $item);prefix_name_query=($null -ne $item -and [string]$item.Current.Name -ne $ModuleName)}
-  if($watch.ElapsedMilliseconds -ge 1000){throw 'KV_MODULE_LOOKUP_TIMEOUT'}
+  # 1 s bounds the initial UIA query; nested-folder expansion is allowed up to
+  # 10 s so a legitimate deep FB path is not mistaken for a hung lookup.
+  if($watch.ElapsedMilliseconds -ge 10000){throw 'KV_MODULE_LOOKUP_TIMEOUT'}
   return $item
 }
 

@@ -159,7 +159,7 @@ function Assert-KvVariableDefinitions([object[]]$Rows, [string]$Scope, [string]$
   }
 }
 
-function Assert-FbArgumentDefinitions([object[]]$Rows, [string]$OwnerProgram, [string]$Path) {
+function Assert-FbArgumentDefinitions([object[]]$Rows, [string]$OwnerProgram, [string]$Path, [string[]]$AllowedCustomDataTypes = @()) {
   $allowedKinds = @('IN','OUT','IN-OUT')
   $errors = [System.Collections.Generic.List[object]]::new()
   foreach ($row in @($Rows | Where-Object { $_.status -ne 'display_name' -and $_.argument_name })) {
@@ -169,7 +169,7 @@ function Assert-FbArgumentDefinitions([object[]]$Rows, [string]$OwnerProgram, [s
     if ($allowedKinds -notcontains ([string]$row.argument_kind)) {
       $errors.Add([pscustomobject]@{ code='KV_FB_ARGUMENT_KIND_INVALID'; argument_name=[string]$row.argument_name; argument_kind=[string]$row.argument_kind; message='FB argument_kind must be IN, OUT, or IN-OUT.' })
     }
-    if (-not (Test-KvVariableDataType ([string]$row.data_type))) {
+    if (-not (Test-KvVariableDataType ([string]$row.data_type) -AllowedCustomDataTypes $AllowedCustomDataTypes)) {
       $errors.Add([pscustomobject]@{ code='KV_FB_ARGUMENT_DATA_TYPE_UNSUPPORTED'; argument_name=[string]$row.argument_name; data_type=[string]$row.data_type; message='FB argument data_type is outside the supported KEYENCE type grammar.' })
     }
   }
@@ -431,7 +431,7 @@ foreach ($entry in $mnmEntries) {
     if ($definedArgumentRows.Count -eq 0) {
       Stop-ScaffoldValidation 'KV_SCAFFOLD_FB_ARGUMENTS_EMPTY' "Function-block arguments.tsv must contain executable argument rows. module=$moduleName" @($argumentsTsv)
     }
-    Assert-FbArgumentDefinitions $definedArgumentRows $moduleName $argumentsTsv
+    Assert-FbArgumentDefinitions $definedArgumentRows $moduleName $argumentsTsv $fbTypeNames
     $argumentCount = $definedArgumentRows.Count
     $argumentNames = @($definedArgumentRows | ForEach-Object { [string]$_.argument_name } | Where-Object { $_ } | Select-Object -Unique)
     $unreferencedArguments = @($argumentNames | Where-Object { -not (Test-MnmReferencesName $text $_) })
@@ -448,7 +448,13 @@ foreach ($entry in $mnmEntries) {
   if ($actualModuleType -eq 0 -and $text -notmatch '(?m)^ENDH\s*$') {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_MNM_ENDH_MISSING' "Scan-executed MNM must contain ENDH so KV STUDIO conversion can complete: $mnmPath" @($mnmPath)
   }
-  $referencedNames = @($definedGlobalRows | ForEach-Object { [string]$_.name } | Where-Object { $_ } | Select-Object -Unique)
+  # Device-bound globals are defined by their device assignment even when the
+  # program body never reads them (for example motion axis references such as
+  # _MC_AXIS_REF with device _MC_Axis[2]). Motion axis/group reference types can
+  # also be bound by the unit configuration without a device column, so they are
+  # exempt as well. Only ordinary unbound globals must appear in the paired MNM.
+  $configBoundTypes = @('_MC_AXIS_REF','_MC_AXIS_GROUP_REF')
+  $referencedNames = @($definedGlobalRows | Where-Object { -not ([string]$_.device).Trim() -and $configBoundTypes -notcontains ([string]$_.data_type).Trim() } | ForEach-Object { [string]$_.name } | Where-Object { $_ } | Select-Object -Unique)
   $unreferencedNames = @($referencedNames | Where-Object { -not (Test-MnmReferencesName $text $_) })
   if ($unreferencedNames.Count -gt 0) {
     Stop-ScaffoldValidation 'KV_SCAFFOLD_GLOBAL_VARIABLE_NOT_REFERENCED_BY_MNM' "Executable global variable rows must be referenced by their MNM file so the compile gate proves global variable definitions. Missing MNM references: $($unreferencedNames -join ', ')" @($mnmPath, $entryGlobalTsv)

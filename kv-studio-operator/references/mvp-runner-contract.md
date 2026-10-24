@@ -129,6 +129,15 @@ plus project identity and ordered module entries. Instruction membership is not
 an execution-order check. `task.acceptance[]` is preserved in generated TASK.md.
 Empty, null, or omitted local variables render an explicit no-local-state marker.
 
+A model may declare `variables.allowed_custom_data_types` for types that already
+exist in the target project (user structures such as `strCylinderCtrl`, official
+FB instance types such as `TON` or `MC_MoveAbsolute`). The renderer merges that
+list with the model's own FB names, writes it into `scaffold.json`, and the
+validator applies it to local variables and FB arguments. The validator exempts
+device-bound globals and motion axis/group reference types (`_MC_AXIS_REF`,
+`_MC_AXIS_GROUP_REF`) from the "referenced by the paired MNM" rule: those are
+configuration objects, not code references.
+
 The baseline variable writer proves `name` and `data_type`. The opt-in
 `-FullGlobalAttributes` route on `set_kv_variables.ps1` additionally writes and
 reads back the global `device`, `initial_value` and `comment` columns (live

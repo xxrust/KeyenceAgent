@@ -168,12 +168,15 @@ foreach ($module in $modules) {
 }
 
 $script:AllowedCustomDataTypes = @(
-  $modules |
-    Where-Object {
-      $moduleTypeForCustom = if ($null -ne $_.module_type -and [string]$_.module_type -ne '') { [int]$_.module_type } else { 0 }
-      $moduleTypeForCustom -eq 2
-    } |
-    ForEach-Object { [string]$_.name } |
+  @(
+    $modules |
+      Where-Object {
+        $moduleTypeForCustom = if ($null -ne $_.module_type -and [string]$_.module_type -ne '') { [int]$_.module_type } else { 0 }
+        $moduleTypeForCustom -eq 2
+      } |
+      ForEach-Object { [string]$_.name }
+    if ($model.variables -and $model.variables.allowed_custom_data_types) { @($model.variables.allowed_custom_data_types) }
+  ) |
     Where-Object { $_ } |
     Select-Object -Unique
 )
@@ -268,6 +271,9 @@ $manifest = [ordered]@{
     # the global device/initial_value/comment columns on close/reopen.
     attributes = $(if ($globalAttributeRowCount -gt 0) { 'full' } else { 'name_type' })
     attribute_row_count = $globalAttributeRowCount
+    # Types the model declares as already present in the target project
+    # (structures and official FB instance types such as TON or MC_MoveAbsolute).
+    allowed_custom_data_types = @($script:AllowedCustomDataTypes)
   }
 }
 $manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $ScaffoldRoot 'scaffold.json') -Encoding UTF8
