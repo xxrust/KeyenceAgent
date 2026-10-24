@@ -862,6 +862,10 @@ function Handle-PostOkDialogs {
       } else {
         $button = Invoke-DialogButton -Dialog $dialog -NameParts @($NameNo, 'No')
       }
+    } elseif ($text -like '*坐标转换*') {
+      # After axes are registered KV asks whether to run the new-axis coordinate
+      # conversion wizard; it is not needed to make the axes exist.
+      $button = Invoke-DialogButton -Dialog $dialog -NameParts @($NameNo, 'No')
     } else {
       $button = Invoke-DialogButton -Dialog $dialog -NameParts @($NameConfirm, 'OK')
     }
@@ -880,6 +884,10 @@ function Save-Project {
   $process = Get-KvsProcess
   Set-ForegroundWindowByHwnd -Hwnd $process.MainWindowHandle
   Invoke-KvGuardedSendKeys -TargetHwnd ([IntPtr]$process.MainWindowHandle) -Step 'save EtherCAT node configuration Ctrl+S' -Keys '^s' -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+S saves configured EtherCAT nodes' -SleepMs 1200
+  # KV asks "EtherCAT设定完成。要批量登录轴吗？" after the save; the batch axis
+  # registration must be answered before the persistence readback, otherwise the
+  # node/axis write is still pending and the readback sees nothing.
+  Handle-PostOkDialogs | Out-Null
   (Get-KvsProcess).MainWindowTitle
 }
 
