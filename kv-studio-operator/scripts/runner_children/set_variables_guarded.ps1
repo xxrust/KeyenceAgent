@@ -752,19 +752,50 @@ function Invoke-GuardedVariablePaste($Form, [string]$Step, [string]$Text, [strin
     if ($foreground.hwnd -ne $formHwnd.ToInt64()) {
       if ($foreground.process_id -ne $script:ProcessIdForVariables) { throw 'KV_VARIABLE_REPLACE_MODAL_PROCESS_MISMATCH' }
       $dialog=[Windows.Automation.AutomationElement]::FromHandle([IntPtr]$foreground.hwnd)
-      if ($dialog.Current.AutomationId -cne 'PasteConfirmationForm') { throw 'KV_VARIABLE_REPLACE_UNEXPECTED_MODAL' }
-      $buttons=$dialog.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'_buttonOverwriteAll')))
-      if ($buttons.Count -ne 1 -or $buttons[0].Current.ProcessId -ne $script:ProcessIdForVariables -or $buttons[0].Current.ControlType -ne [Windows.Automation.ControlType]::Button -or -not $buttons[0].Current.IsEnabled) { throw 'KV_VARIABLE_REPLACE_BUTTON_MISMATCH' }
-      Get-KvsModalEvidence $dialog "$Step explicit replacement" | Out-Null
-      Assert-KvUiForegroundHwnd -ExpectedHwnd ([IntPtr]$foreground.hwnd) -Step "$Step confirm explicit overwrite" -ExpectedTitleLike 'KV STUDIO' | Out-Null
-      $invoke=$null
-      if (-not $buttons[0].TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$invoke)) { throw 'KV_VARIABLE_REPLACE_BUTTON_NOT_INVOKABLE' }
-      $overwriteWatch=[Diagnostics.Stopwatch]::StartNew()
-      $invoke.Invoke()
-      Start-Sleep -Milliseconds 250
-      Assert-KvUiForegroundHwnd -ExpectedHwnd $formHwnd -Step "$Step replacement returned to editor" -ExpectedTitleLike '*变量编辑*' | Out-Null
-      Complete-KvUiGuardAtomicAction -Stopwatch $overwriteWatch -Step "$Step bound overwrite confirmation" -Action 'InvokePattern on verified overwrite button and exact editor return' -TargetHwnd ([IntPtr]$foreground.hwnd) -ExpectedTitleLike 'KV STUDIO' | Out-Null
-      Log 'explicit global Replace confirmed on bound PasteConfirmationForm; no focus recovery'
+      $dialogNodes = @()
+      try { $dialogNodes = @($dialog.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)) } catch {}
+      $dialogText = (@($dialogNodes | ForEach-Object { [string]$_.Current.Name } | Where-Object { $_ }) -join ' ')
+      if ($dialog.Current.AutomationId -cne 'PasteConfirmationForm') {
+        # KV accepts the valid rows and raises an owner-drawn warning for the
+        # rows it skipped (for example motion axis rows whose _MC_Axis device
+        # does not exist yet). Dismiss it and let the readback name the skipped
+        # variables instead of failing with a generic unexpected-modal error.
+        if ($dialogText -match '\u7C98\u8D34\u6570\u636E\u4E2D\u5B58\u5728\u9519\u8BEF|\u5DF2\u8DF3\u8FC7\u90E8\u5206\u6570\u636E\u7C98\u8D34') {
+          Log "paste data error modal detected; skipped rows will be reported by readback"
+          Get-KvsModalEvidence $dialog "$Step paste data error" | Out-Null
+          Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd ([IntPtr]$foreground.hwnd) -Step "$Step dismiss paste data error" -Keys '{ENTER}' -ExpectedTitleLike 'KV STUDIO' -SuccessTitleLike @('*变量编辑*','KV STUDIO*') -Action 'dismiss paste-data-error modal' -SleepMs 300
+          Assert-NoKvsModal $script:ProcessIdForVariables "$Step paste data error dismissed"
+          return (Wait-VariableForm $script:ProcessIdForVariables 6)
+        }
+      }
+      # Two overwrite-confirmation variants exist: the PasteConfirmationForm
+      # exposes _buttonOverwriteAll, while the "变量名被更改，要覆盖吗？" dialog
+      # only names its buttons (取消/覆盖/全部覆盖). Handle both by identifying
+      # the all-overwrite action and clicking/invoking that exact control.
+      $overwriteAll = @($dialogNodes | Where-Object {
+        [string]$_.Current.AutomationId -eq '_buttonOverwriteAll' -or
+        [string]$_.Current.Name -eq (-join ([char[]](0x5168,0x90E8,0x8986,0x76D6)))
+      })
+      if ($overwriteAll.Count -eq 1) {
+        $button = $overwriteAll[0]
+        if ($button.Current.ProcessId -ne $script:ProcessIdForVariables -or -not $button.Current.IsEnabled) { throw 'KV_VARIABLE_REPLACE_BUTTON_MISMATCH' }
+        Get-KvsModalEvidence $dialog "$Step explicit replacement" | Out-Null
+        Assert-KvUiForegroundHwnd -ExpectedHwnd ([IntPtr]$foreground.hwnd) -Step "$Step confirm explicit overwrite" -ExpectedTitleLike 'KV STUDIO' | Out-Null
+        $overwriteWatch=[Diagnostics.Stopwatch]::StartNew()
+        $invoke=$null
+        if ($button.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$invoke)) {
+          $invoke.Invoke()
+        } else {
+          $rect=$button.Current.BoundingRectangle
+          Invoke-KvGuardedMouseClick -TargetHwnd ([IntPtr]$foreground.hwnd) -Step "$Step click overwrite all" -X ([int]($rect.X+$rect.Width/2)) -Y ([int]($rect.Y+$rect.Height/2)) -ExpectedTitleLike 'KV STUDIO' -SleepMs 250
+        }
+        Start-Sleep -Milliseconds 250
+        Assert-KvUiForegroundHwnd -ExpectedHwnd $formHwnd -Step "$Step replacement returned to editor" -ExpectedTitleLike '*变量编辑*' | Out-Null
+        Complete-KvUiGuardAtomicAction -Stopwatch $overwriteWatch -Step "$Step bound overwrite confirmation" -Action 'all-overwrite action on the verified confirmation dialog' -TargetHwnd ([IntPtr]$foreground.hwnd) -ExpectedTitleLike 'KV STUDIO' | Out-Null
+        Log 'explicit global Replace confirmed on the overwrite confirmation dialog'
+      } else {
+        throw 'KV_VARIABLE_REPLACE_UNEXPECTED_MODAL'
+      }
     }
   } else {
     Invoke-KvGuardedClipboardPaste -TargetHwnd ([IntPtr]$Form.Current.NativeWindowHandle) -Step $Step -Text $Text -ExpectedTitleLike '*变量编辑*' -SleepMs $SleepMs

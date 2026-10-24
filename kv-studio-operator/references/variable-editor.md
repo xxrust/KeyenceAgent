@@ -164,6 +164,23 @@ instead of producing a confusing `KV_FOCUS_LOST` at the first Alt+L.
 Verified 2026-10-24 with three consecutive write runs (each with global paste and
 reopen copy-back) on a live project after the focus check was added.
 
+## Paste Confirmation Dialogs
+
+KV raises three different dialogs after a bulk paste into the global table:
+
+- `PasteConfirmationForm` exposing `_buttonOverwriteAll`;
+- `变量名被更改，要覆盖吗？` with 取消/覆盖/全部覆盖 and no stable dialog AutomationId;
+- `粘贴数据中存在错误，已跳过部分数据粘贴。` — a warning that some rows were rejected.
+
+The runner identifies the all-overwrite action by AutomationId **or** by the
+`全部覆盖` control name, invoking it (InvokePattern) or clicking its verified
+rectangle when the pattern is unavailable. The paste-data warning is dismissed
+and the readback reports the skipped variable names; the startup modal check also
+fails fast with `KV_VARIABLE_PASTE_DATA_ERROR` if a previous run left it open.
+Live 2026-10-24: both overwrite variants were exercised on the KVX sample rebuild
+project (axis and axis-group rows with `_MC_Axis[n]` / `_MC_AxisGroup[1]` were
+accepted and read back).
+
 ## FB Argument Read/Write Focus
 
 The published `workflows/set_kv_fb_arguments.ps1 -SnapshotOnly` uses the same
