@@ -71,6 +71,15 @@ Build a variable inventory before editing MNM:
 - Arrays, structures, timers, counters, and retained/device-backed variables.
 - External device mappings that must match unit configuration.
 
+`workflows/export_kv_project_text_snapshot.ps1` now captures ordinary program
+local tables as well: after the global and per-FB snapshots it opens one local
+grid session with all program modules (`-SnapshotModules` joined by commas),
+writes `text/variables/local_<module>_raw.tsv`, and records the module list in
+`source_snapshot_manifest.json` as `discovered_program_local_modules`. Use
+`-ProgramLocalModules` to limit the set or `-SkipProgramLocals` for the older
+FB-only behavior. A failed module fails the snapshot instead of silently
+publishing a partial local layer.
+
 ## Reconstruction Order
 
 ## Structure Definition Extraction

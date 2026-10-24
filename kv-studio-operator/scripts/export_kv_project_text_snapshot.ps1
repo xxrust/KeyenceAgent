@@ -15,6 +15,10 @@ param(
   [string]$SnapshotId = '',
   [int]$TimeoutSeconds = 600,
   [switch]$PlanOnly,
+  # Ordinary program local tables are captured by default. Pass an explicit
+  # list to limit the run, or -SkipProgramLocals for the old FB-only behavior.
+  [string[]]$ProgramLocalModules = @(),
+  [switch]$SkipProgramLocals,
   [switch]$KeepProjectOpen
 )
 
@@ -228,9 +232,39 @@ foreach($name in @($fbReadable|Sort-Object -Unique)){
     $null=Copy-SnapshotFiles @($fbVariableSnapshot.snapshots|ForEach-Object {$_.raw_path}) (Join-Path $textRoot 'variables')
   }
 }
+# Ordinary program modules keep their local declarations in the same local-tab
+# grid as FBs, and the runner can walk several module names inside one editor
+# session. Batch them into one child call: a per-module workflow launch pays the
+# whole checklist/boundary/guard overhead again for every program (observed
+# ~90s/module, which made a 24-program sample impractical). FB modules are
+# excluded here because they already use their dedicated per-FB sessions above.
+$programLocalCandidates=@()
+if(-not $SkipProgramLocals){
+  $programLocalCandidates=if($ProgramLocalModules.Count -gt 0){
+    @($ProgramLocalModules|ForEach-Object{([string]$_).Trim()}|Where-Object {$_})
+  } else {
+    @($moduleNames|Where-Object {$fbModules -notcontains $_})
+  }
+  $programLocalCandidates=@($programLocalCandidates|Sort-Object -Unique)
+}
+$programLocalSteps=@()
+if($programLocalCandidates.Count -gt 0){
+  $programVariablesOut=Join-Path $rawRoot 'program_variables'
+  $programVariablesResult=Join-Path $programVariablesOut 'variable_workflow_result.json'
+  $programVariablesArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$programVariablesOut,'-SnapshotOnly','-SkipGlobal','-SnapshotModules',($programLocalCandidates -join ','),'-TimeoutSeconds',[string]$TimeoutSeconds)
+  $programVariableStep=Invoke-Child $variablesWorkflow $programVariablesArgs $programVariablesResult 'program_variables'
+  $programLocalSteps+=$programVariableStep
+  $programVariableSnapshotPath=Join-Path $programVariablesOut 'artifacts\variables\variable_snapshot_result.json'
+  if(Test-Path $programVariableSnapshotPath){
+    $programVariableSnapshot=Get-Content -Raw $programVariableSnapshotPath|ConvertFrom-Json
+    $allVariableSnapshots+=@($programVariableSnapshot.snapshots)
+    $null=Copy-SnapshotFiles @($programVariableSnapshot.snapshots|ForEach-Object {$_.raw_path}) (Join-Path $textRoot 'variables')
+  }
+}
+$allLocalVariableSteps=@($fbVariableSteps+$programLocalSteps)
 if(-not $PlanOnly){
   $globalComplete=($variableSnapshot -and $variableSnapshot.unfiltered_completeness_verified -eq $true)
-  Write-Json (Join-Path $textRoot 'variables\variable_snapshot_result.json') ([ordered]@{ok=($variablesStep.ok -and @($fbVariableSteps|Where-Object{-not $_.ok}).Count -eq 0);read_only=$true;project_path=$uiProjectPath;snapshots=@($allVariableSnapshots);all_columns_preserved=$true;unfiltered_completeness_verified=$globalComplete}) 8
+  Write-Json (Join-Path $textRoot 'variables\variable_snapshot_result.json') ([ordered]@{ok=($variablesStep.ok -and @($allLocalVariableSteps|Where-Object{-not $_.ok}).Count -eq 0);read_only=$true;project_path=$uiProjectPath;snapshots=@($allVariableSnapshots);all_columns_preserved=$true;unfiltered_completeness_verified=$globalComplete;captured_program_locals=@($programLocalCandidates);program_local_step_count=@($programLocalSteps).Count}) 8
 }
 
 $fbSteps=@()
@@ -273,8 +307,8 @@ $index=@(); foreach($f in @(Get-ChildItem -LiteralPath $textRoot -File -Recurse 
   $index += [ordered]@{path=(Rel $snapshotRoot $f.FullName);format=$f.Extension.TrimStart('.');length=$f.Length;sha256=(Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 }
 Write-Json (Join-Path $snapshotRoot 'text_index.json') $index 8
-$statuses=@($inventoryStep,$mnmStep,$structureStep,$variablesStep)+@($fbVariableSteps)+@($fbSteps)+@($inventoryFinalStep,$materializationStep,$commentsStep,$annotateStep)
-$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($fbVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}
+$statuses=@($inventoryStep,$mnmStep,$structureStep,$variablesStep)+@($allLocalVariableSteps)+@($fbSteps)+@($inventoryFinalStep,$materializationStep,$commentsStep,$annotateStep)
+$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($allLocalVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}
 $semanticStatus=if($materializationStep.ok){'complete'}else{'failed'}
 $semanticWarnings=@()
 if($materializationStep.result -and $materializationStep.result.warnings){$semanticWarnings=@($materializationStep.result.warnings)}
@@ -286,7 +320,7 @@ $manifest=[ordered]@{
   project=[ordered]@{path=$ProjectPath;root=$projectRoot;fingerprint=$fingerprint}
   layout=[ordered]@{snapshot_root='.';project='project';text='text';raw='raw';architecture='architecture';text_index='text_index.json'}
   artifacts=[ordered]@{semantic_project='project';inventory='text/project_inventory.json';mnm='text/mnm';variables='text/variables';structures='text/structure_definitions.json';fb_arguments='text/fb_arguments';comments='text/comments'}
-  workflow_status=$statuses; discovered_modules=$moduleNames; discovered_fb_modules=@($fbModules|Sort-Object -Unique)
+  workflow_status=$statuses; discovered_modules=$moduleNames; discovered_fb_modules=@($fbModules|Sort-Object -Unique); discovered_program_local_modules=@($programLocalCandidates)
   semantic_project_status=$semanticStatus; semantic_warnings=$semanticWarnings; missing_capabilities=@($missing); skipped_capabilities=$fbSkipped; version_control=[ordered]@{deterministic_index='text_index.json';file_hashes='sha256';binary_project_files='referenced_by_project.fingerprint_only';generated_files='isolated_snapshot_directory'}
 }
 Write-Json (Join-Path $snapshotRoot 'source_snapshot_manifest.json') $manifest 20

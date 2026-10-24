@@ -73,7 +73,14 @@ plan 暴露 `project_inventory_path` 与 `scan_order_result_path`。
    （`R_Flag/R100`、`Init_Flag/TRUE`、`Note_Flag/comment` 均回读保留）。
    仍缺：retain/constant/group_name 与局部变量属性。
 2. **官方库依赖安装**：样例的 36 个官方/库 FB 仍无安装 workflow；复刻需要先装库。
-3. **普通程序局部变量导出**：快照路线只抓全局与 FB 局部变量。
+3. ~~**普通程序局部变量导出**~~：**2026-10-24 已关闭**。
+   `export_kv_project_text_snapshot.ps1` 现在把普通程序模块加入同一个局部变量
+   快照会话（`-SnapshotModules` 逗号连接；`-SkipProgramLocals` 可退回旧行为）。
+   样例实测：`discovered_program_local_modules=24`，24/24 都有 local 快照，
+   `text\variables` 共 28 个 local raw（24 程序 + 4 FB），24 个 program entity
+   全部 `locals=complete`，快照 `status=ready`、`semantic=complete`、`missing=[]`，
+   总耗时 8.5 分钟。证据：`C:\kvrun\snapshot_sample\out2\snapshot_20261024_091005`。
+   `13_project_text_snapshot\run.ps1` 也加了后置断言，防止以后回退。
 4. **新工程 Main 替换**：同名预检 + repair 路线已可用，新工程默认 Main 仍未验证。
 5. **编译结果文本/截图**：owner-drawn 行仍读不到文本，建议失败时保存截图并把
    `route`/`item_count` 写入结果。

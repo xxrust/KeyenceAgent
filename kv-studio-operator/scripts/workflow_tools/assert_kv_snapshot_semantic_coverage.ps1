@@ -51,9 +51,9 @@ foreach ($u in $unresolved) {
 }
 if (-not $symbols.counts.by_class) { $failures.Add('symbol_classes_missing') | Out-Null }
 
-# Entity layer: a ready snapshot can still carry missing/partial entities (program locals
-# are not captured by the current variables route).  Count them so that ok can never be
-# read as "the analysis is complete".
+# Entity layer: a ready snapshot can still carry missing/partial entities (an
+# older snapshot may lack program locals, or an entity may report unresolved
+# members). Count them so that ok can never be read as "the analysis is complete".
 $programEntities = New-Object System.Collections.Generic.List[object]
 $projectRoot = Join-Path $snapshotRoot 'project'
 foreach ($p in @($structure.programs)) {
