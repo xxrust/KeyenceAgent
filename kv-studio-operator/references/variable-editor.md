@@ -144,6 +144,22 @@ keeps for the next member is ignored when counting persisted members.
 - A missing FB type usually means the official FB was not imported or the project already has a conflicting FB name.
 - Do not solve missing variables by deleting logic unless the reference logic analysis proves the logic is unnecessary.
 
+## Variable Grid Focus And Copy
+
+`set_variables_guarded.ps1` proves that the focused element is the variable grid
+(`_grid`, or an ancestor) after the Alt+L/Shift+Tab route. It tries at most three
+bounded Shift+Tab steps and fails with `KV_VARIABLE_GRID_FOCUS_NOT_PROVEN` if the
+grid never owns focus. A Ctrl+A/Ctrl+C issued outside the grid makes KV STUDIO
+raise the owner-drawn `向剪贴板复制失败。` modal, which used to surface as a
+generic `KV_CLIPBOARD_COPY_FAILED` during reopen verification.
+
+The runner also checks for stale KV modals before opening the editor. A leftover
+error dialog from a failed run now fails fast with the modal text and evidence
+instead of producing a confusing `KV_FOCUS_LOST` at the first Alt+L.
+
+Verified 2026-10-24 with three consecutive write runs (each with global paste and
+reopen copy-back) on a live project after the focus check was added.
+
 ## FB Argument Read/Write Focus
 
 The published `workflows/set_kv_fb_arguments.ps1 -SnapshotOnly` uses the same

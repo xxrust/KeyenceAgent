@@ -1097,6 +1097,20 @@ function Escape-SendKeysText([string]$Text) {
   $escaped
 }
 
+function Test-VariableGridFocused([string]$Label) {
+  $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+  if (-not $focused) { Log "grid focus check ${Label}: no focused element"; return $false }
+  $focusedId = [string]$focused.Current.AutomationId
+  $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+  $current = $focused
+  for ($depth = 0; $depth -lt 5 -and $current; $depth++) {
+    if ([string]$current.Current.AutomationId -eq '_grid') { return $true }
+    $current = $walker.GetParent($current)
+  }
+  Log "grid focus check ${Label}: focused id=<$focusedId> type=$($focused.Current.ControlType.ProgrammaticName)"
+  return $false
+}
+
 function Focus-VariableGridArea($Form, [string]$PageAid, [string]$Label) {
   $focusStep = "$Label grid focus"
   $before = Assert-VariableFormForeground $Form $focusStep -AllowSingleRecovery
@@ -1110,15 +1124,18 @@ function Focus-VariableGridArea($Form, [string]$PageAid, [string]$Label) {
   try {
     $Form = Invoke-GuardedVariableKeyAction $Form "$focusStep Alt+L" '%l' 'Alt+L focuses variable filter field' 150
     $Form = Invoke-GuardedVariableKeyAction $Form "$focusStep Shift+Tab" '+{TAB}' 'Shift+Tab moves from filter field toward the upper-left variable cell' 150
-    # In the global table KV STUDIO exposes the filter button group between
-    # the filter combo and the grid. One additional guarded Shift+Tab is
-    # required when that intermediate control owns focus.
-    $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
-    if ($focused -and @('_buttonGroupFilter','_comboBoxModuleName') -contains [string]$focused.Current.AutomationId) {
-      $Form = Invoke-GuardedVariableKeyAction $Form "$focusStep Shift+Tab grid" '+{TAB}' 'Shift+Tab moves from the filter intermediate control to upper-left variable cell' 150
+    # In the global table KV STUDIO may expose the filter button group or a
+    # combo between the filter field and the grid. Walk Shift+Tab until the
+    # focused element is the grid (or an ancestor is), bounded to three steps.
+    # A copy attempted outside the grid makes KV STUDIO raise the owner-drawn
+    # "向剪贴板复制失败。" modal instead of copying the table.
+    for ($attempt = 0; $attempt -lt 3; $attempt++) {
+      if (Test-VariableGridFocused $Label) { break }
+      if ($attempt -eq 2) { throw 'KV_VARIABLE_GRID_FOCUS_NOT_PROVEN' }
+      $Form = Invoke-GuardedVariableKeyAction $Form "$focusStep Shift+Tab retry $($attempt + 1)" '+{TAB}' 'Shift+Tab moves toward the upper-left variable cell' 150
     }
     $after = Assert-VariableFormForeground $Form "$focusStep semantic focus postcondition" -AllowSingleRecovery
-    Write-StepCheckpoint $focusStep 'after' 'Alt+L then Shift+Tab semantic variable-cell focus' $Form $before $after '' 'Native KV focus chain reached upper-left variable cell.' @() | Out-Null
+    Write-StepCheckpoint $focusStep 'after' 'Alt+L then Shift+Tab semantic variable-cell focus' $Form $before $after '' 'Native KV focus chain reached upper-left variable cell with verified grid focus.' @() | Out-Null
     return
   } catch {
     Log "semantic Alt+L/Shift+Tab focus route unavailable for $Label; using verified grid route: $($_.Exception.Message)"
@@ -1680,6 +1697,11 @@ try {
   $process = Get-BoundKvsProcess $projectNeedle $ProjectPath
   if (-not $process) { throw 'No visible KV STUDIO process.' }
   $script:ProcessIdForVariables = $process.Id
+  # A stale KV error modal (for example "向剪贴板复制失败。") from an earlier
+  # failed run blocks every later focus/copy action and surfaces as a confusing
+  # KV_FOCUS_LOST. Detect it before touching the editor and fail with the modal
+  # text and evidence so the operator can dismiss it or restart KV STUDIO.
+  Assert-NoKvsModalFast $process.Id 'before variable editing startup'
   $existingEditor=Get-VariableForm $process.Id
   if ($existingEditor) {
     Assert-KvUiForegroundHwnd -ExpectedHwnd ([IntPtr]$existingEditor.Current.NativeWindowHandle) -Step 'set variables existing editor start' -ExpectedTitleLike '*变量编辑*' -AllowSingleRecovery | Out-Null

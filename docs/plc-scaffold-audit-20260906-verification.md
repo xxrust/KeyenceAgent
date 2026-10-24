@@ -106,8 +106,9 @@ plan 暴露 `project_inventory_path` 与 `scan_order_result_path`。
    期间修掉两个真实回归：execution plan 未把 UI guard/agent boundary 两门禁放前两位
    （`KV_PLAN_REQUIRED_GATE_ORDER`），以及 Ctrl+N 创建的 KVS 命令行不含工程路径导致
    import/compile/copy 绑定失败（现统一用 `-CreatedProjectResultPath`）。
-   剩余：变量 reopen 复制偶发 `KV_CLIPBOARD_COPY_FAILED`
-   （KV 弹"向剪贴板复制失败。"），重跑可复现性待观察。
+   变量 reopen 复制失败已定位并修复：焦点未证明落在 `_grid` 时 Ctrl+C 会触发 KV 的
+   “向剪贴板复制失败。”；现在 Alt+L/Shift+Tab 最多 3 次并校验焦点祖先含 `_grid`，
+   启动时还检查遗留模态框。修复后同一工程连续 3 次写入+重开回读全部 ok。
 5. **编译结果文本/截图**：已修掉“成功结果对话框被当作 unexpected modal”的误判
    （按进程 + `#32770` + 标题 `转换结果` 接受），直接编译实测复制到
    `转换结果 OK / 转换成功。 / 总步数：4`。NG 时 owner-drawn 错误行仍可能读不到文本，
