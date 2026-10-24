@@ -29,6 +29,9 @@
   # the group cell (ten columns), so rows keep their storage group instead of all
   # landing in (Default).
   [switch]$GlobalPasteWithGroupColumn,
+  # Storage group for the global paste: Alt+G, type the group name, commit, then
+  # paste the nine-column payload. Use this to create or switch to a user group.
+  [string]$GlobalGroupName = '',
 
   [switch]$AppendGlobalVariables,
   [string[]]$AllowedCustomDataTypes = @(),
@@ -936,6 +939,39 @@ function Get-KvsModalErrorCode([string]$Text) {
   return 'KV_MODAL_PRESENT'
 }
 
+function Dismiss-BenignVariableModal([int]$ProcessIdValue) {
+  # A previous failed paste can leave KV's paste-warning modal open. It is a
+  # #32770 rendered inside the main window, so find its 确定 button in the main
+  # window's UIA tree and click that exact control before starting the editor.
+  $process = Get-Process -Id $ProcessIdValue -ErrorAction SilentlyContinue
+  if (-not $process -or $process.MainWindowHandle -eq 0) { return $false }
+  $main = [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$process.MainWindowHandle)
+  if (-not $main) { return $false }
+  $nodes = @()
+  try { $nodes = @($main.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)) } catch { return $false }
+  $text = (@($nodes | ForEach-Object { [string]$_.Current.Name } | Where-Object { $_ }) -join ' ')
+  $needles = @(
+    (-join ([char[]](0x7C98,0x8D34,0x6570,0x636E,0x4E2D,0x5B58,0x5728,0x9519,0x8BEF))),
+    (-join ([char[]](0x7C98,0x8D34,0x6570,0x636E,0x4E2D,0x5B58,0x5728,0x65E0,0x6548,0x6570,0x636E)))
+  )
+  $match = $false
+  foreach ($n in $needles) { if ($text.Contains($n)) { $match = $true; break } }
+  if (-not $match) { return $false }
+  $okName = -join ([char[]](0x786E,0x5B9A))
+  $dialog = @($nodes | Where-Object { [string]$_.Current.ClassName -eq '#32770' -and [string]$_.Current.Name -eq 'KV STUDIO' }) | Select-Object -First 1
+  if ($dialog) {
+    Log 'dismissing benign stale variable paste modal with Enter'
+    Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd ([IntPtr]$dialog.Current.NativeWindowHandle) -Step 'dismiss stale variable paste modal' -Keys '{ENTER}' -ExpectedTitleLike 'KV STUDIO' -SuccessTitleLike @('*变量编辑*','KV STUDIO*') -Action 'Enter closes the paste-warning modal' -SleepMs 300
+    return $true
+  }
+  $button = @($nodes | Where-Object { [string]$_.Current.Name -eq $okName -and [string]$_.Current.ClassName -eq 'Button' -and $_.Current.BoundingRectangle.Width -gt 0 }) | Select-Object -First 1
+  if (-not $button) { return $false }
+  $rect = $button.Current.BoundingRectangle
+  Log 'dismissing benign stale variable paste modal'
+  Invoke-KvGuardedMouseClick -TargetHwnd ([IntPtr]$process.MainWindowHandle) -Step 'dismiss stale variable paste modal' -X ([int]($rect.X + $rect.Width / 2)) -Y ([int]($rect.Y + $rect.Height / 2)) -ExpectedTitleLike 'KV STUDIO*' -SleepMs 300
+  return $true
+}
+
 function Assert-NoKvsModalFast([int]$ProcessIdValue, [string]$Stage) {
   foreach ($window in (Get-TopLevelWindowElementsForProcess $ProcessIdValue)) {
     $className = [string]$window.Current.ClassName
@@ -1022,17 +1058,27 @@ function Assert-KvVariablePastePayloadSchema(
       continue
     }
     if ($i -lt $expectedRows.Count) {
+      $nameIndex = if ($WithGroupColumn) { 1 } else { 0 }
       $expectedName = [string]$expectedRows[$i].name
       $expectedType = [string]$expectedRows[$i].data_type
-      if ($fields[0] -ne $expectedName -or $fields[1] -ne $expectedType) {
-        $errors.Add([pscustomobject]@{ code='NAME_TYPE_MISMATCH'; row=$i+1; expected_name=$expectedName; actual_name=$fields[0]; expected_data_type=$expectedType; actual_data_type=$fields[1] })
+      if ($WithGroupColumn) {
+        $expectedGroup = [string]$expectedRows[$i].group
+        if ($fields[0] -ne $expectedGroup) {
+          $errors.Add([pscustomobject]@{ code='GROUP_MISMATCH'; row=$i+1; expected_group=$expectedGroup; actual_group=$fields[0] })
+        }
       }
-      if ($expectedColumnCount -eq 9) {
+      if ($fields[$nameIndex] -ne $expectedName -or $fields[$nameIndex + 1] -ne $expectedType) {
+        $errors.Add([pscustomobject]@{ code='NAME_TYPE_MISMATCH'; row=$i+1; expected_name=$expectedName; actual_name=$fields[$nameIndex]; expected_data_type=$expectedType; actual_data_type=$fields[$nameIndex + 1] })
+      }
+      if ($expectedColumnCount -ge 9) {
         $expectedDevice = ([string]$expectedRows[$i].device).Trim()
         $expectedInitial = ([string]$expectedRows[$i].initial_value).Trim()
         $expectedComment = ([string]$expectedRows[$i].comment).Trim()
-        if ($fields[2] -ne $expectedDevice -or $fields[3] -ne $expectedInitial -or $fields[8] -ne $expectedComment) {
-          $errors.Add([pscustomobject]@{ code='DEVICE_INITIAL_MISMATCH'; row=$i+1; expected_device=$expectedDevice; actual_device=$fields[2]; expected_initial_value=$expectedInitial; actual_initial_value=$fields[3]; expected_comment=$expectedComment; actual_comment=$fields[8] })
+        $deviceIndex = $nameIndex + 2
+        $initialIndex = $nameIndex + 3
+        $commentIndex = $nameIndex + 8
+        if ($fields[$deviceIndex] -ne $expectedDevice -or $fields[$initialIndex] -ne $expectedInitial -or $fields[$commentIndex] -ne $expectedComment) {
+          $errors.Add([pscustomobject]@{ code='DEVICE_INITIAL_MISMATCH'; row=$i+1; expected_device=$expectedDevice; actual_device=$fields[$deviceIndex]; expected_initial_value=$expectedInitial; actual_initial_value=$fields[$initialIndex]; expected_comment=$expectedComment; actual_comment=$fields[$commentIndex] })
         }
       }
     }
@@ -1580,6 +1626,20 @@ function Paste-GlobalVariablesByFirstNameTab($Form, [string]$Text) {
   if (-not $formNow) { throw 'KvVariableForm missing before global paste.' }
   if (-not (Test-VariablePageSelected $formNow '_tabPageGlobal')) { throw 'Global variable page is not selected before paste.' }
 
+  if ($GlobalGroupName) {
+    # The global table is grouped; the group combo is the only way to create or
+    # switch to a group. Alt+G focuses 变量组(G), then paste the group name and
+    # commit, so the following rows land in that group.
+    $formNow = Invoke-GuardedVariableKeyAction $formNow 'global group Alt+G' '%g' 'Alt+G focuses the variable group combo' 150
+    $formNow = Invoke-GuardedVariableKeyAction $formNow 'global group select-all' '^a' 'Select the current group name' 100
+    Invoke-KvGuardedClipboardSetText -TargetHwnd ([IntPtr]$formNow.Current.NativeWindowHandle) -Step "global group name $GlobalGroupName" -Text $GlobalGroupName -ExpectedTitleLike '*变量编辑*'
+    $formNow = Invoke-GuardedVariableKeyAction $formNow 'global group commit' '{ENTER}' 'Commit the variable group name' 250
+    Log "selected global variable group: $GlobalGroupName"
+    $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
+    Focus-VariableGridArea $formNow '_tabPageGlobal' 'global variables'
+    $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
+  }
+
   Focus-VariableGridArea $formNow '_tabPageGlobal' 'global variables'
   $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
   if ($GlobalPasteWithGroupColumn) {
@@ -1782,8 +1842,9 @@ try {
   $script:ProcessIdForVariables = $process.Id
   # A stale KV error modal (for example "向剪贴板复制失败。") from an earlier
   # failed run blocks every later focus/copy action and surfaces as a confusing
-  # KV_FOCUS_LOST. Detect it before touching the editor and fail with the modal
-  # text and evidence so the operator can dismiss it or restart KV STUDIO.
+  # KV_FOCUS_LOST. Dismiss the benign paste warnings automatically; anything
+  # else fails with the modal text and evidence.
+  Dismiss-BenignVariableModal $process.Id | Out-Null
   Assert-NoKvsModalFast $process.Id 'before variable editing startup'
   $existingEditor=Get-VariableForm $process.Id
   if ($existingEditor) {

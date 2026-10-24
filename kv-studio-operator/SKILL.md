@@ -100,6 +100,27 @@ variables_ok / complete` 与 `reasons`；有未完成模块时退出码 41。**�
 编译噪声的判别口诀：**错误按模块均匀铺开 ⇒ 多半是变量没写完；集中在少数模块/符号 ⇒ 才是
 该模块的真实问题**。
 
+## 底层依赖先行（写变量之前必须回答“它凭什么存在”）
+
+变量在 KV STUDIO 里是否成立，取决于**目标工程已有的对象**，而不是类型名是否写对：
+
+- 自定义结构体必须已在工程里（`strCylinder` 等），成员类型递归成立；
+- FB 实例类型必须已导入（用户 FB 或库 FB，如 `TON`/`MC_*`/`ModbusTCPClient_*`）；
+- `_MC_AXIS_REF` / `_MC_AXIS_GROUP_REF` 及 `_MC_Axis[n]` / `_MC_AxisGroup[n]` 必须有对应**轴/轴组**（由 EtherCAT/轴配置生成，**不能靠变量粘贴创建**）；
+- 写入顺序必须是：类型/轴存在 → 再写引用它们的变量。缺依赖的行**不写**，报告为 blocked。
+
+写任何变量前先跑离线依赖规划（不碰 UI）：
+
+```powershell
+powershell -File <skill-root>\scripts\workflow_tools\plan_kv_variable_dependencies.ps1 `
+  -VariablesTsv <vars.tsv> -StructureDefinitionsPath <structures.json> `
+  -AxisIndexes 1,2,3 -FbTypes TON,MC_Power -OutDir <dir>\deps
+```
+
+输出 `variable_dependency_report.json`：每行 `ready/blocked`、`missing`（`missing_type:*`、`missing_axis:n`、`missing_axis_group:n`）、以及 `required_structures/required_axes/required_fb_types`。只有 `blocked_count=0` 的集合才允许进入写入步骤。
+
+**证据标准（防止把“局部通过”说成全绿）**：说“通过”必须同时满足——目标工程完整编译 `转换结果 OK`、模块完成度 100%、扫描顺序一致。单步 runner `ok=true`、子集快照通过、结构体导入成功，都不算全绿。
+
 ## 选择接口
 
 唯一能力清单是 [scripts/script_manifest.json](scripts/script_manifest.json)。用只读查询获得实际路径、参数类型、必填参数和验证范围：

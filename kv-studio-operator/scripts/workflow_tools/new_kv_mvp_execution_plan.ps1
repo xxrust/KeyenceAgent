@@ -1,4 +1,4 @@
-﻿param(
+param(
   [Parameter(Mandatory=$true)]
   [ValidateSet('new_project','repair_existing_project')]
   [string]$Mode,
@@ -227,6 +227,30 @@ try {
 
   $variableArtifactDir = Join-Path $artifactRoot 'variables'
   $mergedGlobal = New-MergedGlobalVariablesTsv $resolvedMnmFiles $variableArtifactDir
+  # Axis/group references cannot be created by a variable paste without the
+  # motion configuration; keep them out of the runtime global set, record them
+  # as deferred, and let the global layer complete and compile.
+  $deferredAxisVariables = @()
+  $runtimeGlobalPath = $mergedGlobal.path
+  if ($mergedGlobal.path -and (Test-Path -LiteralPath $mergedGlobal.path)) {
+    $globalLines = @(Get-Content -LiteralPath $mergedGlobal.path -Encoding Default)
+    if ($globalLines.Count -ge 2) {
+      $kept = New-Object System.Collections.Generic.List[string]
+      $kept.Add($globalLines[0])
+      foreach ($line in $globalLines[1..($globalLines.Count - 1)]) {
+        if (-not $line) { continue }
+        $parts = @($line -split "`t", -1)
+        $type = if ($parts.Count -gt 3) { $parts[3].Trim() } else { '' }
+        if ($type -eq '_MC_AXIS_REF' -or $type -eq '_MC_AXIS_GROUP_REF') {
+          $deferredAxisVariables += (if ($parts.Count -gt 2) { $parts[2].Trim() } else { '' })
+          continue
+        }
+        $kept.Add($line)
+      }
+      $runtimeGlobalPath = Join-Path $variableArtifactDir 'global_variables_runtime.tsv'
+      [IO.File]::WriteAllText($runtimeGlobalPath, (($kept -join "`r`n") + "`r`n"), [Text.Encoding]::Default)
+    }
+  }
   $projectPathForRun = if ($Mode -eq 'new_project') { Join-Path (Join-Path $projectRoot $ProjectName) ($ProjectName + '.kpr') } else { $ProjectPath }
   if ($Mode -eq 'new_project' -and (Test-Path -LiteralPath $projectPathForRun)) { throw "KV_NEW_PROJECT_ALREADY_EXISTS: use a fresh output directory or the existing-project repair workflow: $projectPathForRun" }
   $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($projectPathForRun)
