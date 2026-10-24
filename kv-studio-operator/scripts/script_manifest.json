@@ -317,6 +317,15 @@
                                                      "customer_callable":  true
                                                  },
                                                  {
+                                                     "path":  "workflow_tools/assert_kv_scan_order.ps1",
+                                                     "status":  "published",
+                                                     "customer_callable":  true,
+                                                     "capabilities":  [
+                                                                          "verify_saved_scan_order",
+                                                                          "verify_source_target_execution_order"
+                                                                      ]
+                                                 },
+                                                 {
                                                      "path":  "export_kv_project_text_snapshot.ps1",
                                                      "status":  "published",
                                                      "customer_callable":  true,

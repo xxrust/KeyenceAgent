@@ -99,10 +99,27 @@ Local names may be reused across modules. Isolation checks exclude names owned b
 the selected module from other-module forbidden names; uniqueness is scoped to
 the module, not to the project.
 
-`modules[]` order controls the import schedule, but the existing placement check
-does not yet prove the saved PLC scan execution order. Full reproduction also
-requires a separate source/target execution-order comparison, variable/structure
-snapshot, library dependency evidence, and the same-run conversion result.
+`modules[]` order controls the import schedule, but placement alone does not prove
+the saved PLC scan execution order. After the project is saved, compare the saved
+inventory with the intended schedule using
+`scripts/workflow_tools/assert_kv_scan_order.ps1`:
+
+- `-ExpectedInventory <source project_inventory.json> -ActualInventory <target project_inventory.json>`
+  compares the relative order of the expected modules. Add `-RequireExactNumbers`
+  to also require identical execution numbers.
+- `-ScaffoldPath <scaffold.json> -ActualInventory <target project_inventory.json>`
+  compares the declared `mnm_files[]` import order; only `module_type: 0` entries
+  participate in the scan schedule, so function blocks are excluded.
+- Unexpected modules fail by default; `-AllowExtraModules` records them as
+  warnings while keeping the relative-order check hard.
+
+The tool writes `scan_order_verification.json` and fails closed with
+`KV_SCAN_ORDER_MODULE_MISSING`, `KV_SCAN_ORDER_MODULE_EXTRA`,
+`KV_SCAN_ORDER_MISMATCH`, `KV_SCAN_ORDER_NUMBER_MISMATCH`, or
+`KV_SCAN_ORDER_DUPLICATE_MODULE`. `tests\scan-order\run.bat` covers identical,
+swapped, missing, extra, shifted-number, duplicate, and scaffold-order cases.
+Full reproduction still requires a variable/structure snapshot, library dependency
+evidence, and the same-run conversion result.
 
 The flat workflow creates `<RunRoot>/run.log` before its first child and passes
 `KV_WORKFLOW_RUN_LOG` to children so guard actions and workflow stage results share
