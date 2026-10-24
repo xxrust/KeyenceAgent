@@ -41,6 +41,12 @@ $contractFiles = @()
 try {
   $manifest = Get-Content -LiteralPath (Join-Path $root 'script_manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
   $contract = $manifest.step_result_contracts.([string]$step.script_name)
+  if (-not $contract) {
+    $leaf = [IO.Path]::GetFileName([string]$step.script_name)
+    foreach ($entry in $manifest.step_result_contracts.PSObject.Properties) {
+      if ([IO.Path]::GetFileName($entry.Name) -eq $leaf) { $contract = $entry.Value; break }
+    }
+  }
   if ($contract -and $contract.files) { $contractFiles = @($contract.files | ForEach-Object { [string]$_ }) }
 } catch {}
 $present = @()
