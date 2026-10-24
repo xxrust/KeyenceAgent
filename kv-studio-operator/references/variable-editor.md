@@ -33,6 +33,24 @@ and other unverified properties empty. Argument `constant`, `retain` and `hidden
 may be empty or `False`; `default_value` must be empty. Put initialization in ST
 when needed. Name/type persistence does not verify those omitted properties.
 
+### Global device, initial value and comment (opt-in)
+
+`workflows/set_kv_variables.ps1 -FullGlobalAttributes` writes nine paste columns
+for globals: name, data_type, device, initial_value, retain (`False`),
+constant (`False`), public, hidden (`False`), comment. Readback compares name,
+data_type, device, initial_value and comment. Verified live on 2026-10-24:
+a `DM9002` device binding, an INT initial value `789` (read back as `+789`),
+a BOOL initial value `TRUE`, and a comment all survived editor close/reopen.
+
+- A global row that declares both `device` and `initial_value` is rejected with
+  `KV_VARIABLE_DEVICE_INITIAL_VALUE_CONFLICT`: KV STUDIO does not preserve an
+  initial value for a device-assigned global variable.
+- `retain`, `constant` and `group_name` remain unsupported and fail closed.
+- Locals keep the name/type (or `Full` name/type/comment) route; local device and
+  initial value are still rejected.
+- The public/private token is the Chinese UI value `非公开`; a non-Chinese
+  KV STUDIO UI is not covered by this route.
+
 Run the public variable workflow with `-PlanOnly` for standalone declarations,
 or the complete module workflow for its combined declaration/ownership gate.
 Internal validators are implementation details, not separate customer entrypoints.

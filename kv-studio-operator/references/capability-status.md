@@ -10,8 +10,11 @@
 - 同次 receipt：输入、脚本版本和输出归属证据。
 - 语义验证：以子步骤明确的字段和读回内容为准。
 
-变量当前主要核对名称和类型；自变量核对名称、方向和类型。完整源表
-逐列相等属于额外回归证据，不能推及所有普通写入。快照还需区别当前
+变量默认核对名称和类型；`set_kv_variables.ps1 -FullGlobalAttributes` 额外
+写入并读回全局变量的 device、initial_value、comment（2026-10-24 实测）。
+device 与 initial_value 同时声明会被 `KV_VARIABLE_DEVICE_INITIAL_VALUE_CONFLICT`
+拒绝；retain/constant/group_name 仍失败关闭。自变量核对名称、方向和类型。
+完整源表逐列相等属于额外回归证据，不能推及所有普通写入。快照还需区别当前
 筛选结果与完整清单。MNM 导入的完成、模块归属、声明完整及编译通过
 是不同验收项，不能互相替代。
 

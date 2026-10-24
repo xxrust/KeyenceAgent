@@ -87,13 +87,20 @@ plus project identity and ordered module entries. Instruction membership is not
 an execution-order check. `task.acceptance[]` is preserved in generated TASK.md.
 Empty, null, or omitted local variables render an explicit no-local-state marker.
 
-The current variable writer proves `name` and `data_type`, not complete variable
-attributes. Device bindings, non-default initial values, retain/constant flags,
-and structure/library creation are not implemented by this scaffold workflow.
-Unsupported write fields fail before UI input. Explicit default initial values
-are permitted only in a newly created project; repair/direct writes require an
-empty initial_value until full value write/readback exists. Comments in the model
-remain source documentation and are not currently a UI persistence guarantee.
+The baseline variable writer proves `name` and `data_type`. The opt-in
+`-FullGlobalAttributes` route on `set_kv_variables.ps1` additionally writes and
+reads back the global `device`, `initial_value` and `comment` columns (live
+verification 2026-10-24: `DM9002` binding, INT `789`, BOOL `TRUE`, comment). A
+global row that declares both `device` and `initial_value` is rejected with
+`KV_VARIABLE_DEVICE_INITIAL_VALUE_CONFLICT`, because KV STUDIO does not preserve
+an initial value for a device-assigned variable. `retain`, `constant` and
+`group_name` remain unsupported and fail before UI input. The scaffold/validator
+path still uses the name/type baseline; wiring `-FullGlobalAttributes` into the
+scaffold model is follow-up work. Explicit default initial values are permitted
+only in a newly created project; repair/direct writes require an empty
+initial_value unless the full-attribute route is enabled. Comments in the model
+are written only through the full-attribute route; the name/type baseline leaves
+them as source documentation.
 
 Local names may be reused across modules. Isolation checks exclude names owned by
 the selected module from other-module forbidden names; uniqueness is scoped to

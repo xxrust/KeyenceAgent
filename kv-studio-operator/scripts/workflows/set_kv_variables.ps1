@@ -7,6 +7,9 @@ param(
   [string]$ChecklistPath = '',
   [ValidateSet('Full','NameType')][string]$LocalPasteFormat = 'NameType',
   [ValidateSet('Replace','Append')][string]$GlobalWriteMode = 'Append',
+  # Opt-in: write and read back global device, initial-value and comment
+  # columns. The baseline remains a name/type payload unless this is supplied.
+  [switch]$FullGlobalAttributes,
   [string[]]$AllowedCustomDataTypes = @(),
   [int]$TimeoutSeconds = 120,
   [switch]$PlanOnly,
@@ -32,7 +35,7 @@ if (-not $SnapshotOnly) {
     if (-not $inputSet.path) { continue }
     $rows=@(Import-Csv -LiteralPath $inputSet.path -Delimiter "`t" -Encoding UTF8)
     $errors=@(Get-KvVariableDefinitionErrors -Rows $rows -Scope $inputSet.scope -SourcePath $inputSet.path -ExpectedOwnerProgram $LocalProgramName -AllowedCustomDataTypes $AllowedCustomDataTypes)
-    $errors+=@(Get-KvVariableWriteCapabilityErrors -Rows $rows)
+    $errors+=@(Get-KvVariableWriteCapabilityErrors -Rows $rows -AllowGlobalAttributes:($FullGlobalAttributes -and $inputSet.scope -eq 'global') -Scope $inputSet.scope)
     if ($errors.Count) { throw "$($errors[0].code): $($errors[0].message)" }
   }
 }
@@ -50,6 +53,7 @@ if ($SnapshotOnly) {
   $parameters.LocalPasteFormat=$LocalPasteFormat
   $parameters.AuditPersistence=$true
   $parameters.AppendGlobalVariables=($GlobalWriteMode -eq 'Append')
+  if ($FullGlobalAttributes) { $parameters.FullGlobalAttributes=$true }
 }
 Add-KvWorkflowStep -Plan $plan -Name 'variables' -Script 'runner_children/set_variables_guarded.ps1' -OutDir $dest -Parameters $parameters
 Submit-KvWorkflowPlan -Plan $plan -ScriptsRoot $root -PlanOnly:$PlanOnly

@@ -217,21 +217,40 @@ function Get-KvNoLocalVariablesMarkerErrors {
 }
 
 function Get-KvVariableWriteCapabilityErrors {
-  param([object[]]$Rows, [switch]$AllowDefaultInitialValues)
+  param(
+    [object[]]$Rows,
+    [switch]$AllowDefaultInitialValues,
+    [switch]$AllowGlobalAttributes,
+    [string]$Scope = ''
+  )
+  # Global variable tables support a device binding and an initial value column.
+  # Pass -AllowGlobalAttributes together with -Scope global only when the caller
+  # writes and reads those columns back; locals still prove name/type only.
+  $globalAttributeWrite = $AllowGlobalAttributes -and $Scope -eq 'global'
   foreach ($row in $Rows) {
     $unsupported = @()
-    if ([string]$row.device) { $unsupported += 'device' }
+    if ([string]$row.device -and -not $globalAttributeWrite) { $unsupported += 'device' }
     $initial = ([string]$row.initial_value).Trim()
+    $device = ([string]$row.device).Trim()
+    # KV STUDIO keeps the initial value only for variables without a device
+    # binding. A device-assigned global variable reopens with an empty initial
+    # value, so reject the combination before any UI input instead of writing a
+    # value that cannot be read back.
+    if ($globalAttributeWrite -and $device -and $initial) {
+      [pscustomobject]@{code='KV_VARIABLE_DEVICE_INITIAL_VALUE_CONFLICT';name=[string]$row.name;fields=@('initial_value');message="Variable '$($row.name)' declares both device '$device' and initial_value '$initial'. KV STUDIO does not preserve an initial value for a device-assigned global variable; declare one or the other."}
+      continue
+    }
     $type = ([string]$row.data_type).Trim().ToUpperInvariant()
     $isDefault = -not $initial -or ($type -eq 'BOOL' -and $initial -in @('FALSE','0')) -or
       ($type -in @('INT','DINT','UINT','UDINT','REAL','LREAL') -and $initial -match '^[-+]?0(?:\.0+)?$')
-    if ($initial -and (-not $AllowDefaultInitialValues -or -not $isDefault)) { $unsupported += 'initial_value' }
+    if ($initial -and (-not $globalAttributeWrite) -and (-not $AllowDefaultInitialValues -or -not $isDefault)) { $unsupported += 'initial_value' }
     foreach ($field in @('retain','constant','group_name','assignment_target','opc_ua','file_export')) {
       $value = ([string]$row.$field).Trim()
       if ($value -and $value -notin @('False','0')) { $unsupported += $field }
     }
     if ($unsupported.Count) {
-      [pscustomobject]@{code='KV_VARIABLE_WRITE_CAPABILITY_UNSUPPORTED';name=[string]$row.name;fields=$unsupported;message="Variable '$($row.name)' requires unsupported write/readback fields: $($unsupported -join ', '). Current variable API verifies name and data_type only."}
+      $verified = if ($globalAttributeWrite) { 'name, data_type, device, initial_value and comment' } else { 'name and data_type only' }
+      [pscustomobject]@{code='KV_VARIABLE_WRITE_CAPABILITY_UNSUPPORTED';name=[string]$row.name;fields=$unsupported;message="Variable '$($row.name)' requires unsupported write/readback fields: $($unsupported -join ', '). Current variable API verifies $verified."}
     }
   }
 }

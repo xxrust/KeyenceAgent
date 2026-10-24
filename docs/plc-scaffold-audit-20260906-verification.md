@@ -53,9 +53,12 @@ verification），并补了可重复的离线测试与文档。
 
 ## 仍未关闭（按建议优先级）
 
-1. **完整变量属性写入/读回**（device、非默认初值、retain/constant、注释）：
-   当前 paste 仍只写 name/type（local 的 `Full` 格式只多写 comment 与 False 标志），
-   校验器对未支持字段继续失败关闭。
+1. **完整变量属性写入/读回**：全局变量的 device、initial_value、comment 已由
+   `set_kv_variables.ps1 -FullGlobalAttributes` 写入并读回（2026-10-24 实测：
+   `DM9002`、INT `789`→`+789`、BOOL `TRUE`、comment 全部在关闭/重开后保留）。
+   device 与 initial_value 同时声明会被 `KV_VARIABLE_DEVICE_INITIAL_VALUE_CONFLICT`
+   拒绝（KV STUDIO 对已绑定设备的变量不保留初值）。仍缺：retain/constant/group_name、
+   局部变量属性、以及把该开关接入 scaffold 模型与校验器。
 2. **官方库依赖安装**：样例的 36 个官方/库 FB 仍无安装 workflow；复刻需要先装库。
 3. **普通程序局部变量导出**：快照路线只抓全局与 FB 局部变量。
 4. **新工程 Main 替换**：同名预检 + repair 路线已可用，新工程默认 Main 仍未验证。

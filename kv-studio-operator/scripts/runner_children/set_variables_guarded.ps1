@@ -21,6 +21,10 @@
   [ValidateSet('Full','NameType')]
   [string]$LocalPasteFormat = 'NameType',
   [switch]$NewProjectDefaults,
+  # Opt-in: write and read back the global-variable device, initial-value and
+  # comment columns. Off by default because a plain name/type paste is the
+  # verified baseline; enabling this extends the paste payload to nine columns.
+  [switch]$FullGlobalAttributes,
 
   [switch]$AppendGlobalVariables,
   [string[]]$AllowedCustomDataTypes = @(),
@@ -901,6 +905,24 @@ function Convert-GlobalRows([string]$Path) {
   $text = Read-KvDelimitedText $Path
   $rows = $text | ConvertFrom-Csv -Delimiter "`t"
   $lines = foreach ($row in (Get-KvExecutableVariableRows -Rows @($rows) -Scope global)) {
+    if ($FullGlobalAttributes) {
+      # Anchor is the name cell, so the payload starts at name. The saved grid
+      # layout is group, name, data_type, device, initial_value, retain,
+      # constant, public, hidden, comment; nine columns fill name..comment.
+      $publicToken = -join ([char[]](0x975E, 0x516C, 0x5F00))
+      @(
+        $row.name
+        $row.data_type
+        $row.device
+        $row.initial_value
+        'False'
+        'False'
+        $publicToken
+        'False'
+        $row.comment
+      ) -join "`t"
+      continue
+    }
     @(
       $row.name
       $row.data_type
@@ -918,7 +940,7 @@ function Assert-KvVariablePastePayloadSchema(
 ) {
   $expectedRows = @(Get-KvExecutableVariableRows -Rows $Rows -Scope $Scope)
   $payloadLines = @($Text -split "`r?`n" | Where-Object { $_ -ne '' })
-  $expectedColumnCount = if ($Scope -eq 'global' -or $Format -eq 'NameType') { 2 } else { 7 }
+  $expectedColumnCount = if ($Scope -eq 'global' -and $Format -eq 'Full') { 9 } elseif ($Scope -eq 'global' -or $Format -eq 'NameType') { 2 } else { 7 }
   $errors = [System.Collections.Generic.List[object]]::new()
 
   if ($payloadLines.Count -ne $expectedRows.Count) {
@@ -935,6 +957,14 @@ function Assert-KvVariablePastePayloadSchema(
       $expectedType = [string]$expectedRows[$i].data_type
       if ($fields[0] -ne $expectedName -or $fields[1] -ne $expectedType) {
         $errors.Add([pscustomobject]@{ code='NAME_TYPE_MISMATCH'; row=$i+1; expected_name=$expectedName; actual_name=$fields[0]; expected_data_type=$expectedType; actual_data_type=$fields[1] })
+      }
+      if ($expectedColumnCount -eq 9) {
+        $expectedDevice = ([string]$expectedRows[$i].device).Trim()
+        $expectedInitial = ([string]$expectedRows[$i].initial_value).Trim()
+        $expectedComment = ([string]$expectedRows[$i].comment).Trim()
+        if ($fields[2] -ne $expectedDevice -or $fields[3] -ne $expectedInitial -or $fields[8] -ne $expectedComment) {
+          $errors.Add([pscustomobject]@{ code='DEVICE_INITIAL_MISMATCH'; row=$i+1; expected_device=$expectedDevice; actual_device=$fields[2]; expected_initial_value=$expectedInitial; actual_initial_value=$fields[3]; expected_comment=$expectedComment; actual_comment=$fields[8] })
+        }
       }
     }
     if ($payloadLines[$i].Contains([char]0xFFFD) -or $payloadLines[$i].Contains('闈炲叕寮€')) {
@@ -975,8 +1005,8 @@ function Assert-NoSoftDeviceLikeVariableNames([object[]]$Rows, [string]$Scope, [
   }
 }
 
-function Assert-KvVariableDefinitionsBeforePaste([object[]]$Rows, [string]$Scope, [string]$SourcePath, [string]$ExpectedOwnerProgram = '') {
-  $writeErrors = @(Get-KvVariableWriteCapabilityErrors -Rows $Rows -AllowDefaultInitialValues:$NewProjectDefaults)
+function Assert-KvVariableDefinitionsBeforePaste([object[]]$Rows, [string]$Scope, [string]$SourcePath, [string]$ExpectedOwnerProgram = '', [switch]$FullGlobalAttributes) {
+  $writeErrors = @(Get-KvVariableWriteCapabilityErrors -Rows $Rows -AllowDefaultInitialValues:$NewProjectDefaults -AllowGlobalAttributes:$FullGlobalAttributes -Scope $Scope)
   if ($writeErrors.Count) {
     Fail-Guard $writeErrors[0].code "preflight $Scope variable write capability" $writeErrors[0].message @($SourcePath)
   }
@@ -1370,6 +1400,7 @@ function Get-CopiedVariableRows([string]$Text) {
     $rows.Add([pscustomobject]@{
       name = if ($columns.Count -gt $offset) { [string]$columns[$offset] } else { '' }
       data_type = if ($columns.Count -gt ($offset + 1)) { [string]$columns[$offset + 1] } else { '' }
+      offset = $offset
       columns = $columns
       raw = $line
     })
@@ -1377,19 +1408,63 @@ function Get-CopiedVariableRows([string]$Text) {
   @($rows)
 }
 
-function Assert-ExpectedVariableRowsInCopiedText([string]$Text, [object[]]$ExpectedRows, [string]$Label, [string]$EvidencePath) {
+function Test-SameAttributeText([string]$A, [string]$B) {
+  $left = ([string]$A).Trim()
+  $right = ([string]$B).Trim()
+  if ($left -ieq $right) { return $true }
+  $leftNumber = 0.0
+  $rightNumber = 0.0
+  if ([double]::TryParse($left, [ref]$leftNumber) -and [double]::TryParse($right, [ref]$rightNumber)) {
+    return ($leftNumber -eq $rightNumber)
+  }
+  return $false
+}
+
+function Assert-ExpectedVariableRowsInCopiedText([string]$Text, [object[]]$ExpectedRows, [string]$Label, [string]$EvidencePath, [switch]$FullAttributes, [string]$Scope = '') {
   $copiedRows = @(Get-CopiedVariableRows $Text)
   $missing = @()
+  $attributeMismatches = @()
   foreach ($expected in @($ExpectedRows)) {
     $expectedName = [string]$expected.name
     $expectedType = [string]$expected.data_type
     if (-not $expectedName) { continue }
     $match = @($copiedRows | Where-Object { $_.name -eq $expectedName -and $_.data_type -eq $expectedType })
-    if ($match.Count -eq 0) { $missing += "$expectedName/$expectedType" }
+    if ($match.Count -eq 0) { $missing += "$expectedName/$expectedType"; continue }
+    if (-not $FullAttributes) { continue }
+    $row = $match[0]
+    $offset = [int]$row.offset
+    $columns = @($row.columns)
+    $deviceIndex = if ($Scope -eq 'global') { $offset + 2 } else { 2 }
+    $initialIndex = if ($Scope -eq 'global') { $offset + 3 } else { -1 }
+    # Global comment is the ninth payload column (index 9 after the group column).
+    $commentIndex = if ($Scope -eq 'global') { $offset + 8 } else { 6 }
+    $actualDevice = if ($columns.Count -gt $deviceIndex) { [string]$columns[$deviceIndex] } else { '' }
+    $expectedDevice = ([string]$expected.device).Trim()
+    if (-not (Test-SameAttributeText $actualDevice $expectedDevice)) {
+      $attributeMismatches += "$expectedName device expected=<$expectedDevice> actual=<$actualDevice>"
+    }
+    if ($initialIndex -ge 0) {
+      $actualInitial = if ($columns.Count -gt $initialIndex) { [string]$columns[$initialIndex] } else { '' }
+      $expectedInitial = ([string]$expected.initial_value).Trim()
+      if (-not (Test-SameAttributeText $actualInitial $expectedInitial)) {
+        $attributeMismatches += "$expectedName initial_value expected=<$expectedInitial> actual=<$actualInitial>"
+      }
+    }
+    if ($commentIndex -ge 0 -and $columns.Count -gt $commentIndex) {
+      $actualComment = ([string]$columns[$commentIndex]).Trim()
+      $expectedComment = ([string]$expected.comment).Trim()
+      if ($expectedComment -and -not (Test-SameAttributeText $actualComment $expectedComment)) {
+        $attributeMismatches += "$expectedName comment expected=<$expectedComment> actual=<$actualComment>"
+      }
+    }
   }
   if ($missing.Count -gt 0) {
     $code = if ($Label -like 'global*') { 'KV_GLOBAL_VARIABLE_REOPEN_VERIFICATION_FAILED' } else { 'KV_LOCAL_VARIABLE_REOPEN_VERIFICATION_FAILED' }
     Fail-Guard $code "$Label copied-text verification" "$Label copied text is missing expected variable name/type row(s) in the first two columns: $($missing -join ', ')" @($EvidencePath)
+  }
+  if ($attributeMismatches.Count -gt 0) {
+    $code = if ($Scope -eq 'global') { 'KV_GLOBAL_VARIABLE_ATTRIBUTE_MISMATCH' } else { 'KV_LOCAL_VARIABLE_ATTRIBUTE_MISMATCH' }
+    Fail-Guard $code "$Label copied-text attribute verification" "$Label copied text does not preserve the requested attributes: $($attributeMismatches -join '; ')" @($EvidencePath)
   }
   Log "$Label copied-text first-column verification passed: $(@($ExpectedRows | ForEach-Object { [string]$_.name }) -join ',')"
 }
@@ -1586,7 +1661,8 @@ try {
   if ($localRows.Count -gt 0 -and [string]::IsNullOrWhiteSpace($LocalProgramName)) {
     throw 'LocalProgramName is required when executable local variables exist.'
   }
-  Assert-KvVariableDefinitionsBeforePaste $globalRows 'global' $GlobalVariablesTsv
+  $globalPasteFormat = if ($FullGlobalAttributes) { 'Full' } else { 'NameType' }
+  Assert-KvVariableDefinitionsBeforePaste $globalRows 'global' $GlobalVariablesTsv -FullGlobalAttributes:$FullGlobalAttributes
   Assert-KvVariableDefinitionsBeforePaste $localRows 'local' $LocalVariablesTsv $LocalProgramName
   $globalText = Convert-GlobalRows $GlobalVariablesTsv
   $localText = Convert-LocalRows $LocalVariablesTsv
@@ -1596,7 +1672,7 @@ try {
   Log "decoded executable local variable rows=$($definedLocalNames.Count): $($definedLocalNames -join ',')"
   Set-Content -LiteralPath (Join-Path $OutDir 'global_paste.tsv') -Value $globalText -Encoding UTF8
   Set-Content -LiteralPath (Join-Path $OutDir 'local_paste.tsv') -Value $localText -Encoding UTF8
-  Assert-KvVariablePastePayloadSchema $globalText $globalRows 'global' 'NameType' $GlobalVariablesTsv
+  Assert-KvVariablePastePayloadSchema $globalText $globalRows 'global' $globalPasteFormat $GlobalVariablesTsv
   Assert-KvVariablePastePayloadSchema $localText $localRows 'local' $LocalPasteFormat $LocalVariablesTsv
 
   $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
@@ -1665,7 +1741,7 @@ try {
     $globalReopenClipboardText = Copy-VariableGridText $verifyForm '_tabPageGlobal' 'global variables reopen verification'
     $globalReopenClipboardPath = Join-Path $OutDir 'global_variables_reopen_clipboard.txt'
     Set-Content -LiteralPath $globalReopenClipboardPath -Value $globalReopenClipboardText -Encoding UTF8
-    Assert-ExpectedVariableRowsInCopiedText $globalReopenClipboardText $globalRows 'global variables after close/reopen' $globalReopenClipboardPath
+    Assert-ExpectedVariableRowsInCopiedText $globalReopenClipboardText $globalRows 'global variables after close/reopen' $globalReopenClipboardPath -FullAttributes:$FullGlobalAttributes -Scope 'global'
     Save-Shot '05_after_global_reopen_verification.png'
   }
   if ($AuditPersistence -and $localRows.Count -gt 0) {
@@ -1729,8 +1805,10 @@ try {
     LocalProgramName = $LocalProgramName
     LocalVariablesTsv = $LocalVariablesTsv
     GlobalVariablesTsv = $GlobalVariablesTsv
-    VerifiedFields = @('name','data_type')
-    UnverifiedFields = @('initial_value','device','retain','constant','comment','group_name')
+    VerifiedFields = if ($FullGlobalAttributes -and $globalRows.Count -gt 0) { @('name','data_type','device','initial_value','comment') } else { @('name','data_type') }
+    UnverifiedFields = if ($FullGlobalAttributes -and $globalRows.Count -gt 0) { @('retain','constant','group_name') } else { @('initial_value','device','retain','constant','comment','group_name') }
+    FullGlobalAttributes = [bool]$FullGlobalAttributes
+    GlobalPasteColumnCount = if ($FullGlobalAttributes) { 9 } else { 2 }
     Basis = if ($AuditPersistence) { 'variable editor route completed without modal; local executable names were verified by closing/reopening the variable editor, selecting the same program, copying the local grid text, and matching expected names' } else { 'fast variable editor route completed without modal; variable correctness is completed by the later compile gate unless audit flags are enabled' }
     RequiredNames = $requiredNames
     GlobalNames = $definedGlobalNames
@@ -1762,6 +1840,7 @@ try {
     GlobalVariablesTsv = $GlobalVariablesTsv
     RequiredNames = $requiredNames
     VariableDefinitionCheckOk = $true
+    FullGlobalAttributes = [bool]$FullGlobalAttributes
     GlobalVariableFileScanOk = $globalFileScan.Ok
     AuditPersistence = [bool]$AuditPersistence
     AuditProjectTextScan = [bool]$AuditProjectTextScan
