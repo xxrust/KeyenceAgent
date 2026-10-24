@@ -35,7 +35,7 @@ function Tree([int]$PidValue){$root=[Windows.Automation.AutomationElement]::Root
 function ExpandDataTypes([Windows.Automation.AutomationElement]$T){$typeRoot=-join([char[]](0x6570,0x636E,0x7C7B,0x578B));$cond=New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::TreeItem);$walker=[Windows.Automation.TreeWalker]::ControlViewWalker;for($pass=0;$pass -lt 5;$pass++){$items=$T.FindAll([Windows.Automation.TreeScope]::Descendants,$cond);$changed=$false;foreach($i in $items){$under=([string]$i.Current.Name -eq $typeRoot);$p=$walker.GetParent($i);for($n=0;$p -and $n -lt 20;$n++){if([string]$p.Current.Name -eq $typeRoot){$under=$true;break};$p=$walker.GetParent($p)};if(-not $under){continue};$ep=$null;if($i.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern,[ref]$ep) -and $ep.Current.ExpandCollapseState -eq [Windows.Automation.ExpandCollapseState]::Collapsed){$ep.Expand();$changed=$true;Start-Sleep -Milliseconds 60}};if(-not $changed){break}};Log 'data_type_tree_expanded' @{}
 }
 function ItemPath([Windows.Automation.AutomationElement]$Item){$walker=[Windows.Automation.TreeWalker]::ControlViewWalker;$parts=@([string]$Item.Current.Name);$p=$walker.GetParent($Item);for($i=0;$p -and $i -lt 20;$i++){if($p.Current.ControlType -eq [Windows.Automation.ControlType]::TreeItem){$parts=@([string]$p.Current.Name)+$parts};$p=$walker.GetParent($p)};return @($parts)}
-function FindItem([Windows.Automation.AutomationElement]$T,[string[]]$Path){$all=$T.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::TreeItem)));if($Path.Count -eq 1){$hits=@($all|Where-Object {[string]$_.Current.Name -eq [string]$Path[0]})}else{$hits=@($all|Where-Object {$p=ItemPath $_; if($p.Count -lt $Path.Count){return $false}; $offset=$p.Count-$Path.Count; for($i=0;$i -lt $Path.Count;$i++){$actual=([string]$p[$offset+$i] -split ':',2)[0].Trim();if($actual -ne [string]$Path[$i]){return $false}}; return $true})}; if($hits.Count -ne 1){return $null};return $hits[0]}
+function FindItem([Windows.Automation.AutomationElement]$T,[string[]]$Path){$all=$T.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::TreeItem)));if($Path.Count -eq 1){$hits=@($all|Where-Object {[string]$_.Current.Name -eq [string]$Path[0]})}else{$hits=@($all|Where-Object { try { $p=ItemPath $_; if($p.Count -lt $Path.Count){return $false}; $offset=$p.Count-$Path.Count; for($i=0;$i -lt $Path.Count;$i++){$actual=([string]$p[$offset+$i] -split ':',2)[0].Trim();if($actual -ne [string]$Path[$i]){return $false}}; return $true } catch { return $false } })}; if($hits.Count -ne 1){return $null};return $hits[0]}
 function SelectItem([Windows.Automation.AutomationElement]$T,[string[]]$Path,[string]$Label){$item=FindItem $T $Path;if(-not $item){Fail 'KV_STRUCTURE_TREE_ITEM_NOT_FOUND' "Tree item not found: $($Path -join '/')"};try{$s=$null;if($item.TryGetCurrentPattern([Windows.Automation.ScrollItemPattern]::Pattern,[ref]$s)){$s.ScrollIntoView()}}catch{};Assert-KvUiForegroundHwnd -ExpectedHwnd $script:MainHwnd -Step "select $Label" -ExpectedTitleLike $script:ExpectedTitle -AllowSingleRecovery|Out-Null;$sel=$null;if($item.TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern,[ref]$sel)){$sel.Select()}else{Fail 'KV_STRUCTURE_TREE_SELECT_UNAVAILABLE' "Tree item is not selectable: $($Path -join '/')"};Start-Sleep -Milliseconds 80;return $item}
 function UserTypeNames([Windows.Automation.AutomationElement]$T){$typeRoot=-join([char[]](0x6570,0x636E,0x7C7B,0x578B));$all=$T.FindAll([Windows.Automation.TreeScope]::Descendants,(New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::TreeItem)));$walker=[Windows.Automation.TreeWalker]::ControlViewWalker;$out=@();foreach($i in $all){$n=[string]$i.Current.Name;if(-not $n -or $n -eq '(System)'){continue};$p=$walker.GetParent($i);$under=$false;$system=$false;for($j=0;$p -and $j -lt 20;$j++){$pn=[string]$p.Current.Name;if($pn -eq $typeRoot){$under=$true};if($pn -eq '(System)'){$system=$true};$p=$walker.GetParent($p)};$ep=$null;$isContainer=$i.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern,[ref]$ep);if($under -and -not $system -and -not $isContainer){$out+=($n -split ':',2)[0].Trim()}};return @($out|Sort-Object -Unique)}
 function WaitDialog([string]$Kind){$deadline=(Get-Date).AddSeconds(5);do{$fg=Get-KvForegroundSnapshot;if($fg.process_id -eq $script:ProjectPid -and $fg.hwnd -ne $script:MainHwnd -and ((-not $Kind) -or $fg.title -like "*$Kind*")){$hwnd=[IntPtr]$fg.hwnd;Log 'dialog_foreground_verified' @{kind=$Kind;hwnd=$hwnd.ToInt64();title=$fg.title;focus_policy='KV STUDIO locks name field automatically; no focus navigation'};return $hwnd};Start-Sleep -Milliseconds 80}while((Get-Date)-lt $deadline);Fail 'KV_STRUCTURE_DIALOG_TIMEOUT' "Dialog not found: $Kind"}
@@ -75,29 +75,13 @@ function PasteMembers([string]$Name,[object[]]$Members,[string[]]$Path=@()){
 }
 function WaitTreeItem([string]$Name,[string[]]$Path){
   # The new data type appears in the project tree only after the editor dialog
-  # closes; a flat plan run can reach the next step before the tree refreshes.
-  # Long type lists can also leave newly added items unrealized in UIA, so
-  # collapse/expand the 数据类型 node on later retries to force a refresh.
+  # closes; poll a fresh tree snapshot. Do not collapse/expand here: mutating the
+  # tree while FindItem enumerates its children caused ElementNotAvailable races.
   $deadline=(Get-Date).AddSeconds(8)
-  $attempt=0
   do{
     $t=Tree $script:ProjectPid
     $item=FindItem $t $Path
     if($item){ return $item }
-    $attempt++
-    if($attempt % 3 -eq 0){
-      try{
-        $typeRootName=-join([char[]](0x6570,0x636E,0x7C7B,0x578B))
-        $rootItem=FindItem $t @($typeRootName)
-        if($rootItem){
-          $ep=$null
-          if($rootItem.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern,[ref]$ep)){
-            $ep.Collapse(); Start-Sleep -Milliseconds 120; $ep.Expand(); Start-Sleep -Milliseconds 200
-            Log 'data_type_tree_refreshed' @{name=$Name}
-          }
-        }
-      }catch{ }
-    }
     Start-Sleep -Milliseconds 200
   }while((Get-Date) -lt $deadline)
   Fail 'KV_STRUCTURE_TREE_ITEM_NOT_FOUND' "Tree item not found after create: $($Path -join '/')"

@@ -7,6 +7,36 @@ description: 通过稳定 workflow 操作和快照化 KEYENCE KV STUDIO 桌面�
 
 把 KV STUDIO 当作由 workflow 提供接口的编辑器。agent 准备目标、输入和预期结果，调用接口后读取本次结果；不要临时拼接键盘、窗口或剪贴板操作。
 
+## 最小验证优先（不要为验证一步跑全流程）
+
+完整 plan（建工程 → 结构 → 28 个模块 → 变量 → 编译 → 扫描顺序）只用于**最终验收**。
+任何中间步骤先用**同一份参数**单独重放：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\workflow_tools\rerun_kv_plan_step.ps1 `
+  -PlanPath <plan-dir>\execution_plan.json -StepName set_variables_FB_Cylinder -OutDir <dir>\verify
+```
+
+- 单步验证只看该步的 `set_variables_result.json` / `result.json`；失败先打开
+  `failure.png` 或结果里的 `failure_screenshot_path`。
+- 需要复现 UI 状态时，对**同一个已打开工程**重跑该 runner，不要新建工程。
+- 全流程一次 20 分钟以上，单步通常 20 秒–2 分钟；改一步验证一步。
+
+## 写入依赖顺序（自底向上）
+
+KV STUDIO 的编译是全局的，但 UI 写入必须按依赖顺序，**块里引用的变量必须在其它地方先定义**：
+
+1. **数据类型（结构体/用户 DUT）**：先建；嵌套类型按成员依赖排序（标量成员在前）。
+2. **FB 模块**：先导入 FB 的 MNM，再写它的自变量表和局部变量；FB 自变量用到的结构体已存在。
+3. **变量定义**：程序引用的全局/局部变量所在表必须先存在；`_MC_AXIS_REF` /
+   `_MC_AXIS_GROUP_REF` 等轴引用按目标工程实际配置（没有轴时 device 可先为空）。
+4. **程序模块**：最后导入/写入引用这些变量和 FB 的扫描程序。MNM 导入本身不解析变量，
+   但**编译前**所有被引用的变量必须已定义，否则编译报“未注册变量”。
+5. **编译与扫描顺序**：全部落盘后再编译，扫描顺序用 `assert_kv_scan_order.ps1` 单独验证。
+
+先写顶层程序、后补变量，或者跳过结构体直接写 FB 自变量，都会在粘贴/编译阶段
+报“无效数据类型/未注册变量”。修改任何一步前先确认它依赖的层已经存在。
+
 ## 选择接口
 
 唯一能力清单是 [scripts/script_manifest.json](scripts/script_manifest.json)。用只读查询获得实际路径、参数类型、必填参数和验证范围：
