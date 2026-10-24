@@ -250,6 +250,13 @@ The flat workflow creates `<RunRoot>/run.log` before its first child and passes
 `KV_WORKFLOW_RUN_LOG` to children so guard actions and workflow stage results share
 one JSONL audit file. Per-step stdout/stderr remain supporting evidence.
 
+On any failed step (non-zero exit, timeout, or a hung child) the executor saves
+`failure.png` into that step's `out_dir` if the child did not already, adds it to
+the failure evidence, and writes its path as `failure_screenshot_path` in both the
+failure summary and the final `mvp_result.json`; the failure message also ends with
+`screenshot=<path>`. A failed run therefore always points at the exact screen state
+to inspect without guessing that a capture exists.
+
 - `scaffold.json`
 - `CHECKLIST.md`
 - `TASK.md`

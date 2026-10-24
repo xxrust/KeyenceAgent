@@ -70,6 +70,7 @@ function Get-StepFailureSummary([object]$Step, [int]$ExitCode) {
     child_result_path = ''
     checkpoint_path = ''
     fail_text_path = ''
+    failure_screenshot_path = ''
     evidence = @()
     message = ''
   }
@@ -107,12 +108,31 @@ function Get-StepFailureSummary([object]$Step, [int]$ExitCode) {
     }
   }
   if (-not $summary.error_code) { $summary.error_code = 'KV_FLAT_WORKFLOW_STEP_FAILED' }
+  $existingShot = Join-Path $outDir 'failure.png'
+  if (Test-Path -LiteralPath $existingShot -PathType Leaf) {
+    $summary.failure_screenshot_path = $existingShot
+  }
   $summary.evidence = @($summary.evidence | Where-Object { $_ } | Select-Object -Unique)
   [pscustomobject]$summary
 }
 
-function Stop-ProcessTree([int]$ProcessIdValue) {
-  $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$ProcessIdValue" -ErrorAction SilentlyContinue)
+function Save-FailureScreenshot([string]$OutDirValue) {
+  # Capture the desktop state next to the failed step and return the path so it
+  # can be written into the failure summary and the final result.
+  if (-not $OutDirValue) { return '' }
+  $path = Join-Path $OutDirValue 'failure.png'
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    try {
+      & (Join-Path $scriptRoot 'Capture-KvFrame.ps1') -OutDir $OutDirValue -Name 'failure.png' | Out-Null
+    } catch {
+      Write-WorkflowLog 'failure_screenshot_failed' @{error=$_.Exception.Message}
+    }
+  }
+  if (Test-Path -LiteralPath $path -PathType Leaf) { return $path }
+  return ''
+}
+
+function Stop-ProcessTree([int]$ProcessIdValue) {  $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$ProcessIdValue" -ErrorAction SilentlyContinue)
   foreach ($child in $children) { Stop-ProcessTree ([int]$child.ProcessId) }
   $process = Get-Process -Id $ProcessIdValue -ErrorAction SilentlyContinue
   if ($process) { Stop-Process -Id $ProcessIdValue -Force -ErrorAction SilentlyContinue }
@@ -202,7 +222,13 @@ function Invoke-FlatWorkflowStep([object]$Step) {
     })
     $script:lastFailure = Get-StepFailureSummary $Step -2
     $script:lastFailure.error_code = 'KV_FLAT_WORKFLOW_STEP_TIMEOUT'
-    Write-WorkflowLog 'step_failed' @{error_code='KV_FLAT_WORKFLOW_STEP_TIMEOUT';elapsed_seconds=$elapsed}
+    $timeoutShot = Save-FailureScreenshot $outDir
+    if ($timeoutShot) {
+      $script:lastFailure.failure_screenshot_path = $timeoutShot
+      $script:lastFailure.evidence = @($script:lastFailure.evidence) + $timeoutShot
+      Write-WorkflowLog 'failure_screenshot' @{path=$timeoutShot}
+    }
+    Write-WorkflowLog 'step_failed' @{error_code='KV_FLAT_WORKFLOW_STEP_TIMEOUT';elapsed_seconds=$elapsed;failure_screenshot_path=$timeoutShot}
     throw "Flat workflow step timed out: $($Step.name)"
   }
   $process.WaitForExit()
@@ -248,7 +274,15 @@ function Invoke-FlatWorkflowStep([object]$Step) {
       $script:lastFailure.message=$evidenceError
       $script:lastFailure.error_code=($evidenceError -split ':',2)[0]
     }
-    throw "Flat workflow step failed: $($Step.name) exit_code=$exit"
+    # Save a failure screenshot and surface its path in the exception/result so
+    # the caller sees the UI state without having to guess that it exists.
+    $shotPath = Save-FailureScreenshot $outDir
+    if ($shotPath) {
+      $script:lastFailure.failure_screenshot_path = $shotPath
+      if (@($script:lastFailure.evidence) -notcontains $shotPath) { $script:lastFailure.evidence = @($script:lastFailure.evidence) + $shotPath }
+      Write-WorkflowLog 'failure_screenshot' @{path=$shotPath}
+    }
+    throw "Flat workflow step failed: $($Step.name) exit_code=$exit screenshot=$shotPath"
   }
   Assert-TimeBudget "after $($Step.name)"
 }
@@ -293,6 +327,7 @@ function Write-FlatWorkflowResult([object]$Plan, [string]$ResolvedPlanPath, [boo
     merged_global_variables_tsv = [string]$Plan.merged_global_variables_tsv
     variable_sets = @($Plan.variable_sets)
     compile_result_path = $compileResultPath
+    failure_screenshot_path = $(if ($script:lastFailure -and $script:lastFailure.failure_screenshot_path) { [string]$script:lastFailure.failure_screenshot_path } else { '' })
     compile_acceptance_required = $compileAcceptanceRequired
     compile_result_contains_ok = ($compileText.Contains($okNeedle))
     compile_result_contains_ng = ($compileText.Contains($ngNeedle))
@@ -376,9 +411,15 @@ try {
     # "Flat workflow step failed" wrapper.
     $failureMessage = $_.Exception.ToString()
     if ($script:lastFailure) {
+      if (-not $script:lastFailure.failure_screenshot_path) {
+        $fallbackDir = if ($script:lastFailure.out_dir) { [string]$script:lastFailure.out_dir } elseif ($plan -and $plan.run_root) { [string]$plan.run_root } else { '' }
+        $fallbackShot = Save-FailureScreenshot $fallbackDir
+        if ($fallbackShot) { $script:lastFailure.failure_screenshot_path = $fallbackShot }
+      }
       $parts = @($_.Exception.Message)
       if ($script:lastFailure.error_code) { $parts += "error_code=$($script:lastFailure.error_code)" }
       if ($script:lastFailure.message) { $parts += "child_message=$($script:lastFailure.message)" }
+      if ($script:lastFailure.failure_screenshot_path) { $parts += "screenshot=$($script:lastFailure.failure_screenshot_path)" }
       $failureMessage = ($parts -join ' | ') + [Environment]::NewLine + $failureMessage
     }
     Write-FlatWorkflowResult $plan $PlanPath $false 'fail' $failureMessage
