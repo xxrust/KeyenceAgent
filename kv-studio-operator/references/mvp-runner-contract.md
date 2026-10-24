@@ -101,9 +101,16 @@ Verified replacement sequence (2026-10-24, `MainReplaceTest`):
 3. `-DeleteOnly -ExpectedModuleName MainStage`.
 
 The saved tree then contains exactly `Main [1]`, and the conversion result dialog
-shows `转换成功。` (0 errors, 4 steps). The execution plan passes the pre-delete
-flag for every new-project import; automating the staging import/cleanup in the
-plan is the remaining integration step.
+shows `转换成功。` (0 errors, 4 steps).
+
+The execution plan now performs the sequence automatically:
+`stage_default_program` (generates `KV_Stage_Temp.mnm` and imports it after
+`create_project`), then the normal imports (the Main import carries the
+pre-delete flag), then `delete_staged_program` (`-DeleteOnly`). When the scaffold
+does not declare `Main`, the plan instead adds `delete_default_program` so the
+untouched default program does not remain. Plan metadata
+`default_program_staging` records the stage/cleanup names and the generated MNM
+path; `tests\scaffold-variable-attributes` asserts both steps and the file.
 
 ## Scaffold Files
 

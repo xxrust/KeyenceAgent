@@ -254,6 +254,43 @@ try {
     $steps.Add((New-Step 'create_project' 'create_project_local_guarded.ps1' @('runner_child_approved') $createArgs.ToArray() (Join-Path $artifactRoot 'create_project') 'runner_child'))
   }
 
+  $defaultProgramName = 'Main'
+  $scaffoldModuleNames = @($resolvedMnmFiles | ForEach-Object { [string]$_.module_name })
+  $scaffoldHasDefaultProgram = (@($scaffoldModuleNames | Where-Object { $_ -ieq $defaultProgramName }).Count -gt 0)
+  $stageModuleName = ''
+  $stageMnmPath = ''
+  if ($Mode -eq 'new_project' -and $resolvedMnmFiles.Count -gt 0 -and $scaffoldHasDefaultProgram) {
+    # KV STUDIO refuses to delete the last program, so a scaffold module named
+    # Main cannot replace the fresh project's default Main by delete-first.
+    # Import a disposable staging program first; then the real Main can be
+    # imported with pre-delete, and the staging program is removed afterwards.
+    $stageModuleName = 'KV_Stage_Temp'
+    $suffix = 1
+    while (@($scaffoldModuleNames | Where-Object { $_ -ieq $stageModuleName }).Count -gt 0) {
+      $suffix++
+      $stageModuleName = "KV_Stage_Temp$suffix"
+    }
+    $stageDir = Join-Path $artifactRoot 'staging'
+    New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+    $stageMnmPath = Join-Path $stageDir ($stageModuleName + '.mnm')
+    $stageText = "DEVICE:63`r`n;MODULE:$stageModuleName`r`n;MODULE_TYPE:0`r`nLD X0`r`nEND`r`nENDH`r`n"
+    [IO.File]::WriteAllText($stageMnmPath, $stageText, (New-Object System.Text.UnicodeEncoding($false, $true)))
+  }
+  if ($stageModuleName) {
+    $stageArgs = [System.Collections.Generic.List[string]]::new()
+    Add-Arg -List $stageArgs -Name '-MnmPath' -Value $stageMnmPath
+    Add-Arg -List $stageArgs -Name '-ProjectPath' -Value $projectPathForRun
+    Add-Arg -List $stageArgs -Name '-OutDir' -Value (Join-Path $artifactRoot 'stage_default_program')
+    Add-Arg -List $stageArgs -Name '-ExpectedModuleName' -Value $stageModuleName
+    Add-Arg -List $stageArgs -Name '-ExpectedCategory' -Value 'scan'
+    Add-Arg -List $stageArgs -Name '-ProjectSearchRoot' -Value $projectSearchRoot
+    Add-Arg -List $stageArgs -Name '-ChecklistPath' -Value $ChecklistPath
+    Add-SwitchArg -List $stageArgs -Name '-SaveAfterImport' -Enabled $true
+    Add-Arg -List $stageArgs -Name '-RestartKvs' -Value 'false'
+    Add-Arg -List $stageArgs -Name '-KvsExe' -Value $KvsExe
+    $steps.Add((New-Step 'stage_default_program' 'import_mnm_guarded.ps1' @('runner_child_approved') $stageArgs.ToArray() (Join-Path $artifactRoot 'stage_default_program') 'runner_child'))
+  }
+
   for ($i = 0; $i -lt $resolvedMnmFiles.Count; $i++) {
     $entry = $resolvedMnmFiles[$i]
     $importArgs = [System.Collections.Generic.List[string]]::new()
@@ -278,6 +315,16 @@ try {
       $placementDir = Join-Path (Join-Path $artifactRoot 'module_placement') $entry.module_name
       $steps.Add((New-Step "verify_module_placement_$($entry.module_name)" 'assert_kv_module_placement.ps1' @('workflow_tool') @('-ProjectTreePath',(Join-Path $projectSearchRoot 'WsTreeEnv.xml'),'-ModuleName',$entry.module_name,'-Category',$entry.category,'-OutDir',$placementDir) $placementDir 'tool'))
     }
+  }
+
+  # Remove the disposable staging program (when Main was replaced) or the
+  # untouched default Main (when the scaffold does not declare it), so the saved
+  # project contains exactly the scaffold programs.
+  $cleanupModuleName = if ($stageModuleName) { $stageModuleName } else { $defaultProgramName }
+  if ($Mode -eq 'new_project' -and $resolvedMnmFiles.Count -gt 0) {
+    $cleanupOut = Join-Path $artifactRoot 'delete_default_program'
+    $cleanupArgs = @('-ProjectPath',$projectPathForRun,'-ExpectedModuleName',$cleanupModuleName,'-DeleteOnly','-RestartKvs','false','-ChecklistPath',$ChecklistPath,'-OutDir',$cleanupOut,'-KvsExe',$KvsExe)
+    $steps.Add((New-Step $(if ($stageModuleName) { 'delete_staged_program' } else { 'delete_default_program' }) 'import_mnm_guarded.ps1' @('runner_child_approved') $cleanupArgs $cleanupOut 'runner_child'))
   }
 
   $fbArgumentRoot = Join-Path $artifactRoot 'set_fb_arguments'
@@ -365,6 +412,12 @@ try {
     timeout_seconds = $TimeoutSeconds
     source_snapshot_manifest = $SourceSnapshotManifestPath
     delete_existing_modules_before_import = [bool]($DeleteExistingModulesBeforeImport -or $Mode -eq 'new_project')
+    default_program_staging = [ordered]@{
+      scaffold_contains_default_program = $scaffoldHasDefaultProgram
+      stage_module_name = $stageModuleName
+      stage_mnm_path = $stageMnmPath
+      cleanup_module_name = $cleanupModuleName
+    }
     mnm_files = @($resolvedMnmFiles)
     merged_global_variables_tsv = $mergedGlobal.path
     executable_global_variable_count = $mergedGlobal.executable_global_variable_count

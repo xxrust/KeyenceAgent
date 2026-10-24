@@ -97,9 +97,12 @@ plan 暴露 `project_inventory_path` 与 `scan_order_result_path`。
    对象级确认）→ `-DeleteOnly -ExpectedModuleName MainStage`。保存后树里只有
    `Main [1]`，转换结果对话框为 `转换成功。`（0 错误，4 步）。
    runner 还加了 `Main [1]` 数字后缀查找、树焦点+选中证明、以及
-   `KV_MNM_DELETE_LAST_PROGRAM_FORBIDDEN` 快速失败。剩余：把“占位导入/清理”
-   自动化进 execution plan；compile 步骤在本机出现过
-   `KV_COMPILE_PROJECT_PROCESS_AMBIGUOUS`（与替换无关的进程绑定问题）待单独复现。
+   `KV_MNM_DELETE_LAST_PROGRAM_FORBIDDEN` 快速失败。已自动化进 execution plan：
+   `stage_default_program`（生成并导入 `KV_Stage_Temp`）→ 正常导入（Main 带预删除）
+   → `delete_staged_program`；scaffold 不含 Main 时改为 `delete_default_program`。
+   `tests\scaffold-variable-attributes` 12/12 断言这两个步骤与生成的 MNM。
+   剩余：完整 plan 的真机跑通受 compile 步骤
+   `KV_COMPILE_PROJECT_PROCESS_AMBIGUOUS`（进程绑定问题，与替换无关）影响，待复现。
 5. **编译结果文本/截图**：owner-drawn 行仍读不到文本，建议失败时保存截图并把
    `route`/`item_count` 写入结果。
 6. **同步 UIA 硬超时**：8 秒只是查找循环预算，不是所有调用的硬上限。

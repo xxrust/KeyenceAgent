@@ -138,10 +138,17 @@ if (Test-Path -LiteralPath $planPath -PathType Leaf) {
   $scanOk = ($inventoryStep.Count -eq 1) -and ($scanStep.Count -eq 1) -and ($scanArgs -contains '-AllowExtraModules') -and ($scanArgs -contains '-ScaffoldPath')
   Add-Result 'plan_includes_scan_order_steps' $scanOk "inventory=$($inventoryStep.Count) scan=$($scanStep.Count) args=$($scanArgs -join ' ')"
   Add-Result 'plan_exposes_scan_order_result' ([string]$plan.scan_order_result_path -like '*scan_order_verification.json') "path=$($plan.scan_order_result_path)"
+  $stageStep = @($plan.steps | Where-Object { $_.name -eq 'stage_default_program' })
+  $cleanupStep = @($plan.steps | Where-Object { $_.name -eq 'delete_staged_program' })
+  $stageName = [string]$plan.default_program_staging.stage_module_name
+  $stageMnm = [string]$plan.default_program_staging.stage_mnm_path
+  $stageOk = ($stageStep.Count -eq 1) -and ($cleanupStep.Count -eq 1) -and $stageName -and (Test-Path -LiteralPath $stageMnm -PathType Leaf)
+  Add-Result 'plan_stages_default_program' $stageOk "stage=$stageName mnm_exists=$(Test-Path -LiteralPath $stageMnm -PathType Leaf) cleanup=$($cleanupStep.Count)"
 } else {
   Add-Result 'plan_includes_full_attribute_switch' $false 'execution_plan.json missing'
   Add-Result 'plan_includes_scan_order_steps' $false 'execution_plan.json missing'
   Add-Result 'plan_exposes_scan_order_result' $false 'execution_plan.json missing'
+  Add-Result 'plan_stages_default_program' $false 'execution_plan.json missing'
 }
 
 $failed = @($results | Where-Object { -not $_.pass })
