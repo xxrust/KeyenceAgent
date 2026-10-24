@@ -132,8 +132,16 @@ if (Test-Path -LiteralPath $planPath -PathType Leaf) {
   $variableSteps = @($plan.steps | Where-Object { $_.script_name -eq 'set_variables_guarded.ps1' })
   $withFlag = @($variableSteps | Where-Object { @($_.arguments) -contains '-FullGlobalAttributes' })
   Add-Result 'plan_includes_full_attribute_switch' ($exit -eq 0 -and $variableSteps.Count -gt 0 -and $withFlag.Count -eq $variableSteps.Count) "exit=$exit steps=$($variableSteps.Count) flagged=$($withFlag.Count)"
+  $inventoryStep = @($plan.steps | Where-Object { $_.name -eq 'export_project_inventory' })
+  $scanStep = @($plan.steps | Where-Object { $_.name -eq 'verify_saved_scan_order' })
+  $scanArgs = if ($scanStep.Count -eq 1) { @($scanStep[0].arguments) } else { @() }
+  $scanOk = ($inventoryStep.Count -eq 1) -and ($scanStep.Count -eq 1) -and ($scanArgs -contains '-AllowExtraModules') -and ($scanArgs -contains '-ScaffoldPath')
+  Add-Result 'plan_includes_scan_order_steps' $scanOk "inventory=$($inventoryStep.Count) scan=$($scanStep.Count) args=$($scanArgs -join ' ')"
+  Add-Result 'plan_exposes_scan_order_result' ([string]$plan.scan_order_result_path -like '*scan_order_verification.json') "path=$($plan.scan_order_result_path)"
 } else {
   Add-Result 'plan_includes_full_attribute_switch' $false 'execution_plan.json missing'
+  Add-Result 'plan_includes_scan_order_steps' $false 'execution_plan.json missing'
+  Add-Result 'plan_exposes_scan_order_result' $false 'execution_plan.json missing'
 }
 
 $failed = @($results | Where-Object { -not $_.pass })

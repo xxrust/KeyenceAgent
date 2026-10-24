@@ -141,6 +141,16 @@ The tool writes `scan_order_verification.json` and fails closed with
 `KV_SCAN_ORDER_MISMATCH`, `KV_SCAN_ORDER_NUMBER_MISMATCH`, or
 `KV_SCAN_ORDER_DUPLICATE_MODULE`. `tests\scan-order\run.bat` covers identical,
 swapped, missing, extra, shifted-number, duplicate, and scaffold-order cases.
+
+The new-project and repair execution plans append two non-UI steps after the
+conversion-result copy: `export_project_inventory.ps1` reads the saved tree, then
+`assert_kv_scan_order.ps1 -ScaffoldPath <scaffold.json> -AllowExtraModules`
+compares the saved schedule. Extra modules are tolerated because a fresh
+KV STUDIO project keeps its default `Main` until the replacement route is
+verified; a missing module, a relative-order change, or a duplicate name still
+fails the workflow. The plan exposes `project_inventory_path` and
+`scan_order_result_path`.
+
 Full reproduction still requires a variable/structure snapshot, library dependency
 evidence, and the same-run conversion result.
 

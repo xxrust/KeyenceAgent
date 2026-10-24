@@ -334,6 +334,16 @@ try {
   $copyOutDir = Join-Path $artifactRoot 'copy_result'
   $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })copy_convert_result" 'copy_convert_result_from_tree_handle.ps1' @('runner_child_approved') @('-ProjectNeedle',$projectNeedle,'-OutDir',$copyOutDir,'-ChecklistPath',$ChecklistPath,'-MaxLookupMs','8000') $copyOutDir 'runner_child'))
 
+  # Saved scan-order evidence: read the saved project tree (offline inventory)
+  # and compare the module schedule with the scaffold import order. Extra
+  # modules are tolerated because a fresh KV STUDIO project keeps its default
+  # Main until the still-open replacement gap is fixed.
+  $inventoryOutDir = Join-Path $artifactRoot 'project_inventory'
+  $steps.Add((New-Step 'export_project_inventory' 'export_kv_project_inventory.ps1' @('customer_non_ui_tool') @('-ProjectPath',$projectPathForRun,'-OutDir',$inventoryOutDir) $inventoryOutDir 'tool'))
+  $scanOrderOutDir = Join-Path $artifactRoot 'scan_order'
+  $scanOrderInventory = Join-Path $inventoryOutDir 'project_inventory.json'
+  $steps.Add((New-Step 'verify_saved_scan_order' 'assert_kv_scan_order.ps1' @('customer_non_ui_tool') @('-ScaffoldPath',$manifestPath,'-ActualInventory',$scanOrderInventory,'-OutDir',$scanOrderOutDir,'-AllowExtraModules') $scanOrderOutDir 'tool'))
+
   $plan = [ordered]@{
     ok = $true
     schema_version = 1
@@ -359,6 +369,8 @@ try {
     })
     set_variable_summaries = $setVariableSummaries
     compile_result_path = Join-Path $copyOutDir 'compile_result_copied.txt'
+    project_inventory_path = $scanOrderInventory
+    scan_order_result_path = Join-Path $scanOrderOutDir 'scan_order_verification.json'
     steps = @($steps)
   }
   $planPath = Join-Path $OutDir 'execution_plan.json'

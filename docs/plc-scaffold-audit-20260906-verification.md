@@ -48,8 +48,16 @@ verification），并补了可重复的离线测试与文档。
 真实审计 scaffold 的 scaffold 模式也已验证：`unchanged` → 期望 2 个扫描模块
 （Main、Worker），Reusable 作为 FB 被排除，`ok=true`。
 
+已接入执行计划：new_project / repair 的 plan 在 compile 结果复制后追加
+`export_project_inventory.ps1`（读已保存工程树）和
+`assert_kv_scan_order.ps1 -ScaffoldPath ... -AllowExtraModules`（比较已保存扫描顺序）；
+plan 暴露 `project_inventory_path` 与 `scan_order_result_path`。
+`tests\scaffold-variable-attributes` 已断言这两个步骤和参数（11/11）。
+已用真实打开的工程手工执行这两步：inventory `ok=true`，匹配的 scaffold 下
+`scan_order_verification.json ok=true`。
+
 文档：`references/mvp-runner-contract.md` 已把"尚未证明扫描顺序"改为
-"用 assert_kv_scan_order.ps1 比较"，并写明参数、失败码和测试位置。
+"用 assert_kv_scan_order.ps1 比较"，并写明参数、失败码、计划集成与测试位置。
 
 ## 仍未关闭（按建议优先级）
 

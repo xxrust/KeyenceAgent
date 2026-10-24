@@ -226,6 +226,16 @@
                                                                                                       "module_placement_result.json"
                                                                                                   ]
                                                                                     },
+                                  "workflow_tools/assert_kv_scan_order.ps1":  {
+                                                                                 "files":  [
+                                                                                               "scan_order_verification.json"
+                                                                                           ]
+                                                                             },
+                                  "export_kv_project_inventory.ps1":  {
+                                                                          "files":  [
+                                                                                        "project_inventory.json"
+                                                                                    ]
+                                                                      },
                                   "workflow_tools/new_kv_mvp_execution_plan.ps1":  {
                                                                                        "files":  [
                                                                                                      "execution_plan_result.json"
