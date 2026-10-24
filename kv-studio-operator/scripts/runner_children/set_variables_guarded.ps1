@@ -755,27 +755,41 @@ function Invoke-GuardedVariablePaste($Form, [string]$Step, [string]$Text, [strin
       $dialogNodes = @()
       try { $dialogNodes = @($dialog.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)) } catch {}
       $dialogText = (@($dialogNodes | ForEach-Object { [string]$_.Current.Name } | Where-Object { $_ }) -join ' ')
-      if ($dialog.Current.AutomationId -cne 'PasteConfirmationForm') {
-        # KV accepts the valid rows and raises an owner-drawn warning for the
-        # rows it skipped (for example motion axis rows whose _MC_Axis device
-        # does not exist yet). Dismiss it and let the readback name the skipped
-        # variables instead of failing with a generic unexpected-modal error.
-        if ($dialogText -match '\u7C98\u8D34\u6570\u636E\u4E2D\u5B58\u5728\u9519\u8BEF|\u5DF2\u8DF3\u8FC7\u90E8\u5206\u6570\u636E\u7C98\u8D34') {
-          Log "paste data error modal detected; skipped rows will be reported by readback"
-          Get-KvsModalEvidence $dialog "$Step paste data error" | Out-Null
-          Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd ([IntPtr]$foreground.hwnd) -Step "$Step dismiss paste data error" -Keys '{ENTER}' -ExpectedTitleLike 'KV STUDIO' -SuccessTitleLike @('*变量编辑*','KV STUDIO*') -Action 'dismiss paste-data-error modal' -SleepMs 300
-          Assert-NoKvsModal $script:ProcessIdForVariables "$Step paste data error dismissed"
-          return (Wait-VariableForm $script:ProcessIdForVariables 6)
-        }
+      $pasteErrorNeedle = -join ([char[]](0x7C98,0x8D34,0x6570,0x636E,0x4E2D,0x5B58,0x5728,0x9519,0x8BEF))
+      $pasteSkippedNeedle = -join ([char[]](0x5DF2,0x8DF3,0x8FC7,0x90E8,0x5206,0x6570,0x636E,0x7C98,0x8D34))
+      $mainNodes = @()
+      if (-not $dialogText.Contains($pasteErrorNeedle) -and -not $dialogText.Contains($pasteSkippedNeedle)) {
+        # The #32770 warning is rendered inside the main window tree; reading
+        # its own handle can return no children. Search the main window too.
+        try {
+          $mainEl = [Windows.Automation.AutomationElement]::FromHandle((Get-Process -Id $script:ProcessIdForVariables).MainWindowHandle)
+          $mainNodes = @($mainEl.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition))
+          $dialogText = (@($mainNodes | ForEach-Object { [string]$_.Current.Name } | Where-Object { $_ }) -join ' ')
+        } catch {}
+      }
+      if ($dialog.Current.AutomationId -cne 'PasteConfirmationForm' -and
+          ($dialogText.Contains($pasteErrorNeedle) -or $dialogText.Contains($pasteSkippedNeedle))) {
+        # KV accepts the valid rows and warns about the rows it skipped. Dismiss
+        # the warning and let the readback name the skipped variables instead of
+        # failing with a generic unexpected-modal error.
+        Log "paste data error modal detected; skipped rows will be reported by readback"
+        Get-KvsModalEvidence $dialog "$Step paste data error" | Out-Null
+        Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd ([IntPtr]$foreground.hwnd) -Step "$Step dismiss paste data error" -Keys '{ENTER}' -ExpectedTitleLike 'KV STUDIO' -SuccessTitleLike @('*变量编辑*','KV STUDIO*') -Action 'dismiss paste-data-error modal' -SleepMs 300
+        Assert-NoKvsModal $script:ProcessIdForVariables "$Step paste data error dismissed"
+        return (Wait-VariableForm $script:ProcessIdForVariables 6)
       }
       # Two overwrite-confirmation variants exist: the PasteConfirmationForm
       # exposes _buttonOverwriteAll, while the "变量名被更改，要覆盖吗？" dialog
       # only names its buttons (取消/覆盖/全部覆盖). Handle both by identifying
       # the all-overwrite action and clicking/invoking that exact control.
-      $overwriteAll = @($dialogNodes | Where-Object {
-        [string]$_.Current.AutomationId -eq '_buttonOverwriteAll' -or
-        [string]$_.Current.Name -eq (-join ([char[]](0x5168,0x90E8,0x8986,0x76D6)))
-      })
+      $overwriteName = -join ([char[]](0x5168,0x90E8,0x8986,0x76D6))
+      $dialogRect = $dialog.Current.BoundingRectangle
+      $overwriteAll = @(@($dialogNodes) + @($mainNodes) | Where-Object {
+        if ([string]$_.Current.AutomationId -eq '_buttonOverwriteAll') { return $true }
+        if ([string]$_.Current.Name -ne $overwriteName) { return $false }
+        $r = $_.Current.BoundingRectangle
+        return ($r.Width -gt 0 -and $r.Left -ge $dialogRect.Left - 4 -and $r.Top -ge $dialogRect.Top - 4 -and $r.Right -le $dialogRect.Right + 4 -and $r.Bottom -le $dialogRect.Bottom + 4)
+      } | Select-Object -Unique)
       if ($overwriteAll.Count -eq 1) {
         $button = $overwriteAll[0]
         if ($button.Current.ProcessId -ne $script:ProcessIdForVariables -or -not $button.Current.IsEnabled) { throw 'KV_VARIABLE_REPLACE_BUTTON_MISMATCH' }
