@@ -133,4 +133,8 @@ validate_scaffold → create_project → stage_default_program
    flat workflow 结果也带 `error_code=KV_COMPILE_RESULT_NG` 与 `child_message=…`。
    若 owner-drawn 行确实读不到，子结果报 `text_available=false` 并指向
    编译步骤截图与 fail.txt，不再出现空 message。
-6. **同步 UIA 硬超时**：8 秒只是查找循环预算，不是所有调用的硬上限。
+6. **同步 UIA 硬超时**：plan 给 `copy_convert_result` 显式 `timeout_seconds=120`，
+   `compile_convert` 300、每个 `import_mnm_*` 240、`set_variables_*` 600；
+   由 flat executor 在预算到点时杀进程树，作为硬兜底。
+   子进程内的 8 秒查找预算仍只是协作式检查（单个阻塞的 COM/UIA 调用无法在进程内取消），
+   这一点如实保留。

@@ -106,8 +106,8 @@ function Add-SwitchArg([System.Collections.Generic.List[string]]$List, [string]$
   if ($Enabled) { $List.Add($Name) }
 }
 
-function New-Step([string]$Name, [string]$ScriptName, [string[]]$Classes, [string[]]$Arguments, [string]$OutDirValue, [string]$Kind = 'script') {
-  [ordered]@{
+function New-Step([string]$Name, [string]$ScriptName, [string[]]$Classes, [string[]]$Arguments, [string]$OutDirValue, [string]$Kind = 'script', [int]$TimeoutSeconds = 0) {
+  $step = [ordered]@{
     name = $Name
     kind = $Kind
     script_name = $ScriptName
@@ -115,6 +115,11 @@ function New-Step([string]$Name, [string]$ScriptName, [string[]]$Classes, [strin
     arguments = @($Arguments)
     out_dir = $OutDirValue
   }
+  # A per-step hard timeout is enforced by the flat executor (it kills the
+  # process tree). Use it for steps whose synchronous UIA calls cannot be
+  # cancelled from inside the child.
+  if ($TimeoutSeconds -gt 0) { $step.timeout_seconds = $TimeoutSeconds }
+  $step
 }
 
 try {
@@ -317,7 +322,7 @@ try {
     if ($Mode -eq 'new_project' -or $DeleteExistingModulesBeforeImport) { Add-SwitchArg -List $importArgs -Name '-DeleteExistingModuleBeforeImport' -Enabled $true }
     Add-Arg -List $importArgs -Name '-RestartKvs' -Value $(if ($Mode -eq 'repair_existing_project' -and $i -eq 0) { 'true' } else { 'false' })
     Add-Arg -List $importArgs -Name '-KvsExe' -Value $KvsExe
-    $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })import_mnm_$($i + 1)" 'import_mnm_guarded.ps1' @('runner_child_approved') $importArgs.ToArray() (Join-Path $artifactRoot ("import_mnm_$($i + 1)")) 'runner_child'))
+    $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })import_mnm_$($i + 1)" 'import_mnm_guarded.ps1' @('runner_child_approved') $importArgs.ToArray() (Join-Path $artifactRoot ("import_mnm_$($i + 1)")) 'runner_child' 240))
 
     if ($Mode -eq 'new_project') {
       $placementDir = Join-Path (Join-Path $artifactRoot 'module_placement') $entry.module_name
@@ -378,7 +383,7 @@ try {
       $forbiddenLocalNames = @($forbiddenLocalNames | Where-Object { $_ -and $ownedLocalNames -notcontains $_ } | Select-Object -Unique)
       if ($forbiddenLocalNames.Count -gt 0) { Add-Arg -List $setArgs -Name '-ForbiddenLocalNamesCsv' -Value ($forbiddenLocalNames -join ',') }
     }
-    $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })set_variables_$($entry.module_name)" 'set_variables_guarded.ps1' @('runner_child_approved') $setArgs.ToArray() $moduleOutDir 'runner_child'))
+    $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })set_variables_$($entry.module_name)" 'set_variables_guarded.ps1' @('runner_child_approved') $setArgs.ToArray() $moduleOutDir 'runner_child' 600))
     if ([int]$mergedGlobal.executable_global_variable_count -gt 0) { $globalVariablesPasted = $true }
     $setVariableSummaries += [pscustomobject]@{
       module_name = $entry.module_name
@@ -392,11 +397,13 @@ try {
   $compileOutDir = Join-Path $artifactRoot 'compile_convert'
   $compileStepArgs = @('-ProjectPath',$projectPathForRun,'-OutDir',$compileOutDir,'-WaitSeconds','40','-ChecklistPath',$ChecklistPath,'-ConvertAction','CtrlF9')
   if ($createdProjectResultPath) { $compileStepArgs += @('-CreatedProjectResultPath',$createdProjectResultPath) }
-  $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })compile_convert" 'compile_and_copy_result_bounded.ps1' @('runner_child_approved') $compileStepArgs $compileOutDir 'runner_child'))
+  $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })compile_convert" 'compile_and_copy_result_bounded.ps1' @('runner_child_approved') $compileStepArgs $compileOutDir 'runner_child' 300))
   $copyOutDir = Join-Path $artifactRoot 'copy_result'
   $copyStepArgs = @('-ProjectNeedle',$projectNeedle,'-ProjectPath',$projectPathForRun,'-OutDir',$copyOutDir,'-ChecklistPath',$ChecklistPath,'-MaxLookupMs','8000')
   if ($createdProjectResultPath) { $copyStepArgs += @('-CreatedProjectResultPath',$createdProjectResultPath) }
-  $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })copy_convert_result" 'copy_convert_result_from_tree_handle.ps1' @('runner_child_approved') $copyStepArgs $copyOutDir 'runner_child'))
+  # The result lookup calls synchronous UIA APIs that cannot be cancelled from
+  # inside the child; the executor's per-step timeout is the hard bound.
+  $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })copy_convert_result" 'copy_convert_result_from_tree_handle.ps1' @('runner_child_approved') $copyStepArgs $copyOutDir 'runner_child' 120))
 
   # Saved scan-order evidence: read the saved project tree (offline inventory)
   # and compare the module schedule with the scaffold import order. Extra

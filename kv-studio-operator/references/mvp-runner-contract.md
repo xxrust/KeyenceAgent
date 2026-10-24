@@ -214,6 +214,15 @@ If the owner-drawn result rows are truly unreadable, the child reports
 `text_available=false` and a message that names the failure modal and the compile
 step screenshot/fail.txt, rather than an empty message.
 
+### Step Timeouts
+
+Steps whose children make synchronous UIA calls that cannot be cancelled carry an
+explicit `timeout_seconds`, and the flat executor kills the process tree at that
+budget: `copy_convert_result` 120 s, `compile_convert` 300 s, each
+`import_mnm_*` 240 s, `set_variables_*` 600 s. In-child budgets (the 8 s result
+lookup loop, 1 s module lookup) remain cooperative checks; they do not bound a
+single blocked COM call. The step timeout is the hard outer bound.
+
 The flat workflow creates `<RunRoot>/run.log` before its first child and passes
 `KV_WORKFLOW_RUN_LOG` to children so guard actions and workflow stage results share
 one JSONL audit file. Per-step stdout/stderr remain supporting evidence.

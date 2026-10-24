@@ -147,12 +147,16 @@ if (Test-Path -LiteralPath $planPath -PathType Leaf) {
   $stageMnm = [string]$plan.default_program_staging.stage_mnm_path
   $stageOk = ($stageStep.Count -eq 1) -and ($cleanupStep.Count -eq 1) -and $stageName -and (Test-Path -LiteralPath $stageMnm -PathType Leaf)
   Add-Result 'plan_stages_default_program' $stageOk "stage=$stageName mnm_exists=$(Test-Path -LiteralPath $stageMnm -PathType Leaf) cleanup=$($cleanupStep.Count)"
+  $copyStep = @($plan.steps | Where-Object { $_.name -eq 'copy_convert_result' })
+  $copyTimeout = if ($copyStep.Count -eq 1) { [int]$copyStep[0].timeout_seconds } else { 0 }
+  Add-Result 'plan_lookup_step_hard_timeout' ($copyStep.Count -eq 1 -and $copyTimeout -gt 0) "copy_timeout=$copyTimeout"
 } else {
   Add-Result 'plan_required_gate_order' $false 'execution_plan.json missing'
   Add-Result 'plan_includes_full_attribute_switch' $false 'execution_plan.json missing'
   Add-Result 'plan_includes_scan_order_steps' $false 'execution_plan.json missing'
   Add-Result 'plan_exposes_scan_order_result' $false 'execution_plan.json missing'
   Add-Result 'plan_stages_default_program' $false 'execution_plan.json missing'
+  Add-Result 'plan_lookup_step_hard_timeout' $false 'execution_plan.json missing'
 }
 
 $failed = @($results | Where-Object { -not $_.pass })
