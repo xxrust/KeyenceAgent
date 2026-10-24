@@ -1101,13 +1101,21 @@ function Test-VariableGridFocused([string]$Label) {
   $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
   if (-not $focused) { Log "grid focus check ${Label}: no focused element"; return $false }
   $focusedId = [string]$focused.Current.AutomationId
+  $focusedType = $focused.Current.ControlType
+  $rect = $focused.Current.BoundingRectangle
+  # KV's owner-drawn variable grid exposes a focused cell as a Pane with a
+  # numeric runtime id and a large surface. The container (_grid) is not always
+  # an ancestor of that cell, so accept the numeric Pane directly when its
+  # bounds cover the table area (small panes are filter controls).
+  if ($focusedId -match '^\d+$' -and $focusedType -eq [System.Windows.Automation.ControlType]::Pane -and
+      $rect.Width -gt 300 -and $rect.Height -gt 100) { return $true }
   $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
   $current = $focused
   for ($depth = 0; $depth -lt 5 -and $current; $depth++) {
     if ([string]$current.Current.AutomationId -eq '_grid') { return $true }
     $current = $walker.GetParent($current)
   }
-  Log "grid focus check ${Label}: focused id=<$focusedId> type=$($focused.Current.ControlType.ProgrammaticName)"
+  Log "grid focus check ${Label}: focused id=<$focusedId> type=$($focusedType.ProgrammaticName) size=$($rect.Width)x$($rect.Height)"
   return $false
 }
 

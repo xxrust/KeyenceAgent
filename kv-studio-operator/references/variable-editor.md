@@ -147,11 +147,15 @@ keeps for the next member is ignored when counting persisted members.
 ## Variable Grid Focus And Copy
 
 `set_variables_guarded.ps1` proves that the focused element is the variable grid
-(`_grid`, or an ancestor) after the Alt+L/Shift+Tab route. It tries at most three
-bounded Shift+Tab steps and fails with `KV_VARIABLE_GRID_FOCUS_NOT_PROVEN` if the
-grid never owns focus. A Ctrl+A/Ctrl+C issued outside the grid makes KV STUDIO
-raise the owner-drawn `向剪贴板复制失败。` modal, which used to surface as a
-generic `KV_CLIPBOARD_COPY_FAILED` during reopen verification.
+after the Alt+L/Shift+Tab route: either `_grid` (or an ancestor), or the
+owner-drawn cell Pane with a numeric runtime id and table-sized bounds. It tries
+at most three bounded Shift+Tab steps and fails with
+`KV_VARIABLE_GRID_FOCUS_NOT_PROVEN` if the grid never owns focus. Accepting the
+numeric cell Pane matters: the cell's UIA ancestry does not always include
+`_grid`, and extra Shift+Tab steps otherwise move focus onto the tab control. A
+Ctrl+A/Ctrl+C issued outside the grid makes KV STUDIO raise the owner-drawn
+`向剪贴板复制失败。` modal, which used to surface as a generic
+`KV_CLIPBOARD_COPY_FAILED` during reopen verification.
 
 The runner also checks for stale KV modals before opening the editor. A leftover
 error dialog from a failed run now fails fast with the modal text and evidence

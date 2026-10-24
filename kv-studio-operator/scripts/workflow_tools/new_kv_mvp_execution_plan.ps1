@@ -394,7 +394,7 @@ try {
   if ($createdProjectResultPath) { $compileStepArgs += @('-CreatedProjectResultPath',$createdProjectResultPath) }
   $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })compile_convert" 'compile_and_copy_result_bounded.ps1' @('runner_child_approved') $compileStepArgs $compileOutDir 'runner_child'))
   $copyOutDir = Join-Path $artifactRoot 'copy_result'
-  $copyStepArgs = @('-ProjectNeedle',$projectNeedle,'-OutDir',$copyOutDir,'-ChecklistPath',$ChecklistPath,'-MaxLookupMs','8000')
+  $copyStepArgs = @('-ProjectNeedle',$projectNeedle,'-ProjectPath',$projectPathForRun,'-OutDir',$copyOutDir,'-ChecklistPath',$ChecklistPath,'-MaxLookupMs','8000')
   if ($createdProjectResultPath) { $copyStepArgs += @('-CreatedProjectResultPath',$createdProjectResultPath) }
   $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })copy_convert_result" 'copy_convert_result_from_tree_handle.ps1' @('runner_child_approved') $copyStepArgs $copyOutDir 'runner_child'))
 

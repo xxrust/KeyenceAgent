@@ -59,6 +59,23 @@ plan 暴露 `project_inventory_path` 与 `scan_order_result_path`。
 文档：`references/mvp-runner-contract.md` 已把"尚未证明扫描顺序"改为
 "用 assert_kv_scan_order.ps1 比较"，并写明参数、失败码、计划集成与测试位置。
 
+## 2026-10-24 端到端结果
+
+`ScaffoldAttrPlan10`（真实 KV STUDIO，new_project）完整通过：
+
+```
+validate_scaffold → create_project → stage_default_program
+→ import_mnm_1..3（Main 预删除成功）→ delete_staged_program
+→ set_fb_arguments → set_variables → compile_convert → copy_convert_result
+→ export_project_inventory → verify_saved_scan_order
+```
+
+- `mvp_result.json`: `ok=true`，最后一步 `verify_saved_scan_order`。
+- 编译结果：`转换结果 OK / 转换成功。 / 总步数：14/1536000（总指令数: 12）`。
+- 扫描顺序：expected `[Main, Worker]`，actual `[Main, Worker]`，`extra=[]`。
+- 工程树：`Reusable`（FB）+ `Main [1]` + `Worker [2]`；占位程序与默认 Main 都已清理。
+- 证据：`C:\kvrun\scaffold_attr\runs10\ScaffoldAttrPlan10`。
+
 ## 仍未关闭（按建议优先级）
 
 1. **完整变量属性写入/读回**：全局变量的 device、initial_value、comment 已由
