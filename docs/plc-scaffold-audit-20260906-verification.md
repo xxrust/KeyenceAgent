@@ -57,8 +57,13 @@ verification），并补了可重复的离线测试与文档。
    `set_kv_variables.ps1 -FullGlobalAttributes` 写入并读回（2026-10-24 实测：
    `DM9002`、INT `789`→`+789`、BOOL `TRUE`、comment 全部在关闭/重开后保留）。
    device 与 initial_value 同时声明会被 `KV_VARIABLE_DEVICE_INITIAL_VALUE_CONFLICT`
-   拒绝（KV STUDIO 对已绑定设备的变量不保留初值）。仍缺：retain/constant/group_name、
-   局部变量属性、以及把该开关接入 scaffold 模型与校验器。
+   拒绝（KV STUDIO 对已绑定设备的变量不保留初值）。scaffold 已接入：
+   renderer 生成 `scaffold.json variables.attributes=full`，validator 按该模式放行
+   并在 `variable_write_verified_fields` 中报告，execution plan 自动给每个
+   `set_variables` 步骤加 `-FullGlobalAttributes`；`tests\scaffold-variable-attributes`
+   9/9 通过，且 scaffold 产出的 merged TSV 已在真实工程上跑通
+   （`R_Flag/R100`、`Init_Flag/TRUE`、`Note_Flag/comment` 均回读保留）。
+   仍缺：retain/constant/group_name 与局部变量属性。
 2. **官方库依赖安装**：样例的 36 个官方/库 FB 仍无安装 workflow；复刻需要先装库。
 3. **普通程序局部变量导出**：快照路线只抓全局与 FB 局部变量。
 4. **新工程 Main 替换**：同名预检 + repair 路线已可用，新工程默认 Main 仍未验证。

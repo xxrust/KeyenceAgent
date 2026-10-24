@@ -157,6 +157,7 @@ function New-DefaultNetworkConfig {
 
 $mnmEntries = @()
 $variableSets = @()
+$globalAttributeRowCount = 0
 $allModuleNames = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 
 foreach ($module in $modules) {
@@ -191,6 +192,14 @@ foreach ($module in $modules) {
   Write-Text $mnmPath (New-MnmText $module) ([Text.Encoding]::Unicode)
   Write-Text $globalTsv (New-VariableTsv 'global' $moduleName @($module.variables.global) $evidence) ([Text.Encoding]::Default)
   Write-Text $localTsv (New-VariableTsv 'local' $moduleName @($module.variables.local) $evidence) ([Text.Encoding]::Default)
+  # Declare the variable-attribute contract in the generated manifest so the
+  # validator and execution plan cannot disagree about what the run will write.
+  foreach ($globalRow in @($module.variables.global)) {
+    if ($null -eq $globalRow) { continue }
+    if (([string]$globalRow.device).Trim() -or ([string]$globalRow.initial_value).Trim() -or ([string]$globalRow.comment).Trim()) {
+      $globalAttributeRowCount++
+    }
+  }
   if ($moduleType -eq 2) {
     Write-Text $argumentsTsv (New-FbArgumentTsv $moduleName @($module.arguments) $evidence) ([Text.Encoding]::Default)
   }
@@ -254,6 +263,11 @@ $manifest = [ordered]@{
     sets = $variableSets
     encoding = 'system-default ANSI'
     source = 'generated_from_scaffold_model'
+    # name_type = the baseline paste proves name/data_type only.
+    # full = the run uses set_kv_variables -FullGlobalAttributes and verifies
+    # the global device/initial_value/comment columns on close/reopen.
+    attributes = $(if ($globalAttributeRowCount -gt 0) { 'full' } else { 'name_type' })
+    attribute_row_count = $globalAttributeRowCount
   }
 }
 $manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $ScaffoldRoot 'scaffold.json') -Encoding UTF8

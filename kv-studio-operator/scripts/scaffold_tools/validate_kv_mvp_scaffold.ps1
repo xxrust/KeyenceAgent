@@ -215,6 +215,11 @@ if ([int]$manifest.schema_version -ne 2) {
 if ([string]$manifest.variables.schema -ne 'per_mnm') {
   Stop-ScaffoldValidation 'KV_SCAFFOLD_VARIABLE_SCHEMA_INVALID' 'scaffold.json variables.schema must be per_mnm. Top-level variables.global_tsv/local_tsv is not authoritative.' @($manifestPath)
 }
+$variableAttributesMode = if ($manifest.variables.attributes) { [string]$manifest.variables.attributes } else { 'name_type' }
+if ($variableAttributesMode -notin @('name_type','full')) {
+  Stop-ScaffoldValidation 'KV_SCAFFOLD_VARIABLE_SCHEMA_INVALID' "scaffold.json variables.attributes must be name_type or full. Received: $variableAttributesMode" @($manifestPath)
+}
+$fullGlobalAttributes = ($variableAttributesMode -eq 'full')
 
 $networkConfigPath = ''
 $networkConfig = $null
@@ -340,7 +345,8 @@ foreach ($entry in $mnmEntries) {
   $noLocalMarkers = @($localRows | Where-Object { Test-KvNoLocalVariablesMarkerRow $_ })
   Assert-KvVariableDefinitions $definedGlobalRows 'global' $entryGlobalTsv '' $fbTypeNames
   Assert-KvVariableDefinitions $definedLocalRows 'local' $entryLocalTsv $moduleName $fbTypeNames
-  $writeErrors = @(Get-KvVariableWriteCapabilityErrors -Rows @($definedGlobalRows + $definedLocalRows) -AllowDefaultInitialValues)
+  $writeErrors = @(Get-KvVariableWriteCapabilityErrors -Rows @($definedGlobalRows) -AllowDefaultInitialValues -AllowGlobalAttributes:$fullGlobalAttributes -Scope 'global')
+  $writeErrors += @(Get-KvVariableWriteCapabilityErrors -Rows @($definedLocalRows) -AllowDefaultInitialValues -Scope 'local')
   if ($writeErrors.Count) { Stop-ScaffoldValidation $writeErrors[0].code $writeErrors[0].message @($entryGlobalTsv,$entryLocalTsv) }
   $noLocalMarkerErrors = @(Get-KvNoLocalVariablesMarkerErrors -Rows $localRows -SourcePath $entryLocalTsv -ExpectedOwnerProgram $moduleName)
   if ($noLocalMarkerErrors.Count -gt 0) {
@@ -574,7 +580,8 @@ $payload = [ordered]@{
   source_model = $sourceModelPath
   source_model_hash = Get-FileHashText $sourceModelPath
   ordered_model_render_verified = [bool]$sourceModel
-  variable_write_verified_fields = @('name','data_type')
+  variable_attributes = $variableAttributesMode
+  variable_write_verified_fields = if ($fullGlobalAttributes) { @('name','data_type','device','initial_value','comment') } else { @('name','data_type') }
   full_project_replication_verified = $false
   variable_sets = $variableSetChecks
   executable_global_variable_count = $globalDefinitions.Count

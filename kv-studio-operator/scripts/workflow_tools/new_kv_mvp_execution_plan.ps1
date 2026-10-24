@@ -22,6 +22,8 @@
   [switch]$AuditVariablePersistence,
   [ValidateSet('Full','NameType')]
   [string]$LocalPasteFormat = 'NameType',
+  # Optional override; scaffold.json variables.attributes=full also enables it.
+  [switch]$FullGlobalAttributes,
   [switch]$DeleteExistingModulesBeforeImport,
 
   [Parameter(Mandatory=$true)]
@@ -127,6 +129,11 @@ try {
   if ([int]$manifest.schema_version -ne 2 -or [string]$manifest.variables.schema -ne 'per_mnm') {
     throw 'Unsupported scaffold variable schema. Use schema_version=2 and variables.schema=per_mnm.'
   }
+  $manifestVariableAttributes = if ($manifest.variables.attributes) { [string]$manifest.variables.attributes } else { 'name_type' }
+  if ($manifestVariableAttributes -notin @('name_type','full')) {
+    throw "Unsupported scaffold variables.attributes value: $manifestVariableAttributes. Use name_type or full."
+  }
+  $effectiveFullGlobalAttributes = [bool]($FullGlobalAttributes -or ($manifestVariableAttributes -eq 'full'))
 
   if (-not $ProjectName) {
     if ($manifest.project.name) { $ProjectName = [string]$manifest.project.name }
@@ -291,6 +298,7 @@ try {
     Add-Arg -List $setArgs -Name '-LocalVariablesTsv' -Value $entry.local_tsv
     Add-Arg -List $setArgs -Name '-LocalProgramName' -Value $entry.module_name
     Add-Arg -List $setArgs -Name '-LocalPasteFormat' -Value $LocalPasteFormat
+    if ($effectiveFullGlobalAttributes) { Add-SwitchArg -List $setArgs -Name '-FullGlobalAttributes' -Enabled $true }
     if ($Mode -eq 'new_project') { Add-SwitchArg -List $setArgs -Name '-NewProjectDefaults' -Enabled $true }
     Add-Arg -List $setArgs -Name '-ChecklistPath' -Value $ChecklistPath
     Add-Arg -List $setArgs -Name '-OutDir' -Value $moduleOutDir

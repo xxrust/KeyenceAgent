@@ -15,6 +15,8 @@ param(
   [switch]$AuditVariablePersistence,
   [ValidateSet('Full','NameType')]
   [string]$LocalPasteFormat = 'NameType',
+  # Optional override; scaffold.json variables.attributes=full enables it too.
+  [switch]$FullGlobalAttributes,
   [switch]$DeleteExistingModulesBeforeImport
 )
 
@@ -59,6 +61,7 @@ if ($KvsExe) { $planArgs += @('-KvsExe',$KvsExe) }
 if ($ChecklistPath) { $planArgs += @('-ChecklistPath',$ChecklistPath) }
 if ($SourceSnapshotManifestPath) { $planArgs += @('-SourceSnapshotManifestPath',$SourceSnapshotManifestPath) }
 if ($AuditVariablePersistence) { $planArgs += '-AuditVariablePersistence' }
+if ($FullGlobalAttributes) { $planArgs += '-FullGlobalAttributes' }
 if ($DeleteExistingModulesBeforeImport) { $planArgs += '-DeleteExistingModulesBeforeImport' }
 
 & powershell @planArgs

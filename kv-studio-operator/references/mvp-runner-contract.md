@@ -94,9 +94,25 @@ verification 2026-10-24: `DM9002` binding, INT `789`, BOOL `TRUE`, comment). A
 global row that declares both `device` and `initial_value` is rejected with
 `KV_VARIABLE_DEVICE_INITIAL_VALUE_CONFLICT`, because KV STUDIO does not preserve
 an initial value for a device-assigned variable. `retain`, `constant` and
-`group_name` remain unsupported and fail before UI input. The scaffold/validator
-path still uses the name/type baseline; wiring `-FullGlobalAttributes` into the
-scaffold model is follow-up work. Explicit default initial values are permitted
+`group_name` remain unsupported and fail before UI input.
+
+The scaffold carries the same contract in `scaffold.json`:
+
+```json
+"variables": { "schema": "per_mnm", "attributes": "full", "attribute_row_count": 3 }
+```
+
+`render_kv_mvp_scaffold_model.ps1` emits `attributes: full` when any executable
+global model row has a non-empty `device`, `initial_value` or `comment`, and
+`name_type` otherwise. The validator then permits those fields only for the
+`full` mode (`variable_write_verified_fields` mirrors the mode), and
+`new_kv_mvp_execution_plan.ps1` adds `-FullGlobalAttributes` to every
+`set_variables` step. A scaffold without the declaration keeps the fail-closed
+name/type behavior, and an unknown value fails with
+`KV_SCAFFOLD_VARIABLE_SCHEMA_INVALID`. `tests\scaffold-variable-attributes\run.bat`
+covers the render/validate/plan chain offline.
+
+Explicit default initial values are permitted
 only in a newly created project; repair/direct writes require an empty
 initial_value unless the full-attribute route is enabled. Comments in the model
 are written only through the full-attribute route; the name/type baseline leaves

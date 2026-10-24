@@ -51,6 +51,12 @@ a BOOL initial value `TRUE`, and a comment all survived editor close/reopen.
 - The public/private token is the Chinese UI value `非公开`; a non-Chinese
   KV STUDIO UI is not covered by this route.
 
+Scaffolds declare the same mode in `scaffold.json` as
+`variables.attributes: full`; the renderer derives it from the model, the
+validator gates on it, and the execution plan adds `-FullGlobalAttributes`
+automatically. `tests\scaffold-variable-attributes\run.bat` covers that chain
+without opening KV STUDIO.
+
 Run the public variable workflow with `-PlanOnly` for standalone declarations,
 or the complete module workflow for its combined declaration/ownership gate.
 Internal validators are implementation details, not separate customer entrypoints.

@@ -14,7 +14,9 @@ param(
   [int]$TimeoutSeconds = 600,
   [switch]$AuditVariablePersistence,
   [ValidateSet('Full','NameType')]
-  [string]$LocalPasteFormat = 'NameType'
+  [string]$LocalPasteFormat = 'NameType',
+  # Optional override; scaffold.json variables.attributes=full enables it too.
+  [switch]$FullGlobalAttributes
 )
 
 $ErrorActionPreference = 'Stop'
@@ -61,6 +63,7 @@ if ($AdminUser) { $planArgs += @('-AdminUser',$AdminUser) }
 if ($AdminPassword) { $planArgs += @('-AdminPassword',$AdminPassword) }
 if ($AdminCredentialPath) { $planArgs += @('-AdminCredentialPath',$AdminCredentialPath) }
 if ($AuditVariablePersistence) { $planArgs += '-AuditVariablePersistence' }
+if ($FullGlobalAttributes) { $planArgs += '-FullGlobalAttributes' }
 
 & powershell @planArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
