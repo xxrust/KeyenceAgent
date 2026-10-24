@@ -86,6 +86,17 @@ powershell -File <skill-root>\scripts\workflow_tools\parse_kv_compile_result.ps1
 （用 `set_variables_result.json` / `fb_snapshot_result.json`）。缺变量的模块不要纳入
 错误归因。
 
+执行器生成的每步回执可以直接汇总成完成度报告（需要在编译前跑）：
+
+```powershell
+powershell -File <skill-root>\scripts\workflow_tools\get_kv_module_completion.ps1 `
+  -PlanPath <plan>\execution_plan.json -ArtifactsRoot <run>\artifacts -OutDir <run>\triage\completion
+```
+
+`module_completion.json` 给出每个模块的 `import_ok / placement_ok / fb_arguments_ok /
+variables_ok / complete` 与 `reasons`；有未完成模块时退出码 41。**完成度不是 100% 时
+不要依据编译结果下结论。**
+
 编译噪声的判别口诀：**错误按模块均匀铺开 ⇒ 多半是变量没写完；集中在少数模块/符号 ⇒ 才是
 该模块的真实问题**。
 

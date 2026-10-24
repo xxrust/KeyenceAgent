@@ -427,6 +427,45 @@ try {
   $scanOrderInventory = Join-Path $inventoryOutDir 'project_inventory.json'
   $steps.Add((New-Step 'verify_saved_scan_order' 'assert_kv_scan_order.ps1' @('customer_non_ui_tool') @('-ScaffoldPath',$manifestPath,'-ActualInventory',$scanOrderInventory,'-OutDir',$scanOrderOutDir,'-AllowExtraModules') $scanOrderOutDir 'tool'))
 
+  # Interleave each module's import, placement check, FB arguments and variable
+  # write so a module is complete as soon as its group finishes. Importing every
+  # MNM first and writing variables afterwards leaves a partially written
+  # project where a compile reports all unwritten modules at once.
+  $interleaved = [System.Collections.Generic.List[object]]::new()
+  $consumed = @{}
+  $firstImportName = $null
+  foreach ($step in $steps) {
+    if ([string]$step.name -match '^(repair_)?import_mnm_\d+$') { $firstImportName = [string]$step.name; break }
+  }
+  foreach ($step in $steps) {
+    if ($firstImportName -and [string]$step.name -eq $firstImportName) { break }
+    $interleaved.Add($step)
+    $consumed[[string]$step.name] = $true
+  }
+  for ($i = 0; $i -lt $resolvedMnmFiles.Count; $i++) {
+    $entry = $resolvedMnmFiles[$i]
+    $prefixName = if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' }
+    foreach ($candidate in @(
+      "$($prefixName)import_mnm_$($i + 1)",
+      "verify_module_placement_$($entry.module_name)",
+      "$($prefixName)set_fb_arguments_$($entry.module_name)",
+      "$($prefixName)set_variables_$($entry.module_name)"
+    )) {
+      $match = @($steps | Where-Object { [string]$_.name -eq $candidate })
+      if ($match.Count -eq 1 -and -not $consumed.ContainsKey($candidate)) {
+        $interleaved.Add($match[0])
+        $consumed[$candidate] = $true
+      }
+    }
+  }
+  foreach ($step in $steps) {
+    if (-not $consumed.ContainsKey([string]$step.name)) {
+      $interleaved.Add($step)
+      $consumed[[string]$step.name] = $true
+    }
+  }
+  $steps = $interleaved
+
   $plan = [ordered]@{
     ok = $true
     schema_version = 1
