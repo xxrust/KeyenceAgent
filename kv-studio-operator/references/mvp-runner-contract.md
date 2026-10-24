@@ -200,6 +200,20 @@ by the EtherCAT device configuration, not by a separate install step; use
 that call them. See `references/library-dependencies.md` for the dependency
 order, failure codes and the 2026-10-24 live evidence.
 
+### Compile Result Contract
+
+`copy_convert_result_from_tree_handle.ps1` writes the full conversion result to
+`compile_result_copied.txt` and reports it in `result.json`. For NG results the
+child `message` now carries the copied rows (the result file stays authoritative)
+and `text_available=true`. Verified 2026-10-24: a module with an undefined tag
+produced `转换结果 NG (错误数量:1 ...)` plus the `错误214 ... [UndefinedTag]` row,
+and the flat workflow result surfaced `error_code=KV_COMPILE_RESULT_NG` and
+`child_message=...` instead of a generic failure.
+
+If the owner-drawn result rows are truly unreadable, the child reports
+`text_available=false` and a message that names the failure modal and the compile
+step screenshot/fail.txt, rather than an empty message.
+
 The flat workflow creates `<RunRoot>/run.log` before its first child and passes
 `KV_WORKFLOW_RUN_LOG` to children so guard actions and workflow stage results share
 one JSONL audit file. Per-step stdout/stderr remain supporting evidence.

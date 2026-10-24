@@ -126,8 +126,11 @@ validate_scaffold → create_project → stage_default_program
    变量 reopen 复制失败已定位并修复：焦点未证明落在 `_grid` 时 Ctrl+C 会触发 KV 的
    “向剪贴板复制失败。”；现在 Alt+L/Shift+Tab 最多 3 次并校验焦点祖先含 `_grid`，
    启动时还检查遗留模态框。修复后同一工程连续 3 次写入+重开回读全部 ok。
-5. **编译结果文本/截图**：已修掉“成功结果对话框被当作 unexpected modal”的误判
-   （按进程 + `#32770` + 标题 `转换结果` 接受），直接编译实测复制到
-   `转换结果 OK / 转换成功。 / 总步数：4`。NG 时 owner-drawn 错误行仍可能读不到文本，
-   失败时保留截图；待补 NG 回读回归。
+5. **编译结果文本/截图**：**成功与 NG 都已实测可回读**。成功：
+   `转换结果 OK / 转换成功。 / 总步数 14`；NG（未注册变量）：
+   `转换结果 NG (错误数量:1  警告数量:1)` + `NgProbe(行:00001)[错误214]…[UndefinedTag]`。
+   子结果 `message` 现在直接带 NG 行并标记 `text_available=true`；
+   flat workflow 结果也带 `error_code=KV_COMPILE_RESULT_NG` 与 `child_message=…`。
+   若 owner-drawn 行确实读不到，子结果报 `text_available=false` 并指向
+   编译步骤截图与 fail.txt，不再出现空 message。
 6. **同步 UIA 硬超时**：8 秒只是查找循环预算，不是所有调用的硬上限。

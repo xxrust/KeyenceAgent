@@ -348,10 +348,18 @@ try {
   # The file is authoritative; do not overwrite the user's clipboard merely
   # to mirror text already read through a scoped control API.
   if ($conversionFailed -or $text.Contains($ngNeedle)) {
+    # Carry the copied NG rows into the message. The result file remains the
+    # authoritative evidence, but an empty/generic "conversion result is NG"
+    # message hides the actual program error from the workflow caller.
+    $ngLines = @($lines | Where-Object { $_.Trim() } | Select-Object -First 4)
+    $ngSummary = ($ngLines -join ' | ')
+    if ($ngSummary.Length -gt 700) { $ngSummary = $ngSummary.Substring(0,700) + '...' }
     $currentResult = [pscustomobject]@{
       ok = $false
       error_code = 'KV_COMPILE_RESULT_NG'
-      message = 'KV STUDIO conversion result is NG.'
+      message = "KV STUDIO conversion result is NG: $ngSummary"
+      text_available = $true
+      result_text = $text
       route = $route
       lookup_ms = $lookupWatch.ElapsedMilliseconds
       line_count = $lines.Count
@@ -362,7 +370,7 @@ try {
       compile_result_path = $compileResultPath
     }
     $currentResult | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'result.json') -Encoding UTF8
-    throw 'KV_COMPILE_RESULT_NG: KV STUDIO conversion result is NG. See compile_result_copied.txt.'
+    throw "KV_COMPILE_RESULT_NG: $($currentResult.message)"
   }
   if (-not $text.Contains($okNeedle)) { throw "Copied text does not contain expected OK marker: $okNeedle" }
 
@@ -384,7 +392,21 @@ try {
   $_.Exception.ToString() | Set-Content -LiteralPath (Join-Path $OutDir 'fail.txt') -Encoding UTF8
   $code = if ($_.Exception.Message -match '(KV_[A-Z0-9_]+)') { $Matches[1] } else { 'KV_COMPILE_RESULT_READBACK_FAILED' }
   if ($conversionFailed) { $code = 'KV_COMPILE_RESULT_NG' }
-  if (-not $currentResult) { $currentResult = [pscustomobject]@{ok=$false;error_code=$code;message=$_.Exception.Message;compile_success_verified=$false;conversion_failed_modal_observed=$conversionFailed} }
+  if (-not $currentResult) {
+    $message = $_.Exception.Message
+    if ($conversionFailed) {
+      $message = "KV STUDIO conversion result is NG, but the owner-drawn result rows could not be read as text. The failure modal was observed; inspect the compile step screenshot and fail.txt. $message"
+    }
+    $currentResult = [pscustomobject]@{
+      ok=$false
+      error_code=$code
+      message=$message
+      text_available=$false
+      compile_success_verified=$false
+      conversion_failed_modal_observed=$conversionFailed
+      compile_result_path=if ($compileResultPath) { $compileResultPath } else { '' }
+    }
+  }
   $currentResult | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'result.json') -Encoding UTF8
   exit 1
 }

@@ -371,7 +371,17 @@ try {
 } catch {
   Write-WorkflowLog 'workflow_failed' @{message=$_.Exception.Message;elapsed_seconds=(Get-ElapsedSeconds)}
   if ($plan -and $plan.result_path) {
-    Write-FlatWorkflowResult $plan $PlanPath $false 'fail' $_.Exception.ToString()
+    # Surface the failed child's own error code and message (for example the
+    # NG text copied from the conversion result), not only the generic
+    # "Flat workflow step failed" wrapper.
+    $failureMessage = $_.Exception.ToString()
+    if ($script:lastFailure) {
+      $parts = @($_.Exception.Message)
+      if ($script:lastFailure.error_code) { $parts += "error_code=$($script:lastFailure.error_code)" }
+      if ($script:lastFailure.message) { $parts += "child_message=$($script:lastFailure.message)" }
+      $failureMessage = ($parts -join ' | ') + [Environment]::NewLine + $failureMessage
+    }
+    Write-FlatWorkflowResult $plan $PlanPath $false 'fail' $failureMessage
   }
   exit 1
 } finally {
