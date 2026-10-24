@@ -129,6 +129,9 @@ $exit = Invoke-Script $planner $planArgs
 $planPath = Join-Path $planRoot 'execution_plan.json'
 if (Test-Path -LiteralPath $planPath -PathType Leaf) {
   $plan = Get-Content -LiteralPath $planPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  $firstTwo = @($plan.steps | Select-Object -First 2 | ForEach-Object { $_.script_name })
+  $gatesFirst = ($firstTwo.Count -eq 2) -and ($firstTwo[0] -eq 'assert_kv_mvp_ui_guard_usage.ps1') -and ($firstTwo[1] -eq 'assert_kv_mvp_agent_boundary.ps1')
+  Add-Result 'plan_required_gate_order' $gatesFirst "first_two=$($firstTwo -join ',')"
   $variableSteps = @($plan.steps | Where-Object { $_.script_name -eq 'set_variables_guarded.ps1' })
   $withFlag = @($variableSteps | Where-Object { @($_.arguments) -contains '-FullGlobalAttributes' })
   Add-Result 'plan_includes_full_attribute_switch' ($exit -eq 0 -and $variableSteps.Count -gt 0 -and $withFlag.Count -eq $variableSteps.Count) "exit=$exit steps=$($variableSteps.Count) flagged=$($withFlag.Count)"
@@ -145,6 +148,7 @@ if (Test-Path -LiteralPath $planPath -PathType Leaf) {
   $stageOk = ($stageStep.Count -eq 1) -and ($cleanupStep.Count -eq 1) -and $stageName -and (Test-Path -LiteralPath $stageMnm -PathType Leaf)
   Add-Result 'plan_stages_default_program' $stageOk "stage=$stageName mnm_exists=$(Test-Path -LiteralPath $stageMnm -PathType Leaf) cleanup=$($cleanupStep.Count)"
 } else {
+  Add-Result 'plan_required_gate_order' $false 'execution_plan.json missing'
   Add-Result 'plan_includes_full_attribute_switch' $false 'execution_plan.json missing'
   Add-Result 'plan_includes_scan_order_steps' $false 'execution_plan.json missing'
   Add-Result 'plan_exposes_scan_order_result' $false 'execution_plan.json missing'

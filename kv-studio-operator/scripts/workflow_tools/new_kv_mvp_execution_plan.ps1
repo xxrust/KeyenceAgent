@@ -226,9 +226,11 @@ try {
   $resultPath = if ($Mode -eq 'new_project') { Join-Path $runRoot 'mvp_result.json' } else { Join-Path $runRoot 'repair_result.json' }
 
   $steps = [System.Collections.Generic.List[object]]::new()
-  $steps.Add((New-Step 'validate_scaffold' 'validate_kv_mvp_scaffold.ps1' @('customer_scaffold_tool') @('-ScaffoldRoot',$ScaffoldRoot,'-ChecklistPath',$ChecklistPath,'-OutDir',(Join-Path $artifactRoot 'scaffold_validation')) (Join-Path $artifactRoot 'scaffold_validation') 'gate'))
+  # The flat executor's preflight requires the UI guard and agent boundary gates
+  # to be the first two steps of every plan; scaffold validation follows them.
   $steps.Add((New-Step 'assert_ui_guard_usage' 'assert_kv_mvp_ui_guard_usage.ps1' @('gate') @('-ScriptsRoot',$scriptRoot,'-OutDir',(Join-Path $artifactRoot 'ui_guard_usage')) (Join-Path $artifactRoot 'ui_guard_usage') 'gate'))
   $steps.Add((New-Step 'assert_agent_boundary' 'assert_kv_mvp_agent_boundary.ps1' @('gate') @('-ScriptsRoot',$scriptRoot,'-MvpScriptsRoot',(Join-Path $scriptRoot 'runner_children'),'-OutDir',(Join-Path $artifactRoot 'agent_boundary')) (Join-Path $artifactRoot 'agent_boundary') 'gate'))
+  $steps.Add((New-Step 'validate_scaffold' 'validate_kv_mvp_scaffold.ps1' @('customer_scaffold_tool') @('-ScaffoldRoot',$ScaffoldRoot,'-ChecklistPath',$ChecklistPath,'-OutDir',(Join-Path $artifactRoot 'scaffold_validation')) (Join-Path $artifactRoot 'scaffold_validation') 'gate'))
 
   if ($Mode -eq 'repair_existing_project') {
     $sourceGateDir = Join-Path $artifactRoot 'source_snapshot_gate'
@@ -253,6 +255,10 @@ try {
     Add-Arg -List $createArgs -Name '-AdminCredentialPath' -Value $AdminCredentialPath
     $steps.Add((New-Step 'create_project' 'create_project_local_guarded.ps1' @('runner_child_approved') $createArgs.ToArray() (Join-Path $artifactRoot 'create_project') 'runner_child'))
   }
+  # create_project starts KV STUDIO without the project path on its command
+  # line, so later steps must bind through the creation evidence instead of
+  # command-line matching.
+  $createdProjectResultPath = if ($Mode -eq 'new_project') { Join-Path (Join-Path $artifactRoot 'create_project') 'create_project_result.json' } else { '' }
 
   $defaultProgramName = 'Main'
   $scaffoldModuleNames = @($resolvedMnmFiles | ForEach-Object { [string]$_.module_name })
@@ -284,6 +290,7 @@ try {
     Add-Arg -List $stageArgs -Name '-ExpectedModuleName' -Value $stageModuleName
     Add-Arg -List $stageArgs -Name '-ExpectedCategory' -Value 'scan'
     Add-Arg -List $stageArgs -Name '-ProjectSearchRoot' -Value $projectSearchRoot
+    if ($createdProjectResultPath) { Add-Arg -List $stageArgs -Name '-CreatedProjectResultPath' -Value $createdProjectResultPath }
     Add-Arg -List $stageArgs -Name '-ChecklistPath' -Value $ChecklistPath
     Add-SwitchArg -List $stageArgs -Name '-SaveAfterImport' -Enabled $true
     Add-Arg -List $stageArgs -Name '-RestartKvs' -Value 'false'
@@ -300,6 +307,7 @@ try {
     Add-Arg -List $importArgs -Name '-ExpectedModuleName' -Value $entry.module_name
     Add-Arg -List $importArgs -Name '-ExpectedCategory' -Value $entry.category
     Add-Arg -List $importArgs -Name '-ProjectSearchRoot' -Value $projectSearchRoot
+    if ($createdProjectResultPath) { Add-Arg -List $importArgs -Name '-CreatedProjectResultPath' -Value $createdProjectResultPath }
     Add-Arg -List $importArgs -Name '-ChecklistPath' -Value $ChecklistPath
     Add-SwitchArg -List $importArgs -Name '-SaveAfterImport' -Enabled $true
     # A fresh KV STUDIO project already contains a default 'Main' module. Give
@@ -324,6 +332,7 @@ try {
   if ($Mode -eq 'new_project' -and $resolvedMnmFiles.Count -gt 0) {
     $cleanupOut = Join-Path $artifactRoot 'delete_default_program'
     $cleanupArgs = @('-ProjectPath',$projectPathForRun,'-ExpectedModuleName',$cleanupModuleName,'-DeleteOnly','-RestartKvs','false','-ChecklistPath',$ChecklistPath,'-OutDir',$cleanupOut,'-KvsExe',$KvsExe)
+    if ($createdProjectResultPath) { $cleanupArgs += @('-CreatedProjectResultPath',$createdProjectResultPath) }
     $steps.Add((New-Step $(if ($stageModuleName) { 'delete_staged_program' } else { 'delete_default_program' }) 'import_mnm_guarded.ps1' @('runner_child_approved') $cleanupArgs $cleanupOut 'runner_child'))
   }
 
@@ -381,9 +390,13 @@ try {
   }
 
   $compileOutDir = Join-Path $artifactRoot 'compile_convert'
-  $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })compile_convert" 'compile_and_copy_result_bounded.ps1' @('runner_child_approved') @('-ProjectPath',$projectPathForRun,'-OutDir',$compileOutDir,'-WaitSeconds','40','-ChecklistPath',$ChecklistPath,'-ConvertAction','CtrlF9') $compileOutDir 'runner_child'))
+  $compileStepArgs = @('-ProjectPath',$projectPathForRun,'-OutDir',$compileOutDir,'-WaitSeconds','40','-ChecklistPath',$ChecklistPath,'-ConvertAction','CtrlF9')
+  if ($createdProjectResultPath) { $compileStepArgs += @('-CreatedProjectResultPath',$createdProjectResultPath) }
+  $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })compile_convert" 'compile_and_copy_result_bounded.ps1' @('runner_child_approved') $compileStepArgs $compileOutDir 'runner_child'))
   $copyOutDir = Join-Path $artifactRoot 'copy_result'
-  $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })copy_convert_result" 'copy_convert_result_from_tree_handle.ps1' @('runner_child_approved') @('-ProjectNeedle',$projectNeedle,'-OutDir',$copyOutDir,'-ChecklistPath',$ChecklistPath,'-MaxLookupMs','8000') $copyOutDir 'runner_child'))
+  $copyStepArgs = @('-ProjectNeedle',$projectNeedle,'-OutDir',$copyOutDir,'-ChecklistPath',$ChecklistPath,'-MaxLookupMs','8000')
+  if ($createdProjectResultPath) { $copyStepArgs += @('-CreatedProjectResultPath',$createdProjectResultPath) }
+  $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })copy_convert_result" 'copy_convert_result_from_tree_handle.ps1' @('runner_child_approved') $copyStepArgs $copyOutDir 'runner_child'))
 
   # Saved scan-order evidence: read the saved project tree (offline inventory)
   # and compare the module schedule with the scaffold import order. Extra

@@ -199,12 +199,16 @@ try {
   $processes=@()
   if($ProjectPath){$fullPath=[IO.Path]::GetFullPath($ProjectPath);$processes=@(Get-CimInstance Win32_Process -Filter "Name='Kvs.exe'" -ErrorAction SilentlyContinue | Where-Object {$_.CommandLine -and $_.CommandLine.IndexOf($fullPath,[StringComparison]::OrdinalIgnoreCase) -ge 0} | ForEach-Object {Get-Process -Id ([int]$_.ProcessId) -ErrorAction SilentlyContinue} | Where-Object {$_.MainWindowHandle -ne 0})}
   if($processes.Count -eq 0){$processes = @(Get-KvProcessesByCommandLine -Needle $ProjectNeedle)}
-  if ($processes.Count -eq 0) {
-    throw "No visible Kvs process found for project needle $ProjectNeedle."
-  }
+  # A project created through Ctrl+N has no project path on the KVS command
+  # line, and the result modal makes MainWindowTitle read "KV STUDIO", so the
+  # needle lookup can legitimately find nothing. Bind through the creation
+  # evidence before failing.
   if ($CreatedProjectResultPath) {
     . (Join-Path (Split-Path -Parent $PSScriptRoot) 'kv_project_process_binding.ps1')
     $processes=@(Get-KvCreatedProjectProcess $ProjectPath $CreatedProjectResultPath)
+  }
+  if ($processes.Count -eq 0) {
+    throw "No visible Kvs process found for project needle $ProjectNeedle."
   }
   if ($processes.Count -ne 1) { throw 'KV_TARGET_WINDOW_AMBIGUOUS: More than one project matches.' }
   $process = $processes[0]

@@ -100,9 +100,16 @@ plan 暴露 `project_inventory_path` 与 `scan_order_result_path`。
    `KV_MNM_DELETE_LAST_PROGRAM_FORBIDDEN` 快速失败。已自动化进 execution plan：
    `stage_default_program`（生成并导入 `KV_Stage_Temp`）→ 正常导入（Main 带预删除）
    → `delete_staged_program`；scaffold 不含 Main 时改为 `delete_default_program`。
-   `tests\scaffold-variable-attributes` 12/12 断言这两个步骤与生成的 MNM。
-   剩余：完整 plan 的真机跑通受 compile 步骤
-   `KV_COMPILE_PROJECT_PROCESS_AMBIGUOUS`（进程绑定问题，与替换无关）影响，待复现。
-5. **编译结果文本/截图**：owner-drawn 行仍读不到文本，建议失败时保存截图并把
-   `route`/`item_count` 写入结果。
+   `tests\scaffold-variable-attributes` 13/13 断言这两个步骤与生成的 MNM。
+   2026-10-24 真机全流程（`ScaffoldAttrPlan7`）：validate → create → stage →
+   3 个模块导入（Main 预删除成功）→ 删除占位 → FB 自变量 → 变量写入，全部走通；
+   期间修掉两个真实回归：execution plan 未把 UI guard/agent boundary 两门禁放前两位
+   （`KV_PLAN_REQUIRED_GATE_ORDER`），以及 Ctrl+N 创建的 KVS 命令行不含工程路径导致
+   import/compile/copy 绑定失败（现统一用 `-CreatedProjectResultPath`）。
+   剩余：变量 reopen 复制偶发 `KV_CLIPBOARD_COPY_FAILED`
+   （KV 弹"向剪贴板复制失败。"），重跑可复现性待观察。
+5. **编译结果文本/截图**：已修掉“成功结果对话框被当作 unexpected modal”的误判
+   （按进程 + `#32770` + 标题 `转换结果` 接受），直接编译实测复制到
+   `转换结果 OK / 转换成功。 / 总步数：4`。NG 时 owner-drawn 错误行仍可能读不到文本，
+   失败时保留截图；待补 NG 回读回归。
 6. **同步 UIA 硬超时**：8 秒只是查找循环预算，不是所有调用的硬上限。

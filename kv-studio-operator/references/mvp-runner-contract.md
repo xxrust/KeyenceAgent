@@ -112,6 +112,13 @@ untouched default program does not remain. Plan metadata
 `default_program_staging` records the stage/cleanup names and the generated MNM
 path; `tests\scaffold-variable-attributes` asserts both steps and the file.
 
+MVP plans must satisfy the flat executor preflight: the first two steps are
+`assert_kv_mvp_ui_guard_usage` and `assert_kv_mvp_agent_boundary`, then
+`validate_scaffold`. Steps that operate on a project created through Ctrl+N pass
+`-CreatedProjectResultPath`, because that KVS process has no project path on its
+command line; the creation evidence binds the exact process for the staging
+import, module imports, cleanup delete, compile, and result collection.
+
 ## Scaffold Files
 
 Required files:

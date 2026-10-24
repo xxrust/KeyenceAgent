@@ -335,9 +335,9 @@ try {
     . (Join-Path (Split-Path -Parent $PSScriptRoot) 'kv_project_process_binding.ps1')
     $pathMatches=@(Get-KvCreatedProjectProcess $ProjectPath $CreatedProjectResultPath)
   }
-  if($pathMatches.Count -ne 1){throw 'KV_COMPILE_PROJECT_PROCESS_AMBIGUOUS'}
+  if($pathMatches.Count -eq 0){throw "KV_COMPILE_PROJECT_PROCESS_NOT_FOUND: no visible Kvs process is bound to '$fullProjectPath'. Open the project (or run the preceding import step) before compiling."}
+  if($pathMatches.Count -gt 1){throw 'KV_COMPILE_PROJECT_PROCESS_AMBIGUOUS'}
   $process=$pathMatches[0]
-  if (-not $process) { throw "No visible Kvs process matched target project '$projectNeedle'. Refusing to operate another project window." }
 
   Assert-NoBlockingPopup $process.Id
   Log "selected target KV STUDIO pid=$($process.Id) title=$($process.MainWindowTitle) without changing window size"
