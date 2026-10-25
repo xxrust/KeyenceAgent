@@ -35,6 +35,9 @@
   # Delete every global row before the replacement paste so no rename-overwrite
   # dialog can appear.
   [switch]$ClearGlobalRows,
+  # Paste only the name column (one cell per row) so existing rows are renamed in
+  # place while their device/type stay untouched.
+  [switch]$NameColumnOnly,
 
   [switch]$AppendGlobalVariables,
   [string[]]$AllowedCustomDataTypes = @(),
@@ -995,6 +998,7 @@ function Convert-GlobalRows([string]$Path) {
   $text = Read-KvDelimitedText $Path
   $rows = $text | ConvertFrom-Csv -Delimiter "`t"
   $lines = foreach ($row in (Get-KvExecutableVariableRows -Rows @($rows) -Scope global)) {
+    if ($NameColumnOnly) { $row.name; continue }
     if ($FullGlobalAttributes) {
       # Anchor is the name cell, so the payload starts at name. The saved grid
       # layout is group, name, data_type, device, initial_value, retain,
@@ -1046,11 +1050,12 @@ function Assert-KvVariablePastePayloadSchema(
   [ValidateSet('global','local')][string]$Scope,
   [ValidateSet('Full','NameType')][string]$Format,
   [string]$SourcePath,
-  [switch]$WithGroupColumn
+  [switch]$WithGroupColumn,
+  [switch]$NameOnly
 ) {
   $expectedRows = @(Get-KvExecutableVariableRows -Rows $Rows -Scope $Scope)
   $payloadLines = @($Text -split "`r?`n" | Where-Object { $_ -ne '' })
-  $expectedColumnCount = if ($Scope -eq 'global' -and $Format -eq 'Full' -and $WithGroupColumn) { 10 } elseif ($Scope -eq 'global' -and $Format -eq 'Full') { 9 } elseif ($Scope -eq 'global' -or $Format -eq 'NameType') { 2 } else { 7 }
+  $expectedColumnCount = if ($NameOnly) { 1 } elseif ($Scope -eq 'global' -and $Format -eq 'Full' -and $WithGroupColumn) { 10 } elseif ($Scope -eq 'global' -and $Format -eq 'Full') { 9 } elseif ($Scope -eq 'global' -or $Format -eq 'NameType') { 2 } else { 7 }
   $errors = [System.Collections.Generic.List[object]]::new()
 
   if ($payloadLines.Count -ne $expectedRows.Count) {
@@ -1071,6 +1076,10 @@ function Assert-KvVariablePastePayloadSchema(
         if ($fields[0] -ne $expectedGroup) {
           $errors.Add([pscustomobject]@{ code='GROUP_MISMATCH'; row=$i+1; expected_group=$expectedGroup; actual_group=$fields[0] })
         }
+      }
+      if ($NameOnly) {
+        if ($fields[0] -ne $expectedName) { $errors.Add([pscustomobject]@{ code='NAME_MISMATCH'; row=$i+1; expected_name=$expectedName; actual_name=$fields[0] }) }
+        continue
       }
       if ($fields[$nameIndex] -ne $expectedName -or $fields[$nameIndex + 1] -ne $expectedType) {
         $errors.Add([pscustomobject]@{ code='NAME_TYPE_MISMATCH'; row=$i+1; expected_name=$expectedName; actual_name=$fields[$nameIndex]; expected_data_type=$expectedType; actual_data_type=$fields[$nameIndex + 1] })
@@ -1877,7 +1886,7 @@ try {
     throw 'LocalProgramName is required when executable local variables exist.'
   }
   $globalPasteFormat = if ($FullGlobalAttributes) { 'Full' } else { 'NameType' }
-  Assert-KvVariableDefinitionsBeforePaste $globalRows 'global' $GlobalVariablesTsv -FullGlobalAttributes:$FullGlobalAttributes
+  if (-not $NameColumnOnly) { Assert-KvVariableDefinitionsBeforePaste $globalRows 'global' $GlobalVariablesTsv -FullGlobalAttributes:$FullGlobalAttributes }
   Assert-KvVariableDefinitionsBeforePaste $localRows 'local' $LocalVariablesTsv $LocalProgramName
   $globalText = Convert-GlobalRows $GlobalVariablesTsv
   $localText = Convert-LocalRows $LocalVariablesTsv
@@ -1887,7 +1896,7 @@ try {
   Log "decoded executable local variable rows=$($definedLocalNames.Count): $($definedLocalNames -join ',')"
   Set-Content -LiteralPath (Join-Path $OutDir 'global_paste.tsv') -Value $globalText -Encoding UTF8
   Set-Content -LiteralPath (Join-Path $OutDir 'local_paste.tsv') -Value $localText -Encoding UTF8
-  Assert-KvVariablePastePayloadSchema $globalText $globalRows 'global' $globalPasteFormat $GlobalVariablesTsv -WithGroupColumn:$GlobalPasteWithGroupColumn
+  Assert-KvVariablePastePayloadSchema $globalText $globalRows 'global' $globalPasteFormat $GlobalVariablesTsv -WithGroupColumn:$GlobalPasteWithGroupColumn -NameOnly:$NameColumnOnly
   Assert-KvVariablePastePayloadSchema $localText $localRows 'local' $LocalPasteFormat $LocalVariablesTsv
 
   $projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
