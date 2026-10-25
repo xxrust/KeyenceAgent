@@ -32,6 +32,9 @@
   # Storage group for the global paste: Alt+G, type the group name, commit, then
   # paste the nine-column payload. Use this to create or switch to a user group.
   [string]$GlobalGroupName = '',
+  # Delete every global row before the replacement paste so no rename-overwrite
+  # dialog can appear.
+  [switch]$ClearGlobalRows,
 
   [switch]$AppendGlobalVariables,
   [string[]]$AllowedCustomDataTypes = @(),
@@ -774,8 +777,9 @@ function Invoke-GuardedVariablePaste($Form, [string]$Step, [string]$Text, [strin
           $dialogText = (@($mainNodes | ForEach-Object { [string]$_.Current.Name } | Where-Object { $_ }) -join ' ')
         } catch {}
       }
-      if ($dialog.Current.AutomationId -cne 'PasteConfirmationForm' -and
-          ($dialogText.Contains($pasteErrorNeedle) -or $dialogText.Contains($pasteSkippedNeedle))) {
+      $overwriteWord = -join ([char[]](0x8986,0x76D6))
+      if (($dialogText.Contains($pasteErrorNeedle) -or $dialogText.Contains($pasteSkippedNeedle)) -and
+          -not $dialogText.Contains($overwriteWord)) {
         # KV accepts the valid rows and warns about the rows it skipped. Dismiss
         # the warning and let the readback name the skipped variables instead of
         # failing with a generic unexpected-modal error.
@@ -814,6 +818,7 @@ function Invoke-GuardedVariablePaste($Form, [string]$Step, [string]$Text, [strin
         Assert-KvUiForegroundHwnd -ExpectedHwnd $formHwnd -Step "$Step replacement returned to editor" -ExpectedTitleLike '*变量编辑*' | Out-Null
         Complete-KvUiGuardAtomicAction -Stopwatch $overwriteWatch -Step "$Step bound overwrite confirmation" -Action 'all-overwrite action on the verified confirmation dialog' -TargetHwnd ([IntPtr]$foreground.hwnd) -ExpectedTitleLike 'KV STUDIO' | Out-Null
         Log 'explicit global Replace confirmed on the overwrite confirmation dialog'
+        for ($i = 0; $i -lt 4; $i++) { if (Clear-PasteWarningModal) { break }; Start-Sleep -Milliseconds 400 }
       } else {
         throw 'KV_VARIABLE_REPLACE_UNEXPECTED_MODAL'
       }
@@ -1642,6 +1647,26 @@ function Paste-GlobalVariablesByFirstNameTab($Form, [string]$Text) {
 
   Focus-VariableGridArea $formNow '_tabPageGlobal' 'global variables'
   $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
+  if ($ClearGlobalRows) {
+    # Replace the whole table: select every row, delete, confirm. A replacement
+    # paste into an empty table never opens the rename-overwrite dialog.
+    $formNow = Invoke-GuardedVariableKeyAction $formNow 'global select all rows' '^+{END}' 'Select every global variable row' 120
+    Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd ([IntPtr]$formNow.Current.NativeWindowHandle) -Step 'global delete selected rows' -Keys '+{DELETE}' -ExpectedTitleLike '*变量编辑*' -SuccessTitleLike @('KV STUDIO') -Action 'open selected-row deletion confirmation' -SleepMs 220
+    $fg = Get-KvForegroundSnapshot
+    if ($fg.process_id -ne $script:ProcessIdForVariables -or $fg.class_name -ne '#32770') {
+      # KV deletes selected rows without a confirmation dialog in this build.
+      Log 'global rows deleted without a confirmation dialog'
+    } else {
+      $dh = [IntPtr]$fg.hwnd
+      Invoke-KvGuardedSendKeys -TargetHwnd $dh -Step 'select global clear confirm button' -Keys '{LEFT}' -ExpectedTitleLike 'KV STUDIO' -SleepMs 80
+      Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $dh -Step 'confirm global clear' -Keys '{ENTER}' -ExpectedTitleLike 'KV STUDIO' -SuccessTitleLike @('*变量编辑*','KV STUDIO*') -Action 'confirm deleting all global variable rows' -SleepMs 350
+    }
+    Start-Sleep -Milliseconds 400
+    $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
+    Focus-VariableGridArea $formNow '_tabPageGlobal' 'global variables'
+    Log 'cleared all global variable rows before replacement paste'
+  }
+  $formNow = Wait-VariableForm $script:ProcessIdForVariables 6
   if ($GlobalPasteWithGroupColumn) {
     # The anchor stays on the group cell so the ten-column payload can carry the
     # storage group for every row.
@@ -1712,9 +1737,39 @@ function Save-Shot([string]$Name) {
   Log "screenshot $Name"
 }
 
+function Clear-PasteWarningModal {
+  # After an overwrite paste KV may append a "粘贴数据中存在错误/无效数据" warning.
+  # It blocks the save keystroke, so clear it by invoking its 确定 button.
+  $needles = @(
+    (-join ([char[]](0x7C98,0x8D34,0x6570,0x636E,0x4E2D,0x5B58,0x5728,0x9519,0x8BEF))),
+    (-join ([char[]](0x7C98,0x8D34,0x6570,0x636E,0x4E2D,0x5B58,0x5728,0x65E0,0x6548,0x6570,0x636E))),
+    (-join ([char[]](0x5DF2,0x8DF3,0x8FC7,0x90E8,0x5206,0x6570,0x636E,0x7C98,0x8D34)))
+  )
+  $main = [Windows.Automation.AutomationElement]::FromHandle((Get-Process -Id $script:ProcessIdForVariables).MainWindowHandle)
+  if (-not $main) { return $false }
+  $nodes = @()
+  try { $nodes = @($main.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)) } catch { return $false }
+  $text = (@($nodes | ForEach-Object { [string]$_.Current.Name } | Where-Object { $_ }) -join ' ')
+  $match = $false
+  foreach ($n in $needles) { if ($text.Contains($n)) { $match = $true; break } }
+  if (-not $match) { return $false }
+  $okName = -join ([char[]](0x786E,0x5B9A))
+  $button = @($nodes | Where-Object { [string]$_.Current.Name -eq $okName -and [string]$_.Current.ClassName -eq 'Button' }) | Select-Object -First 1
+  if (-not $button) { return $false }
+  $invoke = $null
+  if ($button.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern, [ref]$invoke)) {
+    $invoke.Invoke()
+    Log 'dismissed pending variable paste warning before save'
+    Start-Sleep -Milliseconds 400
+    return $true
+  }
+  return $false
+}
+
 function Save-Project([System.Diagnostics.Process]$Process, [string]$ProjectNeedle) {
   $form=Get-VariableForm $Process.Id
   if($form){
+    Clear-PasteWarningModal | Out-Null
     Invoke-KvGuardedSendKeys -TargetHwnd ([IntPtr]$form.Current.NativeWindowHandle) -Step 'save variables in current editor' -Keys '^s' -ExpectedTitleLike '*变量编辑*' -Action 'Ctrl+S from the verified variable editor' -SleepMs 300
     Log 'sent Ctrl+S in variable editor; main project save follows editor close'
     return
