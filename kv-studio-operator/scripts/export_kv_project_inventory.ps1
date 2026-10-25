@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory=$true)]
   [string]$ProjectPath,
 
@@ -183,7 +183,13 @@ try {
 
   $treePath = Join-Path $projectDir 'WsTreeEnv.xml'
   $treeNodes = @(Read-WsTreeNodes -WsTreePath $treePath)
-  $cpuNodes = @($treeNodes | Where-Object { $_.text -match '^\[(\d+)\]\s+(KV-[A-Z0-9*]+)' } | ForEach-Object {
+  # Expansion units are only the direct children of the 单元配置 branch. The
+  # EtherCAT node list also contains "[n] KV-..." lines (for example the KV-EC01
+  # I/O couplers at node addresses 4/5/6 in the sample), and matching them
+  # globally fabricated three expansion units that do not exist in the project.
+  $unitConfigNode = @($treeNodes | Where-Object { $_.text -eq '单元配置' } | Select-Object -First 1)
+  $unitNodes = if ($unitConfigNode) { @($treeNodes | Where-Object { $_.parent_id -eq $unitConfigNode.id }) } else { @() }
+  $cpuNodes = @($unitNodes | Where-Object { $_.text -match '^\[(\d+)\]\s+(KV-[A-Z0-9*]+)' } | ForEach-Object {
     $_ | Add-Member -NotePropertyName slot -NotePropertyValue ([int]([regex]::Match($_.text, '^\[(\d+)\]').Groups[1].Value)) -PassThru
   })
   $cpuNode = @($cpuNodes | Where-Object { $_.slot -eq 0 } | Select-Object -First 1)
