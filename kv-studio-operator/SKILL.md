@@ -173,6 +173,22 @@ exit=0 但工程没变”。先保证只有一个 KVS 进程，或给支持 `-Cr
 → 编译（看转换结果 + 总步数）→ 完成度 100% + 扫描顺序
 ```
 
+## EtherNet/IP 设定读取（B00/B01… 整表）
+
+EIP 主窗口是 MFC（`Afx` + `VSFlexGrid8L`），没有 UIA 树；但 `连接设定 - N:<设备>` 是标准
+`#32770`，字段可由 UIA 读（连接名称/连接点/数据大小/RPI 等），`软元件分配设定` 的表格用
+“点单元格 → Ctrl+Home → Ctrl+Shift+End → Ctrl+C”整表复制。
+
+```powershell
+powershell -File <skill-root>\scripts\workflow_tools\get_kv_eip_connection_snapshot.ps1 `
+  -ConnectionTitle '连接设定' -OutDir C:\kvrun\eip\snapshots
+```
+
+输出 `<连接名>.json`（fields + assignment[] + raw_path）和 `<连接名>.tsv`，并默认关闭
+`软元件分配设定`/`连接设定`。`EtherNet/IP 设定` 主窗口由调用方用“取消”关闭，读完必须让界面
+只剩 KV STUDIO 主窗口。字段 AutomationId、样例实测值（NU-EP1/DL-EP1、IN_100 64/84 字、
+B00/B0B0 等）见 `references/eip-settings.md`。
+
 ## 选择接口
 
 唯一能力清单是 [scripts/script_manifest.json](scripts/script_manifest.json)。用只读查询获得实际路径、参数类型、必填参数和验证范围：
