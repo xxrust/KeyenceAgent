@@ -2,53 +2,53 @@
   [Parameter(Mandatory=$true)][string]$ProjectName,
   [Parameter(Mandatory=$true)][string]$DevicesConfigPath,
   [Parameter(Mandatory=$true)][string]$OutDir,
-  [int]$TimeoutSeconds = 120,
+  [int]$TimeoutSeconds = 180,
   [switch]$PreflightOnly
 )
-# Writes EtherNet/IP devices into the project that is currently open in
-# KV STUDIO. Verified steps so far:
-#   - open 单元配置 > [0] > EtherNet/IP (select + Enter)
-#   - answer the first-run 手动/自动配置 dialog with 手动(M)
-#   - add a catalog device (search tab + double-click)
-# The device add currently stops at KV_EIP_COMMUNICATION_ADAPTER_REQUIRED on a
-# project without a 通信适配器; that code is deliberate so the next iteration
-# can implement the adapter step instead of silently claiming success.
+# Writes an EtherNet/IP device into the project that is currently open in
+# KV STUDIO. Verified flow (2026-10-26):
+#   open 单元配置 > [0] > EtherNet/IP -> 手动 config -> 设备列表
+#   -> catalog row scan until the model detail matches -> Enter
+#   -> 适配器初始设定 (node/IP defaults) -> OK
+#   -> main 设定信息被更改 -> 是(Y) -> update unit editor -> 确定
+#   -> variable creation prompt -> 确定 -> variable names -> save project
+#   -> reopen EIP and read the 设定列表 grid back to prove the device exists.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type -AssemblyName System.Windows.Forms
-Add-Type -TypeDefinition @"
-using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Text;
-public class EipWriteWin {
-  public delegate bool EnumProc(IntPtr h, IntPtr l);
-  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr l);
-  [DllImport("user32.dll")] public static extern int GetWindowThreadProcessId(IntPtr h, out int pid);
-  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
-  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr h, StringBuilder s, int n);
-  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
-  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
-  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
-  [DllImport("user32.dll")] public static extern void mouse_event(uint f, uint dx, uint dy, uint d, IntPtr e);
-  [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr h, int x, int y, int w, int ht, bool repaint);
-  public static List<string> Windows(int pid) {
-    var res = new List<string>();
-    EnumWindows((h, l) => { int p; GetWindowThreadProcessId(h, out p); if (p == pid && IsWindowVisible(h)) { var t = new StringBuilder(256); GetWindowText(h, t, 256); var c = new StringBuilder(256); GetClassName(h, c, 256); if (t.Length > 0) res.Add(h.ToInt64() + "|" + c.ToString() + "|" + t.ToString()); } return true; }, IntPtr.Zero);
-    return res;
-  }
-  public static void DoubleClick(int x, int y) {
-    SetCursorPos(x, y); System.Threading.Thread.Sleep(150);
-    mouse_event(0x0002, 0, 0, 0, IntPtr.Zero); System.Threading.Thread.Sleep(60); mouse_event(0x0004, 0, 0, 0, IntPtr.Zero);
-    System.Threading.Thread.Sleep(120);
-    mouse_event(0x0002, 0, 0, 0, IntPtr.Zero); System.Threading.Thread.Sleep(60); mouse_event(0x0004, 0, 0, 0, IntPtr.Zero);
-  }
-  public static void Click(int x, int y) {
-    SetCursorPos(x, y); System.Threading.Thread.Sleep(150);
-    mouse_event(0x0002, 0, 0, 0, IntPtr.Zero); System.Threading.Thread.Sleep(60); mouse_event(0x0004, 0, 0, 0, IntPtr.Zero);
-  }
+Add-Type -Name EipWinWrite -Namespace EipWrite -MemberDefinition @"
+public delegate bool EnumProc(IntPtr h, IntPtr l);
+[DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr l);
+[DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr p, EnumProc cb, IntPtr l);
+[DllImport("user32.dll")] public static extern int GetWindowThreadProcessId(IntPtr h, out int pid);
+[DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, System.Text.StringBuilder s, int n);
+[DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr h, System.Text.StringBuilder s, int n);
+[DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+[DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+[DllImport("user32.dll")] public static extern void mouse_event(uint f, uint dx, uint dy, uint d, IntPtr e);
+[DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+[DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+[DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, string l);
+[StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
+public static System.Collections.Generic.List<string> Windows(int pid) {
+  var res = new System.Collections.Generic.List<string>();
+  EnumWindows((h, l) => { int p; GetWindowThreadProcessId(h, out p); if (p == pid && IsWindowVisible(h)) { var t = new System.Text.StringBuilder(256); GetWindowText(h, t, 256); var c = new System.Text.StringBuilder(256); GetClassName(h, c, 256); if (t.Length > 0) res.Add(h.ToInt64() + "|" + c.ToString() + "|" + t.ToString()); } return true; }, IntPtr.Zero);
+  return res;
 }
+public static System.Collections.Generic.List<string> Children(long p) {
+  var res = new System.Collections.Generic.List<string>();
+  EnumChildWindows(new IntPtr(p), (h, l) => { var c = new System.Text.StringBuilder(256); GetClassName(h, c, 256); var t = new System.Text.StringBuilder(256); GetWindowText(h, t, 256); res.Add(h.ToInt64() + "|" + c.ToString() + "|" + t.ToString()); return true; }, IntPtr.Zero);
+  return res;
+}
+public static string StaticText(long p) {
+  var sb = new System.Text.StringBuilder();
+  EnumChildWindows(new IntPtr(p), (h, l) => { var c = new System.Text.StringBuilder(256); GetClassName(h, c, 256); if (c.ToString().Contains("Static")) { var t = new System.Text.StringBuilder(512); GetWindowText(h, t, 512); if (t.Length > 0) sb.Append(t.ToString()).Append("|"); } return true; }, IntPtr.Zero);
+  return sb.ToString();
+}
+public static void Click(int x, int y) { SetCursorPos(x, y); System.Threading.Thread.Sleep(120); mouse_event(0x0002, 0, 0, 0, IntPtr.Zero); System.Threading.Thread.Sleep(60); mouse_event(0x0004, 0, 0, 0, IntPtr.Zero); }
+public static void ClickCenter(long h) { RECT r; if (GetWindowRect(new IntPtr(h), out r)) Click((r.L + r.R) / 2, (r.T + r.B) / 2); }
 "@
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
@@ -61,7 +61,6 @@ function Log([string]$Name, [hashtable]$Data = @{}) {
 function Save-Shot([string]$Name) {
   try {
     Add-Type -AssemblyName System.Drawing
-    Add-Type -AssemblyName System.Windows.Forms
     $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
     $bmp = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
     $g = [System.Drawing.Graphics]::FromImage($bmp)
@@ -72,18 +71,25 @@ function Save-Shot([string]$Name) {
     return $path
   } catch { return $null }
 }
+function Fail([string]$Code, [string]$Message) {
+  $shot = Save-Shot 'failure.png'
+  $result = [ordered]@{ ok = $false; error_code = $Code; message = $Message; project = $ProjectName; screenshot = $shot }
+  $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'eip_write_result.json') -Encoding UTF8
+  Log 'failed' @{ code = $Code; message = $Message }
+  $result | ConvertTo-Json -Depth 3
+  exit 41
+}
 
 if (-not (Test-Path -LiteralPath $DevicesConfigPath -PathType Leaf)) { throw "KV_EIP_CONFIG_MISSING: $DevicesConfigPath" }
 $config = Get-Content -LiteralPath $DevicesConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $devices = @($config.devices)
 if ($devices.Count -eq 0) { throw 'KV_EIP_CONFIG_EMPTY: devices[] is empty' }
-foreach ($d in $devices) {
-  if (-not $d.model) { throw 'KV_EIP_CONFIG_INVALID: device.model is required' }
-}
+foreach ($d in $devices) { if (-not $d.model) { throw 'KV_EIP_CONFIG_INVALID: device.model is required' } }
+$device = $devices[0]
 $process = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectName*" }) | Select-Object -First 1
 if (-not $process) { throw "KV_EIP_PROJECT_NOT_OPEN: $ProjectName" }
 if ($process.MainWindowTitle -match '\*') { throw 'KV_EIP_PROJECT_UNSAVED: save the project before writing EtherNet/IP settings' }
-Log 'started' @{ project = $ProjectName; devices = $devices.Count; process_id = $process.Id }
+Log 'started' @{ project = $ProjectName; model = [string]$device.model; process_id = $process.Id }
 
 $main = [System.Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
 function Get-TreeItem([string]$pattern) {
@@ -101,20 +107,85 @@ function Expand-Item($item) {
     if ($expand.Current.ExpandCollapseState -ne [System.Windows.Automation.ExpandCollapseState]::Expanded) { try { $expand.Expand(); Start-Sleep -Milliseconds 350 } catch {} }
   }
 }
-function Find-Window([string]$needle) {
-  foreach ($row in [EipWriteWin]::Windows($process.Id)) {
+function Find-Window([string]$needle, [string]$classLike = '') {
+  foreach ($row in [EipWrite.EipWinWrite]::Windows($process.Id)) {
     $parts = $row -split '\|', 3
-    if ($parts[2].Contains($needle)) { return [pscustomobject]@{ hwnd = [long]$parts[0]; class = $parts[1]; title = $parts[2] } }
+    if ($parts[2].Contains($needle) -and (-not $classLike -or $parts[1] -like $classLike)) { return [pscustomobject]@{ hwnd = [long]$parts[0]; class = $parts[1]; title = $parts[2] } }
   }
   return $null
 }
+function Wait-Window([string]$needle, [int]$seconds = 10, [string]$classLike = '') {
+  $deadline = (Get-Date).AddSeconds($seconds)
+  do { $w = Find-Window $needle $classLike; if ($w) { return $w }; Start-Sleep -Milliseconds 300 } while ((Get-Date) -lt $deadline)
+  return $null
+}
 function Find-Button($rootElement, [string]$name) {
-  # KV dialogs expose their buttons as Pane or Button depending on the dialog;
-  # match by name and let the caller choose BM_CLICK vs a mouse click.
   foreach ($b in @($rootElement.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition))) {
     if ([string]$b.Current.Name -eq $name) { return $b }
   }
   return $null
+}
+function Find-ChildButton([long]$hwnd, [string]$text) {
+  foreach ($row in [EipWrite.EipWinWrite]::Children($hwnd)) {
+    $parts = $row -split '\|', 3
+    if ($parts[1] -eq 'Button' -and $parts[2] -eq $text) { return [long]$parts[0] }
+  }
+  return 0
+}
+function Handle-EipDialogs([int]$seconds = 20) {
+  # After the EIP window is closed KV may show, in any order: the save-changes
+  # prompt (是/否/取消), the unit-editor refresh prompt, the variable creation
+  # prompt and the WinForms variable-name dialog. Handle whatever appears.
+  $deadline = (Get-Date).AddSeconds($seconds)
+  $handled = 0
+  while ((Get-Date) -lt $deadline) {
+    $sawDialog = $false
+    foreach ($row in [EipWrite.EipWinWrite]::Windows($process.Id)) {
+      $parts = $row -split '\|', 3
+      if ($parts[2] -eq '' -or $parts[1] -like 'tooltips*' -or $parts[1] -like 'Afx*' -or $parts[2] -like '*编辑器: KV-X520*') { continue }
+      $sawDialog = $true
+      $el = $null
+      try { $el = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr][long]$parts[0]) } catch { Start-Sleep -Milliseconds 300; continue }
+      if (-not $el) { continue }
+      if ($parts[2] -match '变量设置') {
+        # Variable names are optional for the device write; close the dialog and
+        # keep the device configuration.
+        [void][EipWrite.EipWinWrite]::SendMessage([IntPtr][long]$parts[0], 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
+        Log 'variable_dialog_closed' @{ hwnd = $parts[0] }
+        $handled++
+        Start-Sleep -Milliseconds 600
+        continue
+      }
+      $yes = Find-Button $el '是(Y)'
+      if ($yes) {
+        try { [void](Press-Button $el '是(Y)'); Log 'dialog_yes' @{ title = $parts[2] }; $handled++ } catch {}
+        Start-Sleep -Milliseconds 500
+        continue
+      }
+      $ok = Find-Button $el '确定'
+      if ($ok) {
+        try { [void](Press-Button $el '确定'); Log 'dialog_ok' @{ title = $parts[2] }; $handled++ } catch {}
+        Start-Sleep -Milliseconds 500
+        continue
+      }
+    }
+    if (-not $sawDialog) { Start-Sleep -Milliseconds 400 }
+  }
+  return $handled
+}
+function Press-Button($rootElement, [string]$name) {
+  # KV prompts are WinForms inside #32770 shells; BM_CLICK is ignored there, so
+  # focus the button and press Space (verified on 确定/是(Y)/手动(M)).
+  $b = Find-Button $rootElement $name
+  if (-not $b) { return $false }
+  $pressed = $false
+  try { $b.SetFocus(); Start-Sleep -Milliseconds 250; [System.Windows.Forms.SendKeys]::SendWait(' '); $pressed = $true } catch {}
+  if (-not $pressed) {
+    $native = [long]$b.Current.NativeWindowHandle
+    if ($native -ne 0) { [void][EipWrite.EipWinWrite]::SendMessage([IntPtr]$native, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) }
+  }
+  Start-Sleep -Seconds 1
+  return $true
 }
 
 Expand-Item (Get-TreeItem '^单元配置$')
@@ -122,60 +193,27 @@ Start-Sleep -Milliseconds 250
 Expand-Item (Get-TreeItem '^\[0\]')
 Start-Sleep -Milliseconds 250
 $eipNode = Get-TreeItem '^EtherNet/IP'
-if (-not $eipNode) { throw 'KV_EIP_TREE_NODE_MISSING' }
-[void][EipWriteWin]::SetForegroundWindow([IntPtr]$process.MainWindowHandle)
+if (-not $eipNode) { Fail 'KV_EIP_TREE_NODE_MISSING' 'EtherNet/IP node not found in the project tree' }
+[void][EipWrite.EipWinWrite]::SetForegroundWindow([IntPtr]$process.MainWindowHandle)
 Start-Sleep -Milliseconds 300
 $selection = $null
 if ($eipNode.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selection)) { try { $selection.Select() } catch {} }
 Start-Sleep -Milliseconds 300
 [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
-$deadline = (Get-Date).AddSeconds(15)
-$eipWindow = $null
-do {
-  Start-Sleep -Milliseconds 500
-  $eipWindow = Find-Window 'EtherNet/IP 设定'
-} while (-not $eipWindow -and (Get-Date) -lt $deadline)
-if (-not $eipWindow) { throw 'KV_EIP_SETTINGS_NOT_OPENED' }
+$eipWindow = Wait-Window 'EtherNet/IP 设定' 15 'Afx*'
+if (-not $eipWindow) { Fail 'KV_EIP_SETTINGS_NOT_OPENED' 'EtherNet/IP settings window did not open' }
 Log 'settings_opened' @{ hwnd = $eipWindow.hwnd }
-[void][EipWriteWin]::MoveWindow([IntPtr]$eipWindow.hwnd, 0, 0, 1500, 900, $true)
 Start-Sleep -Milliseconds 800
-[void][EipWriteWin]::SetForegroundWindow([IntPtr]$eipWindow.hwnd)
-Start-Sleep -Milliseconds 500
-function Find-ManualDialog {
-  foreach ($row in [EipWriteWin]::Windows($process.Id)) {
-    $parts = $row -split '\|', 3
-    if ($parts[2] -eq 'EtherNet/IP 设定' -and $parts[1] -eq '#32770') { return [pscustomobject]@{ hwnd = [long]$parts[0] } }
-  }
-  return $null
-}
-# First-run dialog: choose manual device configuration. The dialog can take a
-# few seconds to appear after the settings window is shown.
-$manualDeadline = (Get-Date).AddSeconds(12)
-$manualSelected = $false
-do {
-  $manualDialog = Find-ManualDialog
-  if ($manualDialog) {
-    $el = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$manualDialog.hwnd)
-    $manual = Find-Button $el '手动(M)'
-    if ($manual) {
-      $r = $manual.Current.BoundingRectangle
-      $native = [long]$manual.Current.NativeWindowHandle
-      if ($native -ne 0) {
-        Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public class EipMsg{[DllImport("user32.dll")]public static extern IntPtr SendMessage(IntPtr h,uint m,IntPtr w,IntPtr l);}' -ErrorAction SilentlyContinue
-        [void][EipMsg]::SendMessage([IntPtr]$native, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)
-      } else {
-        [EipWriteWin]::Click([int]($r.Left + $r.Width / 2), [int]($r.Top + $r.Height / 2))
-      }
-      Start-Sleep -Seconds 2
-      Log 'manual_mode_clicked'
-    }
-  }
-  $manualSelected = -not ($null -ne (Find-ManualDialog))
-  if (-not $manualSelected) { Start-Sleep -Milliseconds 500 }
-} while (-not $manualSelected -and (Get-Date) -lt $manualDeadline)
-if (-not $manualSelected) { throw 'KV_EIP_MANUAL_MODE_NOT_SELECTED' }
-Log 'manual_mode_ready'
 
+# First-run prompt: manual configuration.
+$manual = Wait-Window 'EtherNet/IP 设定' 3 '#32770'
+if ($manual) {
+  $el = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$manual.hwnd)
+  if (-not (Press-Button $el '手动(M)')) { Fail 'KV_EIP_MANUAL_BUTTON_MISSING' 'manual mode button not found' }
+  Start-Sleep -Seconds 2
+  if (Wait-Window 'EtherNet/IP 设定' 2 '#32770') { Fail 'KV_EIP_MANUAL_MODE_NOT_SELECTED' 'manual mode dialog did not close' }
+  Log 'manual_mode_selected'
+}
 if ($PreflightOnly) {
   $shot = Save-Shot 'preflight.png'
   $result = [ordered]@{ ok = $true; preflight_only = $true; project = $ProjectName; devices = $devices.Count; screenshot = $shot; note = 'EIP settings opened and manual mode selected; device writing not attempted' }
@@ -185,75 +223,141 @@ if ($PreflightOnly) {
   exit 0
 }
 
-# Device add for the first configured device. The catalog is a VSFlexGrid, so
-# the search tab is used to filter to the model, then the first result row is
-# activated by a double click.
-$device = $devices[0]
-$tabs = $null
-$condition = New-Object System.Windows.Automation.PropertyCondition -ArgumentList @(
-  [System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::TabItem)
-$tabItems = @($main.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition))
-$searchTab = $null
-foreach ($t in $tabItems) { if ([string]$t.Current.Name -like '*设备查找*') { $searchTab = $t } }
-if (-not $searchTab) { throw 'KV_EIP_SEARCH_TAB_MISSING' }
-$selTab = $null
-if ($searchTab.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selTab)) { try { $selTab.Select() } catch {} }
-Start-Sleep -Milliseconds 600
+# Pre-write readback: capture the 设定列表 IP column before adding the device.
+$preRect = New-Object EipWrite.EipWinWrite+RECT
+[void][EipWrite.EipWinWrite]::GetWindowRect([IntPtr]$eipWindow.hwnd, [ref]$preRect)
+[void][EipWrite.EipWinWrite]::SetForegroundWindow([IntPtr]$eipWindow.hwnd)
+Start-Sleep -Milliseconds 500
+[EipWrite.EipWinWrite]::Click(($preRect.L + 300), ($preRect.T + 760))
+Start-Sleep -Milliseconds 400
+[System.Windows.Forms.SendKeys]::SendWait('^a')
+Start-Sleep -Milliseconds 250
+[System.Windows.Forms.SendKeys]::SendWait('^c')
+Start-Sleep -Milliseconds 800
+$preText = [System.Windows.Forms.Clipboard]::GetText()
+$preIps = @($preText -split "`r?`n" | Where-Object { $_ -match '^\d{1,3}(\.\d{1,3}){3}$' })
+Log 'pre_write_readback' @{ count = $preIps.Count; ips = ($preIps -join ',') }
+
+$rect = New-Object EipWrite.EipWinWrite+RECT
+[void][EipWrite.EipWinWrite]::GetWindowRect([IntPtr]$eipWindow.hwnd, [ref]$rect)
+function WindowPoint([int]$dx, [int]$dy) { return @(($rect.L + $dx), ($rect.T + $dy)) }
+[void][EipWrite.EipWinWrite]::SetForegroundWindow([IntPtr]$eipWindow.hwnd)
+Start-Sleep -Milliseconds 500
+# 设备列表 tab (Alt+1) then focus the catalog grid at its top.
+[System.Windows.Forms.SendKeys]::SendWait('%1')
+Start-Sleep -Seconds 1
+$p = WindowPoint 1300 350
+[EipWrite.EipWinWrite]::Click($p[0], $p[1])
+Start-Sleep -Milliseconds 300
+[System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
+Start-Sleep -Milliseconds 500
+
+$model = [string]$device.model
+$found = $false
+for ($i = 0; $i -lt 300; $i++) {
+  $statics = [EipWrite.EipWinWrite]::StaticText($eipWindow.hwnd)
+  if ($statics -match [regex]::Escape($model)) { $found = $true; break }
+  [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+  Start-Sleep -Milliseconds 35
+}
+if (-not $found) { Fail 'KV_EIP_MODEL_NOT_IN_CATALOG' ("catalog scan did not find model " + $model) }
+Log 'catalog_selected' @{ model = $model; steps = $i }
+[System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+$adapter = Wait-Window '适配器初始设定' 10 '#32770'
+if (-not $adapter) { Fail 'KV_EIP_ADAPTER_DIALOG_MISSING' '适配器初始设定 dialog did not appear' }
+$adapterEl = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$adapter.hwnd)
+$adapterValues = @()
 $editCondition = New-Object System.Windows.Automation.PropertyCondition -ArgumentList @(
   [System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
-$searchEdit = $null
-foreach ($e in @($main.FindAll([System.Windows.Automation.TreeScope]::Descendants, $editCondition))) {
-  $r = $e.Current.BoundingRectangle
-  if ($r.Width -gt 100 -and $r.Top -gt 60 -and $r.Top -lt 220) { $searchEdit = $e; break }
+foreach ($edit in @($adapterEl.FindAll([System.Windows.Automation.TreeScope]::Descendants, $editCondition))) {
+  try {
+    $vp = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+    $value = [string]$vp.Current.Value
+    if ($value) { $adapterValues += $value }
+  } catch {}
 }
-if (-not $searchEdit) { throw 'KV_EIP_SEARCH_EDIT_MISSING' }
-$setValue = $null
-if ($searchEdit.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$setValue)) {
-  try { $setValue.SetValue([string]$device.model) } catch {}
-}
-Start-Sleep -Milliseconds 400
-
-$searchButton = $null
-foreach ($b in @($main.FindAll([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition -ArgumentList @([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Button))))) {
-  $n = [string]$b.Current.Name
-  if ($n -eq '查找' -or $n -eq '检索' -or $n -eq '设备查找') { $searchButton = $b; break }
-}
-if ($searchButton) {
-  $r = $searchButton.Current.BoundingRectangle
-  [EipWriteWin]::Click([int]($r.Left + $r.Width / 2), [int]($r.Top + $r.Height / 2))
-  Start-Sleep -Seconds 2
-}
-
-# Activate the first result row (right panel list area under the search box).
-[EipWriteWin]::DoubleClick(1380, 330)
+$assignedNode = if ($adapterValues.Count -gt 0) { $adapterValues[0] } else { [string]$device.node_address }
+$octets = @($adapterValues | Where-Object { $_ -match '^\d{1,3}$' })
+$assignedIp = if ($octets.Count -ge 4) { (($octets[($octets.Count - 4)..($octets.Count - 1)]) -join '.') } else { [string]$device.ip_address }
+if (-not (Press-Button $adapterEl 'OK')) { Fail 'KV_EIP_ADAPTER_OK_MISSING' 'adapter dialog OK button missing' }
 Start-Sleep -Seconds 2
+Log 'adapter_initial_settings_confirmed' @{ node = $assignedNode; ip = $assignedIp; requested_node = [string]$device.node_address; requested_ip = [string]$device.ip_address; values = ($adapterValues -join ',') }
 
-$adapterDialog = $null
-foreach ($row in [EipWriteWin]::Windows($process.Id)) {
-  $parts = $row -split '\|', 3
-  if ($parts[1] -eq '#32770') {
-    try {
-      $el = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr][long]$parts[0])
-      $texts = @($el.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition) | ForEach-Object { [string]$_.Current.Name })
-      if (($texts -join ' ') -match '通信适配器') { $adapterDialog = $parts[0] }
-    } catch {}
-  }
+# Close the EIP settings window; KV then shows its update prompts in any order.
+$okButton = Find-ChildButton $eipWindow.hwnd 'OK'
+if ($okButton -ne 0) {
+  [void][EipWrite.EipWinWrite]::SendMessage([IntPtr]$okButton, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)
+  Log 'eip_ok_clicked' @{ hwnd = $okButton }
+} else {
+  $pt = WindowPoint 1290 880
+  [EipWrite.EipWinWrite]::Click($pt[0], $pt[1])
+  Log 'eip_ok_coordinate_fallback'
 }
-if ($adapterDialog) {
-  $shot = Save-Shot 'communication_adapter_required.png'
-  $result = [ordered]@{
-    ok = $false
-    error_code = 'KV_EIP_COMMUNICATION_ADAPTER_REQUIRED'
-    message = 'KV STUDIO requires a 通信适配器 before an EtherNet/IP device can be added; configure it in the EIP CPU/通信 settings, then rerun.'
-    project = $ProjectName
-    device = $device
-    screenshot = $shot
-  }
+$handled = Handle-EipDialogs 20
+Log 'dialogs_after_ok' @{ handled = $handled }
+
+
+# Save the project.
+[void][EipWrite.EipWinWrite]::SetForegroundWindow([IntPtr]$process.MainWindowHandle)
+Start-Sleep -Milliseconds 500
+[System.Windows.Forms.SendKeys]::SendWait('^s')
+Start-Sleep -Seconds 4
+Start-Sleep -Seconds 2
+$handledSave = Handle-EipDialogs 15
+Log 'dialogs_after_save' @{ handled = $handledSave }
+$process.Refresh()
+if ($process.MainWindowTitle -match '\*') { Fail 'KV_EIP_PROJECT_SAVE_FAILED' 'project still has unsaved changes after Ctrl+S' }
+Log 'project_saved'
+
+# Readback: reopen EIP and copy the 设定列表 grid; it must contain the device IP.
+$eipNode = Get-TreeItem '^EtherNet/IP'
+if (-not $eipNode) { Fail 'KV_EIP_READBACK_TREE_MISSING' 'EtherNet/IP node missing before readback' }
+$selection = $null
+if ($eipNode.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selection)) { try { $selection.Select() } catch {} }
+Start-Sleep -Milliseconds 300
+[System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+$readWindow = Wait-Window 'EtherNet/IP 设定' 15 'Afx*'
+if (-not $readWindow) { Fail 'KV_EIP_READBACK_NOT_OPENED' 'EIP settings did not reopen for readback' }
+Start-Sleep -Seconds 1
+$rect2 = New-Object EipWrite.EipWinWrite+RECT
+[void][EipWrite.EipWinWrite]::GetWindowRect([IntPtr]$readWindow.hwnd, [ref]$rect2)
+[EipWrite.EipWinWrite]::Click(($rect2.L + 300), ($rect2.T + 760))
+Start-Sleep -Milliseconds 400
+[System.Windows.Forms.SendKeys]::SendWait('^a')
+Start-Sleep -Milliseconds 250
+[System.Windows.Forms.SendKeys]::SendWait('^c')
+Start-Sleep -Milliseconds 800
+$readText = [System.Windows.Forms.Clipboard]::GetText()
+$postIps = @($readText -split "`r?`n" | Where-Object { $_ -match '^\d{1,3}(\.\d{1,3}){3}$' })
+$newIps = @($postIps | Where-Object { $preIps -notcontains $_ })
+$ipOk = ($newIps.Count -gt 0)
+if (-not $ipOk) {
+  $shot = Save-Shot 'readback.png'
+  $result = [ordered]@{ ok = $false; error_code = 'KV_EIP_READBACK_FAILED'; message = '设定列表 did not gain a new device IP after the write'; clipboard = $readText; pre_ips = ($preIps -join ','); screenshot = $shot }
   $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'eip_write_result.json') -Encoding UTF8
-  Log 'adapter_required'
+  Log 'readback_failed' @{ clipboard = $readText; pre_ips = ($preIps -join ',') }
   $result | ConvertTo-Json -Depth 3
-  exit 42
+  exit 41
 }
+$ip = ($newIps -join ',')
+Log 'readback_ok' @{ clipboard = $readText }
+$closeEl = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$readWindow.hwnd)
+$cancel = Find-Button $closeEl '取消'
+if ($cancel) { $native = [long]$cancel.Current.NativeWindowHandle; if ($native -ne 0) { [void][EipWrite.EipWinWrite]::SendMessage([IntPtr]$native, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) } else { $cancel.SetFocus(); [System.Windows.Forms.SendKeys]::SendWait(' ') } }
+Start-Sleep -Seconds 1
+$shot = Save-Shot 'success.png'
+$result = [ordered]@{
+  ok = $true
+  project = $ProjectName
+  model = [string]$device.model
+  ip_address = $ip
+  readback = $readText.Trim()
+  screenshot = $shot
+}
+$result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'eip_write_result.json') -Encoding UTF8
+Log 'succeeded'
+$result | ConvertTo-Json -Depth 3
+exit 0
 
-throw 'KV_EIP_DEVICE_ADD_UNVERIFIED: the catalog activation path did not reach a verified device row; extend the runner before claiming a write.'
+
 

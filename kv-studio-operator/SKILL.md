@@ -1,4 +1,4 @@
----
+﻿---
 name: kv-studio-operator
 description: 通过稳定 workflow 操作和快照化 KEYENCE KV STUDIO 桌面项目。用于项目创建、语义项目快照、MNM 导入导出、FB 自变量与局部变量、数据类型、编译结果和单元/EtherCAT 配置；从能力清单选择接口，由脚本负责焦点、输入、验证和日志。
 ---
@@ -258,7 +258,7 @@ powershell -File <skill-root>\scripts\workflow_tools\get_kv_eip_connection_snaps
 只剩 KV STUDIO 主窗口。字段 AutomationId、样例实测值（NU-EP1/DL-EP1、IN_100 64/84 字、
 B00/B0B0 等）见 `references/eip-settings.md`。
 
-## EtherNet/IP 写入（进行中，勿宣称已打通）
+## EtherNet/IP 写入（已实机打通）
 
 入口：`configure_kv_eip_devices.bat` → `scripts/workflows/configure_kv_eip_devices.ps1` →
 `runner_children/configure_eip_devices_guarded.ps1`。设备配置 JSON：
@@ -267,17 +267,30 @@ B00/B0B0 等）见 `references/eip-settings.md`。
 { "schema_version": 1, "devices": [ { "model": "NU-EP1", "node_address": 1, "ip_address": "192.168.0.1" } ] }
 ```
 
-工作流在打开任何 UI 前校验：`model` 必填、`node_address` 为数字且不重复、`ip_address` 为 IPv4；
-`-PlanOnly` 只生成执行计划。已实机验证的部分（2026-10-26，
-`C:\kvrun\eip_write_preflight4\eip_write.log`）：打开 `EtherNet/IP 设定`、处理首启
-`手动/自动配置` 弹窗并点中 `手动(M)`（该按钮在 UIA 里是 Pane，需要按名字匹配 + `BM_CLICK`/
-坐标点击，不能用 `ControlType.Button` 过滤）。
+```powershell
+.\configure_kv_eip_devices.bat -ProjectPath <project.kpr> -DevicesConfigPath <devices.json> -OutDir <dir>
+```
 
-未打通：**设备目录的加入动作**。EIP 主窗口的 `设备列表/设备设定/设备查找` 是 MFC Tab
-（`Afx:TabWnd`，无 UIA TabItem），目录表格是 `VSFlexGrid`，必须改用 Win32 子窗口/坐标；
-且在没有 `通信适配器` 时会弹“需要通信适配器”。runner 已预置
-`KV_EIP_COMMUNICATION_ADAPTER_REQUIRED` 错误码；在能用回读断言“设备已写入”之前，不得把该
-能力标为可用。
+工作流在打开任何 UI 前校验：`model` 必填、`node_address` 为数字且不重复、`ip_address` 为 IPv4；
+`-PlanOnly` 只生成执行计划，`-PreflightOnly` 只验证“打开 EIP 设定 + 进入手动模式”。
+
+已验证的写入步骤（2026-10-26，证据 `C:\kvrun\eip_write_dl_run6\eip_write.log` + `success.png`，
+退出码 0，回读新增 `192.168.0.6`）：
+
+1. 选中 `单元配置 > [0] > EtherNet/IP` 回车打开设定窗口；首启弹窗用名字匹配 `手动(M)` 后
+   `SetFocus` + 空格（WinForms 按钮不响应 `BM_CLICK`）。
+2. `Alt+1` 切到 `设备列表`，点目录网格 → `Ctrl+Home` → 逐行 `Down`，同时用 Win32 读窗口里的
+   `Static` 详情文本，命中机型（如 `DL-EP1`）后回车。
+3. `适配器初始设定` 弹窗确认（KV 自动分配节点地址/IP，例如依次 `.1/.2/...`）→ OK。
+4. 主窗口点 `OK`；随后出现的 `设定信息被更改`（是(Y)）、`更新单元编辑器`（确定）、
+   `EIP 设备更新，创建设备连接用变量`（确定）与 `EtherNet/IP设备 变量设置`（直接关掉，变量可后补）
+   由统一的对话框处理器按“任意顺序”处理。
+5. `Ctrl+S` 保存工程（标题不再带 `*`）。
+6. 回读：重新打开 EIP 设定，点 `设定列表` 网格 → `Ctrl+A/Ctrl+C`，比对写入前后的 IP 行集合；
+   出现新 IP 才算成功，结果写 `eip_write_result.json`。
+
+注意：当前版本使用 KV 自动分配的节点地址/IP（配置里的值只做计划与日志），因为
+`适配器初始设定` 的 IP 分片输入尚未自动化；需要指定 IP 时在该弹窗手工改，或后续扩展 runner。
 
 ## 选择接口
 

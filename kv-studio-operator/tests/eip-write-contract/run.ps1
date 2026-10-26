@@ -28,9 +28,13 @@ Add-Case 'bat launcher exists' (Test-Path -LiteralPath $bat) $bat
 $batText = if (Test-Path -LiteralPath $bat) { Get-Content -LiteralPath $bat -Raw -Encoding ASCII } else { '' }
 Add-Case 'bat calls the workflow' ($batText -match 'scripts\\workflows\\configure_kv_eip_devices\.ps1') 'bat'
 $runnerText = if (Test-Path -LiteralPath $runner) { Get-Content -LiteralPath $runner -Raw -Encoding UTF8 } else { '' }
-Add-Case 'runner has adapter blocker code' ($runnerText -match 'KV_EIP_COMMUNICATION_ADAPTER_REQUIRED') 'runner'
+
+Add-Case 'runner rejects manual-mode failure' ($runnerText -match 'KV_EIP_MANUAL_MODE_NOT_SELECTED') 'runner'
 Add-Case 'runner has preflight mode' ($runnerText -match 'PreflightOnly') 'runner'
-Add-Case 'runner never fakes success' ($runnerText -match 'KV_EIP_DEVICE_ADD_UNVERIFIED') 'runner'
+
+Add-Case 'runner scans the catalog for the model' ($runnerText -match 'KV_EIP_MODEL_NOT_IN_CATALOG') 'runner'
+Add-Case 'runner handles KV update prompts' ($runnerText -match 'Handle-EipDialogs') 'runner'
+Add-Case 'runner proves the write by readback' ($runnerText -match 'pre_write_readback' -and $runnerText -match 'KV_EIP_READBACK_FAILED') 'runner'
 
 $projectPath = Join-Path $WorkRoot 'Fixture.kpr'
 [IO.File]::WriteAllText($projectPath, 'fixture', (New-Object Text.UTF8Encoding($false)))
@@ -76,3 +80,5 @@ $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $WorkRoo
 $result | ConvertTo-Json -Depth 3
 if ($failed.Count -gt 0) { exit 41 }
 exit 0
+
+
