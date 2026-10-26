@@ -209,15 +209,21 @@ powershell -File <skill-root>\tests\run_all.ps1 -WorkRoot <out>              # �
 powershell -File <skill-root>\tests\run_all.ps1 -WorkRoot <out> -IncludeLive # 含真实桌面
 ```
 
-- 离线套件：`compile-triage`、`module-completion`、`variable-dependencies`、`plan-runner`、
-  `inventory-expansion`、`ethercat-guard-contract`、`script-hygiene`、`eip-snapshot`；
+- 离线套件（13）：`compile-triage`、`module-completion`、`variable-dependencies`、`plan-runner`、
+  `inventory-expansion`、`ethercat-guard-contract`、`script-hygiene`、`eip-snapshot`、
+  `variable-usage`，以及既有 `scan-order`、`variable-attributes`、`scaffold-variable-attributes`、
+  `library-dependencies`（后四者输出 `Cases/Passed/Failed` 文本，run_all 会解析）；
 - 真实桌面套件：`axis-rename-live`（改临时名→校验→改回→保存）、
   `ethercat-node-live`（选下一个空闲节点地址→加节点+批量轴→回读 WsTreeEnv）；
-- 每个套件是 `tests/<name>/run.ps1`，输出 `test_result.json`（passed/failed/cases）；
+- 每个套件是 `tests/<name>/run.ps1`，新套件输出 `test_result.json`（passed/failed/cases）；
   `run_all.ps1` 汇总为 `test_run_all_result.json`，任何失败 exit 41；
 - live 前提：KVS 已打开 `KVXEcTest` 且标题无 `*`；`ethercat-node-live` 会向该 scratch 工程追加节点/轴，
   `axis-rename-live` 结束后会保存；
 - 验收口径：`suites_failed = 0` 且 `cases_failed = 0`，并以同次运行的 JSON 为准。
+
+最近一次全量结果（2026-10-26，`C:\kvrun\tests_final3`）：15 个套件、143 个用例全部通过
+（离线 13 套 124 例；真实桌面 2 套 19 例）。EIP 连接快照的**成功路径**目前在套件里只覆盖契约与
+“无对话框快速失败”，真实 199 行读取是人工实测（`C:\kvrun\eip\assign_*.tsv`），尚未自动化。
 
 ## 计划执行器（结构/模块/变量的批量写入）
 
