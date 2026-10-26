@@ -213,17 +213,19 @@ powershell -File <skill-root>\tests\run_all.ps1 -WorkRoot <out> -IncludeLive # �
   `inventory-expansion`、`ethercat-guard-contract`、`script-hygiene`、`eip-snapshot`、
   `variable-usage`，以及既有 `scan-order`、`variable-attributes`、`scaffold-variable-attributes`、
   `library-dependencies`（后四者输出 `Cases/Passed/Failed` 文本，run_all 会解析）；
-- 真实桌面套件：`axis-rename-live`（改临时名→校验→改回→保存）、
-  `ethercat-node-live`（选下一个空闲节点地址→加节点+批量轴→回读 WsTreeEnv）；
+- 真实桌面套件（3）：`axis-rename-live`（改临时名→校验→改回→保存）、
+  `ethercat-node-live`（选下一个空闲节点地址→加节点+批量轴→回读 WsTreeEnv）、
+  `eip-snapshot-live`（打开样例工程→EtherNet/IP 设定→NU-EP1 连接设定→快照 199 行→关闭并恢复 scratch）；
 - 每个套件是 `tests/<name>/run.ps1`，新套件输出 `test_result.json`（passed/failed/cases）；
   `run_all.ps1` 汇总为 `test_run_all_result.json`，任何失败 exit 41；
 - live 前提：KVS 已打开 `KVXEcTest` 且标题无 `*`；`ethercat-node-live` 会向该 scratch 工程追加节点/轴，
   `axis-rename-live` 结束后会保存；
 - 验收口径：`suites_failed = 0` 且 `cases_failed = 0`，并以同次运行的 JSON 为准。
 
-最近一次全量结果（2026-10-26，`C:\kvrun\tests_final3`）：15 个套件、143 个用例全部通过
-（离线 13 套 124 例；真实桌面 2 套 19 例）。EIP 连接快照的**成功路径**目前在套件里只覆盖契约与
-“无对话框快速失败”，真实 199 行读取是人工实测（`C:\kvrun\eip\assign_*.tsv`），尚未自动化。
+最近一次全量结果（2026-10-26，`C:\kvrun\tests_final4`）：16 个套件、160 个用例全部通过
+（离线 13 套 124 例；真实桌面 3 套 36 例）。EIP 连接快照成功路径由
+`eip-snapshot-live` 自动化：真实打开样例工程的 `连接设定 - 1:NU-EP1`，断言 `IN_100`、
+64 字、199 行分配、`B00`/`B01` 与 raw TSV 落盘，再关闭对话框并恢复 scratch 工程。
 
 ## 计划执行器（结构/模块/变量的批量写入）
 
