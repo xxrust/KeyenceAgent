@@ -127,7 +127,16 @@ powershell -File <skill-root>\scripts\workflow_tools\plan_kv_variable_dependenci
 （`旋转轴DEMO`、`上料1拨料` 等）**不能靠变量粘贴创建**：设备已被 `Axis_N` 占用，粘贴会被判
 重复分配而忽略（或留下 709 无效定义）。
 
-改轴名的 UI 路径（UIA 选中节点后按同样键序即可批量改）：
+已固化为脚本（2026-10-26 实机 2 轴回归通过）：
+
+```powershell
+powershell -File <skill-root>\scripts\workflow_tools\rename_kv_axes.ps1 `
+  -MappingPath <轴序号<TAB>新名称.tsv> -OutDir <out>
+```
+
+脚本走“轴设定页”路径：选中树节点/双击打开该轴页 → 用 `轴No.` 与 `轴名称` 两个字段确认页面已
+切到目标轴 → 改 `轴名称` → TAB 提交 → 校验树节点文字；失败逐条记入 `axis_rename_result.json`
+并 exit 41。手工路径与注意点：
 
 1. 打开“轴设定”，选中轴名称节点（如 `轴1: Axis_1`）；
 2. 右键 → 按 `P`；
