@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$ScriptsRoot = (Split-Path -Parent (Split-Path -Parent $PSCommandPath)),
   [string]$MvpScriptsRoot = (Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'runner_children'),
   [string]$ManifestPath = (Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'script_manifest.json'),
@@ -133,6 +133,11 @@ $workflowToolUiForbiddenPatterns = @(
 $workflowToolPatternAllowlist = @{
   'workflow_tools/invoke_kv_flat_execution_plan.ps1' = @('StartProcessUiStep')
   'workflow_tools/kv_workflow_plan.ps1' = @('StartProcessUiStep')
+  # These three only spawn the corresponding runner child; UI work lives in
+  # runner_children, so they contain no manual decision points.
+  'workflow_tools/rename_kv_axes.ps1' = @('StartProcessUiStep')
+  'workflow_tools/get_kv_eip_connection_snapshot.ps1' = @('StartProcessUiStep')
+  'workflow_tools/run_kv_execution_plan.ps1' = @('StartProcessUiStep')
 }
 
 foreach ($name in $workflowPaths) {

@@ -957,6 +957,16 @@
                                                       "status":  "approved",
                                                       "customer_callable":  false,
                                                       "ui_guard_required":  true
+                                                  },
+                                                  {
+                                                      "path":  "runner_children/rename_axes_guarded.ps1",
+                                                      "status":  "approved",
+                                                      "customer_callable":  false
+                                                  },
+                                                  {
+                                                      "path":  "runner_children/snapshot_eip_connection_guarded.ps1",
+                                                      "status":  "approved",
+                                                      "customer_callable":  false
                                                   }
                                               ],
                     "runner_child_pending":  [

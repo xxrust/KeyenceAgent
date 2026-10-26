@@ -877,8 +877,12 @@ function Handle-PostOkDialogs {
       # After axes are registered KV asks whether to run the new-axis coordinate
       # conversion wizard; it is not needed to make the axes exist.
       $button = Invoke-DialogButton -Dialog $dialog -NameParts @($NameNo, 'No')
+    } elseif ($text -like '*管理员设定*' -or $text -like '*密码*' -or $text -like '*认证*') {
+      # Credential dialogs must never be auto-confirmed; fail loudly instead.
+      throw "KV_ETHERCAT_CREDENTIAL_DIALOG: $text"
     } else {
-      $button = Invoke-DialogButton -Dialog $dialog -NameParts @($NameConfirm, 'OK')
+      # Unknown dialog: leave it alone and fail, do not guess an OK.
+      throw "KV_ETHERCAT_UNEXPECTED_DIALOG: $text"
     }
     if (-not $button) { throw "Post EtherCAT OK dialog could not be handled: $text" }
     $handled += [pscustomobject]@{
