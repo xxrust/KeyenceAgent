@@ -840,12 +840,14 @@ function Handle-PostOkDialogs {
     # main window and not the EtherCAT settings editor itself.
     $dialogRow = @(Get-KvRelevantWindows | Where-Object {
       $_.title -and
-      $_.title -notlike 'KV STUDIO*' -and
       $_.title -notlike '*EtherCAT 设定*' -and
       $_.title -notlike '*EtherCAT设定*' -and
       $_.title -notlike '*单元编辑器*' -and
       $_.title -notlike '*EtherNet/IP*' -and
-      ($_.class_name -eq '#32770' -or $_.class_name -like 'WindowsForms*')
+      (
+        $_.class_name -eq '#32770' -or
+        ($_.class_name -like 'WindowsForms*' -and $_.title -notlike 'KV STUDIO*')
+      )
     } | Select-Object -First 1)
     if ($dialogRow.Count -eq 0) {
       $main = Get-KvsProcess
