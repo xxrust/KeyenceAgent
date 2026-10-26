@@ -182,6 +182,21 @@ exit=0 但工程没变”。先保证只有一个 KVS 进程，或给支持 `-Cr
 → 编译（看转换结果 + 总步数）→ 完成度 100% + 扫描顺序
 ```
 
+## 计划执行器（结构/模块/变量的批量写入）
+
+原先 `C:\kvrun` 里的 `pipeline.ps1`/`vars9.ps1` 已固化为：
+
+```powershell
+powershell -File <skill-root>\scripts\workflow_tools\run_kv_execution_plan.ps1 `
+  -PlanPath <execution_plan.json> -ProjectPath <project.kpr> `
+  -GlobalVariablesTsv <globals.tsv> -RunRoot <out>
+```
+
+- 阶段：`structures → imports → fb_arguments → variables`（可用 `-Stages` 选择）；
+- 每步用计划里的参数，自动补 `ProjectPath`/`OutDir`，从 `exit_code.txt` 取退出码；
+- `variables` 阶段默认除 `set_variables_FB_Cylinder` 外都加 `SkipGlobal`，避免每模块重写全局表；
+- 结果写 `plan_run_result.json`，任一步非 0 → exit 41；`-DryRun` 只打印命令，可在不碰 UI 的情况下校验计划。
+
 ## EtherNet/IP 设定读取（B00/B01… 整表）
 
 EIP 主窗口是 MFC（`Afx` + `VSFlexGrid8L`），没有 UIA 树；但 `连接设定 - N:<设备>` 是标准

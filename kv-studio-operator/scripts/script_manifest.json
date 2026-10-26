@@ -1,4 +1,4 @@
-{
+﻿{
     "schema_version":  2,
     "layout_policy":  "role_directories",
     "notes":  [
@@ -227,15 +227,15 @@
                                                                                                   ]
                                                                                     },
                                   "workflow_tools/assert_kv_scan_order.ps1":  {
-                                                                                 "files":  [
-                                                                                               "scan_order_verification.json"
-                                                                                           ]
-                                                                             },
+                                                                                  "files":  [
+                                                                                                "scan_order_verification.json"
+                                                                                            ]
+                                                                              },
                                   "workflow_tools/assert_kv_library_dependencies.ps1":  {
-                                                                                           "files":  [
-                                                                                                         "library_dependency_result.json"
-                                                                                                     ]
-                                                                                       },
+                                                                                            "files":  [
+                                                                                                          "library_dependency_result.json"
+                                                                                                      ]
+                                                                                        },
                                   "export_kv_project_inventory.ps1":  {
                                                                           "files":  [
                                                                                         "project_inventory.json"
@@ -1000,6 +1000,41 @@
                                           },
                                           {
                                               "path":  "workflow_tools/materialize_kv_project_snapshot.ps1",
+                                              "status":  "approved",
+                                              "customer_callable":  false
+                                          },
+                                          {
+                                              "path":  "workflow_tools/rename_kv_axes.ps1",
+                                              "status":  "approved",
+                                              "customer_callable":  false
+                                          },
+                                          {
+                                              "path":  "workflow_tools/get_kv_eip_connection_snapshot.ps1",
+                                              "status":  "approved",
+                                              "customer_callable":  false
+                                          },
+                                          {
+                                              "path":  "workflow_tools/run_kv_execution_plan.ps1",
+                                              "status":  "approved",
+                                              "customer_callable":  false
+                                          },
+                                          {
+                                              "path":  "workflow_tools/plan_kv_variable_dependencies.ps1",
+                                              "status":  "approved",
+                                              "customer_callable":  false
+                                          },
+                                          {
+                                              "path":  "workflow_tools/get_kv_module_completion.ps1",
+                                              "status":  "approved",
+                                              "customer_callable":  false
+                                          },
+                                          {
+                                              "path":  "workflow_tools/parse_kv_compile_result.ps1",
+                                              "status":  "approved",
+                                              "customer_callable":  false
+                                          },
+                                          {
+                                              "path":  "workflow_tools/verify_kv_variable_usage.ps1",
                                               "status":  "approved",
                                               "customer_callable":  false
                                           }
