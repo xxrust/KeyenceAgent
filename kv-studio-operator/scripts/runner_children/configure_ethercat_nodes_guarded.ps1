@@ -466,18 +466,28 @@ function Send-DoubleClickToElement {
   if($rect.Width -le 0 -or $rect.Height -le 0){throw 'KV_ETHERCAT_DEVICE_ITEM_OFFSCREEN: filtered device item has no clickable UIA bounds.'}
   $x=[int]($rect.Left+($rect.Width/2));$y=[int]($rect.Top+($rect.Height/2))
   $owner=[IntPtr](Get-EtherCatWindowRow).hwnd
-  Invoke-KvGuardedMouseClick -TargetHwnd $owner -Step 'activate filtered EtherCAT device click 1' -X $x -Y $y -ExpectedTitleLike '*EtherCAT*' -SleepMs 40
-  Invoke-KvGuardedMouseClick -TargetHwnd $owner -Step 'activate filtered EtherCAT device click 2' -X $x -Y $y -ExpectedTitleLike '*EtherCAT*' -SleepMs 80
+  Invoke-KvGuardedDoubleClick -TargetHwnd $owner -Step 'activate filtered EtherCAT device' -X $x -Y $y -ExpectedTitleLike '*EtherCAT*' -SleepMs 80
   [pscustomobject]@{x=$x;y=$y;rect=(Get-ElementRectData $Element)}
 }
 
 function Write-AtomicTiming {
-  param([string]$Step,[Diagnostics.Stopwatch]$Stopwatch,[hashtable]$Data=@{})
+  param([string]$Step,[Diagnostics.Stopwatch]$Stopwatch,[hashtable]$Data=@{},[int]$BudgetMs=10000)
   $elapsed = [int]$Stopwatch.ElapsedMilliseconds
-  $payload = @{step=$Step;elapsed_ms=$elapsed;budget_ms=10000;ok=($elapsed -lt 10000)}
+  $payload = @{step=$Step;elapsed_ms=$elapsed;budget_ms=$BudgetMs;ok=($elapsed -lt $BudgetMs)}
   foreach($key in $Data.Keys){$payload[$key]=$Data[$key]}
+  if($elapsed -ge $BudgetMs){
+    # Capture the real screen and the complete process window list before
+    # failing: an atomic timeout with no image is undebuggable.
+    try { $payload['screenshot'] = Save-Screenshot 'atomic_timeout_failure.png' } catch {}
+    try {
+      $process = Get-KvsProcess
+      $payload['windows'] = @(Get-VisibleTopWindows | Where-Object { $_.process_id -eq $process.Id } | ForEach-Object {
+        [pscustomobject]@{ hwnd = $_.hwnd; class_name = $_.class_name; title = $_.title }
+      })
+    } catch {}
+  }
   Log-Event 'atomic_action' $payload
-  if($elapsed -ge 10000){throw "KV_ETHERCAT_ATOMIC_STEP_TIMEOUT: $Step took ${elapsed}ms."}
+  if($elapsed -ge $BudgetMs){throw "KV_ETHERCAT_ATOMIC_STEP_TIMEOUT: $Step took ${elapsed}ms."}
 }
 
 function Get-ElementRectData {
@@ -837,7 +847,7 @@ function Invoke-DialogButton {
 function Handle-PostOkDialogs {
   $handled = @()
   $watch = [Diagnostics.Stopwatch]::StartNew()
-  $deadline = (Get-Date).AddSeconds(9)
+  $deadline = (Get-Date).AddSeconds(25)
   $readySince = $null
   # Exclude the main window by HWND, never by title: modal dialogs are titled
   # exactly "KV STUDIO" and a "KV STUDIO*" title exclusion silently swallows them.
@@ -863,7 +873,7 @@ function Handle-PostOkDialogs {
       if ($ready) {
         if ($null -eq $readySince) { $readySince = Get-Date }
         if (((Get-Date) - $readySince).TotalMilliseconds -ge 300) {
-          Write-AtomicTiming 'wait for EtherCAT commit dialogs and main readiness' $watch @{handled_count=$handled.Count}
+          Write-AtomicTiming 'wait for EtherCAT commit dialogs and main readiness' $watch @{handled_count=$handled.Count} -BudgetMs 30000
           return $handled
         }
       } else { $readySince = $null }
@@ -873,16 +883,25 @@ function Handle-PostOkDialogs {
     }
     $dialog = Get-ElementFromHwnd -Hwnd $dialogRow[0].hwnd
     $readySince = $null
-    $text = Get-DialogText -Dialog $dialog
+    $bodyText = Get-DialogText -Dialog $dialog
+    # The batch-axis table has its identity only in the window title; its body is
+    # just "详细信息(D) 取消 OK". Always match against title + body.
+    $text = ([string]$dialogRow[0].title + ' ' + $bodyText).Trim()
     $button = $null
     if ($text -like '*Universal Library*' -or $text -like '*KEYENCE_SV3*') {
       $button = Invoke-DialogButton -Dialog $dialog -NameParts @($NameConfirm, 'OK')
+    } elseif ([string]$dialogRow[0].title -eq $TextBatchAxisRegistration) {
+      # Batch axis table: OK registers the listed axes, cancel aborts.
+      $button = Invoke-DialogButton -Dialog $dialog -NameParts @($NameConfirm, 'OK', '确定')
     } elseif ($text -like "*$TextBatchAxisRegistration*") {
       if ($BatchAxisRegistration -eq 'Yes') {
         $button = Invoke-DialogButton -Dialog $dialog -NameParts @($NameYes, 'Yes')
       } else {
         $button = Invoke-DialogButton -Dialog $dialog -NameParts @($NameNo, 'No')
       }
+    } elseif ($text -like '*批量登录已经完成*') {
+      # "轴的批量登录已经完成。" confirmation after the batch-axis table.
+      $button = Invoke-DialogButton -Dialog $dialog -NameParts @($NameConfirm, 'OK')
     } elseif ($text -like '*坐标转换*') {
       # After axes are registered KV asks whether to run the new-axis coordinate
       # conversion wizard; it is not needed to make the axes exist.

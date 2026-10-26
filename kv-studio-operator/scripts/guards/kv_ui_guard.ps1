@@ -654,6 +654,34 @@ function Invoke-KvGuardedMouseClick {
   Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'mouse left click' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
 }
 
+function Invoke-KvGuardedDoubleClick {
+  param(
+    [Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,
+    [Parameter(Mandatory=$true)][string]$Step,
+    [Parameter(Mandatory=$true)][int]$X,
+    [Parameter(Mandatory=$true)][int]$Y,
+    [string]$ExpectedTitleLike = '',
+    [int]$SleepMs = 120
+  )
+  # One atomic gesture: the two clicks must stay inside the system double-click
+  # interval, so checkpoints/screenshots happen only before and after the pair.
+  $watch = [Diagnostics.Stopwatch]::StartNew()
+  $before = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step $Step -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
+  $beforePath = Write-KvUiGuardCheckpoint -Step $Step -Status 'before' -Action 'mouse left double click' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; x = $X; y = $Y } -Before $before -Message 'Precondition passed; target owns foreground.'
+  [KvSharedUiGuardWin32]::SetCursorPos($X, $Y) | Out-Null
+  Start-Sleep -Milliseconds 40
+  for ($click = 0; $click -lt 2; $click++) {
+    [KvSharedUiGuardWin32]::mouse_event(0x0002, 0, 0, 0, 0)
+    Start-Sleep -Milliseconds 20
+    [KvSharedUiGuardWin32]::mouse_event(0x0004, 0, 0, 0, 0)
+    if ($click -eq 0) { Start-Sleep -Milliseconds 60 }
+  }
+  Start-Sleep -Milliseconds $SleepMs
+  $after = Assert-KvUiForegroundHwnd -ExpectedHwnd $TargetHwnd -Step "$Step postcondition" -ExpectedTitleLike $ExpectedTitleLike -AllowSingleRecovery
+  Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action 'mouse left double click' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; x = $X; y = $Y } -Before $before -After $after -Message 'Postcondition passed; target still owns foreground.' -Evidence @($beforePath) | Out-Null
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'mouse left double click' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
+}
+
 function Invoke-KvGuardedTreeItemDrag {
   param([Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,[Parameter(Mandatory=$true)]$Source,[Parameter(Mandatory=$true)]$Destination,[string]$ExpectedTitleLike='')
   Add-Type -AssemblyName System.Windows.Forms

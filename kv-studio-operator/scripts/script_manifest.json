@@ -54,7 +54,8 @@
                                                "Invoke-KvGuardedSendKeysAllowTargetCloseToWindow",
                                                "Invoke-KvGuardedModalFocusSequence",
                                                "Invoke-KvGuardedModalErrorDismissal",
-                                               "Invoke-KvGuardedOpenSaveAsModal"
+                                               "Invoke-KvGuardedOpenSaveAsModal",
+                                               "Invoke-KvGuardedDoubleClick"
                                            ],
                               "pending":  [
 
