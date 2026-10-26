@@ -202,6 +202,23 @@ exit=0 但工程没变”。先保证只有一个 KVS 进程，或给支持 `-Cr
 → 编译（看转换结果 + 总步数）→ 完成度 100% + 扫描顺序
 ```
 
+## 测试套件（固化验收）
+
+```powershell
+powershell -File <skill-root>\tests\run_all.ps1 -WorkRoot <out>              # 离线
+powershell -File <skill-root>\tests\run_all.ps1 -WorkRoot <out> -IncludeLive # 含真实桌面
+```
+
+- 离线套件：`compile-triage`、`module-completion`、`variable-dependencies`、`plan-runner`、
+  `inventory-expansion`、`ethercat-guard-contract`、`script-hygiene`、`eip-snapshot`；
+- 真实桌面套件：`axis-rename-live`（改临时名→校验→改回→保存）、
+  `ethercat-node-live`（选下一个空闲节点地址→加节点+批量轴→回读 WsTreeEnv）；
+- 每个套件是 `tests/<name>/run.ps1`，输出 `test_result.json`（passed/failed/cases）；
+  `run_all.ps1` 汇总为 `test_run_all_result.json`，任何失败 exit 41；
+- live 前提：KVS 已打开 `KVXEcTest` 且标题无 `*`；`ethercat-node-live` 会向该 scratch 工程追加节点/轴，
+  `axis-rename-live` 结束后会保存；
+- 验收口径：`suites_failed = 0` 且 `cases_failed = 0`，并以同次运行的 JSON 为准。
+
 ## 计划执行器（结构/模块/变量的批量写入）
 
 原先 `C:\kvrun` 里的 `pipeline.ps1`/`vars9.ps1` 已固化为：
