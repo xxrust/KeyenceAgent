@@ -136,12 +136,17 @@ function Get-VisibleTopWindows {
 
 function Get-KvRelevantWindows {
   $process = Get-KvsProcess
+  # The whitelist must include WinForms top-level windows: the batch-axis table
+  # is a WindowsForms10 window titled "批量登录轴", which matches none of the
+  # title patterns below. If it is filtered out here, Handle-PostOkDialogs can
+  # never see it regardless of its own filter.
   Get-VisibleTopWindows | Where-Object {
     $_.process_id -eq $process.Id -and (
       $_.title -like 'KV STUDIO*' -or
       $_.title -like $NameUnitEditor -or
       $_.title -like '*EtherCAT*' -or
-      $_.class_name -eq '#32770'
+      $_.class_name -eq '#32770' -or
+      ($_.class_name -like 'WindowsForms*' -and -not [string]::IsNullOrWhiteSpace($_.title))
     )
   } | Sort-Object title, hwnd
 }
@@ -834,19 +839,22 @@ function Handle-PostOkDialogs {
   $watch = [Diagnostics.Stopwatch]::StartNew()
   $deadline = (Get-Date).AddSeconds(9)
   $readySince = $null
+  # Exclude the main window by HWND, never by title: modal dialogs are titled
+  # exactly "KV STUDIO" and a "KV STUDIO*" title exclusion silently swallows them.
+  $mainHandle = (Get-KvsProcess).MainWindowHandle.ToInt64()
   do {
     # KV mixes classic #32770 dialogs with WinForms dialogs (batch axis table,
     # Universal Library import). Match every top-level window that is not the
     # main window and not the EtherCAT settings editor itself.
     $dialogRow = @(Get-KvRelevantWindows | Where-Object {
-      $_.title -and
+      $_.hwnd -ne $mainHandle -and
       $_.title -notlike '*EtherCAT 设定*' -and
       $_.title -notlike '*EtherCAT设定*' -and
       $_.title -notlike '*单元编辑器*' -and
       $_.title -notlike '*EtherNet/IP*' -and
       (
         $_.class_name -eq '#32770' -or
-        ($_.class_name -like 'WindowsForms*' -and $_.title -notlike 'KV STUDIO*')
+        $_.class_name -like 'WindowsForms*'
       )
     } | Select-Object -First 1)
     if ($dialogRow.Count -eq 0) {
@@ -1199,6 +1207,10 @@ try {
   if (-not $result.ok) { exit 62 }
 } catch {
   $originalError=$_
+  # Every failure must leave a screenshot behind, even if the failure happens
+  # before any step-level evidence is written.
+  $failureScreenshot=$null
+  try { $failureScreenshot=Save-Screenshot 'failure.png' } catch { try { Log-Event 'failure_screenshot_unavailable' @{message=$_.Exception.Message} } catch {} }
   $cleanup=$null
   if ($uiStarted) {
     try{$cleanup=Restore-EtherCatCleanEndState}catch{$cleanup=[pscustomobject]@{ok=$false;message=$_.Exception.Message}}
@@ -1209,6 +1221,7 @@ try {
     ok = $false
     error_code = $code
     error = $originalError.Exception.ToString()
+    screenshot = $failureScreenshot
     project_name = $ProjectName
     node_address = $NodeAddress
     nodes_config_path = $NodesConfigPath
