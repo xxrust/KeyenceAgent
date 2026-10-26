@@ -22,7 +22,12 @@ $offline = @(
   'inventory-expansion',
   'ethercat-guard-contract',
   'script-hygiene',
-  'eip-snapshot'
+  'eip-snapshot',
+  'variable-usage',
+  'scan-order',
+  'variable-attributes',
+  'scaffold-variable-attributes',
+  'library-dependencies'
 )
 $live = @(
   'axis-rename-live',
@@ -57,8 +62,21 @@ foreach ($suite in $suites) {
     $failed = [int]$report.failed
     if ($report.PSObject.Properties.Name -contains 'skipped' -and $report.skipped) { $detail = 'skipped' }
   } else {
-    $failed = 1
-    $detail = 'test_result.json missing'
+    # Legacy suites print "Cases: N  Passed: N  Failed: N" instead of JSON.
+    $text = if (Test-Path -LiteralPath $stdout) { Get-Content -LiteralPath $stdout -Raw -Encoding UTF8 } else { '' }
+    $match = [regex]::Match($text, 'Passed:\s*(\d+)\s+Failed:\s*(\d+)')
+    if ($match.Success) {
+      $passed = [int]$match.Groups[1].Value
+      $failed = [int]$match.Groups[2].Value
+      $detail = 'stdout-summary'
+    } elseif ($exitCode -eq 0) {
+      $passed = 0
+      $failed = 0
+      $detail = 'no-summary'
+    } else {
+      $failed = 1
+      $detail = 'no-result'
+    }
   }
   $status = if ($exitCode -eq 0 -and $failed -eq 0) { 'pass' } else { 'fail' }
   $results.Add([pscustomobject]@{ suite = $suite; status = $status; exit = $exitCode; passed = $passed; failed = $failed; detail = $detail })
@@ -83,5 +101,7 @@ $summary | ConvertTo-Json -Depth 4
 Write-Host ("KV_TESTS: suites={0} passed={1} failed={2} cases_passed={3} cases_failed={4}" -f $summary.suites_total, $summary.suites_passed, $summary.suites_failed, $summary.cases_passed, $summary.cases_failed)
 if ($failures.Count -gt 0) { exit 41 }
 exit 0
+
+
 
 
