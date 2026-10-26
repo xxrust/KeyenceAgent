@@ -258,6 +258,27 @@ powershell -File <skill-root>\scripts\workflow_tools\get_kv_eip_connection_snaps
 只剩 KV STUDIO 主窗口。字段 AutomationId、样例实测值（NU-EP1/DL-EP1、IN_100 64/84 字、
 B00/B0B0 等）见 `references/eip-settings.md`。
 
+## EtherNet/IP 写入（进行中，勿宣称已打通）
+
+入口：`configure_kv_eip_devices.bat` → `scripts/workflows/configure_kv_eip_devices.ps1` →
+`runner_children/configure_eip_devices_guarded.ps1`。设备配置 JSON：
+
+```json
+{ "schema_version": 1, "devices": [ { "model": "NU-EP1", "node_address": 1, "ip_address": "192.168.0.1" } ] }
+```
+
+工作流在打开任何 UI 前校验：`model` 必填、`node_address` 为数字且不重复、`ip_address` 为 IPv4；
+`-PlanOnly` 只生成执行计划。已实机验证的部分（2026-10-26，
+`C:\kvrun\eip_write_preflight4\eip_write.log`）：打开 `EtherNet/IP 设定`、处理首启
+`手动/自动配置` 弹窗并点中 `手动(M)`（该按钮在 UIA 里是 Pane，需要按名字匹配 + `BM_CLICK`/
+坐标点击，不能用 `ControlType.Button` 过滤）。
+
+未打通：**设备目录的加入动作**。EIP 主窗口的 `设备列表/设备设定/设备查找` 是 MFC Tab
+（`Afx:TabWnd`，无 UIA TabItem），目录表格是 `VSFlexGrid`，必须改用 Win32 子窗口/坐标；
+且在没有 `通信适配器` 时会弹“需要通信适配器”。runner 已预置
+`KV_EIP_COMMUNICATION_ADAPTER_REQUIRED` 错误码；在能用回读断言“设备已写入”之前，不得把该
+能力标为可用。
+
 ## 选择接口
 
 唯一能力清单是 [scripts/script_manifest.json](scripts/script_manifest.json)。用只读查询获得实际路径、参数类型、必填参数和验证范围：

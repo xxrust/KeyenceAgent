@@ -23,6 +23,7 @@ $offline = @(
   'ethercat-guard-contract',
   'script-hygiene',
   'eip-snapshot',
+  'eip-write-contract',
   'variable-usage',
   'scan-order',
   'variable-attributes',
@@ -102,6 +103,7 @@ $summary | ConvertTo-Json -Depth 4
 Write-Host ("KV_TESTS: suites={0} passed={1} failed={2} cases_passed={3} cases_failed={4}" -f $summary.suites_total, $summary.suites_passed, $summary.suites_failed, $summary.cases_passed, $summary.cases_failed)
 if ($failures.Count -gt 0) { exit 41 }
 exit 0
+
 
 
 

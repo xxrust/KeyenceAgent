@@ -277,7 +277,12 @@
                                                                                                     "axis_param_write.json",
                                                                                                     "axis_param_batch.json"
                                                                                                 ]
-                                                                                  }
+                                                                                  },
+                                  "runner_children/configure_eip_devices_guarded.ps1":  {
+                                                                                            "files":  [
+                                                                                                          "eip_write_result.json"
+                                                                                                      ]
+                                                                                        }
                               },
     "classes":  {
                     "customer_scaffold_tool":  [
@@ -966,6 +971,11 @@
                                                   },
                                                   {
                                                       "path":  "runner_children/snapshot_eip_connection_guarded.ps1",
+                                                      "status":  "approved",
+                                                      "customer_callable":  false
+                                                  },
+                                                  {
+                                                      "path":  "runner_children/configure_eip_devices_guarded.ps1",
                                                       "status":  "approved",
                                                       "customer_callable":  false
                                                   }
