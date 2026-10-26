@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 if (-not ('KvSharedUiGuardWin32' -as [type])) {
   Add-Type @"
@@ -196,6 +196,27 @@ function New-KvUiGuardCheckpointPath {
   return (Join-Path $script:KvUiGuardCheckpointDir ($prefix + $safeStep + $suffix))
 }
 
+function Save-KvUiGuardScreenshot {
+  param([Parameter(Mandatory=$true)][string]$CheckpointPath)
+  # Every checkpoint gets a screenshot: unpredicted branches and single UI
+  # operations must be visually auditable, not just JSON.
+  try {
+    Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+    Add-Type -AssemblyName System.Drawing -ErrorAction SilentlyContinue
+    $pngPath = [System.IO.Path]::ChangeExtension($CheckpointPath, '.png')
+    $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+    $bitmap = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+    $bitmap.Save($pngPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    $graphics.Dispose()
+    $bitmap.Dispose()
+    return $pngPath
+  } catch {
+    return $null
+  }
+}
+
 function Write-KvUiGuardCheckpoint {
   param(
     [Parameter(Mandatory=$true)][string]$Step,
@@ -213,6 +234,9 @@ function Write-KvUiGuardCheckpoint {
   }
   $script:KvUiGuardSeq += 1
   $path = New-KvUiGuardCheckpointPath -Sequence $script:KvUiGuardSeq -Step $Step -Status $Status
+  $evidenceList = @($Evidence)
+  $screenshot = Save-KvUiGuardScreenshot -CheckpointPath $path
+  if ($screenshot) { $evidenceList += $screenshot }
   [ordered]@{
     timestamp = (Get-Date).ToString('o')
     step = $Step
@@ -224,7 +248,7 @@ function Write-KvUiGuardCheckpoint {
     focused_element = Get-KvFocusedElementSnapshot
     error_code = $ErrorCode
     message = $Message
-    evidence = $Evidence
+    evidence = $evidenceList
   } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $path -Encoding UTF8
   return $path
 }
@@ -237,13 +261,18 @@ function Stop-KvUiGuard {
     [string[]]$Evidence = @(),
     [int]$ExitCode = 31
   )
+  $evidenceList = @($Evidence)
+  if ($script:KvUiGuardCheckpointDir) {
+    $failureShot = Save-KvUiGuardScreenshot -CheckpointPath (Join-Path $script:KvUiGuardCheckpointDir ('999_failure_' + (Get-Date -Format 'HHmmssfff') + '.json'))
+    if ($failureShot) { $evidenceList += $failureShot }
+  }
   $payload = [ordered]@{
     ok = $false
     error_code = $ErrorCode
     operation = 'KV STUDIO guarded UI action'
     current_step = $Step
     message = $Message
-    evidence = $Evidence
+    evidence = $evidenceList
     remediation = @(
       'Use scripts/guards/kv_ui_guard.ps1 for every global keyboard, mouse, accelerator, and paste operation.',
       'Prove the target HWND is foreground before the action.',
