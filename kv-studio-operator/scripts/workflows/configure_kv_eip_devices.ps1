@@ -3,6 +3,7 @@
   [Parameter(Mandatory=$true)][string]$ProjectPath,
   [Parameter(Mandatory=$true)][string]$DevicesConfigPath,
   [Parameter(Mandatory=$true)][string]$OutDir,
+  [ValidateSet('Add','Modify','Delete')][string]$Action = 'Add',
   [int]$TimeoutSeconds = 600,
   [switch]$PreflightOnly,
   [switch]$PlanOnly
@@ -22,8 +23,9 @@ $devices = @($config.devices)
 if ($devices.Count -eq 0) { throw 'KV_EIP_CONFIG_EMPTY: devices[] is empty' }
 $seen = @{}
 foreach ($d in $devices) {
-  if (-not $d.model) { throw 'KV_EIP_CONFIG_INVALID: device.model is required' }
+  if ($Action -eq 'Add' -and -not $d.model) { throw 'KV_EIP_CONFIG_INVALID: device.model is required for Add' }
   $addr = [string]$d.node_address
+  if ($Action -ne 'Add' -and -not $addr) { throw "KV_EIP_CONFIG_INVALID: node_address is required for $Action" }
   if ($addr) {
     if ($addr -notmatch '^\d+$') { throw "KV_EIP_CONFIG_INVALID: node_address must be numeric: $addr" }
     if ($seen.ContainsKey([int]$addr)) { throw "KV_EIP_CONFIG_DUPLICATE_NODE: $addr" }
@@ -31,9 +33,16 @@ foreach ($d in $devices) {
   }
   $ip = [string]$d.ip_address
   if ($ip -and ($ip -notmatch '^\d{1,3}(\.\d{1,3}){3}$')) { throw "KV_EIP_CONFIG_INVALID: ip_address is not IPv4: $ip" }
+  if ($Action -eq 'Modify' -and -not $ip) { throw 'KV_EIP_CONFIG_INVALID: ip_address is required for Modify' }
 }
 
-$plan=New-KvWorkflowPlan -ScriptsRoot $root -Operation 'configure_ethernet_ip_devices' -ProjectPath $ProjectPath -OutDir $OutDir -TimeoutSeconds $TimeoutSeconds
-Add-KvWorkflowStep -Plan $plan -Name 'configure_eip_devices' -Script 'runner_children/configure_eip_devices_guarded.ps1' -OutDir $plan.run_root -Parameters @{ProjectName=$ProjectName;DevicesConfigPath=[IO.Path]::GetFullPath($DevicesConfigPath);OutDir=$plan.run_root;TimeoutSeconds=$TimeoutSeconds;PreflightOnly=[bool]$PreflightOnly}
+$operation = if ($Action -eq 'Add') { 'configure_ethernet_ip_devices' } else { 'edit_ethernet_ip_devices' }
+$plan=New-KvWorkflowPlan -ScriptsRoot $root -Operation $operation -ProjectPath $ProjectPath -OutDir $OutDir -TimeoutSeconds $TimeoutSeconds
+if ($Action -eq 'Add') {
+  Add-KvWorkflowStep -Plan $plan -Name 'configure_eip_devices' -Script 'runner_children/configure_eip_devices_guarded.ps1' -OutDir $plan.run_root -Parameters @{ProjectName=$ProjectName;DevicesConfigPath=[IO.Path]::GetFullPath($DevicesConfigPath);OutDir=$plan.run_root;TimeoutSeconds=$TimeoutSeconds;PreflightOnly=[bool]$PreflightOnly}
+} else {
+  Add-KvWorkflowStep -Plan $plan -Name 'edit_eip_devices' -Script 'runner_children/edit_eip_devices_guarded.ps1' -OutDir $plan.run_root -Parameters @{ProjectName=$ProjectName;Action=$Action;DevicesConfigPath=[IO.Path]::GetFullPath($DevicesConfigPath);OutDir=$plan.run_root;TimeoutSeconds=$TimeoutSeconds}
+}
 Submit-KvWorkflowPlan -Plan $plan -ScriptsRoot $root -PlanOnly:$PlanOnly
+
 

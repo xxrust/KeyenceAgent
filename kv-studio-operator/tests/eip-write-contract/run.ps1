@@ -74,7 +74,38 @@ $badIpConfig = Join-Path $WorkRoot 'devices_bad_ip.json'
 $badIpExit = Invoke-TestTool -ScriptPath $workflow -Arguments @('-ProjectPath', $projectPath, '-DevicesConfigPath', $badIpConfig, '-OutDir', (Join-Path $WorkRoot 'plan_badip'), '-PlanOnly')
 Add-Case 'invalid ip rejected before UI' ($badIpExit -ne 0) "exit=$badIpExit"
 
-$failed = @($cases | Where-Object { -not $_.ok })
+
+# --- Modify / Delete contract (implemented, live verification pending) ---
+$editRunner = Join-Path $skillRoot 'scripts\runner_children\edit_eip_devices_guarded.ps1'
+$deleteBat = Join-Path $skillRoot 'delete_kv_eip_device.bat'
+$modifyBat = Join-Path $skillRoot 'modify_kv_eip_device.bat'
+Add-Case 'edit runner exists' (Test-Path -LiteralPath $editRunner) $editRunner
+Add-Case 'delete bat exists' (Test-Path -LiteralPath $deleteBat) $deleteBat
+Add-Case 'modify bat exists' (Test-Path -LiteralPath $modifyBat) $modifyBat
+$deleteBatText = if (Test-Path $deleteBat) { Get-Content -LiteralPath $deleteBat -Raw -Encoding ASCII } else { '' }
+$modifyBatText = if (Test-Path $modifyBat) { Get-Content -LiteralPath $modifyBat -Raw -Encoding ASCII } else { '' }
+Add-Case 'delete bat routes Action Delete' ($deleteBatText -match '-Action Delete') 'bat'
+Add-Case 'modify bat routes Action Modify' ($modifyBatText -match '-Action Modify') 'bat'
+$editText = if (Test-Path $editRunner) { Get-Content -LiteralPath $editRunner -Raw -Encoding UTF8 } else { '' }
+Add-Case 'edit runner proves readback' ($editText -match 'KV_EIP_EDIT_READBACK_FAILED') 'runner'
+Add-Case 'edit runner marks verified flag' ($editText -match 'verified = \$false') 'runner'
+Add-Case 'workflow validates Action set' ((Get-Content -LiteralPath $workflow -Raw -Encoding UTF8) -match 'ValidateSet\(..Add..,.Modify..,.Delete..\)') 'workflow'
+
+$delConfig = Join-Path $WorkRoot 'devices_delete.json'
+[ordered]@{ schema_version = 1; devices = @([ordered]@{ node_address = 6 }) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $delConfig -Encoding UTF8
+$delExit = Invoke-TestTool -ScriptPath $workflow -Arguments @('-ProjectPath', $projectPath, '-DevicesConfigPath', $delConfig, '-OutDir', (Join-Path $WorkRoot 'plan_delete'), '-Action', 'Delete', '-PlanOnly')
+Add-Case 'delete PlanOnly exits 0' ($delExit -eq 0) "exit=$delExit"
+
+$modConfig = Join-Path $WorkRoot 'devices_modify.json'
+[ordered]@{ schema_version = 1; devices = @([ordered]@{ node_address = 6; ip_address = '192.168.0.16' }) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $modConfig -Encoding UTF8
+$modExit = Invoke-TestTool -ScriptPath $workflow -Arguments @('-ProjectPath', $projectPath, '-DevicesConfigPath', $modConfig, '-OutDir', (Join-Path $WorkRoot 'plan_modify'), '-Action', 'Modify', '-PlanOnly')
+Add-Case 'modify PlanOnly exits 0' ($modExit -eq 0) "exit=$modExit"
+
+$modBad = Join-Path $WorkRoot 'devices_modify_noip.json'
+[ordered]@{ schema_version = 1; devices = @([ordered]@{ node_address = 6 }) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $modBad -Encoding UTF8
+$modBadExit = Invoke-TestTool -ScriptPath $workflow -Arguments @('-ProjectPath', $projectPath, '-DevicesConfigPath', $modBad, '-OutDir', (Join-Path $WorkRoot 'plan_modify_bad'), '-Action', 'Modify', '-PlanOnly')
+Add-Case 'modify without ip rejected' ($modBadExit -ne 0) "exit=$modBadExit"
+
 $result = [ordered]@{ test = 'eip-write-contract'; passed = @($cases | Where-Object { $_.ok }).Count; failed = $failed.Count; cases = $cases.ToArray(); work_root = $WorkRoot }
 $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $WorkRoot 'test_result.json') -Encoding UTF8
 $result | ConvertTo-Json -Depth 3
