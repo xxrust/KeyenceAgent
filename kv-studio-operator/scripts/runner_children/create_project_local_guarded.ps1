@@ -500,21 +500,39 @@ try {
   }
   Restore-KvStudioForeground $process 'Ctrl+N'
 
-  Log 'invoke new project button by window-scoped UIA'
-  # UIA Invoke 点「新建项目」按钮在本机实测会挂死（FromHandle Operation timed out ✗）
-  # 直接走守卫的 Ctrl+N 路径（已验证 ✓）
-  $uiaInvoked = $false
-  Log 'UIA new-project button disabled (hangs on this build); using guarded Ctrl+N'
-  if (-not $uiaInvoked) {
-    if (Find-NewProjectDialog 2) { Log 'new project dialog already open; skipping Ctrl+N fallback' } else {
-    Log 'UIA invoke unavailable; fallback requires verified foreground'
+  Log 'open new project dialog with guarded Ctrl+N (retry up to 3)'
+  # Ctrl+N can be lost when KV STUDIO has just started and the foreground
+  # changes under us (observed as KV_CREATE_PROJECT_DIALOG_MISSING). Retry the
+  # guarded chord with a fresh foreground restore and capture evidence per try.
+  $newProjectDialog = $null
+  for ($attempt = 1; $attempt -le 3 -and -not $newProjectDialog; $attempt++) {
+    if (Find-NewProjectDialog 1) {
+      Log "new project dialog already open (attempt $attempt)"
+      $newProjectDialog = Find-NewProjectDialog 1
+      break
+    }
+    Restore-KvStudioForeground $process ("Ctrl+N attempt " + $attempt)
     Assert-KvStudioForeground 'Ctrl+N'
-    Invoke-KvGuardedCtrlChord -TargetHwnd $process.MainWindowHandle -Step 'create project Ctrl+N' -Vk 0x4E -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+N opens new project dialog' -AllowModalAfter -SleepMs 200
+    # A stuck menu bar (Alt/File menu left active by an earlier step) swallows
+    # Ctrl+N and only highlights 文件. Esc first, then send the chord.
+    try {
+      Invoke-KvGuardedSendKeys -TargetHwnd $process.MainWindowHandle -Step ("clear menu mode before Ctrl+N attempt " + $attempt) -Keys '{ESC}' -ExpectedTitleLike 'KV STUDIO*' -SleepMs 150
+    } catch {
+      Log ("Esc before Ctrl+N attempt " + $attempt + " failed: " + $_.Exception.Message)
+    }
+    try {
+      Invoke-KvGuardedCtrlChord -TargetHwnd $process.MainWindowHandle -Step ("create project Ctrl+N attempt " + $attempt) -Vk 0x4E -ExpectedTitleLike 'KV STUDIO*' -Action 'Ctrl+N opens new project dialog' -AllowModalAfter -SleepMs 200
+    } catch {
+      Log ("Ctrl+N attempt " + $attempt + " failed: " + $_.Exception.Message)
+    }
+    $newProjectDialog = Find-NewProjectDialog 10
+    if (-not $newProjectDialog) {
+      Save-Uia ("fail_no_new_project_dialog_attempt" + $attempt + ".json")
+      Log ("new project dialog missing after attempt " + $attempt)
+      Start-Sleep -Seconds 1
     }
   }
-  $newProjectDialog = Find-NewProjectDialog 45
   if (-not $newProjectDialog) {
-    Save-Uia 'fail_no_new_project_dialog.json'
     throw 'New project dialog did not open'
   }
   Assert-KvUiForegroundHwnd -ExpectedHwnd ([IntPtr]$newProjectDialog.Current.NativeWindowHandle) -Step 'verify owned new project dialog' -ExpectedTitleLike $newProjectDialog.Current.Name | Out-Null

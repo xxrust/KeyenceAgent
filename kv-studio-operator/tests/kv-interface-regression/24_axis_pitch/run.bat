@@ -1,10 +1,13 @@
 @echo off
 setlocal
-cd /d "%~dp0"
+set "SCRIPT_DIR=%~dp0"
+cd /d "%SCRIPT_DIR%"
+set "PAUSE_AFTER=1"
+if /I "%~1"=="-NoPause" (set "PAUSE_AFTER=0" & shift)
 echo Running %~n0 ...
-powershell -STA -NoProfile -ExecutionPolicy Bypass -File "%~dp0run.ps1" %*
+powershell -STA -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%run.ps1" %*
 set RC=%ERRORLEVEL%
 echo.
 echo exit=%RC%
-pause
+if "%PAUSE_AFTER%"=="1" pause
 exit /b %RC%
