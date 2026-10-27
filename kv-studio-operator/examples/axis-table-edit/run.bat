@@ -1,12 +1,18 @@
 @echo off
 setlocal enabledelayedexpansion
 rem ==========================================================
-rem  Axis control table cell edit (verified 2026-10-20)
-rem  Read : click table + Ctrl+A + Ctrl+C  -> TSV on clipboard
-rem  Write: click cell + F2 + Ctrl+A + type + Enter
-rem  Row Y : y = gridTop + 82 + (RowIndex-1)*17.7   (row index is
-rem          the same index printed by the list step below)
+rem  Axis control table cell edit example
+rem  Default (no args) : self-contained test, two cases
+rem                      negative = no KVS -> KV_TABLE_NO_KVS
+rem                      positive = fixture project + row 39 -> 1500
+rem  -Interactive      : legacy manual flow (list, ask, edit)
 rem ==========================================================
+if /I "%~1"=="-Interactive" goto interactive
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0run.ps1" %*
+exit /b %errorlevel%
+
+:interactive
 set "HERE=%~dp0"
 set "REPO=H:\KeyenceAgent\kv-studio-operator"
 set "OUT=%TEMP%\kv-table-edit-%RANDOM%"
