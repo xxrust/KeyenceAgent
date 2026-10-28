@@ -48,6 +48,7 @@ foreach ($m in $mnemonics) { $mnemonicSet[$m.ToUpperInvariant()] = $true }
 
 $systemAssumed = New-Object System.Collections.Generic.List[object]
 $unresolved = New-Object System.Collections.Generic.List[object]
+$mnmMissing = New-Object System.Collections.Generic.List[object]
 $invalidTypes = New-Object System.Collections.Generic.List[object]
 $duplicates = New-Object System.Collections.Generic.List[object]
 $conflicts = New-Object System.Collections.Generic.List[object]
@@ -110,6 +111,51 @@ $typeNames = @{}
 foreach ($t in $customTypes.Keys) { $typeNames[$t] = $true }
 foreach ($t in $structureTypes.Keys) { $typeNames[$t] = $true }
 
+function Get-StStatementLines([string]$Text) {
+  # Strip (* ... *) block comments and '...'/"..." string literals before
+  # symbol extraction so comments, strings and their contents are not reported
+  # as undeclared variables. // starts a line comment.
+  $result = New-Object System.Collections.Generic.List[string]
+  $inBlock = $false
+  foreach ($line in ($Text -split "`r?`n")) {
+    $sb = New-Object System.Text.StringBuilder
+    $i = 0
+    while ($i -lt $line.Length) {
+      if ($inBlock) {
+        $end = $line.IndexOf('*)', $i)
+        if ($end -lt 0) { $i = $line.Length; break }
+        $inBlock = $false; $i = $end + 2; continue
+      }
+      $open = $line.IndexOf('(*', $i)
+      $lineComment = $line.IndexOf('//', $i)
+      $sq = $line.IndexOf("'", $i)
+      $dq = $line.IndexOf('"', $i)
+      $candidates = @()
+      if ($open -ge 0) { $candidates += $open }
+      if ($lineComment -ge 0) { $candidates += $lineComment }
+      if ($sq -ge 0) { $candidates += $sq }
+      if ($dq -ge 0) { $candidates += $dq }
+      if ($candidates.Count -eq 0) { [void]$sb.Append($line.Substring($i)); $i = $line.Length; break }
+      $next = ($candidates | Measure-Object -Minimum).Minimum
+      if ($next -gt $i) { [void]$sb.Append($line.Substring($i, $next - $i)) }
+      if ($next -eq $open) { [void]$sb.Append(' '); $inBlock = $true; $i = $next + 2; continue }
+      if ($next -eq $lineComment) { break }
+      $quote = $line[$next]
+      $j = $next + 1
+      while ($j -lt $line.Length) {
+        if ($line[$j] -eq $quote) {
+          if (($j + 1) -lt $line.Length -and $line[$j + 1] -eq $quote) { $j += 2; continue }
+          $j++; break
+        }
+        $j++
+      }
+      [void]$sb.Append(' ')
+      $i = $j
+    }
+    $result.Add($sb.ToString())
+  }
+  return @($result)
+}
 $moduleCount = 0
 foreach ($entry in $mnmEntries) {
   $moduleCount++
@@ -117,19 +163,21 @@ foreach ($entry in $mnmEntries) {
   $mnmRel = [string]$entry.path
   if (-not $mnmRel) { continue }
   $mnmPath = Join-Path $ScaffoldRoot $mnmRel
-  if (-not (Test-Path -LiteralPath $mnmPath -PathType Leaf)) { continue }
+  if (-not (Test-Path -LiteralPath $mnmPath -PathType Leaf)) {
+    $mnmMissing.Add([pscustomobject]@{ module = $module; path = $mnmPath }) | Out-Null
+    continue
+  }
   $text = Get-Content -LiteralPath $mnmPath -Raw -Encoding Unicode
   $locals = if ($localsByModule.ContainsKey($module)) { $localsByModule[$module] } else { @{} }
   $fbArgs = if ($argsByModule.ContainsKey($module)) { $argsByModule[$module] } else { @{} }
   $lineNo = 0
-  foreach ($line in ($text -split "`r?`n")) {
+  $statementLines = Get-StStatementLines $text
+  foreach ($statement in $statementLines) {
     $lineNo++
-    # Only the statement part; trailing // or (* *) comments are not symbols.
-    $statement = $line
+    if ([string]::IsNullOrWhiteSpace($statement)) { continue }
     if ($statement -match '^(DEVICE|;MODULE|;MODULE_TYPE):') { continue }
     if ($statement -match '^; Generated ') { continue }
     if ($statement -match '^\s*;') { $statement = $statement.Substring($statement.IndexOf(';') + 1) }
-    $statement = ($statement -split '//', 2)[0]
     if (-not $statement.Trim()) { continue }
     foreach ($match in [regex]::Matches($statement, '(?<![\w\.])([A-Za-z_\u4e00-\u9fff][A-Za-z0-9_\u4e00-\u9fff]*)')) {
       $name = $match.Groups[1].Value
@@ -152,7 +200,7 @@ foreach ($entry in $mnmEntries) {
 
 $unresolvedUnique = @($unresolved | Group-Object module,name | ForEach-Object { $_.Group[0] })
 $report = [ordered]@{
-  ok = ($unresolvedUnique.Count -eq 0 -and $invalidTypes.Count -eq 0 -and $duplicates.Count -eq 0 -and $conflicts.Count -eq 0)
+  ok = ($unresolvedUnique.Count -eq 0 -and $invalidTypes.Count -eq 0 -and $duplicates.Count -eq 0 -and $conflicts.Count -eq 0 -and $mnmMissing.Count -eq 0)
   scaffold_root = $ScaffoldRoot
   modules_checked = $moduleCount
   declared_globals = $globals.Count
@@ -163,12 +211,13 @@ $report = [ordered]@{
   invalid_data_types = $invalidTypes
   duplicate_declarations = $duplicates
   device_initial_conflicts = $conflicts
+  mnm_missing = $mnmMissing
 }
 $reportPath = Join-Path $OutDir 'variable_usage_report.json'
 $report | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $reportPath -Encoding UTF8
 
 if (-not $report.ok) {
-  throw "KV_VARIABLE_USAGE_INFEASIBLE: unresolved=$($unresolvedUnique.Count) invalid_types=$($invalidTypes.Count) duplicates=$($duplicates.Count) conflicts=$($conflicts.Count). See $reportPath"
+  throw "KV_VARIABLE_USAGE_INFEASIBLE: unresolved=$($unresolvedUnique.Count) invalid_types=$($invalidTypes.Count) duplicates=$($duplicates.Count) conflicts=$($conflicts.Count) mnm_missing=$($mnmMissing.Count). See $reportPath"
 }
 Write-Output ("KV_VARIABLE_USAGE_OK modules={0} globals={1} locals={2} fb_args={3} system_assumed={4} report={5}" -f `
   $report.modules_checked, $report.declared_globals, $report.declared_locals, $report.declared_fb_arguments, $report.system_assumed_count, $reportPath)

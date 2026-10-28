@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory=$true)]
   [ValidateSet('new_project','repair_existing_project')]
   [string]$Mode,
@@ -191,8 +191,11 @@ try {
     if (-not (Test-Path -LiteralPath $entryGlobalTsv -PathType Leaf)) { throw "Global variable TSV not found for ${moduleName}: $entryGlobalTsv" }
     if (-not (Test-Path -LiteralPath $entryLocalTsv -PathType Leaf)) { throw "Local variable TSV not found for ${moduleName}: $entryLocalTsv" }
     if ($Mode -eq 'repair_existing_project') {
-      $writeRows = @(Get-ExecutableVariableRowsFromPath $entryGlobalTsv 'global') + @(Get-ExecutableVariableRowsFromPath $entryLocalTsv 'local')
-      $writeErrors = @(Get-KvVariableWriteCapabilityErrors -Rows $writeRows)
+      $globalWriteRows = @(Get-ExecutableVariableRowsFromPath $entryGlobalTsv 'global')
+      $localWriteRows = @(Get-ExecutableVariableRowsFromPath $entryLocalTsv 'local')
+      $writeErrors = @()
+      $writeErrors += @(Get-KvVariableWriteCapabilityErrors -Rows $globalWriteRows -Scope 'global' -AllowGlobalAttributes:$effectiveFullGlobalAttributes)
+      $writeErrors += @(Get-KvVariableWriteCapabilityErrors -Rows $localWriteRows -Scope 'local')
       if ($writeErrors.Count) { throw "$($writeErrors[0].code): $($writeErrors[0].message)" }
     }
     $entryArgumentsTsv = ''
@@ -395,7 +398,7 @@ try {
     $moduleOutDir = Join-Path $setVariablesRoot ('module_{0:D2}_{1}' -f ($i + 1), $safeModule)
     $setArgs = [System.Collections.Generic.List[string]]::new()
     Add-Arg -List $setArgs -Name '-ProjectPath' -Value $projectPathForRun
-    Add-Arg -List $setArgs -Name '-GlobalVariablesTsv' -Value $mergedGlobal.path
+    Add-Arg -List $setArgs -Name '-GlobalVariablesTsv' -Value $runtimeGlobalPath
     Add-Arg -List $setArgs -Name '-LocalVariablesTsv' -Value $entry.local_tsv
     Add-Arg -List $setArgs -Name '-LocalProgramName' -Value $entry.module_name
     Add-Arg -List $setArgs -Name '-LocalPasteFormat' -Value $LocalPasteFormat
@@ -451,44 +454,35 @@ try {
   $scanOrderInventory = Join-Path $inventoryOutDir 'project_inventory.json'
   $steps.Add((New-Step 'verify_saved_scan_order' 'assert_kv_scan_order.ps1' @('customer_non_ui_tool') @('-ScaffoldPath',$manifestPath,'-ActualInventory',$scanOrderInventory,'-OutDir',$scanOrderOutDir,'-AllowExtraModules') $scanOrderOutDir 'tool'))
 
-  # Interleave each module's import, placement check, FB arguments and variable
-  # write so a module is complete as soon as its group finishes. Importing every
-  # MNM first and writing variables afterwards leaves a partially written
-  # project where a compile reports all unwritten modules at once.
-  $interleaved = [System.Collections.Generic.List[object]]::new()
-  $consumed = @{}
-  $firstImportName = $null
+  # Ordering: every FB type must exist before variables are written, so run all
+  # imports/placement checks, then all FB argument writes, then all variable
+  # writes. The previous per-module interleave could write a global whose custom
+  # type belongs to a module that had not been imported yet.
+  $preSteps = New-Object System.Collections.Generic.List[object]
+  $importSteps = New-Object System.Collections.Generic.List[object]
+  $fbArgSteps = New-Object System.Collections.Generic.List[object]
+  $variableSteps = New-Object System.Collections.Generic.List[object]
+  $restSteps = New-Object System.Collections.Generic.List[object]
+  $seenImport = $false
   foreach ($step in $steps) {
-    if ([string]$step.name -match '^(repair_)?import_mnm_\d+$') { $firstImportName = [string]$step.name; break }
+    $n = [string]$step.name
+    $isImport = ($n -match '^(repair_)?import_mnm_\d+$') -or ([string]$step.script_name -eq 'import_mnm_guarded.ps1')
+    $isPlacement = ($n -match '^verify_module_placement_')
+    $isFbArgs = ($n -match '^(repair_)?set_fb_arguments_')
+    $isVariables = ($n -match '^(repair_)?set_variables_')
+    if (-not $seenImport -and -not ($isImport -or $isPlacement)) { $preSteps.Add($step); continue }
+    if ($isImport -or $isPlacement) { $seenImport = $true; $importSteps.Add($step); continue }
+    if ($isFbArgs) { $fbArgSteps.Add($step); continue }
+    if ($isVariables) { $variableSteps.Add($step); continue }
+    $restSteps.Add($step)
   }
-  foreach ($step in $steps) {
-    if ($firstImportName -and [string]$step.name -eq $firstImportName) { break }
-    $interleaved.Add($step)
-    $consumed[[string]$step.name] = $true
-  }
-  for ($i = 0; $i -lt $resolvedMnmFiles.Count; $i++) {
-    $entry = $resolvedMnmFiles[$i]
-    $prefixName = if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' }
-    foreach ($candidate in @(
-      "$($prefixName)import_mnm_$($i + 1)",
-      "verify_module_placement_$($entry.module_name)",
-      "$($prefixName)set_fb_arguments_$($entry.module_name)",
-      "$($prefixName)set_variables_$($entry.module_name)"
-    )) {
-      $match = @($steps | Where-Object { [string]$_.name -eq $candidate })
-      if ($match.Count -eq 1 -and -not $consumed.ContainsKey($candidate)) {
-        $interleaved.Add($match[0])
-        $consumed[$candidate] = $true
-      }
-    }
-  }
-  foreach ($step in $steps) {
-    if (-not $consumed.ContainsKey([string]$step.name)) {
-      $interleaved.Add($step)
-      $consumed[[string]$step.name] = $true
-    }
-  }
-  $steps = $interleaved
+  $orderedSteps = New-Object System.Collections.Generic.List[object]
+  foreach ($s in $preSteps) { $orderedSteps.Add($s) }
+  foreach ($s in $importSteps) { $orderedSteps.Add($s) }
+  foreach ($s in $fbArgSteps) { $orderedSteps.Add($s) }
+  foreach ($s in $variableSteps) { $orderedSteps.Add($s) }
+  foreach ($s in $restSteps) { $orderedSteps.Add($s) }
+  $steps = $orderedSteps
 
   $plan = [ordered]@{
     ok = $true
@@ -516,6 +510,8 @@ try {
     }
     mnm_files = @($resolvedMnmFiles)
     merged_global_variables_tsv = $mergedGlobal.path
+    runtime_global_variables_tsv = $runtimeGlobalPath
+    deferred_axis_variables = @($deferredAxisVariables)
     executable_global_variable_count = $mergedGlobal.executable_global_variable_count
     variable_sets = @($resolvedMnmFiles | ForEach-Object {
       [pscustomobject]@{ module_name = $_.module_name; category = $_.category; global_tsv = $_.global_tsv; local_tsv = $_.local_tsv; arguments_tsv = $_.arguments_tsv }
@@ -524,7 +520,7 @@ try {
     compile_result_path = Join-Path $copyOutDir 'compile_result_copied.txt'
     project_inventory_path = $scanOrderInventory
     scan_order_result_path = Join-Path $scanOrderOutDir 'scan_order_verification.json'
-    steps = @($steps)
+    steps = $steps.ToArray()
   }
   $planPath = Join-Path $OutDir 'execution_plan.json'
   $plan | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $planPath -Encoding UTF8
@@ -533,7 +529,8 @@ try {
   exit 0
 } catch {
   New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-  $_.Exception.ToString() | Set-Content -LiteralPath (Join-Path $OutDir 'fail.txt') -Encoding UTF8
+  (($_.Exception.ToString()) + "
+" + $_.InvocationInfo.PositionMessage) | Set-Content -LiteralPath (Join-Path $OutDir 'fail.txt') -Encoding UTF8
   [ordered]@{
     ok = $false
     error_code = 'KV_EXECUTION_PLAN_FAILED'

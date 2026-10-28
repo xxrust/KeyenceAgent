@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$WorkRoot = ''
 )
 
@@ -132,6 +132,18 @@ if (Test-Path -LiteralPath $planPath -PathType Leaf) {
   $firstTwo = @($plan.steps | Select-Object -First 2 | ForEach-Object { $_.script_name })
   $gatesFirst = ($firstTwo.Count -eq 2) -and ($firstTwo[0] -eq 'assert_kv_mvp_ui_guard_usage.ps1') -and ($firstTwo[1] -eq 'assert_kv_mvp_agent_boundary.ps1')
   Add-Result 'plan_required_gate_order' $gatesFirst "first_two=$($firstTwo -join ',')"
+  $scriptNames = @($plan.steps | ForEach-Object { [string]$_.script_name })
+  $importIdx = @(for ($i = 0; $i -lt $scriptNames.Count; $i++) { if ($scriptNames[$i] -eq 'import_mnm_guarded.ps1') { $i } })
+  $fbIdx = @(for ($i = 0; $i -lt $scriptNames.Count; $i++) { if ($scriptNames[$i] -eq 'set_fb_arguments_guarded.ps1') { $i } })
+  $varIdx = @(for ($i = 0; $i -lt $scriptNames.Count; $i++) { if ($scriptNames[$i] -eq 'set_variables_guarded.ps1') { $i } })
+  $orderOk = ($importIdx.Count -gt 0 -and $varIdx.Count -gt 0)
+  if ($orderOk) {
+    $orderOk = (($importIdx | Measure-Object -Maximum).Maximum -lt ($varIdx | Measure-Object -Minimum).Minimum)
+    if ($orderOk -and $fbIdx.Count -gt 0) {
+      $orderOk = (($fbIdx | Measure-Object -Maximum).Maximum -lt ($varIdx | Measure-Object -Minimum).Minimum)
+    }
+  }
+  Add-Result 'variables_after_fb_arguments_after_imports' $orderOk "imports=$($importIdx -join '/') fbargs=$($fbIdx -join '/') variables=$($varIdx -join '/')"
   $variableSteps = @($plan.steps | Where-Object { $_.script_name -eq 'set_variables_guarded.ps1' })
   $withFlag = @($variableSteps | Where-Object { @($_.arguments) -contains '-FullGlobalAttributes' })
   Add-Result 'plan_includes_full_attribute_switch' ($exit -eq 0 -and $variableSteps.Count -gt 0 -and $withFlag.Count -eq $variableSteps.Count) "exit=$exit steps=$($variableSteps.Count) flagged=$($withFlag.Count)"

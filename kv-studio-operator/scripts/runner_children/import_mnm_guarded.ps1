@@ -743,9 +743,14 @@ function RemoveProjectModuleIfPresent([string]$moduleName){
   # KV STUDIO refuses to delete the only remaining program:
   # "不能删除。项目必须登录 1 个以上的程序。" Fail before sending DELETE so the
   # caller gets a precise reason instead of a modal timeout or a generic failure.
-  $programItems=@(Get-ProgramModuleTreeItems)
-  if($programItems.Count -le 1){
-    throw "KV_MNM_DELETE_LAST_PROGRAM_FORBIDDEN: '$name' is the only program in the project. KV STUDIO requires at least one program; import another module first or stage a placeholder before replacing this name."
+  # The rule only applies to scan-executed programs ("Name [n]"); function-block
+  # definitions are not programs and can be replaced even when one program exists.
+  $isProgram = ($name -match '^.+ \[\d+\]$')
+  if ($isProgram) {
+    $programItems=@(Get-ProgramModuleTreeItems)
+    if($programItems.Count -le 1){
+      throw "KV_MNM_DELETE_LAST_PROGRAM_FORBIDDEN: '$name' is the only program in the project. KV STUDIO requires at least one program; import another module first or stage a placeholder before replacing this name."
+    }
   }
   try{
     $select=$item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)

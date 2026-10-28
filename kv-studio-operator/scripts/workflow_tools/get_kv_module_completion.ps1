@@ -21,6 +21,8 @@ function Read-JsonOrNull([string]$Path) {
 function Get-SafeModule([string]$Name) { return ($Name -replace '[^A-Za-z0-9_.-]+', '_') }
 
 $sets = @($plan.variable_sets)
+$stepNames = @($plan.steps | ForEach-Object { [string]$_.name } | Where-Object { $_ })
+$hasPlanSteps = ($stepNames.Count -gt 0)
 $modules = New-Object System.Collections.Generic.List[object]
 for ($i = 0; $i -lt $sets.Count; $i++) {
   $set = $sets[$i]
@@ -32,12 +34,19 @@ for ($i = 0; $i -lt $sets.Count; $i++) {
   $argsReceipt = Read-JsonOrNull (Join-Path $ArtifactsRoot ("set_fb_arguments\module_{0:D2}_{1}\step_receipt.json" -f $number, $safe))
   $varResult = Read-JsonOrNull (Join-Path $ArtifactsRoot ("set_variables\module_{0:D2}_{1}\set_variables_result.json" -f $number, $safe))
 
+  $argsExpected = if ($hasPlanSteps) {
+    @($stepNames | Where-Object { $_ -match ('^(repair_)?set_fb_arguments_' + [regex]::Escape($module) + '$') }).Count -gt 0
+  } else { [string]$set.category -match 'fb' }
+  $placementExpected = if ($hasPlanSteps) { $stepNames -contains "verify_module_placement_$module" } else { $false }
+
   $importOk = [bool]($importReceipt -and $importReceipt.ok)
-  $placementOk = if ($placementReceipt) { [bool]$placementReceipt.ok } else { $true }
-  $argsOk = if ($argsReceipt) { [bool]$argsReceipt.ok } else { $true }
+  $placementOk = if ($placementReceipt) { [bool]$placementReceipt.ok } else { -not $placementExpected }
+  $argsOk = if ($argsReceipt) { [bool]$argsReceipt.ok } else { -not $argsExpected }
   $varsOk = [bool]($varResult -and $varResult.ok)
   $reason = @()
   if (-not $importOk) { $reason += 'import_missing_or_failed' }
+  if (-not $placementReceipt -and $placementExpected) { $reason += 'placement_receipt_missing' }
+  if (-not $argsReceipt -and $argsExpected) { $reason += 'fb_arguments_receipt_missing' }
   if ($argsReceipt -and -not $argsOk) { $reason += 'fb_arguments_missing_or_failed' }
   if (-not $varsOk) {
     if ($varResult -and $varResult.error_code) { $reason += "variables:$($varResult.error_code)" }

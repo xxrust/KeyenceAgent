@@ -69,6 +69,29 @@ $conflictReport = if (Test-Path -LiteralPath $conflictReportPath) { Get-Content 
 Add-Case 'device+initial_value exits non-zero' ($conflictExit -ne 0) "exit=$conflictExit"
 Add-Case 'device+initial_value conflict reported' ([bool]($conflictReport -and @($conflictReport.device_initial_conflicts).Count -eq 1)) (@($conflictReport.device_initial_conflicts | ForEach-Object { $_.name }) -join ',')
 
+# Comments and string literals must not be reported as undeclared symbols.
+$commentText = @(
+  'LD DeclaredVar',
+  '(* OUT InsideBlock',
+  'OUT InsideSecondLine *)',
+  "OUT 'StringLiteralOnly'",
+  '// OUT TrailingComment',
+  'OUT DeclaredVar'
+) -join "`r`n"
+$commentRoot = New-Scaffold 'comments' $cleanGlobals $commentText
+$commentExit = Invoke-TestTool -ScriptPath $tool -Arguments @('-ScaffoldRoot', $commentRoot, '-OutDir', (Join-Path $commentRoot 'check'))
+$commentReportPath = Join-Path $commentRoot 'check\variable_usage_report.json'
+$commentReport = if (Test-Path -LiteralPath $commentReportPath) { Get-Content -LiteralPath $commentReportPath -Raw -Encoding UTF8 | ConvertFrom-Json } else { $null }
+Add-Case 'comments and strings are not symbols' ($commentExit -eq 0 -and @($commentReport.unresolved_symbols).Count -eq 0) "exit=$commentExit unresolved=$(@($commentReport.unresolved_symbols | ForEach-Object { $_.name }) -join ',')"
+
+# A configured MNM file that is missing must fail the preflight.
+$missingMnmRoot = New-Scaffold 'mnm_missing' $cleanGlobals 'LD DeclaredVar'
+Remove-Item -LiteralPath (Join-Path $missingMnmRoot 'modules\Main\Main.mnm') -Force
+$missingMnmExit = Invoke-TestTool -ScriptPath $tool -Arguments @('-ScaffoldRoot', $missingMnmRoot, '-OutDir', (Join-Path $missingMnmRoot 'check'))
+$missingMnmReportPath = Join-Path $missingMnmRoot 'check\variable_usage_report.json'
+$missingMnmReport = if (Test-Path -LiteralPath $missingMnmReportPath) { Get-Content -LiteralPath $missingMnmReportPath -Raw -Encoding UTF8 | ConvertFrom-Json } else { $null }
+Add-Case 'missing MNM file fails preflight' ($missingMnmExit -ne 0 -and $missingMnmReport -and @($missingMnmReport.mnm_missing).Count -eq 1) "exit=$missingMnmExit missing=$(@($missingMnmReport.mnm_missing).Count)"
+
 $failed = @($cases | Where-Object { -not $_.ok })
 $result = [ordered]@{ test = 'variable-usage'; passed = @($cases | Where-Object { $_.ok }).Count; failed = $failed.Count; cases = $cases.ToArray(); work_root = $WorkRoot }
 $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $WorkRoot 'test_result.json') -Encoding UTF8

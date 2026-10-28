@@ -1,4 +1,4 @@
-﻿# 对 review-d663fa0 的逐条回应
+# 对 review-d663fa0 的逐条回应
 
 基线：`d663fa0`。本文件随修复提交更新；状态分「已修 / 部分修 / 未修」。
 
@@ -19,15 +19,15 @@
 
 ## 既有风险 S01–S07
 
-均属本批之前的实现，未在本批声称修复；作为独立 backlog 处理：
+S 系列在本批一并处理：
 
-- S01 completion receipt 缺省即 complete
-- S02 交错 import/args/variables
-- S03 轴型别 defer 产物未接线
-- S04 最后一个 program 保护未区分实体类型
-- S05 GlobalGroupName 只设剪贴板未粘贴（本批已修：补 `Ctrl+V` 再 `Enter`）
-- S06 FullGlobalAttributes repair 缺 scope
-- S07 variable usage 词法边界
+- S01 已修：计划声明了 `set_fb_arguments_*` / `verify_module_placement_*` 时，缺少对应 receipt 记为 incomplete（`fb_arguments_receipt_missing` / `placement_receipt_missing`）；无 steps 的计划仍按旧语义保持兼容。
+- S02 已修：步骤顺序改为「全部 import/placement → 全部 FB arguments → 全部 variables」，避免在 FB 型别尚未导入时写全局变量。
+- S03 已修：`runtime_global_path` 真正传给 `set_variables`，并在计划中暴露 `runtime_global_variables_tsv`、`deferred_axis_variables`。
+- S04 已修：只有 scan program（`Name [n]`）才触发“最后一个 program 不能删”，FB 定义可正常替换。
+- S05 已修：`GlobalGroupName` 补 `Ctrl+V` 再 `Enter`。
+- S06 已修：repair 路径分别以 `Scope global`（带 `AllowGlobalAttributes`）和 `Scope local` 调用 `Get-KvVariableWriteCapabilityErrors`。
+- S07 已修：usage 检查先剥离 `(* *)` 块注释、`'...'`/`"..."` 字符串与 `//` 行注释；配置的 MNM 文件缺失记为 `mnm_missing` 并使预检失败。
 
 ## 本批验证
 

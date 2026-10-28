@@ -64,6 +64,37 @@ Add-Case 'complete plan exits 0' ($exitComplete -eq 0) "exit=$exitComplete"
 Add-Case 'complete plan ok true' ([bool]$completeReport.ok) "ok=$($completeReport.ok)"
 Add-Case 'complete modules 2/2' (([int]$completeReport.complete_modules -eq 2) -and ([int]$completeReport.total_modules -eq 2)) "$($completeReport.complete_modules)/$($completeReport.total_modules)"
 
+# Steps-bearing plan: a planned FB-arguments step or placement check without its
+# receipt must make the module incomplete (no more "missing receipt = true").
+$stepsPlan = Join-Path $WorkRoot 'execution_plan_steps.json'
+[ordered]@{
+  plan_id = 'module-completion-steps'
+  artifact_root = $artifacts
+  variable_sets = @([ordered]@{ module_name = 'ST03'; category = 'fb' })
+  steps = @(
+    [ordered]@{ name = 'import_mnm_3' },
+    [ordered]@{ name = 'verify_module_placement_ST03' },
+    [ordered]@{ name = 'set_fb_arguments_ST03' },
+    [ordered]@{ name = 'set_variables_ST03' }
+  )
+} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $stepsPlan -Encoding UTF8
+Write-Json (Join-Path $artifacts 'import_mnm_3\step_receipt.json') ([ordered]@{ ok = $true; step = 'import_mnm_3' })
+Write-Json (Join-Path $artifacts 'set_variables\module_01_ST03\set_variables_result.json') ([ordered]@{ ok = $true; module = 'ST03' })
+$outStepsMissing = Join-Path $WorkRoot 'out_steps_missing'
+& $tool -PlanPath $stepsPlan -ArtifactsRoot $artifacts -OutDir $outStepsMissing -AllowIncomplete | Out-Null
+$stepsMissingReport = Get-Content -LiteralPath (Join-Path $outStepsMissing 'module_completion.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$stepsReasons = @($stepsMissingReport.incomplete[0].reasons)
+Add-Case 'missing fb arguments receipt is incomplete' ($stepsReasons -contains 'fb_arguments_receipt_missing') ($stepsReasons -join ',')
+Add-Case 'missing placement receipt is incomplete' ($stepsReasons -contains 'placement_receipt_missing') ($stepsReasons -join ',')
+
+Write-Json (Join-Path $artifacts 'module_placement\ST03\step_receipt.json') ([ordered]@{ ok = $true; step = 'placement' })
+Write-Json (Join-Path $artifacts 'set_fb_arguments\module_01_ST03\step_receipt.json') ([ordered]@{ ok = $true; step = 'fbargs' })
+$outStepsComplete = Join-Path $WorkRoot 'out_steps_complete'
+& $tool -PlanPath $stepsPlan -ArtifactsRoot $artifacts -OutDir $outStepsComplete | Out-Null
+$stepsCompleteExit = $LASTEXITCODE
+$stepsCompleteReport = Get-Content -LiteralPath (Join-Path $outStepsComplete 'module_completion.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+Add-Case 'complete once planned receipts exist' ($stepsCompleteExit -eq 0 -and [bool]$stepsCompleteReport.ok) "exit=$stepsCompleteExit ok=$($stepsCompleteReport.ok)"
+
 $failed = @($cases | Where-Object { -not $_.ok })
 $result = [ordered]@{ test = 'module-completion'; passed = @($cases | Where-Object { $_.ok }).Count; failed = $failed.Count; cases = $cases.ToArray(); work_root = $WorkRoot }
 $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $WorkRoot 'test_result.json') -Encoding UTF8
