@@ -94,6 +94,9 @@ function Test-KvVariableCustomDataType([string]$DataType, [string[]]$AllowedCust
 
 function Test-KvVariableDataType([string]$DataType, [string[]]$AllowedCustomDataTypes = @()) {
   if ([string]::IsNullOrWhiteSpace($DataType)) { return $false }
+  # KEYENCE binary data type used by communication FBs (for example the ModbusTCP
+  # client Data argument is declared as _BINARY).
+  if ($DataType -match '^_BINARY(\[[0-9]+(\.\.[0-9]+)?\])?$') { return $true }
   return (Test-KvVariableScalarDataType $DataType) -or
     (Test-KvVariableStringDataType $DataType) -or
     (Test-KvVariableArrayDataType $DataType $AllowedCustomDataTypes) -or

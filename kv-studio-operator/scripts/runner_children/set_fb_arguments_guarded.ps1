@@ -508,7 +508,9 @@ function Wait-FbArgumentForm([int]$ProcessIdValue, [string]$ModuleName, [int]$Se
 }
 
 function Convert-FbArgumentRowsToPasteText([string]$Path, [string]$ExpectedOwner) {
-  $text = Read-KvDelimitedText $Path
+  # Clipboard snapshots carry a UTF-8 BOM; strip it so the first argument name
+  # cannot become "\uFEFFDstAddress" and break the FB interface.
+  $text = (Read-KvDelimitedText $Path).TrimStart([char]0xFEFF)
   $lines = @($text -split "\r?\n" | Where-Object { $_ -ne '' })
   if ($lines.Count -eq 0) {
     Fail-Step 'KV_FB_ARGUMENTS_EMPTY' 'preflight FB arguments' "No rows in $Path" @($Path)
@@ -539,7 +541,8 @@ function Convert-FbArgumentRowsToPasteText([string]$Path, [string]$ExpectedOwner
   $errors = [System.Collections.Generic.List[object]]::new()
   $allowedKinds = @('IN','OUT','IN-OUT')
   foreach ($row in $rows) {
-    $name = ([string]$row.argument_name).Trim()
+    $name = ([string]$row.argument_name).Trim().TrimStart([char]0xFEFF)
+    if ($name) { $row.argument_name = $name }
     $kind = ([string]$row.argument_kind).Trim().ToUpperInvariant()
     $dataType = ([string]$row.data_type).Trim()
     if ([string]$row.owner_program -ne $ExpectedOwner) {
