@@ -1,4 +1,4 @@
-﻿param([string]$WorkRoot = '')
+param([string]$WorkRoot = '')
 
 $ErrorActionPreference = 'Stop'
 
@@ -20,10 +20,10 @@ $planPath = Join-Path $WorkRoot 'execution_plan.json'
 [ordered]@{
   plan_id = 'plan-runner-fixture'
   steps = @(
-    [ordered]@{ name = 'import_structures'; arguments = @('-StructuresTsv', 'unused.tsv') },
-    [ordered]@{ name = 'import_mnm_1'; arguments = @('-ModuleName', 'ST01') },
-    [ordered]@{ name = 'set_fb_arguments_1'; arguments = @('-ModuleName', 'FB_Cylinder') },
-    [ordered]@{ name = 'set_variables_1'; arguments = @('-ModuleName', 'ST01') }
+    [ordered]@{ name = 'import_structures'; arguments = @('-PlanPath', 'unused-structures.json') },
+    [ordered]@{ name = 'import_mnm_1'; arguments = @('-MnmPath', 'unused.mnm') },
+    [ordered]@{ name = 'set_fb_arguments_1'; arguments = @('-FbModuleName', 'FB_Cylinder') },
+    [ordered]@{ name = 'set_variables_1'; arguments = @('-LocalProgramName', 'ST01') }
   )
 } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $planPath -Encoding UTF8
 
@@ -58,9 +58,53 @@ $varsReport = Get-Content -LiteralPath (Join-Path $onlyVars 'plan_run_result.jso
 Add-Case 'stage filter variables exits 0' ($varsExit -eq 0) "exit=$varsExit"
 Add-Case 'stage filter leaves one step' ([int]$varsReport.step_count -eq 1) "steps=$($varsReport.step_count)"
 
+# Main-only plan: no import_structures step must not be required.
+$mainOnly = Join-Path $WorkRoot 'plan_main_only.json'
+[ordered]@{
+  plan_id = 'main-only'
+  steps = @([ordered]@{ name = 'set_variables_main'; arguments = @('-LocalProgramName', 'Main') })
+} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $mainOnly -Encoding UTF8
+$mainRoot = Join-Path $WorkRoot 'run_main_only'
+& $tool -PlanPath $mainOnly -ProjectPath $projectPath -RunRoot $mainRoot -DryRun | Out-Null
+$mainExit = $LASTEXITCODE
+$mainReport = if (Test-Path (Join-Path $mainRoot 'plan_run_result.json')) { Get-Content -LiteralPath (Join-Path $mainRoot 'plan_run_result.json') -Raw -Encoding UTF8 | ConvertFrom-Json } else { $null }
+Add-Case 'main-only plan runs without import_structures' ($mainExit -eq 0 -and $mainReport -and [int]$mainReport.step_count -eq 1) "exit=$mainExit"
+
+# Unknown step names are rejected instead of silently skipped.
+$unknown = Join-Path $WorkRoot 'plan_unknown.json'
+[ordered]@{ plan_id = 'unknown'; steps = @([ordered]@{ name = 'frobnicate_widget'; arguments = @() }) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $unknown -Encoding UTF8
+$unknownExit = 0
+try { & $tool -PlanPath $unknown -ProjectPath $projectPath -RunRoot (Join-Path $WorkRoot 'run_unknown') -DryRun | Out-Null } catch { $unknownExit = 1 }
+Add-Case 'unknown step rejected' ($unknownExit -ne 0) "exit=$unknownExit"
+
+# Plan arguments the runner does not declare are rejected before execution.
+$badArg = Join-Path $WorkRoot 'plan_bad_arg.json'
+[ordered]@{ plan_id = 'bad-arg'; steps = @([ordered]@{ name = 'import_mnm_1'; arguments = @('-NoSuchParameter', 'x') }) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $badArg -Encoding UTF8
+$badArgExit = 0
+try { & $tool -PlanPath $badArg -ProjectPath $projectPath -RunRoot (Join-Path $WorkRoot 'run_bad_arg') -DryRun | Out-Null } catch { $badArgExit = 1 }
+Add-Case 'undeclared runner argument rejected' ($badArgExit -ne 0) "exit=$badArgExit"
+
+# repair_* steps map to the same runners as import_*/set_* steps.
+$repair = Join-Path $WorkRoot 'plan_repair.json'
+[ordered]@{ plan_id = 'repair'; steps = @([ordered]@{ name = 'repair_mnm_1'; arguments = @('-MnmPath', 'unused.mnm') }) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $repair -Encoding UTF8
+& $tool -PlanPath $repair -ProjectPath $projectPath -RunRoot (Join-Path $WorkRoot 'run_repair') -DryRun | Out-Null
+$repairExit = $LASTEXITCODE
+$repairReport = if (Test-Path (Join-Path $WorkRoot 'run_repair\plan_run_result.json')) { Get-Content -LiteralPath (Join-Path $WorkRoot 'run_repair\plan_run_result.json') -Raw -Encoding UTF8 | ConvertFrom-Json } else { $null }
+Add-Case 'repair_* step accepted' ($repairExit -eq 0 -and $repairReport -and [int]$repairReport.step_count -eq 1) "exit=$repairExit"
+
+# CreatedProjectResultPath is only forwarded to runners that declare it.
+$bindRoot = Join-Path $WorkRoot 'run_binding'
+& $tool -PlanPath $planPath -ProjectPath $projectPath -RunRoot $bindRoot -DryRun -CreatedProjectResultPath 'C:\tmp\created.json' | Out-Null
+$bindExit = $LASTEXITCODE
+$bindLog = if (Test-Path (Join-Path $bindRoot 'plan_run.log')) { Get-Content -LiteralPath (Join-Path $bindRoot 'plan_run.log') -Raw -Encoding UTF8 } else { '' }
+Add-Case 'CreatedProjectResultPath forwarded only to declaring runner' ($bindExit -eq 0 -and $bindLog -match 'import_mnm_guarded\.ps1.*CreatedProjectResultPath' -and $bindLog -match 'set_fb_arguments.*CreatedProjectResultPath skipped') "exit=$bindExit"
+
 $failed = @($cases | Where-Object { -not $_.ok })
 $result = [ordered]@{ test = 'plan-runner'; passed = @($cases | Where-Object { $_.ok }).Count; failed = $failed.Count; cases = $cases.ToArray(); work_root = $WorkRoot }
 $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $WorkRoot 'test_result.json') -Encoding UTF8
 $result | ConvertTo-Json -Depth 3
 if ($failed.Count -gt 0) { exit 41 }
 exit 0
+
+
+
