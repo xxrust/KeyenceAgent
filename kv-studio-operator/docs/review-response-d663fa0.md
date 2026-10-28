@@ -8,7 +8,7 @@
 | R02 | 已修（本批） | 步骤名→runner/stage 映射显式化（含 `repair_*`）；未知步骤直接拒绝；plan 参数按 runner 参数块校验；`CreatedProjectResultPath` 只传给声明它的 runner；去掉硬编码 `FB_Cylinder`/强制 `SkipGlobal`；无 `import_structures` 的 Main-only 计划可运行；空 stage 选集拒绝。 |
 | R03 | 已修 | 空剪贴板重试、节点标签去重；删除前复制整列“节点”标签，保存后重开再复制一次：目标节点的所有标签必须消失，非目标标签逐项不变；Modify 要求整列完全不变。|
 | R04 | 已修 | `devices.Count > 1` 与 `Modify/Delete + PreflightOnly` 在 UI 之前直接拒绝；契约测试新增两条反例。 |
-| R05 | 部分修复 | EIP runner 现在：多 KVS 匹配即报 `KV_EIP_PROJECT_AMBIGUOUS`；workflow 把 `ProjectPath` 传入 runner，runner 校验进程命令行包含该路径（`KV_EIP_PROJECT_PATH_MISMATCH`）。按键仍未迁移到共用 guard，留待专门批次。 |
+| R05 | 已修 | EIP 两个 runner 登记 `ui_guard_required`，全部 `SendWait` 改走 guard 的 `Invoke-KvGuardedSendKeysScoped`（校验 foreground 属于本 KVS 进程，误发到别的窗口会失败）；多 KVS 匹配报 `KV_EIP_PROJECT_AMBIGUOUS`，`ProjectPath` 校验命令行。`rename_kv_axes` 也支持 `-ProjectPath` 并按命令行匹配唯一进程。 |
 | R06 | 已修 | 保存后重开回读 + 节点列身份校验（见 R03）：Delete 要求目标节点标签全部消失且非目标不变，Modify 要求节点列不变；`post_ips` 为重开集合，`in_window_ips` 保留窗口内证据。 |
 | R07 | 已修 | `Set-StrictMode`；`$failed` 由 cases 计算；`KV_EIP_CONTRACT_SELFTEST=1` 注入故意失败用例，实测 exit=41。 |
 | R08 | 已修 | live 测试拒绝外部 KVS（`KV_*_KVS_BUSY`），只清理自己启动的 PID；repo 路径由 `$PSScriptRoot` 解析，KVS 路径支持 `KV_STUDIO_EXE`。 |

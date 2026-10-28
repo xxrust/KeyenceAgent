@@ -1,5 +1,6 @@
 ﻿param(
   [Parameter(Mandatory=$true)][string]$MappingPath,
+  [string]$ProjectPath = '',
   [string]$OutDir = ''
 )
 # Renames KV STUDIO axes through the verified "..." property dialog route:
@@ -69,7 +70,19 @@ foreach ($line in (Get-Content -LiteralPath $MappingPath -Encoding UTF8)) {
 }
 if ($mapping.Count -eq 0) { throw 'KV_AXIS_MAPPING_EMPTY' }
 
-$process = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }) | Select-Object -First 1
+$candidates = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })
+if ($ProjectPath) {
+  $matched = @()
+  foreach ($candidate in $candidates) {
+    $cmdLine = [string](Get-CimInstance Win32_Process -Filter "ProcessId=$($candidate.Id)" -ErrorAction SilentlyContinue).CommandLine
+    if ($cmdLine -and $cmdLine -like "*$ProjectPath*") { $matched += $candidate }
+  }
+  if ($matched.Count -eq 0) { throw "KV_AXIS_RENAME_PROJECT_NOT_OPEN: $ProjectPath" }
+  if ($matched.Count -gt 1) { throw "KV_AXIS_RENAME_PROJECT_AMBIGUOUS: $($matched.Count) processes match $ProjectPath" }
+  $process = $matched[0]
+} else {
+  $process = $candidates | Select-Object -First 1
+}
 if (-not $process) { throw 'KV_PROCESS_NOT_RUNNING' }
 $root = [System.Windows.Automation.AutomationElement]::RootElement
 $pidCondition = New-Object System.Windows.Automation.PropertyCondition -ArgumentList @(

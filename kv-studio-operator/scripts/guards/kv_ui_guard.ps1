@@ -444,6 +444,31 @@ function Assert-KvUiForegroundHwnd {
   Stop-KvUiGuard -ErrorCode $code -Step $Step -Message "$message Actual foreground title='$($before.title)' process='$($before.process_name)'." -Evidence @($path)
 }
 
+function Invoke-KvGuardedSendKeysScoped {
+  # Guarded single SendKeys for multi-window workflows (dialogs change foreground
+  # between calls, so the session-level foreground assertion is too strict).
+  # Every call still proves that the target belongs to the expected process owner,
+  # is the current foreground window and matches the expected title.
+  param(
+    [Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,
+    [Parameter(Mandatory=$true)][string]$Step,
+    [Parameter(Mandatory=$true)][string]$Keys,
+    [string]$ExpectedTitleLike = '',
+    [int]$OwnerProcessId = 0,
+    [int]$SleepMs = 150
+  )
+  if ($TargetHwnd -eq [IntPtr]::Zero) { throw "KV_UI_SCOPED_TARGET_MISSING: $Step" }
+  if (-not [KvSharedUiGuardWin32]::IsWindow($TargetHwnd)) { throw "KV_UI_SCOPED_TARGET_NOT_WINDOW: $Step" }
+  $fg = Get-KvForegroundSnapshot
+  if ($fg.hwnd -ne $TargetHwnd.ToInt64()) { throw "KV_UI_SCOPED_FOREGROUND_MISMATCH: $Step foreground=$($fg.hwnd) expected=$($TargetHwnd.ToInt64())" }
+  if ($ExpectedTitleLike -and $fg.title -notlike $ExpectedTitleLike) { throw "KV_UI_SCOPED_TITLE_MISMATCH: $Step title='$($fg.title)' expected='$ExpectedTitleLike'" }
+  if ($OwnerProcessId -gt 0 -and [int]$fg.process_id -ne $OwnerProcessId) { throw "KV_UI_SCOPED_OWNER_MISMATCH: $Step owner=$($fg.process_id) expected=$OwnerProcessId" }
+  $watch = [Diagnostics.Stopwatch]::StartNew()
+  [System.Windows.Forms.SendKeys]::SendWait($Keys)
+  Start-Sleep -Milliseconds $SleepMs
+  Write-KvUiGuardRunLog -Event 'scoped_send' -Data @{ step = $Step; hwnd = $TargetHwnd.ToInt64(); keys = $Keys; title = $fg.title; elapsed_ms = [int]$watch.ElapsedMilliseconds }
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'scoped SendKeys' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
+}
 function Invoke-KvGuardedSendKeys {
   param(
     [Parameter(Mandatory=$true)][IntPtr]$TargetHwnd,

@@ -47,6 +47,7 @@
                                                "Invoke-KvGuardedMouseRightClick",
                                                "Invoke-KvGuardedTreeItemDrag",
                                                "Invoke-KvGuardedSendKeys",
+                                               "Invoke-KvGuardedSendKeysScoped",
                                                "Invoke-KvGuardedSendKeysAllowTargetClose",
                                                "Invoke-KvGuardedShiftTab",
                                                "Invoke-KvGuardedVkTap",
@@ -998,12 +999,14 @@
                                                   {
                                                       "path":  "runner_children/configure_eip_devices_guarded.ps1",
                                                       "status":  "approved",
-                                                      "customer_callable":  false
+                                                      "customer_callable":  false,
+                                                      "ui_guard_required":  true
                                                   },
                                                   {
                                                       "path":  "runner_children/edit_eip_devices_guarded.ps1",
                                                       "status":  "approved",
-                                                      "customer_callable":  false
+                                                      "customer_callable":  false,
+                                                      "ui_guard_required":  true
                                                   }
                                               ],
                     "runner_child_pending":  [

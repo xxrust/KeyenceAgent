@@ -61,6 +61,20 @@ function Log([string]$Name, [hashtable]$Data = @{}) {
   foreach ($k in $Data.Keys) { $row[$k] = $Data[$k] }
   ($row | ConvertTo-Json -Compress -Depth 4) | Add-Content -LiteralPath $log -Encoding UTF8
 }
+# Guarded input: this runner is registered with ui_guard_required, so every
+# SendKeys goes through the shared guard. The scoped variant asserts the target
+# is the current foreground window owned by this KV STUDIO process.
+Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class EipFgWin { [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); }' -ErrorAction SilentlyContinue
+$script:EipGuardRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $script:EipGuardRoot 'guards\kv_ui_guard.ps1')
+Initialize-KvUiGuard -OutDir (Join-Path $OutDir 'guard') | Out-Null
+$script:EipKeyStep = 0
+function Send-KvKeys([string]$Keys, [string]$Step = '', [IntPtr]$Target = [IntPtr]::Zero, [string]$Title = '') {
+  $script:EipKeyStep++
+  if (-not $Step) { $Step = "eip key $script:EipKeyStep" }
+  if ($Target -eq [IntPtr]::Zero) { $Target = [EipFgWin]::GetForegroundWindow() }
+  Invoke-KvGuardedSendKeysScoped -TargetHwnd $Target -Step $Step -Keys $Keys -ExpectedTitleLike $Title -OwnerProcessId $process.Id -SleepMs 120
+}
 function Save-Shot([string]$Name) {
   try {
     Add-Type -AssemblyName System.Drawing
@@ -144,7 +158,7 @@ function Find-Button($rootElement, [string]$name) {
 function Press-Button($rootElement, [string]$name) {
   $b = Find-Button $rootElement $name
   if (-not $b) { return $false }
-  try { $b.SetFocus(); Start-Sleep -Milliseconds 250; [System.Windows.Forms.SendKeys]::SendWait(' ') } catch {
+  try { $b.SetFocus(); Start-Sleep -Milliseconds 250; Send-KvKeys -Keys ' ' -Step 'eip key' } catch {
     $native = [long]$b.Current.NativeWindowHandle
     if ($native -ne 0) { [void][EipEdit.EipEditWin]::SendMessage([IntPtr]$native, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) }
   }
@@ -158,9 +172,9 @@ function Read-DeviceIps([long]$hwnd) {
   Start-Sleep -Milliseconds 400
   [EipEdit.EipEditWin]::Click(($r.L + 300), ($r.T + 760))
   Start-Sleep -Milliseconds 400
-  [System.Windows.Forms.SendKeys]::SendWait('^a')
+  Send-KvKeys -Keys '^a' -Step 'eip key'
   Start-Sleep -Milliseconds 200
-  [System.Windows.Forms.SendKeys]::SendWait('^c')
+  Send-KvKeys -Keys '^c' -Step 'eip key'
   Start-Sleep -Milliseconds 700
   $text = [System.Windows.Forms.Clipboard]::GetText()
   return @($text -split "`r?`n" | Where-Object { $_ -match '^\d{1,3}(\.\d{1,3}){3}$' })
@@ -179,7 +193,7 @@ function Get-NodeLabels([long]$hwnd) {
     [EipEdit.EipEditWin]::Click(($r.L + 18), ($r.T + $dy))
     Start-Sleep -Milliseconds 250
     [System.Windows.Forms.Clipboard]::Clear()
-    [System.Windows.Forms.SendKeys]::SendWait('^c')
+    Send-KvKeys -Keys '^c' -Step 'eip key'
     Start-Sleep -Milliseconds 350
     $text = [System.Windows.Forms.Clipboard]::GetText()
     $cand = @($text -split "`r?`n" | Where-Object { $_ -match '^\d+(-\d+)?$' })
@@ -199,7 +213,7 @@ Start-Sleep -Milliseconds 300
 $selection = $null
 if ($eipNode.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selection)) { try { $selection.Select() } catch {} }
 Start-Sleep -Milliseconds 300
-[System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+Send-KvKeys -Keys '{ENTER}' -Step 'eip key'
 $eipWindow = Wait-Window 'EtherNet/IP 设定' 15 'Afx*'
 if (-not $eipWindow) { Fail 'KV_EIP_SETTINGS_NOT_OPENED' 'EtherNet/IP settings window did not open' }
 Start-Sleep -Milliseconds 800
@@ -224,7 +238,7 @@ Start-Sleep -Milliseconds 400
 # Focus the list and scroll it to the top-left cell before scanning.
 [EipEdit.EipEditWin]::Click(($rect.L + 300), ($rect.T + 762))
 Start-Sleep -Milliseconds 300
-[System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
+Send-KvKeys -Keys '^{HOME}' -Step 'eip key'
 Start-Sleep -Milliseconds 500
 $selected = $false
 $devicePos = 0
@@ -236,7 +250,7 @@ for ($y = $scanTop; $y -le $scanBottom -and -not $selected; $y += 10) {
   [System.Windows.Forms.Clipboard]::Clear()
   [EipEdit.EipEditWin]::Click(($rect.L + 20), $y)
   Start-Sleep -Milliseconds 180
-  [System.Windows.Forms.SendKeys]::SendWait('^c')
+  Send-KvKeys -Keys '^c' -Step 'eip key'
   Start-Sleep -Milliseconds 200
   $lines = @()
   try { $lines = @(([System.Windows.Forms.Clipboard]::GetText() -split "`r?`n") | Where-Object { $_.Trim() -ne '' }) } catch {}
@@ -250,7 +264,7 @@ for ($y = $scanTop; $y -le $scanBottom -and -not $selected; $y += 10) {
   if ($isDeviceRow -and ($lines -contains [string]$node)) {
     $deviceIndex = $devicePos
     Log 'device_row_selected' @{ node = $node; y = $y; index = $deviceIndex }
-    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    Send-KvKeys -Keys '{ENTER}' -Step 'eip key'
     Start-Sleep -Milliseconds 700
     $selected = $true
   } elseif ($isDeviceRow) {
@@ -278,21 +292,21 @@ if ($Action -eq 'Delete') {
   # device. That maps the list position to a tree row without coordinates.
   [EipEdit.EipEditWin]::Click(($rect.L + 67), ($rect.T + 107))
   Start-Sleep -Milliseconds 400
-  [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+  Send-KvKeys -Keys '{DOWN}' -Step 'eip key'
   Start-Sleep -Milliseconds 250
   for ($k = 0; $k -lt $deviceIndex; $k++) {
-    [System.Windows.Forms.SendKeys]::SendWait('{LEFT}')
+    Send-KvKeys -Keys '{LEFT}' -Step 'eip key'
     Start-Sleep -Milliseconds 150
-    [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+    Send-KvKeys -Keys '{DOWN}' -Step 'eip key'
     Start-Sleep -Milliseconds 150
   }
-  [System.Windows.Forms.SendKeys]::SendWait('{DELETE}')
+  Send-KvKeys -Keys '{DELETE}' -Step 'eip key'
   Start-Sleep -Seconds 2
   $confirm = Wait-Window 'EtherNet/IP 设定' 5 '#32770'
   if ($confirm) {
     $el = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$confirm.hwnd)
     if (-not (Press-Button $el '是(Y)')) {
-      [void][System.Windows.Forms.SendKeys]::SendWait('%y')
+      Send-KvKeys -Keys '%y' -Step 'eip key'
     }
     Start-Sleep -Seconds 1
     Log 'delete_confirmed'
@@ -314,11 +328,11 @@ if ($Action -eq 'Delete') {
   # full dotted address; Tab commits (verified).
   [EipEdit.EipEditWin]::Click(($rect.L + 1331), ($rect.T + 222))
   Start-Sleep -Milliseconds 400
-  [System.Windows.Forms.SendKeys]::SendWait('^a')
+  Send-KvKeys -Keys '^a' -Step 'eip key'
   Start-Sleep -Milliseconds 150
-  [System.Windows.Forms.SendKeys]::SendWait($newIp)
+  Send-KvKeys -Keys $newIp -Step 'eip key'
   Start-Sleep -Milliseconds 300
-  [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
+  Send-KvKeys -Keys '{TAB}' -Step 'eip key'
   Start-Sleep -Milliseconds 300
   Log 'ip_fields_written' @{ ip = $newIp }
 }
@@ -369,7 +383,7 @@ while ((Get-Date) -lt $deadline) {
 }
 [void][EipEdit.EipEditWin]::SetForegroundWindow([IntPtr]$process.MainWindowHandle)
 Start-Sleep -Milliseconds 400
-[System.Windows.Forms.SendKeys]::SendWait('^s')
+Send-KvKeys -Keys '^s' -Step 'eip key'
 Start-Sleep -Seconds 3
 $process.Refresh()
 if ($process.MainWindowTitle -match '\*') { Fail 'KV_EIP_PROJECT_SAVE_FAILED' 'project still has unsaved changes after Ctrl+S' }
@@ -408,7 +422,7 @@ for ($attempt = 1; $attempt -le 2 -and ($persistedIps.Count -eq 0 -or $postNodeL
     $selection = $null
     if ($eipNode.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selection)) { try { $selection.Select() } catch {} }
     Start-Sleep -Milliseconds 300
-    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    Send-KvKeys -Keys '{ENTER}' -Step 'eip key'
     $readWindow = Wait-Window 'EtherNet/IP 设定' 15 'Afx*'
     if (-not $readWindow) { throw 'reopened EIP window missing' }
     $persistedIps = @(Read-DeviceIps $readWindow.hwnd)

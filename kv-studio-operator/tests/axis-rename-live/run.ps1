@@ -38,13 +38,17 @@ if (-not (Test-Path -LiteralPath $ProjectPath -PathType Leaf)) {
   Save-Result $true
 }
 
-$process = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }) | Select-Object -First 1
+$projectNeedle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
+function Find-ProjectProcess {
+  @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$projectNeedle*" }) | Select-Object -First 1
+}
+$process = Find-ProjectProcess
 if (-not $process) {
   Start-Process -FilePath 'H:\Keyence\KVS12\KVS\Kvs.exe' -ArgumentList @(('"' + $ProjectPath + '"')) | Out-Null
-  $deadline = (Get-Date).AddSeconds(60)
+  $deadline = (Get-Date).AddSeconds(90)
   do {
     Start-Sleep -Seconds 2
-    $process = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }) | Select-Object -First 1
+    $process = Find-ProjectProcess
   } while (-not $process -and (Get-Date) -lt $deadline)
 }
 Add-Case 'KV STUDIO is running' ($null -ne $process) 'process'
