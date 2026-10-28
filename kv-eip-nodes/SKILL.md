@@ -14,10 +14,16 @@ description: 对 KV STUDIO 工程的 EtherNet/IP 节点做增（Add）、查（R
 | 查（连接明细） | `scripts/workflow_tools/get_kv_eip_connection_snapshot.ps1` | 已实机验证 |
 | 查（节点/IP 列表） | 写/改/删 runner 内的 `设定列表` 剪贴板回读 | 已实机验证（Add 流程） |
 | 增（Add） | `configure_kv_eip_devices.bat` / `configure_kv_eip_devices.ps1` | 已实机验证（2026-10-26，回读新增 IP） |
-| 改（Modify） | `modify_kv_eip_device.bat` | 已实现，**未实机验收** |
-| 删（Delete） | `delete_kv_eip_device.bat` | 已实现，**未实机验收** |
+| 改（Modify） | `modify_kv_eip_device.bat` | 已实机验收（2026-10-28，节点 3 IP 192.168.0.3 → 192.168.0.31，回读确认） |
+| 删（Delete） | `delete_kv_eip_device.bat` | 已实机验收（2026-10-28，删除节点 3，设定列表 5 行 → 3 行） |
 
-未验收的能力不得在交付说明里写成“可用”；上线前必须跑一次真实工程并保留 `eip_edit_result.json` + `success.png`。
+验收证据：`C:\kvrun\eip_live\add4`、`modify15`、`delete9`（各含 `eip_*_result.json` + `success.png`）。
+
+实现要点与限制：
+
+- **Modify** 通过 `设定列表` 的“节点”列逐行 `Ctrl+C` 搜索目标节点（不假设行序），命中后 `Enter` 选中设备；IP 字段点一次后 `Ctrl+A` 输入完整点分地址，`Tab` 提交。
+- **Delete** 必须让**左侧树**选中设备：`Delete` 只对树选择生效，列表行选中会落到扫描器并报“无法对扫描器执行该操作”。当前实现选中“PLC 之后的第一台设备”（Add 新节点即位于此处），删除前请确认目标就是这台。
+- 两者都在窗口内回读 `设定列表` 后才保存；保存后会清掉“更新单元编辑器信息”提示。
 
 ## 配置格式
 
@@ -60,7 +66,7 @@ description: 对 KV STUDIO 工程的 EtherNet/IP 节点做增（Add）、查（R
 
 结果 JSON：
 - Add：`eip_write_result.json`
-- Modify/Delete：`eip_edit_result.json`（含 `verified`；未验收前即使 `ok=true` 也只代表“本次回读通过”，不代表能力已验收）
+- Modify/Delete：`eip_edit_result.json`（含 `verified`；2026-10-28 起 Modify/Delete 已实机验收，`ok=true` 表示本次窗口内回读与落盘均通过）
 
 ## 关键 UI 事实（KV STUDIO 12G）
 

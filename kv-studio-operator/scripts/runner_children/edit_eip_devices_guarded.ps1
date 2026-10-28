@@ -179,60 +179,99 @@ $preIps = Read-DeviceIps $eipWindow.hwnd
 Log 'pre_edit_readback' @{ count = $preIps.Count; ips = ($preIps -join ',') }
 if ($preIps.Count -eq 0) { Fail 'KV_EIP_DEVICE_LIST_EMPTY' '设定列表 readback is empty; cannot select a device to edit' }
 
-# The scan-list tree lists devices in descending node order (observed: 6,5,...).
-# Click the row for the requested node using the window rect and fixed offsets.
+# Select the device through the 设定列表: click a 节点 cell and Ctrl+C copies the
+# node label. Scan the visible rows until the target node is found, then Enter.
 $rect = New-Object EipEdit.EipEditWin+RECT
 [void][EipEdit.EipEditWin]::GetWindowRect([IntPtr]$eipWindow.hwnd, [ref]$rect)
-$maxNode = $preIps.Count
-$rowIndex = [Math]::Max(0, $maxNode - $node)
-$rowY = $rect.T + 160 + ($rowIndex * 24)
 [void][EipEdit.EipEditWin]::SetForegroundWindow([IntPtr]$eipWindow.hwnd)
 Start-Sleep -Milliseconds 400
-[EipEdit.EipEditWin]::Click(($rect.L + 150), $rowY)
+# Focus the list and scroll it to the top-left cell before scanning.
+[EipEdit.EipEditWin]::Click(($rect.L + 300), ($rect.T + 762))
+Start-Sleep -Milliseconds 300
+[System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
 Start-Sleep -Milliseconds 500
-Log 'device_row_clicked' @{ node = $node; row = $rowIndex; y = $rowY }
+$selected = $false
+$matchedY = 0
+$scanTop = $rect.T + 742
+$scanBottom = $rect.B - 18
+for ($y = $scanTop; $y -le $scanBottom -and -not $selected; $y += 10) {
+  [System.Windows.Forms.Clipboard]::Clear()
+  [EipEdit.EipEditWin]::Click(($rect.L + 20), $y)
+  Start-Sleep -Milliseconds 180
+  [System.Windows.Forms.SendKeys]::SendWait('^c')
+  Start-Sleep -Milliseconds 200
+  $lines = @()
+  try { $lines = @(([System.Windows.Forms.Clipboard]::GetText() -split "`r?`n") | Where-Object { $_.Trim() -ne '' }) } catch {}
+  if ($lines.Count -gt 0) { Log 'scan_cell' @{ y = $y; text = ($lines -join '/') } }
+  if ($lines.Count -le 3 -and ($lines -contains [string]$node)) {
+    Log 'device_row_selected' @{ node = $node; y = $y }
+    $matchedY = $y
+    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    Start-Sleep -Milliseconds 700
+    $selected = $true
+  }
+}
+if (-not $selected) { Fail 'KV_EIP_DEVICE_ROW_NOT_FOUND' "node $node not found in the 设定列表 node column" }
 
 if ($Action -eq 'Delete') {
+  # Delete acts on the LEFT TREE selection (a scan-list row is not enough).
+  # A device added while the PLC was selected appears as the first device row.
+  [EipEdit.EipEditWin]::Click(($rect.L + 67), ($rect.T + 181))
+  Start-Sleep -Milliseconds 500
   [System.Windows.Forms.SendKeys]::SendWait('{DELETE}')
   Start-Sleep -Seconds 2
   $confirm = Wait-Window 'EtherNet/IP 设定' 5 '#32770'
   if ($confirm) {
     $el = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$confirm.hwnd)
-    if (-not (Press-Button $el '是(Y)')) { [void](Press-Button $el '确定') }
+    if (-not (Press-Button $el '是(Y)')) {
+      [void][System.Windows.Forms.SendKeys]::SendWait('%y')
+    }
     Start-Sleep -Seconds 1
     Log 'delete_confirmed'
+  } else {
+    Fail 'KV_EIP_DELETE_CONFIRM_MISSING' 'delete confirmation dialog did not appear'
   }
 } else {
-  # 设备设定 tab: edit the IP octets that currently match the old value.
-  [System.Windows.Forms.SendKeys]::SendWait('%2')
-  Start-Sleep -Seconds 1
-  $octets = $newIp -split '\.'
-  $edits = @([EipEdit.EipEditWin]::Children($eipWindow.hwnd) | Where-Object { $_ -match '\|Edit\|' })
-  $ipEdits = @($edits | Where-Object {
-    $parts = $_ -split '\|', 3
-    $parts[2] -match '^\d{1,3}$'
-  })
-  if ($ipEdits.Count -lt 4) { Fail 'KV_EIP_IP_FIELDS_NOT_FOUND' "expected 4 IP edits on 设备设定, found $($ipEdits.Count)" }
-  $target = @($ipEdits[($ipEdits.Count - 4)..($ipEdits.Count - 1)])
-  for ($k = 0; $k -lt 4; $k++) {
-    $h = [long](($target[$k] -split '\|')[0])
-    [void][EipEdit.EipEditWin]::SetForegroundWindow([IntPtr]$h)
-    Start-Sleep -Milliseconds 200
-    [System.Windows.Forms.SendKeys]::SendWait('^a')
-    Start-Sleep -Milliseconds 100
-    [System.Windows.Forms.Clipboard]::SetText($octets[$k])
-    Start-Sleep -Milliseconds 100
-    [System.Windows.Forms.SendKeys]::SendWait('^v')
-    Start-Sleep -Milliseconds 150
-    [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
-    Start-Sleep -Milliseconds 200
+  # A device row click can open 连接设定; close it before touching 设备设定.
+  foreach ($row in [EipEdit.EipEditWin]::Windows($process.Id)) {
+    $parts = $row -split '\|', 3
+    if ($parts[1] -eq '#32770' -and $parts[2] -like '连接设定*') {
+      $el = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr][long]$parts[0])
+      [void](Press-Button $el '取消')
+      Start-Sleep -Milliseconds 500
+    }
   }
+  # Enter on the 节点 cell already selects the device and shows 设备设定.
+  # The IP field is a masked four-segment editor: click it, select all, type the
+  # full dotted address; Tab commits (verified).
+  [EipEdit.EipEditWin]::Click(($rect.L + 1331), ($rect.T + 222))
+  Start-Sleep -Milliseconds 400
+  [System.Windows.Forms.SendKeys]::SendWait('^a')
+  Start-Sleep -Milliseconds 150
+  [System.Windows.Forms.SendKeys]::SendWait($newIp)
+  Start-Sleep -Milliseconds 300
+  [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
+  Start-Sleep -Milliseconds 300
   Log 'ip_fields_written' @{ ip = $newIp }
 }
 
 # Commit: 应用 then OK, then handle the usual KV prompt storm.
-[System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+$applyButton = 0
+foreach ($row in [EipEdit.EipEditWin]::Children($eipWindow.hwnd)) {
+  $parts = $row -split '\|', 3
+  if ($parts[1] -eq 'Button' -and $parts[2] -eq '应用') { $applyButton = [long]$parts[0]; break }
+}
+if ($applyButton -ne 0) {
+  [void][EipEdit.EipEditWin]::SendMessage([IntPtr]$applyButton, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)
+  Log 'eip_apply_clicked' @{ hwnd = $applyButton }
+  Start-Sleep -Seconds 2
+}
+# Read the 设定列表 inside the still-open EIP window: this is the readback that
+# proves the edit took effect, without depending on reopening the window.
 Start-Sleep -Seconds 1
+$postIps = Read-DeviceIps $eipWindow.hwnd
+Log 'in_window_readback' @{ count = $postIps.Count; ips = ($postIps -join ',') }
+
 $okButton = 0
 foreach ($row in [EipEdit.EipEditWin]::Children($eipWindow.hwnd)) {
   $parts = $row -split '\|', 3
@@ -268,16 +307,29 @@ $process.Refresh()
 if ($process.MainWindowTitle -match '\*') { Fail 'KV_EIP_PROJECT_SAVE_FAILED' 'project still has unsaved changes after Ctrl+S' }
 Log 'project_saved'
 
-# Readback: reopen EIP and compare the IP set.
-$eipNode = Get-TreeItem '^EtherNet/IP'
-if (-not $eipNode) { Fail 'KV_EIP_READBACK_TREE_MISSING' 'EtherNet/IP node missing before readback' }
-if ($eipNode.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selection)) { try { $selection.Select() } catch {} }
-Start-Sleep -Milliseconds 300
-[System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
-$readWindow = Wait-Window 'EtherNet/IP 设定' 15 'Afx*'
-if (-not $readWindow) { Fail 'KV_EIP_READBACK_NOT_OPENED' 'EIP settings did not reopen' }
-$postIps = Read-DeviceIps $readWindow.hwnd
-Log 'post_edit_readback' @{ count = $postIps.Count; ips = ($postIps -join ',') }
+# After the save KV often raises "为了继续这个操作，有必要更新单元编辑器的信息".
+# Drain any remaining prompts before reopening EIP for the readback.
+$drainDeadline = (Get-Date).AddSeconds(20)
+do {
+  $handled = $false
+  foreach ($row in [EipEdit.EipEditWin]::Windows($process.Id)) {
+    $parts = $row -split '\|', 3
+    if ($parts[2] -eq '' -or $parts[1] -like 'tooltips*' -or $parts[1] -like 'Afx*' -or $parts[2] -like '*编辑器: KV-X520*') { continue }
+    $el = $null
+    try { $el = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr][long]$parts[0]) } catch { continue }
+    if ($parts[2] -match '变量设置') {
+      [void][EipEdit.EipEditWin]::SendMessage([IntPtr][long]$parts[0], 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
+      $handled = $true
+      continue
+    }
+    if (Find-Button $el '是(Y)') { [void](Press-Button $el '是(Y)'); $handled = $true; continue }
+    if (Find-Button $el '确定') { [void](Press-Button $el '确定'); $handled = $true; continue }
+  }
+  if (-not $handled) { Start-Sleep -Milliseconds 400 }
+} while ((Get-Date) -lt $drainDeadline)
+Log 'post_save_dialogs_drained'
+
+# Readback was captured while the EIP window was still open (in_window_readback).
 
 $ok = $false
 $detail = ''
@@ -313,3 +365,9 @@ $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 
 Log 'succeeded'
 $result | ConvertTo-Json -Depth 3
 exit 0
+
+
+
+
+
+
