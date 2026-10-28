@@ -10,8 +10,8 @@
 #             edit row 39/col 1 -> 1500, then verify the result JSON
 #             (ok=true, exactly one diff at row 39).
 $ErrorActionPreference = 'Stop'
-$repo = 'H:\KeyenceAgent\kv-studio-operator'
-$kvsExe = 'H:\Keyence\KVS12\KVS\Kvs.exe'
+$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$kvsExe = if ($env:KV_STUDIO_EXE) { $env:KV_STUDIO_EXE } else { 'H:\Keyence\KVS12\KVS\Kvs.exe' }
 $fixture = Join-Path $repo 'tests\table-cell\fixtures\QA_BlankProject'
 $openTable = Join-Path $repo 'tests\table-cell\open-table.ps1'
 $verify = Join-Path $repo 'tests\table-cell\verify.ps1'
@@ -21,9 +21,21 @@ if (-not $OutDir) { $OutDir = Join-Path $env:TEMP ('kv-axis-table-edit-' + [guid
 $OutDir = [IO.Path]::GetFullPath($OutDir)
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
-function Stop-Kvs {
-  Get-Process Kvs -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
-  Start-Sleep -Seconds 3
+# The test owns only the KV STUDIO instance it starts; refuse to run when another
+# session is open instead of killing someone else's unsaved project.
+$script:OwnedKvsPid = 0
+function Assert-NoForeignKvs {
+  $other = @(Get-Process Kvs -ErrorAction SilentlyContinue)
+  if ($other.Count -gt 0) {
+    throw ("KV_AXIS_TABLE_KVS_BUSY: {0} KV STUDIO process(es) already running; close them first" -f $other.Count)
+  }
+}
+function Stop-OwnedKvs {
+  if ($script:OwnedKvsPid -gt 0) {
+    Stop-Process -Id $script:OwnedKvsPid -Force -ErrorAction SilentlyContinue
+    $script:OwnedKvsPid = 0
+    Start-Sleep -Seconds 3
+  }
 }
 
 function Invoke-Ps([string]$scriptPath, [string[]]$arguments, [string]$outFile) {
@@ -38,7 +50,7 @@ $results = New-Object System.Collections.Generic.List[object]
 if ($Case -in @('Both', 'Negative')) {
   $negDir = Join-Path $OutDir 'negative'
   New-Item -ItemType Directory -Force -Path $negDir | Out-Null
-  Stop-Kvs
+  Assert-NoForeignKvs
   $r = Invoke-Ps $cellRunner @('-OutDir', $negDir, '-ListOnly') (Join-Path $negDir 'list.out.txt')
   $errText = if (Test-Path $r.ErrFile) { Get-Content $r.ErrFile -Raw -Encoding UTF8 } else { '' }
   $outText = if (Test-Path $r.OutFile) { Get-Content $r.OutFile -Raw -Encoding UTF8 } else { '' }
@@ -58,15 +70,16 @@ if ($Case -in @('Both', 'Positive')) {
   $doc = Join-Path $dest 'DocumentWindowInfo.xml'
   if (Test-Path $doc) { Remove-Item $doc -Force }
   $kpr = Join-Path $dest 'QA_BlankProject.kpr'
-  Stop-Kvs
-  Start-Process -FilePath $kvsExe -ArgumentList @('"' + $kpr + '"')
+  Assert-NoForeignKvs
+  $started = Start-Process -FilePath $kvsExe -ArgumentList @('"' + $kpr + '"') -PassThru
+  $script:OwnedKvsPid = $started.Id
   Start-Sleep -Seconds 20
 
   $openR = Invoke-Ps $openTable @() (Join-Path $posDir 'open_table.out.txt')
   $editDir = Join-Path $posDir 'cell'
   $editR = if ($openR.ExitCode -eq 0) { Invoke-Ps $cellRunner @('-OutDir', $editDir, '-RowIndex', '39', '-Column', '1', '-Value', '1500') (Join-Path $posDir 'edit.out.txt') } else { [pscustomobject]@{ ExitCode = 999 } }
   $verifyR = if ($editR.ExitCode -eq 0) { Invoke-Ps $verify @('-OutDir', $posDir, '-Stage', 'result') (Join-Path $posDir 'verify.out.txt') } else { [pscustomobject]@{ ExitCode = 999 } }
-  Stop-Kvs
+  Stop-OwnedKvs
   $ok = ($openR.ExitCode -eq 0) -and ($editR.ExitCode -eq 0) -and ($verifyR.ExitCode -eq 0)
   $results.Add([pscustomobject]@{ case = 'positive'; ok = $ok; open_table_exit = $openR.ExitCode; edit_exit = $editR.ExitCode; verify_exit = $verifyR.ExitCode; detail = $(if ($ok) { 'table opened, row 39 edited, diff verified' } else { 'one of open/edit/verify failed' }) })
   Write-Host ("[positive] open={0} edit={1} verify={2} -> {3}" -f $openR.ExitCode, $editR.ExitCode, $verifyR.ExitCode, $(if ($ok) { 'PASS' } else { 'FAIL' }))
@@ -85,3 +98,4 @@ $result | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutDir 
 Write-Host ($result | ConvertTo-Json -Depth 5)
 if ($failed.Count -gt 0) { exit 41 }
 exit 0
+

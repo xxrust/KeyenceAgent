@@ -8,10 +8,15 @@
 # Modify or delete an existing EtherNet/IP device in the project that is open in
 # KV STUDIO.
 #
-# STATUS: implemented but NOT yet live-verified (the user asked to hold testing
-# for this round). The runner refuses to report success unless the readback
-# proves the change; until a live acceptance run exists the capability is
-# reported as verified=false in eip_edit_result.json.
+# STATUS: live-verified 2026-10-28 on the sample project and on a copy of the
+# rebuilt supplier project (add/modify/delete; verify with
+# tests\eip-live-cycle\run.bat and C:\kvrun\eip_real evidence). The runner
+# refuses to report success unless the in-window readback proves the change;
+# `verified=true` means this run's readback and save passed, not a blanket
+# capability guarantee.
+#
+# Delete selects the device by its position in the 设定列表 node column and
+# walks the left tree; it is verified for first and second device rows.
 #
 # Config schema:
 #   { "schema_version": 1, "devices": [ { "node_address": 6, "ip_address": "192.168.0.16" } ] }
@@ -193,6 +198,7 @@ Start-Sleep -Milliseconds 500
 $selected = $false
 $devicePos = 0
 $deviceIndex = -1
+$seenDeviceLabels = @{}
 $scanTop = $rect.T + 742
 $scanBottom = $rect.B - 18
 for ($y = $scanTop; $y -le $scanBottom -and -not $selected; $y += 10) {
@@ -203,8 +209,13 @@ for ($y = $scanTop; $y -le $scanBottom -and -not $selected; $y += 10) {
   Start-Sleep -Milliseconds 200
   $lines = @()
   try { $lines = @(([System.Windows.Forms.Clipboard]::GetText() -split "`r?`n") | Where-Object { $_.Trim() -ne '' }) } catch {}
+  if ($lines.Count -eq 0) {
+    # A blank clipboard is a sampling miss, not a row: retry once, then skip.
+    Start-Sleep -Milliseconds 250
+    try { $lines = @(([System.Windows.Forms.Clipboard]::GetText() -split "`r?`n") | Where-Object { $_.Trim() -ne '' }) } catch {}
+  }
   if ($lines.Count -gt 0) { Log 'scan_cell' @{ y = $y; text = ($lines -join '/') } }
-  $isDeviceRow = ($lines.Count -le 3) -and (@($lines | Where-Object { $_ -match '^\d+$' }).Count -eq $lines.Count)
+  $isDeviceRow = ($lines.Count -ge 1) -and ($lines.Count -le 3) -and (@($lines | Where-Object { $_ -match '^\d+$' }).Count -eq $lines.Count)
   if ($isDeviceRow -and ($lines -contains [string]$node)) {
     $deviceIndex = $devicePos
     Log 'device_row_selected' @{ node = $node; y = $y; index = $deviceIndex }
@@ -212,7 +223,11 @@ for ($y = $scanTop; $y -le $scanBottom -and -not $selected; $y += 10) {
     Start-Sleep -Milliseconds 700
     $selected = $true
   } elseif ($isDeviceRow) {
-    $devicePos++
+    $label = [string]$lines[0]
+    if (-not $seenDeviceLabels.ContainsKey($label)) {
+      $seenDeviceLabels[$label] = $true
+      $devicePos++
+    }
   }
 }
 if (-not $selected) { Fail 'KV_EIP_DEVICE_ROW_NOT_FOUND' "node $node not found in the 设定列表 node column" }
@@ -342,20 +357,46 @@ do {
 } while ((Get-Date) -lt $drainDeadline)
 Log 'post_save_dialogs_drained'
 
-# Readback was captured while the EIP window was still open (in_window_readback).
+# Persisted verification: reopen EtherNet/IP after the save and read the list
+# again. In-window evidence alone cannot prove the file kept the change.
+$persistedIps = @()
+for ($attempt = 1; $attempt -le 2 -and $persistedIps.Count -eq 0; $attempt++) {
+  try {
+    $eipNode = Get-TreeItem '^EtherNet/IP'
+    if (-not $eipNode) { throw 'EtherNet/IP tree node missing' }
+    $selection = $null
+    if ($eipNode.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selection)) { try { $selection.Select() } catch {} }
+    Start-Sleep -Milliseconds 300
+    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    $readWindow = Wait-Window 'EtherNet/IP 设定' 15 'Afx*'
+    if (-not $readWindow) { throw 'reopened EIP window missing' }
+    $persistedIps = @(Read-DeviceIps $readWindow.hwnd)
+    $readEl = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$readWindow.hwnd)
+    if (Find-Button $readEl '取消') { [void](Press-Button $readEl '取消') }
+    Start-Sleep -Seconds 1
+    Log 'post_save_reopen_readback' @{ count = $persistedIps.Count; ips = ($persistedIps -join ',') }
+  } catch {
+    Log 'post_save_reopen_failed' @{ attempt = $attempt; message = $_.Exception.Message }
+    $persistedIps = @()
+    Start-Sleep -Seconds 1
+  }
+}
+if ($persistedIps.Count -eq 0 -and $preIps.Count -gt 0) {
+  Fail 'KV_EIP_PERSISTED_READBACK_MISSING' 'reopened EIP readback is empty; cannot prove the change was saved'
+}
 
 $ok = $false
 $detail = ''
 if ($Action -eq 'Delete') {
-  $ok = ($postIps.Count -lt $preIps.Count)
-  $detail = "before=$($preIps.Count) after=$($postIps.Count)"
+  $ok = ($persistedIps.Count -lt $preIps.Count)
+  $detail = "persisted before=$($preIps.Count) after=$($persistedIps.Count)"
 } else {
-  $ok = ($postIps -contains $newIp)
-  $detail = "target=$newIp after=$($postIps -join ',')"
+  $ok = ($persistedIps -contains $newIp)
+  $detail = "persisted target=$newIp after=$($persistedIps -join ',')"
 }
 if (-not $ok) {
   $shot = Save-Shot 'readback.png'
-  $result = [ordered]@{ ok = $false; verified = $false; error_code = 'KV_EIP_EDIT_READBACK_FAILED'; message = $detail; action = $Action; pre = $preIps; post = $postIps; screenshot = $shot }
+  $result = [ordered]@{ ok = $false; verified = $false; error_code = 'KV_EIP_EDIT_READBACK_FAILED'; message = $detail; action = $Action; pre = $preIps; post = $persistedIps; in_window_ips = $postIps; screenshot = $shot }
   $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'eip_edit_result.json') -Encoding UTF8
   Log 'readback_failed' @{ detail = $detail }
   $result | ConvertTo-Json -Depth 3
@@ -370,7 +411,8 @@ $result = [ordered]@{
   node_address = $node
   ip_address = $newIp
   pre_ips = $preIps
-  post_ips = $postIps
+  post_ips = $persistedIps
+  in_window_ips = $postIps
   detail = $detail
   screenshot = $shotOk
 }

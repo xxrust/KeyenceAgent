@@ -11,7 +11,9 @@ $ErrorActionPreference = 'Stop'
 $SkillNames = @(
   'kv-studio-kb-programming',
   'keyence-plc-programmer',
-  'kv-studio-operator'
+  'kv-studio-operator',
+  'kv-eip-nodes',
+  'windows-ui-automation'
 )
 
 function Get-FullPath([string]$Path) {

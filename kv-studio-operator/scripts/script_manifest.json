@@ -1,4 +1,4 @@
-﻿{
+{
     "schema_version":  2,
     "layout_policy":  "role_directories",
     "notes":  [
@@ -479,6 +479,15 @@
                                                  }
                                              ],
                     "customer_workflow":  [
+                                              {
+                                                  "path":  "workflows/configure_kv_eip_devices.ps1",
+                                                  "status":  "published",
+                                                  "customer_callable":  true,
+                                                  "capabilities":  [
+                                                                       "ethernet_ip_device_crud"
+                                                                   ],
+                                                  "execution":  "flat_manifest_steps"
+                                              },
                                               {
                                                   "path":  "workflows/complete_kv_axis_registration.ps1",
                                                   "status":  "pending_validation",

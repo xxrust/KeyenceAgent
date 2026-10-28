@@ -10,8 +10,8 @@
 # The fixture has NU-EP1 (node 1) and DL-EP1 (node 2); the added node becomes
 # node 3 (inserted right after the PLC).
 $ErrorActionPreference = 'Stop'
-$repo = 'H:\KeyenceAgent\kv-studio-operator'
-$kvsExe = 'H:\Keyence\KVS12\KVS\Kvs.exe'
+$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$kvsExe = if ($env:KV_STUDIO_EXE) { $env:KV_STUDIO_EXE } else { 'H:\Keyence\KVS12\KVS\Kvs.exe' }
 $workflow = Join-Path $repo 'scripts\workflows\configure_kv_eip_devices.ps1'
 $fixture = Join-Path $repo 'references\KVX样例程序_v100'
 $fixtureKpr = Join-Path $fixture 'KVX样例程序_v100.kpr'
@@ -21,13 +21,25 @@ $OutDir = [IO.Path]::GetFullPath($OutDir)
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 function Log([string]$m) { Write-Host ((Get-Date).ToString('HH:mm:ss') + '  ' + $m) }
-function Stop-Kvs {
-  Get-Process Kvs -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
-  Start-Sleep -Seconds 3
+# The test owns only the KV STUDIO instance it starts. Refuse to run when another
+# session is open instead of killing someone else's unsaved project.
+$script:OwnedKvsPid = 0
+function Assert-NoForeignKvs {
+  $other = @(Get-Process Kvs -ErrorAction SilentlyContinue)
+  if ($other.Count -gt 0) {
+    throw ("KV_EIP_LIVE_KVS_BUSY: {0} KV STUDIO process(es) already running; close them first" -f $other.Count)
+  }
+}
+function Stop-OwnedKvs {
+  if ($script:OwnedKvsPid -gt 0) {
+    Stop-Process -Id $script:OwnedKvsPid -Force -ErrorAction SilentlyContinue
+    $script:OwnedKvsPid = 0
+    Start-Sleep -Seconds 3
+  }
 }
 
 Log "out_dir=$OutDir"
-Stop-Kvs
+Assert-NoForeignKvs
 $dest = Join-Path $OutDir 'project'
 if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
 Copy-Item $fixture $dest -Recurse
@@ -36,16 +48,17 @@ $docInfo = Join-Path (Split-Path $kpr -Parent) 'DocumentWindowInfo.xml'
 if (Test-Path $docInfo) { Remove-Item $docInfo -Force }
 Log "project=$kpr"
 
-Start-Process -FilePath $kvsExe -ArgumentList @('"' + $kpr + '"')
+$started = Start-Process -FilePath $kvsExe -ArgumentList @('"' + $kpr + '"') -PassThru
+$script:OwnedKvsPid = $started.Id
 $deadline = (Get-Date).AddSeconds(120)
 $ready = $false
 while ((Get-Date) -lt $deadline -and -not $ready) {
   Start-Sleep -Seconds 2
-  $p = Get-Process Kvs -ErrorAction SilentlyContinue | Select-Object -First 1
+  $p = Get-Process -Id $script:OwnedKvsPid -ErrorAction SilentlyContinue
   if ($p -and $p.MainWindowTitle -like '*KVX样例程序_v100*') { $ready = $true }
 }
 if (-not $ready) {
-  Stop-Kvs
+  Stop-OwnedKvs
   throw 'KV_EIP_LIVE_KVS_NOT_READY: project window did not appear in 120s'
 }
 Log 'kvs_ready'
@@ -111,7 +124,7 @@ if ($del.ok) {
   if ($post.Count -ge $pre.Count) { $failures.Add("delete: row count did not shrink ($($pre.Count) -> $($post.Count))") }
 } else { $failures.Add('delete: ' + $del.detail) }
 
-Stop-Kvs
+Stop-OwnedKvs
 
 $result = [ordered]@{
   test = 'eip-live-cycle'

@@ -1,4 +1,4 @@
-﻿param(
+param(
   [string]$ProjectName = '',
   [Parameter(Mandatory=$true)][string]$ProjectPath,
   [Parameter(Mandatory=$true)][string]$DevicesConfigPath,
@@ -35,6 +35,10 @@ foreach ($d in $devices) {
   if ($ip -and ($ip -notmatch '^\d{1,3}(\.\d{1,3}){3}$')) { throw "KV_EIP_CONFIG_INVALID: ip_address is not IPv4: $ip" }
   if ($Action -eq 'Modify' -and -not $ip) { throw 'KV_EIP_CONFIG_INVALID: ip_address is required for Modify' }
 }
+# The runners act on one device; reject unsupported request shapes before any UI
+# work instead of silently ignoring the rest of devices[].
+if ($devices.Count -gt 1) { throw "KV_EIP_BATCH_NOT_SUPPORTED: exactly one device per run is supported, got $($devices.Count)" }
+if ($PreflightOnly -and $Action -ne 'Add') { throw "KV_EIP_PREFLIGHT_ONLY_UNSUPPORTED: PreflightOnly is Add-only, got $Action" }
 
 $operation = if ($Action -eq 'Add') { 'configure_ethernet_ip_devices' } else { 'edit_ethernet_ip_devices' }
 $plan=New-KvWorkflowPlan -ScriptsRoot $root -Operation $operation -ProjectPath $ProjectPath -OutDir $OutDir -TimeoutSeconds $TimeoutSeconds

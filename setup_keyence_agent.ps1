@@ -191,7 +191,9 @@ function Get-KeyenceSkillDirectories([string]$RepoRoot) {
   $names = @(
     'kv-studio-kb-programming',
     'keyence-plc-programmer',
-    'kv-studio-operator'
+    'kv-studio-operator',
+    'kv-eip-nodes',
+    'windows-ui-automation'
   )
   $dirs = [System.Collections.Generic.List[object]]::new()
   foreach ($name in $names) {

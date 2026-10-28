@@ -1,6 +1,7 @@
 ﻿param([string]$WorkRoot = '')
 
 $ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
 
 # Offline contract for the EtherNet/IP write path:
 # - script, workflow and bat exist and are wired together;
@@ -74,8 +75,19 @@ $badIpConfig = Join-Path $WorkRoot 'devices_bad_ip.json'
 $badIpExit = Invoke-TestTool -ScriptPath $workflow -Arguments @('-ProjectPath', $projectPath, '-DevicesConfigPath', $badIpConfig, '-OutDir', (Join-Path $WorkRoot 'plan_badip'), '-PlanOnly')
 Add-Case 'invalid ip rejected before UI' ($badIpExit -ne 0) "exit=$badIpExit"
 
+$batchConfig = Join-Path $WorkRoot 'devices_batch.json'
+[ordered]@{
+  schema_version = 1
+  devices = @(
+    [ordered]@{ model = 'NU-EP1'; node_address = 1; ip_address = '192.168.0.1' },
+    [ordered]@{ model = 'DL-EP1'; node_address = 2; ip_address = '192.168.0.2' }
+  )
+} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $batchConfig -Encoding UTF8
+$batchExit = Invoke-TestTool -ScriptPath $workflow -Arguments @('-ProjectPath', $projectPath, '-DevicesConfigPath', $batchConfig, '-OutDir', (Join-Path $WorkRoot 'plan_batch'), '-PlanOnly')
+Add-Case 'multi-device batch rejected before UI' ($batchExit -ne 0) "exit=$batchExit"
 
-# --- Modify / Delete contract (implemented, live verification pending) ---
+
+# --- Modify / Delete contract (live-verified 2026-10-28) ---
 $editRunner = Join-Path $skillRoot 'scripts\runner_children\edit_eip_devices_guarded.ps1'
 $deleteBat = Join-Path $skillRoot 'delete_kv_eip_device.bat'
 $modifyBat = Join-Path $skillRoot 'modify_kv_eip_device.bat'
@@ -89,7 +101,7 @@ Add-Case 'modify bat routes Action Modify' ($modifyBatText -match '-Action Modif
 $editText = if (Test-Path $editRunner) { Get-Content -LiteralPath $editRunner -Raw -Encoding UTF8 } else { '' }
 Add-Case 'edit runner proves readback' ($editText -match 'KV_EIP_EDIT_READBACK_FAILED') 'runner'
 Add-Case 'edit runner marks verified flag' ($editText -match 'verified = \$false') 'runner'
-Add-Case 'workflow validates Action set' ((Get-Content -LiteralPath $workflow -Raw -Encoding UTF8) -match 'ValidateSet\(..Add..,.Modify..,.Delete..\)') 'workflow'
+Add-Case 'workflow validates Action set' ((Get-Content -LiteralPath $workflow -Raw -Encoding UTF8) -match "ValidateSet\('Add','Modify','Delete'\)") 'workflow'
 
 $delConfig = Join-Path $WorkRoot 'devices_delete.json'
 [ordered]@{ schema_version = 1; devices = @([ordered]@{ node_address = 6 }) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $delConfig -Encoding UTF8
@@ -106,10 +118,19 @@ $modBad = Join-Path $WorkRoot 'devices_modify_noip.json'
 $modBadExit = Invoke-TestTool -ScriptPath $workflow -Arguments @('-ProjectPath', $projectPath, '-DevicesConfigPath', $modBad, '-OutDir', (Join-Path $WorkRoot 'plan_modify_bad'), '-Action', 'Modify', '-PlanOnly')
 Add-Case 'modify without ip rejected' ($modBadExit -ne 0) "exit=$modBadExit"
 
-$result = [ordered]@{ test = 'eip-write-contract'; passed = @($cases | Where-Object { $_.ok }).Count; failed = $failed.Count; cases = $cases.ToArray(); work_root = $WorkRoot }
+$modPreflightExit = Invoke-TestTool -ScriptPath $workflow -Arguments @('-ProjectPath', $projectPath, '-DevicesConfigPath', $modConfig, '-OutDir', (Join-Path $WorkRoot 'plan_modify_preflight'), '-Action', 'Modify', '-PreflightOnly')
+Add-Case 'modify + PreflightOnly rejected' ($modPreflightExit -ne 0) "exit=$modPreflightExit"
+
+# A deliberate failing case proves the harness counts failures instead of
+# reporting a false green. Enabled by KV_EIP_CONTRACT_SELFTEST=1.
+Add-Case 'selftest deliberate failure' ($env:KV_EIP_CONTRACT_SELFTEST -ne '1') 'set KV_EIP_CONTRACT_SELFTEST=1 to invert this case'
+
+$failed = @($cases | Where-Object { -not $_.ok })
+$passed = @($cases | Where-Object { $_.ok })
+$result = [ordered]@{ test = 'eip-write-contract'; passed = $passed.Count; failed = $failed.Count; cases = $cases.ToArray(); work_root = $WorkRoot }
 $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $WorkRoot 'test_result.json') -Encoding UTF8
 $result | ConvertTo-Json -Depth 3
-if ($failed.Count -gt 0) { exit 41 }
+if ($failed.Count -gt 0 -or ($passed.Count + $failed.Count) -ne $cases.Count) { exit 41 }
 exit 0
 
 

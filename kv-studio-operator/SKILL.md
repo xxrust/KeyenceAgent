@@ -1,4 +1,4 @@
-﻿---
+---
 name: kv-studio-operator
 description: 通过稳定 workflow 操作和快照化 KEYENCE KV STUDIO 桌面项目。用于项目创建、语义项目快照、MNM 导入导出、FB 自变量与局部变量、数据类型、编译结果和单元/EtherCAT 配置；从能力清单选择接口，由脚本负责焦点、输入、验证和日志。
 ---
@@ -134,16 +134,15 @@ powershell -File <skill-root>\scripts\workflow_tools\rename_kv_axes.ps1 `
   -MappingPath <轴序号<TAB>新名称.tsv> -OutDir <out>
 ```
 
-脚本走“轴设定页”路径：选中树节点/双击打开该轴页 → 用 `轴No.` 与 `轴名称` 两个字段确认页面已
-切到目标轴 → 改 `轴名称` → TAB 提交 → 校验树节点文字；失败逐条记入 `axis_rename_result.json`
-并 exit 41。手工路径与注意点：
+脚本走“轴设定页 + 属性对话框”路径（2026-10-27 实现）：
 
-1. 打开“轴设定”，选中轴名称节点（如 `轴1: Axis_1`）；
-2. 右键 → 按 `P`；
-3. 按 `TAB`；
-4. 输入新名称；
-5. 按 `TAB`（焦点落到“确定”）；
-6. 按 `ENTER`。
+1. 打开“轴设定”页并选中目标轴节点（如 `轴1: Axis_1`）；
+2. 打开 `属性` 对话框（右键菜单 `P`）；
+3. 对话框里的 `轴名称` 是第二个编辑框；页面上那个内联 `轴名称` 是只读的；
+4. 用 `WM_SETTEXT` 写入新名称 → `确定`；
+5. 校验树节点文字，失败逐条记入 `axis_rename_result.json` 并 exit 41。
+
+注意：UIA `Invoke` 点“...”按钮在该版本会挂死，所以属性值走 `WM_SETTEXT` 而不是模拟键盘。
 
 改完后轴变量名随之变化，程序里的引用才成立。**不要把“清空变量表再粘”当成改名手段**：
 `-ClearGlobalRows` 会连系统轴变量一起删掉，有轴时不要用。
