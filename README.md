@@ -28,6 +28,26 @@
 
 ---
 
+## 里程碑：KV-X520 官方示例程序无人类参与复刻成功
+
+<p align="center">
+  <img src="docs/images/kvx520-sample-replica.png" alt="KV-X520 官方示例程序转换结果 OK（错误数量 0）" width="880"/>
+</p>
+
+2026-10-28，KeyenceAgent 在没有人类参与操作 KV STUDIO 的情况下，完成了基恩士 **KV-X520 官方示例程序**（`KVX样例程序_v100`）的工程复刻：
+
+- 自动重建 EtherCAT 拓扑：`SGDXS` ×1、`CL3C-EC503` ×1、`YAKO MS-MINI3E` ×1、`KV-EC01` ×3、`SV630` ×2
+- 自动补齐 Modbus TCP 客户端功能块（`ModbusTCPClient_Connect` / `ModbusTCPClient_Command`）的接口与内部变量
+- 自动执行转换：**转换结果 OK，错误数量 0**，总步数 44058
+
+需要诚实说明的边界：
+
+- 复刻目标是**可编译、结构对齐的工程**，不保证每个参数都与源程序逐项一致；轴参数、PDO 映射、`KV-EC01` 的模块分配（示例为 2/6 modules）等可能存在差异
+- 目前只验证到 **KV STUDIO 转换通过 + 工程文件回读**，**未在实体 PLC 上运行验证**，也没有做实际 IO / 运动联调
+- 示例中的预留轴、注释和部分显示名可能与原工程不同
+
+---
+
 ## 问题：KV STUDIO 是面向人设计的
 
 <p align="center">
