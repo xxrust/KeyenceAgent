@@ -365,11 +365,7 @@
                                                      "status":  "published",
                                                      "customer_callable":  true,
                                                      "capabilities":  [
-                                                                          "read_only_project_text_snapshot",
-                                                                          "source_snapshot_manifest",
-                                                                          "semantic_project_tree",
-                                                                          "entity_restore_plan",
-                                                                          "version_control_text_index"
+                                                                          "source_snapshot_manifest"
                                                                       ]
                                                  },
                                                  {
@@ -407,10 +403,7 @@
                                                      "path":  "annotate_kv_program_with_comments_core.ps1",
                                                      "status":  "published",
                                                      "customer_callable":  true,
-                                                     "capabilities":  [
-                                                                          "annotate_program_with_device_comments",
-                                                                          "device_comment_coverage"
-                                                                      ],
+                                                     "capabilities":  [],
                                                      "verification":  {
                                                                           "scope":  "non-UI read-only join of the exported device comment table with MNM program bodies; device key normalisation, comment classes, program/library body scope, gap lists and unchanged inputs verified",
                                                                           "reference":  "tests/test_kv_program_comment_join.ps1"
@@ -496,17 +489,17 @@
                                               {
                                                   "path":  "workflows/complete_kv_axis_registration.ps1",
                                                   "status":  "pending_validation",
-                                                  "customer_callable":  true
+                                                  "customer_callable":  false
                                               },
                                               {
                                                   "path":  "workflows/set_kv_axis_pitch.ps1",
                                                   "status":  "pending_validation",
-                                                  "customer_callable":  true
+                                                  "customer_callable":  false
                                               },
                                               {
                                                   "path":  "workflows/set_kv_axis_table_cell.ps1",
                                                   "status":  "pending_validation",
-                                                  "customer_callable":  true
+                                                  "customer_callable":  false
                                               },
                                               {
                                                   "path":  "workflows/save_kv_project_as.ps1",
@@ -659,6 +652,15 @@
                                                   "execution":  "flat_manifest_steps"
                                               },
                                               {
+                                                  "path":  "workflows/verify_kv_plan_integrity.ps1",
+                                                  "status":  "published",
+                                                  "customer_callable":  true,
+                                                  "capabilities":  [
+                                                                       "verify_plan_integrity"
+                                                                   ],
+                                                  "execution":  "composed_verification"
+                                              },
+                                              {
                                                   "path":  "workflows/export_kv_project_text_snapshot.ps1",
                                                   "status":  "published",
                                                   "customer_callable":  true,
@@ -769,10 +771,7 @@
                                                   "path":  "workflows/annotate_kv_program_with_comments.ps1",
                                                   "status":  "published",
                                                   "customer_callable":  true,
-                                                  "capabilities":  [
-                                                                       "annotate_program_with_device_comments",
-                                                                       "device_comment_coverage"
-                                                                   ],
+                                                  "capabilities":  [],
                                                   "execution":  "composed_non_ui_join",
                                                   "verification":  {
                                                                        "scope":  "non-UI regression scenario over synthetic fixtures: coverage numbers, gap lists, input hashes and library body scope",

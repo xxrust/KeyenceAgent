@@ -19,6 +19,31 @@ foreach ($entry in @($entries | Where-Object { $_.class -eq 'customer_workflow' 
   if (-not $entry.runner_children.Count -or -not $entry.execution) { throw "KV_WORKFLOW_DEPENDENCIES_REQUIRED: $($entry.path)" }
   foreach ($child in $entry.runner_children) { $null=Resolve-KvStudioOperatorScriptPath -ScriptRoot $root -Name $child -Classes runner_child_approved }
 }
+# R10: a pending workflow must not be advertised as publicly callable, every
+# capability must have exactly one owner, and the offline plan-integrity tools
+# must be wired into at least one workflow.
+foreach ($entry in @($entries | Where-Object { $_.class -eq 'customer_workflow' -and $_.status -eq 'pending_validation' -and $_.customer_callable })) {
+  throw "KV_PENDING_WORKFLOW_PUBLIC: $($entry.path)"
+}
+$capabilityOwners = @{}
+foreach ($entry in $entries) {
+  foreach ($capability in @($entry.capabilities)) {
+    if (-not $capability) { continue }
+    if ($capabilityOwners.ContainsKey($capability)) { throw "KV_CAPABILITY_DUPLICATE: $capability ($($capabilityOwners[$capability]), $($entry.path))" }
+    $capabilityOwners[$capability] = $entry.path
+  }
+}
+$wiredTools = @(
+  'get_kv_module_completion.ps1',
+  'plan_kv_variable_dependencies.ps1',
+  'verify_kv_variable_usage.ps1'
+)
+foreach ($tool in $wiredTools) {
+  $callers = @(Get-ChildItem -LiteralPath $root -File -Recurse -Filter '*.ps1' |
+    Where-Object { $_.Name -ne $tool } |
+    Select-String -SimpleMatch $tool -ErrorAction SilentlyContinue)
+  if ($callers.Count -eq 0) { throw "KV_WORKFLOW_TOOL_UNWIRED: $tool" }
+}
 $query=& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'get_kv_capabilities.ps1') -Capability snapshot_fb_arguments | ConvertFrom-Json
 if (-not $query.ok -or $query.operations.Count -ne 1 -or @($query.operations[0].parameters | Where-Object name -eq SnapshotOnly).Count -ne 1) { throw 'KV_PUBLIC_CAPABILITY_DISCOVERY_FAILED' }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null

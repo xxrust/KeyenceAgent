@@ -13,7 +13,7 @@
 | R07 | 已修 | `Set-StrictMode`；`$failed` 由 cases 计算；`KV_EIP_CONTRACT_SELFTEST=1` 注入故意失败用例，实测 exit=41。 |
 | R08 | 已修 | live 测试拒绝外部 KVS（`KV_*_KVS_BUSY`），只清理自己启动的 PID；repo 路径由 `$PSScriptRoot` 解析，KVS 路径支持 `KV_STUDIO_EXE`。 |
 | R09 | 已修 | skip 不计 passed；no-summary/stale-result/timeout/missing 均为失败；空 `-Only` 选集 exit 41；`eip-live-cycle` 接入 live 套件；`test_system_layout` 通过新 `tests/system-layout` wrapper 接入 offline 套件。 |
-| R10 | 部分修复 | EIP workflow 登记 customer_callable；9 个未分类脚本全部登记；两组同名脚本改为 `*_core.ps1` 并更新引用；layout gate 现在只对 published 非 composed workflow 要求 runner_children。pending/public 分层与 capability 去重仍在。 |
+| R10 | 已修 | 9 个未分类脚本全部登记；同名脚本改为 `*_core.ps1`；3 个 pending workflow 改为 `customer_callable:false`；capability 改为单一 owner（core 工具只保留 `source_snapshot_manifest`，其余归 workflow）；新增 `workflows/verify_kv_plan_integrity.ps1` 把 completion/dependency/usage 三个工具接成一条离线校验；layout gate 增加 pending-public、capability 重复、工具未接线三项断言。 |
 | R11 | 已修 | `setup_keyence_agent.ps1` 与 `install_keyence_dev_links.ps1` 的 skill 清单加入 `kv-eip-nodes`、`windows-ui-automation`。 |
 | R12 | 已修（EIP/轴改名） | EIP runner 状态注释、`verification-contract.md` 改为当前路线（节点列选行、整串 IP、树遍历删除、保存后重开）；轴改名文档改为属性对话框路线。统一能力状态索引仍待建。 |
 
