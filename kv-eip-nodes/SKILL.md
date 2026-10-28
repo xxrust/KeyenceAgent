@@ -15,14 +15,19 @@ description: 对 KV STUDIO 工程的 EtherNet/IP 节点做增（Add）、查（R
 | 查（节点/IP 列表） | 写/改/删 runner 内的 `设定列表` 剪贴板回读 | 已实机验证（Add 流程） |
 | 增（Add） | `configure_kv_eip_devices.bat` / `configure_kv_eip_devices.ps1` | 已实机验证（2026-10-26，回读新增 IP） |
 | 改（Modify） | `modify_kv_eip_device.bat` | 已实机验收（2026-10-28，节点 3 IP 192.168.0.3 → 192.168.0.31，回读确认） |
-| 删（Delete） | `delete_kv_eip_device.bat` | 已实机验收（2026-10-28，删除节点 3，设定列表 5 行 → 3 行） |
+| 删（Delete） | `delete_kv_eip_device.bat` | 已实机验收（2026-10-28；修复为按节点精确删除，实测删节点 1/节点 3 均命中目标） |
 
-验收证据：`C:\kvrun\eip_live\add4`、`modify15`、`delete9`（各含 `eip_*_result.json` + `success.png`）。
+验收证据：`C:\kvrun\eip_live\add4`、`modify15`、`delete9`，以及真实工程副本上的 `C:\kvrun\eip_real\*`。
 
 实现要点与限制：
 
 - **Modify** 通过 `设定列表` 的“节点”列逐行 `Ctrl+C` 搜索目标节点（不假设行序），命中后 `Enter` 选中设备；IP 字段点一次后 `Ctrl+A` 输入完整点分地址，`Tab` 提交。
-- **Delete** 必须让**左侧树**选中设备：`Delete` 只对树选择生效，列表行选中会落到扫描器并报“无法对扫描器执行该操作”。当前实现选中“PLC 之后的第一台设备”（Add 新节点即位于此处），删除前请确认目标就是这台。
+- **Delete** 必须让**左侧树**选中设备（列表行选中会落到扫描器并报“无法对扫描器执行该操作”）。实现方式：
+  1. 扫描“节点”列，按设备行计数得到目标设备在列表中的序号 `index`；
+  2. 点击 CPU 行 → `Down` 进入第一台设备；
+  3. 重复 `index` 次：`Left`（折叠子连接）→ `Down`（下一台设备）；
+  4. `Delete` → 确认框按 `是(Y)` / `Alt+Y`。
+  实测：两台设备时指定节点 1（第二台）删除后回读只剩 `192.168.0.2`，未误删第一台。
 - 两者都在窗口内回读 `设定列表` 后才保存；保存后会清掉“更新单元编辑器信息”提示。
 
 ## 配置格式

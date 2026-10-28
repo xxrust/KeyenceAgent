@@ -191,7 +191,8 @@ Start-Sleep -Milliseconds 300
 [System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
 Start-Sleep -Milliseconds 500
 $selected = $false
-$matchedY = 0
+$devicePos = 0
+$deviceIndex = -1
 $scanTop = $rect.T + 742
 $scanBottom = $rect.B - 18
 for ($y = $scanTop; $y -le $scanBottom -and -not $selected; $y += 10) {
@@ -203,21 +204,33 @@ for ($y = $scanTop; $y -le $scanBottom -and -not $selected; $y += 10) {
   $lines = @()
   try { $lines = @(([System.Windows.Forms.Clipboard]::GetText() -split "`r?`n") | Where-Object { $_.Trim() -ne '' }) } catch {}
   if ($lines.Count -gt 0) { Log 'scan_cell' @{ y = $y; text = ($lines -join '/') } }
-  if ($lines.Count -le 3 -and ($lines -contains [string]$node)) {
-    Log 'device_row_selected' @{ node = $node; y = $y }
-    $matchedY = $y
+  $isDeviceRow = ($lines.Count -le 3) -and (@($lines | Where-Object { $_ -match '^\d+$' }).Count -eq $lines.Count)
+  if ($isDeviceRow -and ($lines -contains [string]$node)) {
+    $deviceIndex = $devicePos
+    Log 'device_row_selected' @{ node = $node; y = $y; index = $deviceIndex }
     [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
     Start-Sleep -Milliseconds 700
     $selected = $true
+  } elseif ($isDeviceRow) {
+    $devicePos++
   }
 }
 if (-not $selected) { Fail 'KV_EIP_DEVICE_ROW_NOT_FOUND' "node $node not found in the 设定列表 node column" }
 
 if ($Action -eq 'Delete') {
-  # Delete acts on the LEFT TREE selection (a scan-list row is not enough).
-  # A device added while the PLC was selected appears as the first device row.
-  [EipEdit.EipEditWin]::Click(($rect.L + 67), ($rect.T + 181))
-  Start-Sleep -Milliseconds 500
+  # Delete acts on the LEFT TREE selection. Traverse from the PLC: Down enters
+  # the first device, Left collapses its children, Down moves to the next
+  # device. That maps the list position to a tree row without coordinates.
+  [EipEdit.EipEditWin]::Click(($rect.L + 67), ($rect.T + 107))
+  Start-Sleep -Milliseconds 400
+  [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+  Start-Sleep -Milliseconds 250
+  for ($k = 0; $k -lt $deviceIndex; $k++) {
+    [System.Windows.Forms.SendKeys]::SendWait('{LEFT}')
+    Start-Sleep -Milliseconds 150
+    [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+    Start-Sleep -Milliseconds 150
+  }
   [System.Windows.Forms.SendKeys]::SendWait('{DELETE}')
   Start-Sleep -Seconds 2
   $confirm = Wait-Window 'EtherNet/IP 设定' 5 '#32770'
