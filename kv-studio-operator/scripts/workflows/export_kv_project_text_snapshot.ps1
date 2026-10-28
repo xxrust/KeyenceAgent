@@ -3,15 +3,18 @@ param(
   [Parameter(Mandatory=$true)][string]$OutDir,
   [int]$TimeoutSeconds = 600,
   [switch]$PlanOnly,
+  [switch]$Resume,
+  [string]$SnapshotId = 'snapshot',
   [switch]$KeepProjectOpen
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $snapshotScript = Join-Path $root 'export_kv_project_text_snapshot_core.ps1'
 if (-not (Test-Path -LiteralPath $snapshotScript -PathType Leaf)) { throw "Snapshot script missing: $snapshotScript" }
-$snapshotId = 'snapshot'
+$snapshotId = if ($SnapshotId) { $SnapshotId } else { 'snapshot' }
 $args = @('-ProjectPath',$ProjectPath,'-OutDir',$OutDir,'-SnapshotId',$snapshotId,'-TimeoutSeconds',[string]$TimeoutSeconds)
 if ($PlanOnly) { $args += '-PlanOnly' }
+if ($Resume) { $args += '-Resume' }
 if ($KeepProjectOpen) { $args += '-KeepProjectOpen' }
 & powershell -STA -NoProfile -ExecutionPolicy Bypass -File $snapshotScript @args
 $exit = if ($LASTEXITCODE -is [int]) { [int]$LASTEXITCODE } else { 0 }

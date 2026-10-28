@@ -15,6 +15,9 @@ param(
   [string]$SnapshotId = '',
   [int]$TimeoutSeconds = 600,
   [switch]$PlanOnly,
+  # Resume: reuse completed stages recorded in <snapshot>/snapshot_state.json
+  # when the project fingerprint and the stage inputs are unchanged.
+  [switch]$Resume,
   # Ordinary program local tables are captured by default. Pass an explicit
   # list to limit the run, or -SkipProgramLocals for the old FB-only behavior.
   [string[]]$ProgramLocalModules = @(),
@@ -42,15 +45,85 @@ function Fingerprint([string]$Root) {
   $bytes=[Text.Encoding]::UTF8.GetBytes($lines); $hash=([Security.Cryptography.SHA256]::Create().ComputeHash($bytes) | ForEach-Object {$_.ToString('x2')}) -join ''
   [ordered]@{algorithm='sha256-of-relative-path-length-file-sha256';root=$Root;hash=$hash;file_count=$entries.Count;files=@($entries)}
 }
-function Invoke-Child([string]$Script,[string[]]$Arguments,[string]$ResultPath,[string]$Label) {
+function Get-StageInputHash([string]$Script,[string[]]$Arguments) {
+  $scriptHash = if($Script -and (Test-Path -LiteralPath $Script -PathType Leaf)) { (Get-FileHash -LiteralPath $Script -Algorithm SHA256).Hash.ToLowerInvariant() } else { '' }
+  # Volatile arguments must not invalidate a completed stage: the MNM export uses
+  # a fresh temporary WorkRoot each run, and a longer timeout does not change the
+  # produced artifacts.
+  $stable=New-Object System.Collections.Generic.List[string]
+  $skipNext=$false
+  foreach($argument in @($Arguments)){
+    if($skipNext){ $skipNext=$false; continue }
+    if([string]$argument -in @('-WorkRoot','-TimeoutSeconds')){ $skipNext=$true; continue }
+    $stable.Add([string]$argument)
+  }
+  $material = @($scriptHash, [string]$fingerprint.hash, ($stable -join "`u{1}")) -join "`u{2}"
+  $bytes=[Text.Encoding]::UTF8.GetBytes($material)
+  (([Security.Cryptography.SHA256]::Create().ComputeHash($bytes)) | ForEach-Object {$_.ToString('x2')}) -join ''
+}
+function Save-SnapshotState {
+  if($PlanOnly -or -not $script:snapshotState){ return }
+  $script:snapshotState.updated_at=(Get-Date).ToUniversalTime().ToString('o')
+  Write-Json $script:snapshotStatePath $script:snapshotState 20
+}
+function Test-StageReusable([string]$Label,[string]$InputHash) {
+  $script:lastResumeReason='unknown'
+  if(-not $Resume){ $script:lastResumeReason='resume_disabled'; return $null }
+  if($script:resumeInvalidated){ $script:lastResumeReason='fingerprint_changed'; return $null }
+  $uiStages=@('mnm_export','device_comments','structure_export','variables_snapshot','program_variables')
+  if(($Label -in $uiStages) -or ($Label -like 'fb_variables_*') -or ($Label -like 'fb_arguments_*')){
+    $uiCopy=[string]$script:snapshotState.ui_project_path
+    if(-not $uiCopy -or -not (Test-Path -LiteralPath $uiCopy -PathType Leaf)){ $script:lastResumeReason='ui_copy_missing'; return $null }
+  }
+  $stage=$script:snapshotState.stages[$Label]
+  if(-not $stage){ $script:lastResumeReason='stage_absent'; return $null }
+  if([string]$stage.input_hash -ne $InputHash){ $script:lastResumeReason='input_changed'; return $null }
+  if([string]$stage.status -notin @('completed','reused','skipped')){ $script:lastResumeReason='status_not_reusable'; return $null }
+  if($stage.ok -ne $true){ $script:lastResumeReason='not_ok'; return $null }
+  if($stage.result_path -and -not (Test-Path -LiteralPath ([string]$stage.result_path) -PathType Leaf)){ $script:lastResumeReason='result_missing'; return $null }
+  $script:lastResumeReason='reused'
+  return $stage
+}
+function Set-StageRequiresPath([string]$Label,[string[]]$Paths) {
+  if($PlanOnly){ return }
+  $stage=$script:snapshotState.stages[$Label]
+  if(-not $stage){ return }
+  Save-SnapshotState
+}
+function Set-StageSkipped([string]$Label,[string]$Reason) {
+  if($PlanOnly){ return }
+  $stage=$script:snapshotState.stages[$Label]
+  if(-not $stage){ return }
+  $stage.status='skipped'; $stage.ok=$true; $stage.reason=$Reason
+  Save-SnapshotState
+}
+function Invoke-Child([string]$Script,[string[]]$Arguments,[string]$ResultPath,[string]$Label,[string[]]$ResetPaths = @()) {
   $request=[ordered]@{label=$Label;script=$Script;arguments=$Arguments;result_path=$ResultPath;plan_only=[bool]$PlanOnly}
   Write-Json (Join-Path $rawRoot ($Label+'_request.json')) $request 10
   if($PlanOnly){ return [ordered]@{ok=$true;status='planned';label=$Label;result_path=$ResultPath} }
+  $inputHash=Get-StageInputHash $Script $Arguments
+  $reusable=Test-StageReusable $Label $inputHash
+  try { [IO.File]::AppendAllText((Join-Path $rawRoot 'resume_decisions.jsonl'), ((@{label=$Label;reused=[bool]$reusable;reason=$script:lastResumeReason;input_hash=$inputHash} | ConvertTo-Json -Compress) + [Environment]::NewLine)) } catch {}
+  if($reusable){
+    $saved=$null
+    if(Test-Path -LiteralPath $ResultPath -PathType Leaf){ try{$saved=Get-Content -Raw -LiteralPath $ResultPath -Encoding UTF8|ConvertFrom-Json}catch{} }
+    $script:reusedStages += $Label
+    return [ordered]@{ok=$true;status='reused';label=$Label;exit_code=0;result_path=$ResultPath;result=$saved;reused=$true}
+  }
+  foreach($resetPath in @($ResetPaths)){
+    if($resetPath -and (Test-Path -LiteralPath $resetPath)){ Remove-Item -LiteralPath $resetPath -Recurse -Force -ErrorAction SilentlyContinue }
+  }
   & powershell -STA -NoProfile -ExecutionPolicy Bypass -File $Script @Arguments *> (Join-Path $rawRoot ($Label+'_stdout.txt'))
   $exit=if($LASTEXITCODE -is [int]){[int]$LASTEXITCODE}else{0}
   $result=$null
   if(Test-Path -LiteralPath $ResultPath -PathType Leaf){try{$result=Get-Content -Raw -LiteralPath $ResultPath -Encoding UTF8|ConvertFrom-Json}catch{}}
-  [ordered]@{ok=($exit -eq 0 -and $result -and $result.ok -eq $true);status=if($exit -eq 0){'completed'}else{'failed'};label=$Label;exit_code=$exit;result_path=$ResultPath;result=$result}
+  $status=if($exit -eq 0){'completed'}else{'failed'}
+  $script:snapshotState.stages[$Label]=[ordered]@{
+    status=$status; ok=($exit -eq 0 -and $result -and $result.ok -eq $true); exit_code=$exit; input_hash=$inputHash
+    result_path=$ResultPath; requires_paths=@(); updated_at=(Get-Date).ToUniversalTime().ToString('o')
+  }
+  Save-SnapshotState
+  [ordered]@{ok=($exit -eq 0 -and $result -and $result.ok -eq $true);status=$status;label=$Label;exit_code=$exit;result_path=$ResultPath;result=$result}
 }
 function Get-KvsExe {
   $loader=Join-Path $scriptRoot 'Import-KvStudioOperatorConfig.ps1'
@@ -101,20 +174,44 @@ $uiLifecycle=[ordered]@{
 }
 $mnmWorkRoot=''
 $exitCode=1
+$snapshotReady=$false
+$snapshotStatePath=Join-Path $snapshotRoot 'snapshot_state.json'
+$script:snapshotStatePath=$snapshotStatePath
+$script:reusedStages=@()
+$script:resumeInvalidated=$false
+$script:snapshotState=[ordered]@{
+  schema_version=1; snapshot_id=$SnapshotId; project_path=$ProjectPath; project_fingerprint=$fingerprint.hash
+  updated_at=''; resumed=[bool]$Resume; ui_project_path=''; stages=[ordered]@{}
+}
+if($Resume){
+  if(-not(Test-Path -LiteralPath $snapshotStatePath -PathType Leaf)){ throw "KV_SNAPSHOT_RESUME_STATE_MISSING: $snapshotStatePath" }
+  $loadedState=Get-Content -Raw -LiteralPath $snapshotStatePath -Encoding UTF8 | ConvertFrom-Json
+  if([string]$loadedState.project_fingerprint -ne [string]$fingerprint.hash){
+    $script:resumeInvalidated=$true
+    Write-Json (Join-Path $rawRoot 'resume_invalidated.json') ([ordered]@{reason='project_fingerprint_changed';previous=[string]$loadedState.project_fingerprint;current=[string]$fingerprint.hash}) 4
+  } else {
+    $script:snapshotState.ui_project_path=[string]$loadedState.ui_project_path
+    foreach($property in $loadedState.stages.PSObject.Properties){
+      $stage=[ordered]@{}
+      foreach($field in $property.Value.PSObject.Properties){ $stage[$field.Name]=$field.Value }
+      $script:snapshotState.stages[$property.Name]=$stage
+    }
+  }
+}
 
 try {
 $inventoryInitial=Join-Path $rawRoot 'inventory_initial'
 $inventoryInitialResult=Join-Path $inventoryInitial 'project_inventory.json'
 $inventoryArgs=@('-ProjectPath',$ProjectPath,'-OutDir',$inventoryInitial)
-$inventoryStep=Invoke-Child (Join-Path $scriptRoot 'export_kv_project_inventory.ps1') $inventoryArgs $inventoryInitialResult 'inventory_initial'
+$inventoryStep=Invoke-Child (Join-Path $scriptRoot 'export_kv_project_inventory.ps1') $inventoryArgs $inventoryInitialResult 'inventory_initial' -ResetPaths @($inventoryInitial)
 $initial=$null; if(Test-Path $inventoryInitialResult){try{$initial=Get-Content -Raw $inventoryInitialResult|ConvertFrom-Json}catch{}}
 
 $mnmOut=Join-Path $rawRoot 'mnm'; $mnmExportDir=Join-Path $rawRoot 'mnm_export'; $mnmTextDir=Join-Path $textRoot 'mnm'
 $mnmWorkflow=Join-Path $scriptRoot 'workflows\export_mnm_project_copy_default_folder.ps1'
 $mnmResult=Join-Path $mnmOut 'export_mnm_project_copy_result.json'
 $mnmWorkRoot=Join-Path ([IO.Path]::GetTempPath()) ('kv_mnm_snapshot_'+[guid]::NewGuid().ToString('N').Substring(0,8))
-$mnmArgs=@('-ProjectPath',$ProjectPath,'-ExportDir',$mnmExportDir,'-OutDir',$mnmOut,'-WorkRoot',$mnmWorkRoot,'-AllowWorkRootOutsideExportDir','-TimeoutSeconds',[string]$TimeoutSeconds)
-$mnmStep=Invoke-Child $mnmWorkflow $mnmArgs $mnmResult 'mnm_export'
+$mnmArgs=@('-ProjectPath',$ProjectPath,'-ExportDir',$mnmExportDir,'-OutDir',$mnmOut,'-WorkRoot',$mnmWorkRoot,'-AllowWorkRootOutsideExportDir','-AllowOverwrite','-TimeoutSeconds',[string]$TimeoutSeconds)
+$mnmStep=Invoke-Child $mnmWorkflow $mnmArgs $mnmResult 'mnm_export' -ResetPaths @($mnmExportDir)
 $mnmWorkspacePlanPath=Join-Path $mnmOut 'artifacts\export_workspace\export_workspace_plan.json'
 if(Test-Path -LiteralPath $mnmWorkspacePlanPath -PathType Leaf){
   try{
@@ -130,6 +227,8 @@ if(Test-Path -LiteralPath $mnmWorkspacePlanPath -PathType Leaf){
 }
 $uiLifecycle.ui_project_path=$uiProjectPath
 $uiLifecycle.process_id=$uiProcessId
+$script:snapshotState.ui_project_path=$uiProjectPath
+if($mnmStep.ok){ Save-SnapshotState }
 if($mnmStep.ok){
   New-Item -ItemType Directory -Force -Path $mnmTextDir | Out-Null
   foreach($f in @(Get-ChildItem -LiteralPath $mnmExportDir -Filter '*.mnm' -File -Recurse -ErrorAction SilentlyContinue)){ Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $mnmTextDir $f.Name) -Force }
@@ -156,8 +255,8 @@ $commentsExportDir=Join-Path $rawRoot 'comments_export'
 $commentsTextDir=Join-Path $textRoot 'comments'
 $commentsWorkflow=Join-Path $scriptRoot 'workflows\export_kv_device_comments.ps1'
 $commentsResult=Join-Path $commentsOut 'workflow_result.json'
-$commentsArgs=@('-ProjectPath',$uiProjectPath,'-CommentsDir',$commentsExportDir,'-OutDir',$commentsOut,'-FileBaseName','device_comments','-TimeoutSeconds',[string]$TimeoutSeconds)
-$commentsStep=Invoke-Child $commentsWorkflow $commentsArgs $commentsResult 'device_comments'
+$commentsArgs=@('-ProjectPath',$uiProjectPath,'-CommentsDir',$commentsExportDir,'-OutDir',$commentsOut,'-FileBaseName','device_comments','-KeepProjectOpenAfterExport','-TimeoutSeconds',[string]$TimeoutSeconds)
+$commentsStep=Invoke-Child $commentsWorkflow $commentsArgs $commentsResult 'device_comments' -ResetPaths @($commentsExportDir)
 $commentsCsv=Join-Path $commentsExportDir 'device_comments.csv'
 if($commentsStep.ok -and (Test-Path -LiteralPath $commentsCsv -PathType Leaf)){
   New-Item -ItemType Directory -Force -Path $commentsTextDir | Out-Null
@@ -194,7 +293,7 @@ foreach($name in @($fbModules|Sort-Object -Unique)){
 $structureOut=Join-Path $rawRoot 'structures'; $structureResult=Join-Path $structureOut 'workflow_result.json'
 $structureWorkflow=Join-Path $scriptRoot 'workflows\export_kv_structure_definitions.ps1'
 $structureArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$structureOut,'-TimeoutSeconds',[string]$TimeoutSeconds)
-$structureStep=Invoke-Child $structureWorkflow $structureArgs $structureResult 'structure_export'
+$structureStep=Invoke-Child $structureWorkflow $structureArgs $structureResult 'structure_export' -ResetPaths @($structureOut)
 $structureJson=Join-Path $structureOut 'structure_definitions.json'
 if(Test-Path $structureJson){Copy-Item $structureJson (Join-Path $textRoot 'structure_definitions.json') -Force}
 
@@ -204,7 +303,7 @@ $variablesOut=Join-Path $rawRoot 'variables'; $variablesResult=Join-Path $variab
 $globalVariablesWorkflow=Join-Path $scriptRoot 'workflows\snapshot_kv_global_variables_all_groups.ps1'
 $variablesArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$variablesOut)
 $variablesArgs += @('-TimeoutSeconds',[string]$TimeoutSeconds)
-$variablesStep=Invoke-Child $globalVariablesWorkflow $variablesArgs $variablesResult 'variables_snapshot'
+$variablesStep=Invoke-Child $globalVariablesWorkflow $variablesArgs $variablesResult 'variables_snapshot' -ResetPaths @($variablesOut)
 $allVariableSnapshots=@()
 $variableSnapshotPath=Join-Path $variablesOut 'artifacts\global_variables_all_groups\variable_snapshot_result.json'
 if(Test-Path $variableSnapshotPath){
@@ -223,7 +322,7 @@ foreach($name in @($fbReadable|Sort-Object -Unique)){
   $fbVariablesOut=Join-Path $rawRoot ('fb_variables\'+$safeName)
   $fbVariablesResult=Join-Path $fbVariablesOut 'variable_workflow_result.json'
   $fbVariablesArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$fbVariablesOut,'-SnapshotOnly','-SkipGlobal','-SnapshotModules',$name,'-TimeoutSeconds',[string]$TimeoutSeconds)
-  $fbVariableStep=Invoke-Child $variablesWorkflow $fbVariablesArgs $fbVariablesResult ('fb_variables_'+$name)
+  $fbVariableStep=Invoke-Child $variablesWorkflow $fbVariablesArgs $fbVariablesResult ('fb_variables_'+$name) -ResetPaths @($fbVariablesOut)
   $fbVariableSteps+=$fbVariableStep
   $fbVariableSnapshotPath=Join-Path $fbVariablesOut 'artifacts\variables\variable_snapshot_result.json'
   if(Test-Path $fbVariableSnapshotPath){
@@ -252,7 +351,7 @@ if($programLocalCandidates.Count -gt 0){
   $programVariablesOut=Join-Path $rawRoot 'program_variables'
   $programVariablesResult=Join-Path $programVariablesOut 'variable_workflow_result.json'
   $programVariablesArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$programVariablesOut,'-SnapshotOnly','-SkipGlobal','-SnapshotModules',($programLocalCandidates -join ','),'-TimeoutSeconds',[string]$TimeoutSeconds)
-  $programVariableStep=Invoke-Child $variablesWorkflow $programVariablesArgs $programVariablesResult 'program_variables'
+  $programVariableStep=Invoke-Child $variablesWorkflow $programVariablesArgs $programVariablesResult 'program_variables' -ResetPaths @($programVariablesOut)
   $programLocalSteps+=$programVariableStep
   $programVariableSnapshotPath=Join-Path $programVariablesOut 'artifacts\variables\variable_snapshot_result.json'
   if(Test-Path $programVariableSnapshotPath){
@@ -272,12 +371,13 @@ foreach($name in @($fbReadable|Sort-Object -Unique)){
   $fbOut=Join-Path $rawRoot ('fb_arguments\'+($name -replace '[\\/:*?""<>|]','_')); New-Item -ItemType Directory -Force -Path $fbOut|Out-Null
   $fbResult=Join-Path $fbOut 'fb_declaration_workflow_result.json'; $fbWorkflow=Join-Path $scriptRoot 'workflows\set_kv_fb_arguments.ps1'
   $fbArgs=@('-ProjectPath',$uiProjectPath,'-FbModuleName',$name,'-OutDir',$fbOut,'-SnapshotOnly','-TimeoutSeconds',[string]$TimeoutSeconds)
-  $fbStep=Invoke-Child $fbWorkflow $fbArgs $fbResult ('fb_arguments_'+$name)
+  $fbStep=Invoke-Child $fbWorkflow $fbArgs $fbResult ('fb_arguments_'+$name) -ResetPaths @($fbOut)
   if(-not $fbStep.ok){
     $missingTreeEvidence=@(Get-ChildItem -LiteralPath $fbOut -Recurse -Filter 'fail.txt' -File -ErrorAction SilentlyContinue | Where-Object {(Get-Content -Raw -LiteralPath $_.FullName) -match 'KV_FB_MODULE_TREE_ITEM_MISSING'})
     if($missingTreeEvidence.Count -gt 0){
       $fbSkipped += [ordered]@{module_name=$name;reason='exported_mnm_not_exposed_as_project_tree_fb';evidence=@($missingTreeEvidence|ForEach-Object {Rel $snapshotRoot $_.FullName})}
       $fbStep=[ordered]@{ok=$true;status='skipped';label=('fb_arguments_'+$name);result_path=$fbResult;reason='exported_mnm_not_exposed_as_project_tree_fb'}
+      Set-StageSkipped ('fb_arguments_'+$name) 'exported_mnm_not_exposed_as_project_tree_fb'
     }
   }
   $fbSteps += $fbStep
@@ -287,7 +387,7 @@ foreach($name in @($fbReadable|Sort-Object -Unique)){
 
 $inventoryFinal=Join-Path $textRoot 'project_inventory.json'
 $inventoryFinalArgs=@('-ProjectPath',$ProjectPath,'-MnmDir',$mnmExportDir,'-OutDir',(Join-Path $rawRoot 'inventory_final'),'-StructureDefinitionsPath',(Join-Path $textRoot 'structure_definitions.json'))
-$inventoryFinalStep=Invoke-Child (Join-Path $scriptRoot 'export_kv_project_inventory.ps1') $inventoryFinalArgs (Join-Path $rawRoot 'inventory_final\project_inventory.json') 'inventory_final'
+$inventoryFinalStep=Invoke-Child (Join-Path $scriptRoot 'export_kv_project_inventory.ps1') $inventoryFinalArgs (Join-Path $rawRoot 'inventory_final\project_inventory.json') 'inventory_final' -ResetPaths @((Join-Path $rawRoot 'inventory_final'))
 if(Test-Path (Join-Path $rawRoot 'inventory_final\project_inventory.json')){Copy-Item (Join-Path $rawRoot 'inventory_final\project_inventory.json') $inventoryFinal -Force}
 
 $materializationScript=Join-Path $scriptRoot 'workflow_tools\materialize_kv_project_snapshot.ps1'
@@ -301,7 +401,7 @@ $materializationArgs=@(
   '-StructureDefinitionsPath',(Join-Path $textRoot 'structure_definitions.json'),
   '-RawRoot',$rawRoot
 )
-$materializationStep=if($PlanOnly){[ordered]@{ok=$true;status='planned';label='materialize_semantic_project';result_path=$materializationResult}}else{Invoke-Child $materializationScript $materializationArgs $materializationResult 'materialize_semantic_project'}
+$materializationStep=if($PlanOnly){[ordered]@{ok=$true;status='planned';label='materialize_semantic_project';result_path=$materializationResult}}else{Invoke-Child $materializationScript $materializationArgs $materializationResult 'materialize_semantic_project' -ResetPaths @((Join-Path $snapshotRoot 'project'))}
 
 $index=@(); foreach($f in @(Get-ChildItem -LiteralPath $textRoot -File -Recurse | Sort-Object FullName)){
   $index += [ordered]@{path=(Rel $snapshotRoot $f.FullName);format=$f.Extension.TrimStart('.');length=$f.Length;sha256=(Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
@@ -314,6 +414,7 @@ $semanticWarnings=@()
 if($materializationStep.result -and $materializationStep.result.warnings){$semanticWarnings=@($materializationStep.result.warnings)}
 if(-not $materializationStep.ok){$missing+='semantic_project'}
 $status=if($PlanOnly){'planned'}elseif($missing.Count -eq 0){'ready'}else{'partial'}
+$snapshotReady=($status -eq 'ready')
 
 $manifest=[ordered]@{
   schema_version=2; snapshot_schema='kv_project_text_snapshot'; status=$status; generated_at=(Get-Date).ToUniversalTime().ToString('o')
@@ -322,6 +423,7 @@ $manifest=[ordered]@{
   artifacts=[ordered]@{semantic_project='project';inventory='text/project_inventory.json';mnm='text/mnm';variables='text/variables';structures='text/structure_definitions.json';fb_arguments='text/fb_arguments';comments='text/comments'}
   workflow_status=$statuses; discovered_modules=$moduleNames; discovered_fb_modules=@($fbModules|Sort-Object -Unique); discovered_program_local_modules=@($programLocalCandidates)
   semantic_project_status=$semanticStatus; semantic_warnings=$semanticWarnings; missing_capabilities=@($missing); skipped_capabilities=$fbSkipped; version_control=[ordered]@{deterministic_index='text_index.json';file_hashes='sha256';binary_project_files='referenced_by_project.fingerprint_only';generated_files='isolated_snapshot_directory'}
+  resume=[ordered]@{enabled=[bool]$Resume;state_path='snapshot_state.json';invalidated_by_fingerprint=[bool]$script:resumeInvalidated;reused_stages=@($script:reusedStages|Sort-Object -Unique)}
 }
 Write-Json (Join-Path $snapshotRoot 'source_snapshot_manifest.json') $manifest 20
 $commentLayer=@()
@@ -390,13 +492,21 @@ $exitCode=if($PlanOnly -or $status -eq 'ready'){0}else{1}
       while((Get-Process -Id $uiProcessId -ErrorAction SilentlyContinue) -and (Get-Date)-lt $deadline){Start-Sleep -Milliseconds 200}
     }
     if($mnmWorkRoot -and (Test-Path -LiteralPath $mnmWorkRoot -PathType Container)){
-      try{[IO.Directory]::Delete($mnmWorkRoot,$true);$uiLifecycle.cleanup_status='isolated_copy_removed'}catch{$uiLifecycle.cleanup_status='isolated_copy_cleanup_failed';$uiLifecycle.cleanup_error=$_.Exception.Message}
+      if($Resume -and -not $snapshotReady){
+        # Keep the isolated project copy so the next -Resume run can continue the
+        # UI stages without re-exporting MNM from scratch.
+        $uiLifecycle.cleanup_status='retained_for_resume'
+        $uiLifecycle.work_root=$mnmWorkRoot
+      }else{
+        try{[IO.Directory]::Delete($mnmWorkRoot,$true);$uiLifecycle.cleanup_status='isolated_copy_removed'}catch{$uiLifecycle.cleanup_status='isolated_copy_cleanup_failed';$uiLifecycle.cleanup_error=$_.Exception.Message}
+      }
     }else{$uiLifecycle.cleanup_status='isolated_copy_absent'}
     if($KeepProjectOpen){
       try{$reopened=Open-Project $ProjectPath;$uiLifecycle.source_reopened_process_id=$reopened.process.Id}catch{$uiLifecycle.source_reopen_error=$_.Exception.Message}
     }
   }
   Write-Json (Join-Path $rawRoot 'ui_process_lifecycle.json') $uiLifecycle 8
+  Save-SnapshotState
   if($uiLifecycle.cleanup_status -eq 'isolated_copy_cleanup_failed'){
     [Console]::Error.WriteLine("KV_SNAPSHOT_TEMP_CLEANUP_FAILED: $($uiLifecycle.cleanup_error)")
   }

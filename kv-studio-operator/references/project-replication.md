@@ -35,6 +35,22 @@ source_assets_required:
 
 `ui_probe_if_needed`、`mapping_parameter_probe` 等 probe evidence 只能来自已发布 workflow/gate，或来自用户明确授权后的 `research_mode`。
 
+### 快照断点续跑（-Resume）
+
+同一个输出目录和 `SnapshotId` 重跑时，加 `-Resume` 会复用已完成阶段：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/workflows/export_kv_project_text_snapshot.ps1 `
+  -ProjectPath <project.kpr> -OutDir <run-root> -SnapshotId s1 -Resume
+```
+
+- 每个阶段的输入 hash = 子脚本 SHA-256 + 工程 fingerprint + 稳定参数（`-WorkRoot`、`-TimeoutSeconds` 不参与）
+- 状态记录在 `<snapshot>/snapshot_state.json`，阶段完成后立即落盘，异常退出也能续跑
+- 工程文件发生变化（fingerprint 不同）时，旧阶段全部作废并重新执行，同时写入 `raw/resume_invalidated.json`
+- manifest 的 `resume.reused_stages` 列出本次复用的阶段；`workflow_status[].status=reused` 表示未真正执行
+- 复用只跳过子 workflow，text_index、manifest、README 等离线汇总仍会重新生成
+- 若某个阶段缺失或失败，它以及依赖它的阶段会重新执行；UI 阶段的工程副本计划由 `mnm_export` 重建
+
 完整快照的全局变量必须来自 `snapshot_kv_global_variables_all_groups.ps1`。该 workflow 在变量组选择器中全选后复制整表，输出 `global_variables_all_groups.tsv`（同时提供兼容名 `global_variables_raw.tsv`）；因此 `project/配置/全局变量/variables.tsv` 包含所有变量组，而不是仅 `(Default)`。
 
 导出 inventory：
