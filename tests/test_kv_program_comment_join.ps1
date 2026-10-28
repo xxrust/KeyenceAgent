@@ -17,7 +17,7 @@ function Get-Sha([string]$Path) { return (Get-FileHash -LiteralPath $Path -Algor
 
 $testDir = Split-Path -Parent $PSCommandPath
 $repoRoot = Split-Path -Parent $testDir
-$tool = Join-Path $repoRoot 'kv-studio-operator\scripts\annotate_kv_program_with_comments.ps1'
+$tool = Join-Path $repoRoot 'kv-studio-operator\scripts\annotate_kv_program_with_comments_core.ps1'
 $fixture = Join-Path $repoRoot 'kv-studio-operator\tests\kv-interface-regression\22_annotate_program_comments\fixtures\JoinSample'
 Assert-True (Test-Path -LiteralPath $tool -PathType Leaf) 'tool script exists'
 Assert-True (Test-Path -LiteralPath $fixture -PathType Container) 'fixture directory exists'

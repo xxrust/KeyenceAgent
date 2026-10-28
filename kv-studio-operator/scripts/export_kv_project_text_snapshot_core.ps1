@@ -166,7 +166,7 @@ if($commentsStep.ok -and (Test-Path -LiteralPath $commentsCsv -PathType Leaf)){
 $annotateStep=[ordered]@{ok=$true;status='skipped';label='device_comment_coverage';result_path='';reason='comment table or program bodies unavailable'}
 $annotateSummary=$null
 if($commentsStep.ok -and $mnmStep.ok -and (Test-Path -LiteralPath $commentsCsv -PathType Leaf)){
-  $annotateScript=Join-Path $scriptRoot 'annotate_kv_program_with_comments.ps1'
+  $annotateScript=Join-Path $scriptRoot 'annotate_kv_program_with_comments_core.ps1'
   $annotateResult=Join-Path $commentsTextDir 'annotate_result.json'
   $annotateArgs=@('-CommentsPath',$commentsCsv,'-MnmPath',$mnmExportDir,'-OutDir',$commentsTextDir)
   $annotateStep=if($PlanOnly){[ordered]@{ok=$true;status='planned';label='device_comment_coverage';result_path=$annotateResult}}else{Invoke-Child $annotateScript $annotateArgs $annotateResult 'device_comment_coverage'}

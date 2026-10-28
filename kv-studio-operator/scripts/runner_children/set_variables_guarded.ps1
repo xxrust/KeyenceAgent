@@ -1647,6 +1647,7 @@ function Paste-GlobalVariablesByFirstNameTab($Form, [string]$Text) {
     $formNow = Invoke-GuardedVariableKeyAction $formNow 'global group Alt+G' '%g' 'Alt+G focuses the variable group combo' 150
     $formNow = Invoke-GuardedVariableKeyAction $formNow 'global group select-all' '^a' 'Select the current group name' 100
     Invoke-KvGuardedClipboardSetText -TargetHwnd ([IntPtr]$formNow.Current.NativeWindowHandle) -Step "global group name $GlobalGroupName" -Text $GlobalGroupName -ExpectedTitleLike '*变量编辑*'
+    $formNow = Invoke-GuardedVariableKeyAction $formNow 'global group paste' '^v' 'Paste the variable group name into the group combo' 150
     $formNow = Invoke-GuardedVariableKeyAction $formNow 'global group commit' '{ENTER}' 'Commit the variable group name' 250
     Log "selected global variable group: $GlobalGroupName"
     $formNow = Wait-VariableForm $script:ProcessIdForVariables 6

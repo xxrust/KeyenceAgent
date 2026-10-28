@@ -29,7 +29,8 @@ $offline = @(
   'scan-order',
   'variable-attributes',
   'scaffold-variable-attributes',
-  'library-dependencies'
+  'library-dependencies',
+  'system-layout'
 )
 $live = @(
   'axis-rename-live',

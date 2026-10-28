@@ -1,5 +1,6 @@
 ﻿param(
   [Parameter(Mandatory=$true)][string]$ProjectName,
+  [string]$ProjectPath = '',
   [Parameter(Mandatory=$true)][string]$DevicesConfigPath,
   [Parameter(Mandatory=$true)][string]$OutDir,
   [int]$TimeoutSeconds = 180,
@@ -86,8 +87,16 @@ $devices = @($config.devices)
 if ($devices.Count -eq 0) { throw 'KV_EIP_CONFIG_EMPTY: devices[] is empty' }
 foreach ($d in $devices) { if (-not $d.model) { throw 'KV_EIP_CONFIG_INVALID: device.model is required' } }
 $device = $devices[0]
-$process = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectName*" }) | Select-Object -First 1
-if (-not $process) { throw "KV_EIP_PROJECT_NOT_OPEN: $ProjectName" }
+$candidates = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectName*" })
+if ($candidates.Count -eq 0) { throw "KV_EIP_PROJECT_NOT_OPEN: $ProjectName" }
+if ($candidates.Count -gt 1) { throw "KV_EIP_PROJECT_AMBIGUOUS: $($candidates.Count) KV STUDIO windows match '$ProjectName'" }
+$process = $candidates[0]
+if ($ProjectPath) {
+  $cmdLine = ([string](Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)" -ErrorAction SilentlyContinue).CommandLine)
+  if (-not $cmdLine -or $cmdLine -notlike "*$ProjectPath*") {
+    throw "KV_EIP_PROJECT_PATH_MISMATCH: pid=$($process.Id) title='$($process.MainWindowTitle)' expected='$ProjectPath'"
+  }
+}
 if ($process.MainWindowTitle -match '\*') { throw 'KV_EIP_PROJECT_UNSAVED: save the project before writing EtherNet/IP settings' }
 Log 'started' @{ project = $ProjectName; model = [string]$device.model; process_id = $process.Id }
 

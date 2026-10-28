@@ -1,5 +1,6 @@
 ﻿param(
   [Parameter(Mandatory=$true)][string]$ProjectName,
+  [string]$ProjectPath = '',
   [Parameter(Mandatory=$true)][ValidateSet('Modify','Delete')][string]$Action,
   [Parameter(Mandatory=$true)][string]$DevicesConfigPath,
   [Parameter(Mandatory=$true)][string]$OutDir,
@@ -93,8 +94,16 @@ $newIp = [string]$device.ip_address
 if ($Action -eq 'Modify') {
   if ($newIp -notmatch '^\d{1,3}(\.\d{1,3}){3}$') { throw 'KV_EIP_CONFIG_INVALID: ip_address is not IPv4' }
 }
-$process = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectName*" }) | Select-Object -First 1
-if (-not $process) { throw "KV_EIP_PROJECT_NOT_OPEN: $ProjectName" }
+$candidates = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectName*" })
+if ($candidates.Count -eq 0) { throw "KV_EIP_PROJECT_NOT_OPEN: $ProjectName" }
+if ($candidates.Count -gt 1) { throw "KV_EIP_PROJECT_AMBIGUOUS: $($candidates.Count) KV STUDIO windows match '$ProjectName'" }
+$process = $candidates[0]
+if ($ProjectPath) {
+  $cmdLine = ([string](Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)" -ErrorAction SilentlyContinue).CommandLine)
+  if (-not $cmdLine -or $cmdLine -notlike "*$ProjectPath*") {
+    throw "KV_EIP_PROJECT_PATH_MISMATCH: pid=$($process.Id) title='$($process.MainWindowTitle)' expected='$ProjectPath'"
+  }
+}
 if ($process.MainWindowTitle -match '\*') { throw 'KV_EIP_PROJECT_UNSAVED: save the project before editing EtherNet/IP settings' }
 Log 'started' @{ project = $ProjectName; node = $node; process_id = $process.Id }
 
@@ -155,6 +164,28 @@ function Read-DeviceIps([long]$hwnd) {
   Start-Sleep -Milliseconds 700
   $text = [System.Windows.Forms.Clipboard]::GetText()
   return @($text -split "`r?`n" | Where-Object { $_ -match '^\d{1,3}(\.\d{1,3}){3}$' })
+}
+
+# Copy the whole 节点 column. Clicking the column header and pressing Ctrl+C
+# yields every node/connection label; two header offsets cover the list layouts
+# observed with and without a refreshed project window.
+function Get-NodeLabels([long]$hwnd) {
+  $r = New-Object EipEdit.EipEditWin+RECT
+  [void][EipEdit.EipEditWin]::GetWindowRect([IntPtr]$hwnd, [ref]$r)
+  [void][EipEdit.EipEditWin]::SetForegroundWindow([IntPtr]$hwnd)
+  Start-Sleep -Milliseconds 350
+  $labels = @()
+  foreach ($dy in 766, 735) {
+    [EipEdit.EipEditWin]::Click(($r.L + 18), ($r.T + $dy))
+    Start-Sleep -Milliseconds 250
+    [System.Windows.Forms.Clipboard]::Clear()
+    [System.Windows.Forms.SendKeys]::SendWait('^c')
+    Start-Sleep -Milliseconds 350
+    $text = [System.Windows.Forms.Clipboard]::GetText()
+    $cand = @($text -split "`r?`n" | Where-Object { $_ -match '^\d+(-\d+)?$' })
+    if ($cand.Count -gt 0) { $labels = $cand; break }
+  }
+  return @($labels)
 }
 
 Expand-Item (Get-TreeItem '^单元配置$')
@@ -231,6 +262,15 @@ for ($y = $scanTop; $y -le $scanBottom -and -not $selected; $y += 10) {
   }
 }
 if (-not $selected) { Fail 'KV_EIP_DEVICE_ROW_NOT_FOUND' "node $node not found in the 设定列表 node column" }
+
+# Node-level identity snapshot: the 节点 column lists every device/connection
+# label. It is compared again after the reopen so a delete/modify of the wrong
+# device is detected instead of only counting rows.
+$preNodeLabels = @(Get-NodeLabels $eipWindow.hwnd)
+Log 'pre_node_column' @{ count = $preNodeLabels.Count; labels = ($preNodeLabels -join ',') }
+if ($preNodeLabels.Count -eq 0) {
+  Fail 'KV_EIP_NODE_IDENTITY_UNAVAILABLE' 'node column copy returned no labels before the edit'
+}
 
 if ($Action -eq 'Delete') {
   # Delete acts on the LEFT TREE selection. Traverse from the PLC: Down enters
@@ -360,7 +400,8 @@ Log 'post_save_dialogs_drained'
 # Persisted verification: reopen EtherNet/IP after the save and read the list
 # again. In-window evidence alone cannot prove the file kept the change.
 $persistedIps = @()
-for ($attempt = 1; $attempt -le 2 -and $persistedIps.Count -eq 0; $attempt++) {
+$postNodeLabels = @()
+for ($attempt = 1; $attempt -le 2 -and ($persistedIps.Count -eq 0 -or $postNodeLabels.Count -eq 0); $attempt++) {
   try {
     $eipNode = Get-TreeItem '^EtherNet/IP'
     if (-not $eipNode) { throw 'EtherNet/IP tree node missing' }
@@ -371,19 +412,45 @@ for ($attempt = 1; $attempt -le 2 -and $persistedIps.Count -eq 0; $attempt++) {
     $readWindow = Wait-Window 'EtherNet/IP 设定' 15 'Afx*'
     if (-not $readWindow) { throw 'reopened EIP window missing' }
     $persistedIps = @(Read-DeviceIps $readWindow.hwnd)
+    $postNodeLabels = @(Get-NodeLabels $readWindow.hwnd)
     $readEl = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$readWindow.hwnd)
     if (Find-Button $readEl '取消') { [void](Press-Button $readEl '取消') }
     Start-Sleep -Seconds 1
-    Log 'post_save_reopen_readback' @{ count = $persistedIps.Count; ips = ($persistedIps -join ',') }
+    Log 'post_save_reopen_readback' @{ count = $persistedIps.Count; ips = ($persistedIps -join ','); nodes = ($postNodeLabels -join ',') }
   } catch {
     Log 'post_save_reopen_failed' @{ attempt = $attempt; message = $_.Exception.Message }
     $persistedIps = @()
+    $postNodeLabels = @()
     Start-Sleep -Seconds 1
   }
 }
 if ($persistedIps.Count -eq 0 -and $preIps.Count -gt 0) {
   Fail 'KV_EIP_PERSISTED_READBACK_MISSING' 'reopened EIP readback is empty; cannot prove the change was saved'
 }
+if ($postNodeLabels.Count -eq 0) {
+  Fail 'KV_EIP_NODE_IDENTITY_UNAVAILABLE' 'reopened node column copy returned no labels; cannot prove which device changed'
+}
+
+# Identity assertions against the node column seen before the edit:
+#   Delete: all labels for the target node disappear, every other label stays.
+#   Modify: the whole node column stays identical (same devices, same order).
+$targetPattern = '^' + [regex]::Escape([string]$node) + '(-\d+)?$'
+$preNonTarget = @($preNodeLabels | Where-Object { $_ -notmatch $targetPattern })
+$postNonTarget = @($postNodeLabels | Where-Object { $_ -notmatch $targetPattern })
+$postTarget = @($postNodeLabels | Where-Object { $_ -match $targetPattern })
+if ($Action -eq 'Delete') {
+  if ($postTarget.Count -gt 0) {
+    Fail 'KV_EIP_DELETE_IDENTITY_MISMATCH' "node $node labels still present after delete: $($postTarget -join ',')"
+  }
+  if (($preNonTarget -join '|') -ne ($postNonTarget -join '|')) {
+    Fail 'KV_EIP_DELETE_IDENTITY_MISMATCH' "non-target node labels changed: before=[$($preNonTarget -join ',')] after=[$($postNonTarget -join ',')]"
+  }
+} else {
+  if (($preNodeLabels -join '|') -ne ($postNodeLabels -join '|')) {
+    Fail 'KV_EIP_MODIFY_IDENTITY_MISMATCH' "node column changed during modify: before=[$($preNodeLabels -join ',')] after=[$($postNodeLabels -join ',')]"
+  }
+}
+Log 'node_identity_verified' @{ action = $Action; node = $node; pre = ($preNodeLabels -join ','); post = ($postNodeLabels -join ',') }
 
 $ok = $false
 $detail = ''

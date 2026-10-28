@@ -360,7 +360,7 @@
                                                                       ]
                                                  },
                                                  {
-                                                     "path":  "export_kv_project_text_snapshot.ps1",
+                                                     "path":  "export_kv_project_text_snapshot_core.ps1",
                                                      "status":  "published",
                                                      "customer_callable":  true,
                                                      "capabilities":  [
@@ -403,7 +403,7 @@
                                                                       }
                                                  },
                                                  {
-                                                     "path":  "annotate_kv_program_with_comments.ps1",
+                                                     "path":  "annotate_kv_program_with_comments_core.ps1",
                                                      "status":  "published",
                                                      "customer_callable":  true,
                                                      "capabilities":  [
@@ -486,7 +486,11 @@
                                                   "capabilities":  [
                                                                        "ethernet_ip_device_crud"
                                                                    ],
-                                                  "execution":  "flat_manifest_steps"
+                                                  "execution":  "flat_manifest_steps",
+                                                  "runner_children":  [
+                                                                          "runner_children/configure_eip_devices_guarded.ps1",
+                                                                          "runner_children/edit_eip_devices_guarded.ps1"
+                                                                      ]
                                               },
                                               {
                                                   "path":  "workflows/complete_kv_axis_registration.ps1",
@@ -510,7 +514,10 @@
                                                   "capabilities":  [
                                                                        "save_project_as_unique_copy"
                                                                    ],
-                                                  "execution":  "flat_manifest_steps"
+                                                  "execution":  "flat_manifest_steps",
+                                                  "runner_children":  [
+                                                                          "runner_children/save_as_project_guarded.ps1"
+                                                                      ]
                                               },
                                               {
                                                   "path":  "workflows/run_kv_mvp_scaffold.ps1",
@@ -1000,7 +1007,21 @@
                                                   }
                                               ],
                     "runner_child_pending":  [
-
+                                              {
+                                                  "path":  "runner_children/delete_ethercat_slave_guarded.ps1",
+                                                  "status":  "pending_validation",
+                                                  "customer_callable":  false
+                                              },
+                                              {
+                                                  "path":  "runner_children/delete_ethercat_slave_v2_guarded.ps1",
+                                                  "status":  "pending_validation",
+                                                  "customer_callable":  false
+                                              },
+                                              {
+                                                  "path":  "runner_children/export_unit_configuration_snapshot.ps1",
+                                                  "status":  "pending_validation",
+                                                  "customer_callable":  false
+                                              }
                                              ],
                     "workflow_tool":  [
                                           {
@@ -1084,12 +1105,22 @@
                                               "path":  "guards/kv_ui_guard.ps1",
                                               "status":  "library",
                                               "customer_callable":  false
+                                          },
+                                          {
+                                              "path":  "kv_dialog_post.ps1",
+                                              "status":  "library",
+                                              "customer_callable":  false
                                           }
                                       ],
                     "probe_research":  [
 
                                        ],
                     "gate":  [
+                                 {
+                                     "path":  "gates/assert_kv_script_syntax.ps1",
+                                     "status":  "gate",
+                                     "customer_callable":  false
+                                 },
                                  {
                                      "path":  "gates/assert_kv_complete_module.ps1",
                                      "status":  "gate",
@@ -1126,6 +1157,21 @@
                                  }
                              ],
                     "support_library":  [
+                                            {
+                                                "path":  "Capture-KvFrame.ps1",
+                                                "status":  "library",
+                                                "customer_callable":  false
+                                            },
+                                            {
+                                                "path":  "kv_tree_resolver.ps1",
+                                                "status":  "library",
+                                                "customer_callable":  false
+                                            },
+                                            {
+                                                "path":  "kv_window_binding.ps1",
+                                                "status":  "library",
+                                                "customer_callable":  false
+                                            },
                                             {
                                                 "path":  "kv_project_process_binding.ps1",
                                                 "status":  "library",
@@ -1197,6 +1243,11 @@
                     "maintenance_tool":  [
                                              {
                                                  "path":  "set_kv_admin_credential.ps1",
+                                                 "status":  "maintenance",
+                                                 "customer_callable":  false
+                                             },
+                                             {
+                                                 "path":  "workflow_tools/rerun_kv_plan_step.ps1",
                                                  "status":  "maintenance",
                                                  "customer_callable":  false
                                              }

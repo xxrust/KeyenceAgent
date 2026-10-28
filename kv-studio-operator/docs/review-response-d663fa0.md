@@ -6,14 +6,14 @@
 | --- | --- | --- |
 | R01 | 已修（本批） | `run_kv_execution_plan` 现在：共享 `Local\KeyenceAgent.KvStudio.UI` mutex；只有本次写入的 `exit_code.txt` 才被采信（旧文件先删、按 mtime 校验）；首个失败步骤后停止（`skipped_after_failure`）；runner 必须在 `script_manifest.json` 中登记。 |
 | R02 | 已修（本批） | 步骤名→runner/stage 映射显式化（含 `repair_*`）；未知步骤直接拒绝；plan 参数按 runner 参数块校验；`CreatedProjectResultPath` 只传给声明它的 runner；去掉硬编码 `FB_Cylinder`/强制 `SkipGlobal`；无 `import_structures` 的 Main-only 计划可运行；空 stage 选集拒绝。 |
-| R03 | 部分修复 | 空剪贴板重试一次后跳过；同一节点标签去重，不再把采样次数当序号；仍缺“删除前核对当前树节点身份”。 |
+| R03 | 已修 | 空剪贴板重试、节点标签去重；删除前复制整列“节点”标签，保存后重开再复制一次：目标节点的所有标签必须消失，非目标标签逐项不变；Modify 要求整列完全不变。|
 | R04 | 已修 | `devices.Count > 1` 与 `Modify/Delete + PreflightOnly` 在 UI 之前直接拒绝；契约测试新增两条反例。 |
-| R05 | 部分修复 | 本批未统一 guard 绑定；EIP/axis 测试已改为“只操作自己启动的 KVS”。runner 的工程身份绑定留待下一批。 |
-| R06 | 部分修复 | 增加**保存后重开**回读：`post_ips` 改为重开后的集合，`in_window_ips` 保留窗口内证据；仍缺 node→IP 全映射，目标 IP 原本已被占用时判据不足。 |
+| R05 | 部分修复 | EIP runner 现在：多 KVS 匹配即报 `KV_EIP_PROJECT_AMBIGUOUS`；workflow 把 `ProjectPath` 传入 runner，runner 校验进程命令行包含该路径（`KV_EIP_PROJECT_PATH_MISMATCH`）。按键仍未迁移到共用 guard，留待专门批次。 |
+| R06 | 已修 | 保存后重开回读 + 节点列身份校验（见 R03）：Delete 要求目标节点标签全部消失且非目标不变，Modify 要求节点列不变；`post_ips` 为重开集合，`in_window_ips` 保留窗口内证据。 |
 | R07 | 已修 | `Set-StrictMode`；`$failed` 由 cases 计算；`KV_EIP_CONTRACT_SELFTEST=1` 注入故意失败用例，实测 exit=41。 |
 | R08 | 已修 | live 测试拒绝外部 KVS（`KV_*_KVS_BUSY`），只清理自己启动的 PID；repo 路径由 `$PSScriptRoot` 解析，KVS 路径支持 `KV_STUDIO_EXE`。 |
-| R09 | 已修 | skip 不计 passed；no-summary/stale-result/timeout/missing 均为失败；空 `-Only` 选集 exit 41；`eip-live-cycle` 接入 live 套件。 |
-| R10 | 部分修复 | `configure_kv_eip_devices.ps1` 登记为 customer_callable（capability `ethernet_ip_device_crud`）；同名脚本/重复 capability/未分类脚本仍在。 |
+| R09 | 已修 | skip 不计 passed；no-summary/stale-result/timeout/missing 均为失败；空 `-Only` 选集 exit 41；`eip-live-cycle` 接入 live 套件；`test_system_layout` 通过新 `tests/system-layout` wrapper 接入 offline 套件。 |
+| R10 | 部分修复 | EIP workflow 登记 customer_callable；9 个未分类脚本全部登记；两组同名脚本改为 `*_core.ps1` 并更新引用；layout gate 现在只对 published 非 composed workflow 要求 runner_children。pending/public 分层与 capability 去重仍在。 |
 | R11 | 已修 | `setup_keyence_agent.ps1` 与 `install_keyence_dev_links.ps1` 的 skill 清单加入 `kv-eip-nodes`、`windows-ui-automation`。 |
 | R12 | 已修（EIP/轴改名） | EIP runner 状态注释、`verification-contract.md` 改为当前路线（节点列选行、整串 IP、树遍历删除、保存后重开）；轴改名文档改为属性对话框路线。统一能力状态索引仍待建。 |
 
@@ -25,7 +25,7 @@
 - S02 交错 import/args/variables
 - S03 轴型别 defer 产物未接线
 - S04 最后一个 program 保护未区分实体类型
-- S05 GlobalGroupName 只设剪贴板未粘贴
+- S05 GlobalGroupName 只设剪贴板未粘贴（本批已修：补 `Ctrl+V` 再 `Enter`）
 - S06 FullGlobalAttributes repair 缺 scope
 - S07 variable usage 词法边界
 

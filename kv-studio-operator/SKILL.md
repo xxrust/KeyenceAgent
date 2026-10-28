@@ -314,7 +314,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\get_kv_
 需要"他的程序用了哪些软元件"时应与 MNM 程序体交叉过滤；`.cm1` 反解只能作为后备且必须标注推断。
 
 "程序体 ↔ 注释"对照与覆盖率用 `-Capability device_comment_coverage`
-（`annotate_kv_program_with_comments.ps1`，纯非 UI 计算）：输入是上面导出的注释 CSV 与 MNM 程序体目录，
+（`workflows/annotate_kv_program_with_comments.ps1`，纯非 UI 计算）：输入是上面导出的注释 CSV 与 MNM 程序体目录，
 **MNM 只读不改**，join 结果单独落盘 `comments.tsv`/`usage.tsv`/`coverage.json`/`program_annotations.md`。
 默认只统计用户程序体（库 FB 体另计，加 `-IncludeLibraryBodies` 才纳入）；设备键按"去前导零、保留进制"归一
 （`MR013`=`MR13`、`W012`=`W12`，B/W 是十六进制），`TMR 20`、`#1`、`_MC_Axis[#1]` 不算软元件，

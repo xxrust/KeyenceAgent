@@ -1,5 +1,5 @@
 {
-  "note": "Device areas and comment classification terms for annotate_kv_program_with_comments.ps1. Kept out of the .ps1 so the script stays ASCII-only and cannot be broken by ANSI decoding.",
+  "note": "Device areas and comment classification terms for annotate_kv_program_with_comments_core.ps1. Kept out of the .ps1 so the script stays ASCII-only and cannot be broken by ANSI decoding.",
   "devicePattern": "\\b(MR|LR|CR|DM|EM|FM|CM|ZF|R|B|W|T|C)\\d[0-9A-F]*\\b",
   "hexAreas": [ "B", "W" ],
   "documentableAreas": [ "R", "MR", "LR", "B", "W", "ZF", "CR", "DM", "EM", "FM", "CM" ],

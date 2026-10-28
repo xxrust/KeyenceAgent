@@ -8,7 +8,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
-$annotateScript = Join-Path $root 'annotate_kv_program_with_comments.ps1'
+$annotateScript = Join-Path $root 'annotate_kv_program_with_comments_core.ps1'
 if (-not (Test-Path -LiteralPath $annotateScript -PathType Leaf)) { throw "Annotate script missing: $annotateScript" }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 

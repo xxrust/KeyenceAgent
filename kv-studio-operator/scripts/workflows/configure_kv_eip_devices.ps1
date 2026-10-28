@@ -43,9 +43,9 @@ if ($PreflightOnly -and $Action -ne 'Add') { throw "KV_EIP_PREFLIGHT_ONLY_UNSUPP
 $operation = if ($Action -eq 'Add') { 'configure_ethernet_ip_devices' } else { 'edit_ethernet_ip_devices' }
 $plan=New-KvWorkflowPlan -ScriptsRoot $root -Operation $operation -ProjectPath $ProjectPath -OutDir $OutDir -TimeoutSeconds $TimeoutSeconds
 if ($Action -eq 'Add') {
-  Add-KvWorkflowStep -Plan $plan -Name 'configure_eip_devices' -Script 'runner_children/configure_eip_devices_guarded.ps1' -OutDir $plan.run_root -Parameters @{ProjectName=$ProjectName;DevicesConfigPath=[IO.Path]::GetFullPath($DevicesConfigPath);OutDir=$plan.run_root;TimeoutSeconds=$TimeoutSeconds;PreflightOnly=[bool]$PreflightOnly}
+  Add-KvWorkflowStep -Plan $plan -Name 'configure_eip_devices' -Script 'runner_children/configure_eip_devices_guarded.ps1' -OutDir $plan.run_root -Parameters @{ProjectName=$ProjectName;ProjectPath=$plan.project_path;DevicesConfigPath=[IO.Path]::GetFullPath($DevicesConfigPath);OutDir=$plan.run_root;TimeoutSeconds=$TimeoutSeconds;PreflightOnly=[bool]$PreflightOnly}
 } else {
-  Add-KvWorkflowStep -Plan $plan -Name 'edit_eip_devices' -Script 'runner_children/edit_eip_devices_guarded.ps1' -OutDir $plan.run_root -Parameters @{ProjectName=$ProjectName;Action=$Action;DevicesConfigPath=[IO.Path]::GetFullPath($DevicesConfigPath);OutDir=$plan.run_root;TimeoutSeconds=$TimeoutSeconds}
+  Add-KvWorkflowStep -Plan $plan -Name 'edit_eip_devices' -Script 'runner_children/edit_eip_devices_guarded.ps1' -OutDir $plan.run_root -Parameters @{ProjectName=$ProjectName;ProjectPath=$plan.project_path;Action=$Action;DevicesConfigPath=[IO.Path]::GetFullPath($DevicesConfigPath);OutDir=$plan.run_root;TimeoutSeconds=$TimeoutSeconds}
 }
 Submit-KvWorkflowPlan -Plan $plan -ScriptsRoot $root -PlanOnly:$PlanOnly
 

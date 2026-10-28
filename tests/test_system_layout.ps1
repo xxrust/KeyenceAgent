@@ -14,8 +14,9 @@ foreach ($file in $files) {
 }
 if (@($files | Group-Object Name | Where-Object Count -gt 1).Count) { throw 'KV_DUPLICATE_ACTIVE_SCRIPT_NAMES' }
 foreach ($entry in $entries) { $null=Resolve-KvStudioOperatorScriptPath -ScriptRoot $root -Name $entry.path -Classes @($entry.class) }
-foreach ($entry in @($entries | Where-Object class -eq 'customer_workflow')) {
-  if (-not $entry.runner_children.Count -or $entry.execution -ne 'flat_manifest_steps') { throw "KV_WORKFLOW_DEPENDENCIES_REQUIRED: $($entry.path)" }
+foreach ($entry in @($entries | Where-Object { $_.class -eq 'customer_workflow' -and $_.status -eq 'published' })) {
+  if ($entry.execution -like 'composed_*') { continue }
+  if (-not $entry.runner_children.Count -or -not $entry.execution) { throw "KV_WORKFLOW_DEPENDENCIES_REQUIRED: $($entry.path)" }
   foreach ($child in $entry.runner_children) { $null=Resolve-KvStudioOperatorScriptPath -ScriptRoot $root -Name $child -Classes runner_child_approved }
 }
 $query=& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'get_kv_capabilities.ps1') -Capability snapshot_fb_arguments | ConvertFrom-Json

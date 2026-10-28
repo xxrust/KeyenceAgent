@@ -7,7 +7,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
-$snapshotScript = Join-Path $root 'export_kv_project_text_snapshot.ps1'
+$snapshotScript = Join-Path $root 'export_kv_project_text_snapshot_core.ps1'
 if (-not (Test-Path -LiteralPath $snapshotScript -PathType Leaf)) { throw "Snapshot script missing: $snapshotScript" }
 $snapshotId = 'snapshot'
 $args = @('-ProjectPath',$ProjectPath,'-OutDir',$OutDir,'-SnapshotId',$snapshotId,'-TimeoutSeconds',[string]$TimeoutSeconds)

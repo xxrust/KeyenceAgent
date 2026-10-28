@@ -18,7 +18,7 @@
   never reported as documentation gaps.
 
 .EXAMPLE
-  powershell -NoProfile -ExecutionPolicy Bypass -File annotate_kv_program_with_comments.ps1 `
+  powershell -NoProfile -ExecutionPolicy Bypass -File annotate_kv_program_with_comments_core.ps1 `
     -CommentsPath .\comments\device_comments.csv -MnmPath .\snapshot\raw\mnm_export -OutDir .\out
 #>
 param(
