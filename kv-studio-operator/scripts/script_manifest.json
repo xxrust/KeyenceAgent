@@ -752,6 +752,22 @@
                                                   "execution":  "flat_manifest_steps"
                                               },
                                               {
+                                                  "path":  "workflows/export_kv_ethercat_configuration.ps1",
+                                                  "status":  "published",
+                                                  "customer_callable":  true,
+                                                  "capabilities":  [
+                                                                       "read_ethercat_configuration"
+                                                                   ],
+                                                  "runner_children":  [
+                                                                          "runner_children/configure_ethercat_nodes_guarded.ps1"
+                                                                      ],
+                                                  "execution":  "flat_manifest_steps",
+                                                  "verification":  {
+                                                                       "scope":  "read-only EtherCAT 设备设定 walk: master settings plus every slave address/product/vendor/IDs read through UIA ValuePattern and the dialog cancelled without save",
+                                                                       "reference":  "tests/ethercat-configuration/README.md"
+                                                                   }
+                                              },
+                                              {
                                                   "path":  "workflows/export_kv_device_comments.ps1",
                                                   "status":  "published",
                                                   "customer_callable":  true,

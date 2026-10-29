@@ -11,6 +11,8 @@
   [string]$BatchAxisRegistration = 'No',
   [string]$OutDir = '',
   [switch]$InspectOnly,
+  [switch]$ReadConfigurationOnly,
+  [string]$ConfigurationOutPath = '',
   [switch]$KeepWindowOpen
 )
 
@@ -968,6 +970,103 @@ function Restore-EtherCatCleanEndState {
   }
 }
 
+function Read-EtherCatDetailValues([IntPtr]$Hwnd) {
+  $root=Get-ElementFromHwnd -Hwnd $Hwnd
+  $condition=New-Object Windows.Automation.PropertyCondition(
+    [Windows.Automation.AutomationElement]::ControlTypeProperty,
+    [Windows.Automation.ControlType]::TreeItem)
+  $items=$root.FindAll([Windows.Automation.TreeScope]::Descendants,$condition)
+  $values=[ordered]@{}
+  foreach($item in $items){
+    $name=[string]$item.Current.Name
+    if([string]::IsNullOrWhiteSpace($name)){continue}
+    $value=''
+    try{$value=[string]$item.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value}catch{}
+    if(-not [string]::IsNullOrWhiteSpace($value)){$values[$name.Trim()]=$value}
+  }
+  $values
+}
+
+function Select-EtherCatDeviceSettingTab([IntPtr]$Hwnd) {
+  $root=Get-ElementFromHwnd -Hwnd $Hwnd
+  $condition=New-Object Windows.Automation.PropertyCondition(
+    [Windows.Automation.AutomationElement]::ControlTypeProperty,
+    [Windows.Automation.ControlType]::TabItem)
+  foreach($tab in $root.FindAll([Windows.Automation.TreeScope]::Descendants,$condition)){
+    if([string]$tab.Current.Name -eq '设备设定'){
+      $tab.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
+      Start-Sleep -Milliseconds 500
+      return $true
+    }
+  }
+  return $false
+}
+
+function Read-EtherCatConfiguration([IntPtr]$DialogHwnd) {
+  if(-not ('KvEcReadClick' -as [type])) {
+    Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class KvEcReadClick {
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")] public static extern void mouse_event(uint f, uint dx, uint dy, uint d, IntPtr e);
+  public static void Click(int x, int y) {
+    SetCursorPos(x, y);
+    System.Threading.Thread.Sleep(150);
+    mouse_event(0x0002, 0, 0, 0, IntPtr.Zero);
+    System.Threading.Thread.Sleep(80);
+    mouse_event(0x0004, 0, 0, 0, IntPtr.Zero);
+    System.Threading.Thread.Sleep(400);
+  }
+}
+"@ -ErrorAction SilentlyContinue
+  }
+  [void][KvEcReadClick]::SetForegroundWindow($DialogHwnd)
+  Start-Sleep -Milliseconds 400
+  $tabSelected=Select-EtherCatDeviceSettingTab -Hwnd $DialogHwnd
+  if(-not $tabSelected){ throw 'KV_ETHERCAT_DEVICE_SETTING_TAB_MISSING' }
+  $master=Read-EtherCatDetailValues -Hwnd $DialogHwnd
+  $rect=New-Object KvEtherCatWin32+RECT
+  [void][KvEtherCatWin32]::GetWindowRect($DialogHwnd,[ref]$rect)
+  [KvEcReadClick]::Click([int]($rect.Left+62), [int]($rect.Top+195))
+  Start-Sleep -Milliseconds 400
+  Invoke-KvGuardedSendKeys -TargetHwnd $DialogHwnd -Step 'EtherCAT read configuration reset to first node' -Keys '{UP 80}' -ExpectedTitleLike '*' -SleepMs 900
+  $nodes=@()
+  $seen=@{}
+  for($index=0; $index -lt 200; $index++) {
+    Invoke-KvGuardedSendKeys -TargetHwnd $DialogHwnd -Step "EtherCAT read configuration node $($index+1)" -Keys '{DOWN}' -ExpectedTitleLike '*' -SleepMs 350
+    $detail=Read-EtherCatDetailValues -Hwnd $DialogHwnd
+    $addressText=[string]$detail['节点地址']
+    if([string]::IsNullOrWhiteSpace($addressText)){ break }
+    $address=[int]$addressText
+    if($seen.ContainsKey($address)){ break }
+    $seen[$address]=$true
+    $nodes += [pscustomobject]@{
+      node_address=$address
+      product_name=[string]$detail['产品名称']
+      vendor_name=[string]$detail['供应商名称']
+      vendor_id=[string]$detail['供应商 ID']
+      product_code=[string]$detail['产品代码']
+      revision=[string]$detail['版本']
+      port_type=[string]$detail['端口类型']
+      detailed_settings=[string]$detail['详细设定']
+      refresh_timing=[string]$detail['刷新时机']
+      explicit_device_id=[string]$detail['Explicit Device ID']
+      explicit_device_id_check=[string]$detail['Explicit Device ID检查']
+      reserved=[string]$detail['预留']
+      values=$detail
+    }
+  }
+  [pscustomobject]@{
+    device_setting_tab=$tabSelected
+    master_settings=$master
+    dialog_rect=[pscustomobject]@{left=$rect.Left;top=$rect.Top;width=($rect.Right-$rect.Left);height=($rect.Bottom-$rect.Top)}
+    node_count=$nodes.Count
+    nodes=$nodes
+  }
+}
+
 function Assert-EtherCatModelPersisted {
   param([string]$Model,[int]$ExpectedNodeAddress=0)
   $process=Get-KvsProcess
@@ -1130,6 +1229,29 @@ try {
   $nodeAddressWrite = $null
   $nodeAddressWrites = @()
   $inspection = $null
+  if ($ReadConfigurationOnly) {
+    $windowRow = Get-EtherCatWindowRow
+    $configuration = Read-EtherCatConfiguration -DialogHwnd ([IntPtr]$windowRow.hwnd)
+    $cleanup = Restore-EtherCatCleanEndState
+    $configurationOk = ([int]$configuration.node_count -gt 0 -and [bool]$cleanup.ok)
+    $configurationPath = if ($ConfigurationOutPath) { [IO.Path]::GetFullPath($ConfigurationOutPath) } else { Join-Path $OutDir 'ethercat_configuration.json' }
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $configurationPath) | Out-Null
+    $readResult = [pscustomobject]@{
+      ok=$configurationOk
+      mode='read_configuration'
+      project_name=$ProjectName
+      project_path=$ProjectPath
+      configuration=$configuration
+      clean_end_state=$cleanup
+      configuration_path=$configurationPath
+    }
+    Write-JsonFile -Path $configurationPath -Value $readResult
+    Write-JsonFile -Path (Join-Path $OutDir 'result.json') -Value $readResult
+    Log-Event $(if($configurationOk){'workflow_succeeded'}else{'workflow_failed'}) @{mode='read_configuration';node_count=$configuration.node_count;result_path=$configurationPath}
+    $readResult | ConvertTo-Json -Depth 12
+    if (-not $configurationOk) { exit 62 }
+    exit 0
+  }
   if ($InspectOnly) {
     $windowRow = Get-EtherCatWindowRow
     $windowElement = Get-ElementFromHwnd -Hwnd $windowRow.hwnd

@@ -51,6 +51,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/workflows/export_kv_
 - 复用只跳过子 workflow，text_index、manifest、README 等离线汇总仍会重新生成
 - 若某个阶段缺失或失败，它以及依赖它的阶段会重新执行；UI 阶段的工程副本计划由 `mnm_export` 重建
 
+EtherCAT 配置现在由 `export_kv_ethercat_configuration.ps1` 通过只读 UI 读取，产物是
+`project/配置/EtherCAT/devices.json`（主站设定 + 每个从站的节点地址/型号/厂商/ID）。
+PDO 映射与 `详细设定` 子对话框仍未捕获；EtherNet/IP、运动轴参数仍是缺口。
 完整快照的全局变量必须来自 `snapshot_kv_global_variables_all_groups.ps1`。该 workflow 在变量组选择器中全选后复制整表，输出 `global_variables_all_groups.tsv`（同时提供兼容名 `global_variables_raw.tsv`）；因此 `project/配置/全局变量/variables.tsv` 包含所有变量组，而不是仅 `(Default)`。
 
 导出 inventory：

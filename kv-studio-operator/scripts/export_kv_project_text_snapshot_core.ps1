@@ -1,4 +1,4 @@
-<#!
+﻿<#!
 .SYNOPSIS
   Export a KV STUDIO project into a version-control friendly, text-first snapshot.
 .DESCRIPTION
@@ -366,6 +366,15 @@ if(-not $PlanOnly){
   Write-Json (Join-Path $textRoot 'variables\variable_snapshot_result.json') ([ordered]@{ok=($variablesStep.ok -and @($allLocalVariableSteps|Where-Object{-not $_.ok}).Count -eq 0);read_only=$true;project_path=$uiProjectPath;snapshots=@($allVariableSnapshots);all_columns_preserved=$true;unfiltered_completeness_verified=$globalComplete;captured_program_locals=@($programLocalCandidates);program_local_step_count=@($programLocalSteps).Count}) 8
 }
 
+$ethercatOut=Join-Path $rawRoot 'ethercat_configuration'
+$ethercatResult=Join-Path $ethercatOut 'ethercat_configuration_result.json'
+$ethercatWorkflow=Join-Path $scriptRoot 'workflows\export_kv_ethercat_configuration.ps1'
+$ethercatArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$ethercatOut,'-ProjectName',[IO.Path]::GetFileNameWithoutExtension($ProjectPath),'-TimeoutSeconds',[string]$TimeoutSeconds)
+$ethercatStep=Invoke-Child $ethercatWorkflow $ethercatArgs $ethercatResult 'ethercat_configuration' -ResetPaths @($ethercatOut)
+$ethercatConfigurationPath=Join-Path $ethercatOut 'ethercat_configuration.json'
+$ethercatConfiguration=$null
+if(Test-Path -LiteralPath $ethercatConfigurationPath -PathType Leaf){ try{$ethercatConfiguration=Get-Content -Raw -LiteralPath $ethercatConfigurationPath -Encoding UTF8|ConvertFrom-Json}catch{} }
+
 $fbSteps=@()
 foreach($name in @($fbReadable|Sort-Object -Unique)){
   $fbOut=Join-Path $rawRoot ('fb_arguments\'+($name -replace '[\\/:*?""<>|]','_')); New-Item -ItemType Directory -Force -Path $fbOut|Out-Null
@@ -403,12 +412,39 @@ $materializationArgs=@(
 )
 $materializationStep=if($PlanOnly){[ordered]@{ok=$true;status='planned';label='materialize_semantic_project';result_path=$materializationResult}}else{Invoke-Child $materializationScript $materializationArgs $materializationResult 'materialize_semantic_project' -ResetPaths @((Join-Path $snapshotRoot 'project'))}
 
+# The semantic tree is built from WsTreeEnv, which only carries names. Merge the
+# UI-read EtherCAT settings (address / product / vendor / IDs) into it so the
+# restore plan can distinguish default from configured slaves.
+if($ethercatStep.ok -and $ethercatConfiguration){
+  $semanticEtherCatDir=Join-Path $snapshotRoot 'project\配置\EtherCAT'
+  New-Item -ItemType Directory -Force -Path $semanticEtherCatDir | Out-Null
+  Copy-Item -LiteralPath $ethercatConfigurationPath -Destination (Join-Path $semanticEtherCatDir 'devices.json') -Force
+  $etherCatEntityPath=Join-Path $semanticEtherCatDir 'entity.json'
+  if(Test-Path -LiteralPath $etherCatEntityPath -PathType Leaf){
+    try{
+      $entity=Get-Content -Raw -LiteralPath $etherCatEntityPath -Encoding UTF8|ConvertFrom-Json
+      $entity.artifacts | Add-Member -NotePropertyName devices -NotePropertyValue '配置/EtherCAT/devices.json' -Force
+      $entity.status | Add-Member -NotePropertyName devices -NotePropertyValue 'complete' -Force
+      Write-Json $etherCatEntityPath $entity 20
+    }catch{}
+  }
+  $unitConfigPath=Join-Path $snapshotRoot 'project\配置\单元\configuration.json'
+  if(Test-Path -LiteralPath $unitConfigPath -PathType Leaf){
+    try{
+      $unitConfig=Get-Content -Raw -LiteralPath $unitConfigPath -Encoding UTF8|ConvertFrom-Json
+      $unitConfig.asset_status | Add-Member -NotePropertyName ethercat -NotePropertyValue 'ui_read_complete' -Force
+      $unitConfig | Add-Member -NotePropertyName ethercat_node_count -NotePropertyValue ([int]$ethercatConfiguration.node_count) -Force
+      Write-Json $unitConfigPath $unitConfig 20
+    }catch{}
+  }
+}
+
 $index=@(); foreach($f in @(Get-ChildItem -LiteralPath $textRoot -File -Recurse | Sort-Object FullName)){
   $index += [ordered]@{path=(Rel $snapshotRoot $f.FullName);format=$f.Extension.TrimStart('.');length=$f.Length;sha256=(Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 }
 Write-Json (Join-Path $snapshotRoot 'text_index.json') $index 8
-$statuses=@($inventoryStep,$mnmStep,$structureStep,$variablesStep)+@($allLocalVariableSteps)+@($fbSteps)+@($inventoryFinalStep,$materializationStep,$commentsStep,$annotateStep)
-$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($allLocalVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}
+$statuses=@($inventoryStep,$mnmStep,$structureStep,$variablesStep,$ethercatStep)+@($allLocalVariableSteps)+@($fbSteps)+@($inventoryFinalStep,$materializationStep,$commentsStep,$annotateStep)
+$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($allLocalVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $ethercatStep.ok){$missing+='ethercat_configuration'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}
 $semanticStatus=if($materializationStep.ok){'complete'}else{'failed'}
 $semanticWarnings=@()
 if($materializationStep.result -and $materializationStep.result.warnings){$semanticWarnings=@($materializationStep.result.warnings)}
@@ -420,7 +456,7 @@ $manifest=[ordered]@{
   schema_version=2; snapshot_schema='kv_project_text_snapshot'; status=$status; generated_at=(Get-Date).ToUniversalTime().ToString('o')
   project=[ordered]@{path=$ProjectPath;root=$projectRoot;fingerprint=$fingerprint}
   layout=[ordered]@{snapshot_root='.';project='project';text='text';raw='raw';architecture='architecture';text_index='text_index.json'}
-  artifacts=[ordered]@{semantic_project='project';inventory='text/project_inventory.json';mnm='text/mnm';variables='text/variables';structures='text/structure_definitions.json';fb_arguments='text/fb_arguments';comments='text/comments'}
+  artifacts=[ordered]@{semantic_project='project';inventory='text/project_inventory.json';mnm='text/mnm';variables='text/variables';structures='text/structure_definitions.json';fb_arguments='text/fb_arguments';comments='text/comments';ethercat_devices='project/配置/EtherCAT/devices.json'}
   workflow_status=$statuses; discovered_modules=$moduleNames; discovered_fb_modules=@($fbModules|Sort-Object -Unique); discovered_program_local_modules=@($programLocalCandidates)
   semantic_project_status=$semanticStatus; semantic_warnings=$semanticWarnings; missing_capabilities=@($missing); skipped_capabilities=$fbSkipped; version_control=[ordered]@{deterministic_index='text_index.json';file_hashes='sha256';binary_project_files='referenced_by_project.fingerprint_only';generated_files='isolated_snapshot_directory'}
   resume=[ordered]@{enabled=[bool]$Resume;state_path='snapshot_state.json';invalidated_by_fingerprint=[bool]$script:resumeInvalidated;reused_stages=@($script:reusedStages|Sort-Object -Unique)}
