@@ -752,6 +752,18 @@
                                                   "execution":  "flat_manifest_steps"
                                               },
                                               {
+                                                  "path":  "workflows/export_kv_axis_parameters.ps1",
+                                                  "status":  "published",
+                                                  "customer_callable":  true,
+                                                  "capabilities":  [
+                                                                       "read_axis_parameters"
+                                                                   ],
+                                                  "runner_children":  [
+                                                                          "runner_children/axis_parameters_guarded.ps1"
+                                                                      ],
+                                                  "execution":  "composed_axis_dump"
+                                              },
+                                              {
                                                   "path":  "workflows/export_kv_ethercat_configuration.ps1",
                                                   "status":  "published",
                                                   "customer_callable":  true,

@@ -375,6 +375,13 @@ $ethercatConfigurationPath=Join-Path $ethercatOut 'ethercat_configuration.json'
 $ethercatConfiguration=$null
 if(Test-Path -LiteralPath $ethercatConfigurationPath -PathType Leaf){ try{$ethercatConfiguration=Get-Content -Raw -LiteralPath $ethercatConfigurationPath -Encoding UTF8|ConvertFrom-Json}catch{} }
 
+$axisOut=Join-Path $rawRoot 'axis_parameters'
+$axisResult=Join-Path $axisOut 'axis_parameters_result.json'
+$axisWorkflow=Join-Path $scriptRoot 'workflows\export_kv_axis_parameters.ps1'
+$axisArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$axisOut,'-TimeoutSeconds',[string]$TimeoutSeconds)
+$axisStep=Invoke-Child $axisWorkflow $axisArgs $axisResult 'axis_parameters' -ResetPaths @($axisOut)
+$axisTsv=Join-Path $axisOut 'axes_params.tsv'
+
 $fbSteps=@()
 foreach($name in @($fbReadable|Sort-Object -Unique)){
   $fbOut=Join-Path $rawRoot ('fb_arguments\'+($name -replace '[\\/:*?""<>|]','_')); New-Item -ItemType Directory -Force -Path $fbOut|Out-Null
@@ -439,12 +446,44 @@ if($ethercatStep.ok -and $ethercatConfiguration){
   }
 }
 
+# Motion axis control table is a proven read-only dump (axis_parameters_guarded
+# -Mode Dump -AllParams). Merge the TSV and the axis name list into the semantic
+# tree and replace the "missing" markers for motion.
+if($axisStep.ok -and (Test-Path -LiteralPath $axisTsv -PathType Leaf)){
+  $motionDir=Join-Path $snapshotRoot 'project\配置\运动'
+  New-Item -ItemType Directory -Force -Path $motionDir | Out-Null
+  Copy-Item -LiteralPath $axisTsv -Destination (Join-Path $motionDir 'axis_parameters.tsv') -Force
+  $axisLines=@(Get-Content -LiteralPath $axisTsv -Encoding UTF8)
+  $axisNames=@()
+  if($axisLines.Count -gt 0){
+    $header=$axisLines[0] -split "`t"
+    if($header.Count -gt 4){ $axisNames=@($header[4..($header.Count-1)] | Where-Object { $_ }) }
+  }
+  Write-Json (Join-Path $motionDir 'axes.json') ([ordered]@{axis_count=$axisNames.Count;axes=$axisNames}) 6
+  Write-Json (Join-Path $motionDir 'entity.json') ([ordered]@{
+    id='config:运动'; kind='motion_configuration'; display_name='运动设定'; path='配置/运动'
+    artifacts=[ordered]@{axis_parameters='配置/运动/axis_parameters.tsv';axes='配置/运动/axes.json'}
+    status=[ordered]@{axis_parameters='complete';axes='complete'}
+    restore=[ordered]@{order=30;strategy='configure_motion_axes';depends_on=@('config:单元')}
+  }) 12
+  $unitConfigPath2=Join-Path $snapshotRoot 'project\配置\单元\configuration.json'
+  if(Test-Path -LiteralPath $unitConfigPath2 -PathType Leaf){
+    try{
+      $unitConfig2=Get-Content -Raw -LiteralPath $unitConfigPath2 -Encoding UTF8|ConvertFrom-Json
+      $unitConfig2.asset_status | Add-Member -NotePropertyName motion_axes -NotePropertyValue 'ui_dump_complete' -Force
+      $unitConfig2.asset_status | Add-Member -NotePropertyName axis_parameters -NotePropertyValue 'ui_dump_complete' -Force
+      $unitConfig2 | Add-Member -NotePropertyName axis_count -NotePropertyValue $axisNames.Count -Force
+      Write-Json $unitConfigPath2 $unitConfig2 20
+    }catch{}
+  }
+}
+
 $index=@(); foreach($f in @(Get-ChildItem -LiteralPath $textRoot -File -Recurse | Sort-Object FullName)){
   $index += [ordered]@{path=(Rel $snapshotRoot $f.FullName);format=$f.Extension.TrimStart('.');length=$f.Length;sha256=(Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 }
 Write-Json (Join-Path $snapshotRoot 'text_index.json') $index 8
-$statuses=@($inventoryStep,$mnmStep,$structureStep,$variablesStep,$ethercatStep)+@($allLocalVariableSteps)+@($fbSteps)+@($inventoryFinalStep,$materializationStep,$commentsStep,$annotateStep)
-$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($allLocalVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $ethercatStep.ok){$missing+='ethercat_configuration'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}
+$statuses=@($inventoryStep,$mnmStep,$structureStep,$variablesStep,$ethercatStep,$axisStep)+@($allLocalVariableSteps)+@($fbSteps)+@($inventoryFinalStep,$materializationStep,$commentsStep,$annotateStep)
+$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($allLocalVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $ethercatStep.ok){$missing+='ethercat_configuration'}; if(-not $axisStep.ok){$missing+='axis_parameters'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}
 $semanticStatus=if($materializationStep.ok){'complete'}else{'failed'}
 $semanticWarnings=@()
 if($materializationStep.result -and $materializationStep.result.warnings){$semanticWarnings=@($materializationStep.result.warnings)}
@@ -456,7 +495,7 @@ $manifest=[ordered]@{
   schema_version=2; snapshot_schema='kv_project_text_snapshot'; status=$status; generated_at=(Get-Date).ToUniversalTime().ToString('o')
   project=[ordered]@{path=$ProjectPath;root=$projectRoot;fingerprint=$fingerprint}
   layout=[ordered]@{snapshot_root='.';project='project';text='text';raw='raw';architecture='architecture';text_index='text_index.json'}
-  artifacts=[ordered]@{semantic_project='project';inventory='text/project_inventory.json';mnm='text/mnm';variables='text/variables';structures='text/structure_definitions.json';fb_arguments='text/fb_arguments';comments='text/comments';ethercat_devices='project/配置/EtherCAT/devices.json'}
+  artifacts=[ordered]@{semantic_project='project';inventory='text/project_inventory.json';mnm='text/mnm';variables='text/variables';structures='text/structure_definitions.json';fb_arguments='text/fb_arguments';comments='text/comments';ethercat_devices='project/配置/EtherCAT/devices.json';axis_parameters='project/配置/运动/axis_parameters.tsv'}
   workflow_status=$statuses; discovered_modules=$moduleNames; discovered_fb_modules=@($fbModules|Sort-Object -Unique); discovered_program_local_modules=@($programLocalCandidates)
   semantic_project_status=$semanticStatus; semantic_warnings=$semanticWarnings; missing_capabilities=@($missing); skipped_capabilities=$fbSkipped; version_control=[ordered]@{deterministic_index='text_index.json';file_hashes='sha256';binary_project_files='referenced_by_project.fingerprint_only';generated_files='isolated_snapshot_directory'}
   resume=[ordered]@{enabled=[bool]$Resume;state_path='snapshot_state.json';invalidated_by_fingerprint=[bool]$script:resumeInvalidated;reused_stages=@($script:reusedStages|Sort-Object -Unique)}
