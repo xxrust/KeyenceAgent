@@ -46,6 +46,9 @@ foreach ($tool in $wiredTools) {
 }
 $query=& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'get_kv_capabilities.ps1') -Capability snapshot_fb_arguments | ConvertFrom-Json
 if (-not $query.ok -or $query.operations.Count -ne 1 -or @($query.operations[0].parameters | Where-Object name -eq SnapshotOnly).Count -ne 1) { throw 'KV_PUBLIC_CAPABILITY_DISCOVERY_FAILED' }
+$coverageOut = Join-Path $OutDir 'asset_coverage'
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'gates\assert_kv_asset_coverage.ps1') -OutDir $coverageOut | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'KV_ASSET_COVERAGE_FAILED' }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 @{ok=$true;active_scripts=$files.Count;unclassified=0;duplicate_names=0;desktop_input=$false} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutDir 'test_result.json') -Encoding UTF8
 Get-Content -LiteralPath (Join-Path $OutDir 'test_result.json')

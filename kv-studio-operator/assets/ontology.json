@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "generated_from": "manual v1; keep in sync with script_manifest.json",
+  "assets": {
+    "program": { "snapshot_status": "wired", "snapshot_artifact": "project/程序", "snapshot_stage": "mnm_export", "restore_strategy": "import_body_then_set_locals", "depends_on": ["data_types", "global_variables"] },
+    "fb": { "snapshot_status": "wired", "snapshot_artifact": "project/功能块", "snapshot_stage": "mnm_export", "restore_strategy": "import_body_then_set_arguments_then_set_locals", "depends_on": ["data_types"] },
+    "fb_arguments": { "snapshot_status": "wired", "snapshot_artifact": "text/fb_arguments", "snapshot_stage": "fb_arguments", "restore_strategy": "set_fb_arguments", "depends_on": ["fb"] },
+    "global_variables": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/全局变量/variables.tsv", "snapshot_stage": "variables_snapshot", "restore_strategy": "set_global_variables", "depends_on": ["data_types", "unit_configuration"] },
+    "data_types": { "snapshot_status": "wired", "snapshot_artifact": "project/类型/structure_definitions.json", "snapshot_stage": "structure_export", "restore_strategy": "mutate_structure_definitions", "depends_on": [] },
+    "comments": { "snapshot_status": "wired", "snapshot_artifact": "project/注释", "snapshot_stage": "device_comments", "restore_strategy": "not_restorable_read_only", "depends_on": ["program"] },
+    "unit_configuration": { "snapshot_status": "wired_limited", "snapshot_artifact": "project/配置/单元/configuration.json", "snapshot_stage": "materialize_semantic_project", "restore_strategy": "configure_units", "depends_on": [], "limited_reason": "expansion units and KV-EC01 module assignment are not captured" },
+    "ethercat_slave": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/EtherCAT/devices.json", "snapshot_stage": "ethercat_configuration", "restore_strategy": "configure_ethercat_nodes", "depends_on": ["unit_configuration"] },
+    "ethercat_pdo": { "snapshot_status": "missing_route", "snapshot_artifact": "", "snapshot_stage": "", "restore_strategy": "configure_ethercat_nodes", "depends_on": ["ethercat_slave"], "missing_reason": "PDO mapping lives behind 详细设定; UIA exposes no cell values and clipboard copies one cell" },
+    "eip_node": { "snapshot_status": "not_wired", "snapshot_artifact": "", "snapshot_stage": "", "restore_strategy": "configure_eip_devices", "depends_on": ["unit_configuration"], "missing_reason": "read segment exists in configure_eip_devices_guarded.ps1; snapshot stage not wired yet" },
+    "motion_axis": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/运动/axes.json", "snapshot_stage": "axis_parameters", "restore_strategy": "complete_axis_registration", "depends_on": ["ethercat_slave"] },
+    "axis_parameter": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/运动/axis_parameters.tsv", "snapshot_stage": "axis_parameters", "restore_strategy": "axis_parameters_write", "depends_on": ["motion_axis"] }
+  },
+  "stages": {
+    "inventory_initial": { "producer": "export_kv_project_inventory" },
+    "mnm_export": { "producer": "export_mnm_project_copy" },
+    "device_comments": { "producer": "export_kv_device_comments" },
+    "structure_export": { "producer": "export_kv_structure_definitions" },
+    "variables_snapshot": { "producer": "snapshot_kv_global_variables_all_groups" },
+    "fb_variables": { "producer": "set_kv_variables_snapshot" },
+    "program_variables": { "producer": "set_kv_variables_snapshot" },
+    "fb_arguments": { "producer": "set_kv_fb_arguments_snapshot" },
+    "ethercat_configuration": { "producer": "read_ethercat_configuration" },
+    "axis_parameters": { "producer": "read_axis_parameters" },
+    "inventory_final": { "producer": "export_kv_project_inventory" },
+    "materialize_semantic_project": { "producer": "materialize_kv_project_snapshot" },
+    "device_comment_coverage": { "producer": "annotate_kv_program_with_comments" }
+  },
+  "capabilities": {
+    "export_mnm_project_copy": { "script": "workflows/export_mnm_project_copy_default_folder.ps1", "assets": ["program", "fb"], "evidence": ["tests/kv-interface-regression/10_export_mnm"] },
+    "snapshot_kv_global_variables_all_groups": { "script": "workflows/snapshot_kv_global_variables_all_groups.ps1", "assets": ["global_variables"], "evidence": ["tests/kv-interface-regression/20_global_variable_groups"] },
+    "export_kv_structure_definitions": { "script": "workflows/export_kv_structure_definitions.ps1", "assets": ["data_types"], "evidence": ["tests/kv-interface-regression/04_structures_snapshot"] },
+    "export_kv_device_comments": { "script": "workflows/export_kv_device_comments.ps1", "assets": ["comments"], "evidence": ["tests/kv-interface-regression/21_export_device_comments"] },
+    "read_ethercat_configuration": { "script": "workflows/export_kv_ethercat_configuration.ps1", "assets": ["ethercat_slave"], "evidence": ["C:/kvrun/ec_read2/ethercat_configuration.json"] },
+    "read_axis_parameters": { "script": "workflows/export_kv_axis_parameters.ps1", "assets": ["motion_axis", "axis_parameter"], "evidence": ["C:/kvrun/axis_dump_test/axis_parameters_result.json"] },
+    "configure_ethercat_nodes": { "script": "workflows/configure_kv_ethercat_nodes.ps1", "assets": ["ethercat_slave"], "evidence": ["tests/kv-interface-regression/07_ethercat_nodes"] },
+    "configure_eip_devices": { "script": "workflows/configure_kv_eip_devices.ps1", "assets": ["eip_node"], "evidence": ["tests/eip-live-cycle"] },
+    "axis_parameters_write": { "script": "runner_children/axis_parameters_guarded.ps1", "assets": ["axis_parameter"], "evidence": ["tests/axis-params"] },
+    "compile_kv_project": { "script": "workflows/compile_kv_project.ps1", "assets": ["program", "fb", "global_variables"], "evidence": ["tests/kv-interface-regression/05_compile"] },
+    "materialize_kv_project_snapshot": { "script": "workflow_tools/materialize_kv_project_snapshot.ps1", "assets": ["program", "fb", "data_types", "global_variables"], "evidence": ["C:/kvrun/snap_resume/s2/project/_index/materialization_result.json"] },
+    "annotate_kv_program_with_comments": { "script": "workflows/annotate_kv_program_with_comments.ps1", "assets": ["comments"], "evidence": ["tests/kv-interface-regression/22_annotate_program_comments"] },
+    "set_kv_fb_arguments_snapshot": { "script": "workflows/set_kv_fb_arguments.ps1", "assets": ["fb_arguments"], "evidence": ["tests/kv-interface-regression/01_fb_arguments"] },
+    "set_kv_variables_snapshot": { "script": "workflows/set_kv_variables.ps1", "assets": ["global_variables", "fb_arguments"], "evidence": ["tests/kv-interface-regression/03_variables_snapshot"] },
+    "export_kv_project_inventory": { "script": "export_kv_project_inventory.ps1", "assets": ["unit_configuration", "data_types"], "evidence": ["tests/inventory-expansion"] }
+  },
+  "relations": [
+    { "from": "asset:ethercat_slave", "to": "capability:read_ethercat_configuration", "type": "produced_by" },
+    { "from": "asset:axis_parameter", "to": "capability:read_axis_parameters", "type": "produced_by" },
+    { "from": "asset:eip_node", "to": "capability:configure_eip_devices", "type": "produced_by" },
+    { "from": "asset:program", "to": "asset:global_variables", "type": "depends_on" },
+    { "from": "asset:axis_parameter", "to": "asset:motion_axis", "type": "depends_on" },
+    { "from": "asset:ethercat_slave", "to": "asset:unit_configuration", "type": "depends_on" }
+  ]
+}
