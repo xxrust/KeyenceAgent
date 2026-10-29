@@ -381,6 +381,12 @@ $axisWorkflow=Join-Path $scriptRoot 'workflows\export_kv_axis_parameters.ps1'
 $axisArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$axisOut,'-TimeoutSeconds',[string]$TimeoutSeconds)
 $axisStep=Invoke-Child $axisWorkflow $axisArgs $axisResult 'axis_parameters' -ResetPaths @($axisOut)
 $axisTsv=Join-Path $axisOut 'axes_params.tsv'
+$eipOut=Join-Path $rawRoot 'eip_configuration'
+$eipResult=Join-Path $eipOut 'eip_configuration_result.json'
+$eipWorkflow=Join-Path $scriptRoot 'workflows\export_kv_eip_configuration.ps1'
+$eipArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$eipOut)
+$eipStep=Invoke-Child $eipWorkflow $eipArgs $eipResult 'eip_configuration' -ResetPaths @($eipOut)
+$eipConfigPath=Join-Path $eipOut 'eip_configuration.json'
 
 $fbSteps=@()
 foreach($name in @($fbReadable|Sort-Object -Unique)){
@@ -478,12 +484,23 @@ if($axisStep.ok -and (Test-Path -LiteralPath $axisTsv -PathType Leaf)){
   }
 }
 
+# EtherNet/IP read-only probe: IP column + raw 设定列表 table (names/assemblies are not exposed by the grid yet).
+if($eipStep.ok -and (Test-Path -LiteralPath $eipConfigPath -PathType Leaf)){
+  $eipDir=Join-Path $snapshotRoot 'project\配置\EtherNetIP'
+  New-Item -ItemType Directory -Force -Path $eipDir | Out-Null
+  Copy-Item -LiteralPath $eipConfigPath -Destination (Join-Path $eipDir 'devices.json') -Force
+  $eipData=Get-Content -Raw -LiteralPath $eipConfigPath -Encoding UTF8|ConvertFrom-Json
+  Write-Json (Join-Path $eipDir 'entity.json') ([ordered]@{id='config:EtherNetIP';kind='ethernet_ip_configuration';display_name='EtherNet/IP';path='配置/EtherNetIP';artifacts=[ordered]@{devices='配置/EtherNetIP/devices.json'};status=[ordered]@{ips='complete';devices='partial'};restore=[ordered]@{order=25;strategy='configure_eip_devices';depends_on=@('config:单元')}}) 12
+  $uc=Join-Path $snapshotRoot 'project\配置\单元\configuration.json'
+  if(Test-Path -LiteralPath $uc){ try{ $u=Get-Content -Raw -LiteralPath $uc -Encoding UTF8|ConvertFrom-Json; $u.asset_status|Add-Member -NotePropertyName ethernet_ip -NotePropertyValue 'ui_read_limited' -Force; $u|Add-Member -NotePropertyName eip_ip_count -NotePropertyValue ([int]$eipData.ip_count) -Force; Write-Json $uc $u 20 }catch{} }
+}
+
 $index=@(); foreach($f in @(Get-ChildItem -LiteralPath $textRoot -File -Recurse | Sort-Object FullName)){
   $index += [ordered]@{path=(Rel $snapshotRoot $f.FullName);format=$f.Extension.TrimStart('.');length=$f.Length;sha256=(Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 }
 Write-Json (Join-Path $snapshotRoot 'text_index.json') $index 8
-$statuses=@($inventoryStep,$mnmStep,$structureStep,$variablesStep,$ethercatStep,$axisStep)+@($allLocalVariableSteps)+@($fbSteps)+@($inventoryFinalStep,$materializationStep,$commentsStep,$annotateStep)
-$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($allLocalVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $ethercatStep.ok){$missing+='ethercat_configuration'}; if(-not $axisStep.ok){$missing+='axis_parameters'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}
+$statuses=@($inventoryStep,$mnmStep,$structureStep,$variablesStep,$ethercatStep,$axisStep,$eipStep)+@($allLocalVariableSteps)+@($fbSteps)+@($inventoryFinalStep,$materializationStep,$commentsStep,$annotateStep)
+$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($allLocalVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $ethercatStep.ok){$missing+='ethercat_configuration'}; if(-not $axisStep.ok){$missing+='axis_parameters'}; if(-not $eipStep.ok){$missing+='eip_configuration'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}
 $semanticStatus=if($materializationStep.ok){'complete'}else{'failed'}
 $semanticWarnings=@()
 if($materializationStep.result -and $materializationStep.result.warnings){$semanticWarnings=@($materializationStep.result.warnings)}
@@ -495,7 +512,7 @@ $manifest=[ordered]@{
   schema_version=2; snapshot_schema='kv_project_text_snapshot'; status=$status; generated_at=(Get-Date).ToUniversalTime().ToString('o')
   project=[ordered]@{path=$ProjectPath;root=$projectRoot;fingerprint=$fingerprint}
   layout=[ordered]@{snapshot_root='.';project='project';text='text';raw='raw';architecture='architecture';text_index='text_index.json'}
-  artifacts=[ordered]@{semantic_project='project';inventory='text/project_inventory.json';mnm='text/mnm';variables='text/variables';structures='text/structure_definitions.json';fb_arguments='text/fb_arguments';comments='text/comments';ethercat_devices='project/配置/EtherCAT/devices.json';axis_parameters='project/配置/运动/axis_parameters.tsv'}
+  artifacts=[ordered]@{semantic_project='project';inventory='text/project_inventory.json';mnm='text/mnm';variables='text/variables';structures='text/structure_definitions.json';fb_arguments='text/fb_arguments';comments='text/comments';ethercat_devices='project/配置/EtherCAT/devices.json';axis_parameters='project/配置/运动/axis_parameters.tsv';eip_devices='project/配置/EtherNetIP/devices.json'}
   workflow_status=$statuses; discovered_modules=$moduleNames; discovered_fb_modules=@($fbModules|Sort-Object -Unique); discovered_program_local_modules=@($programLocalCandidates)
   semantic_project_status=$semanticStatus; semantic_warnings=$semanticWarnings; missing_capabilities=@($missing); skipped_capabilities=$fbSkipped; version_control=[ordered]@{deterministic_index='text_index.json';file_hashes='sha256';binary_project_files='referenced_by_project.fingerprint_only';generated_files='isolated_snapshot_directory'}
   resume=[ordered]@{enabled=[bool]$Resume;state_path='snapshot_state.json';invalidated_by_fingerprint=[bool]$script:resumeInvalidated;reused_stages=@($script:reusedStages|Sort-Object -Unique)}

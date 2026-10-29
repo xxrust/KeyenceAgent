@@ -1,10 +1,12 @@
 ﻿param(
   [Parameter(Mandatory=$true)][string]$ProjectName,
   [string]$ProjectPath = '',
-  [Parameter(Mandatory=$true)][string]$DevicesConfigPath,
+  [string]$DevicesConfigPath = '',
   [Parameter(Mandatory=$true)][string]$OutDir,
   [int]$TimeoutSeconds = 180,
-  [switch]$PreflightOnly
+  [switch]$PreflightOnly,
+  [switch]$ReadConfigurationOnly,
+  [string]$ConfigurationOutPath = ''
 )
 # Writes an EtherNet/IP device into the project that is currently open in
 # KV STUDIO. Verified flow (2026-10-26):
@@ -94,11 +96,15 @@ function Fail([string]$Code, [string]$Message) {
   exit 41
 }
 
-if (-not (Test-Path -LiteralPath $DevicesConfigPath -PathType Leaf)) { throw "KV_EIP_CONFIG_MISSING: $DevicesConfigPath" }
-$config = Get-Content -LiteralPath $DevicesConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
-$devices = @($config.devices)
-if ($devices.Count -eq 0) { throw 'KV_EIP_CONFIG_EMPTY: devices[] is empty' }
-foreach ($d in $devices) { if (-not $d.model) { throw 'KV_EIP_CONFIG_INVALID: device.model is required' } }
+$devices = @()
+if (-not $ReadConfigurationOnly) {
+  if (-not $DevicesConfigPath) { throw 'KV_EIP_CONFIG_REQUIRED: DevicesConfigPath is required unless -ReadConfigurationOnly' }
+  if (-not (Test-Path -LiteralPath $DevicesConfigPath -PathType Leaf)) { throw "KV_EIP_CONFIG_MISSING: $DevicesConfigPath" }
+  $config = Get-Content -LiteralPath $DevicesConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  $devices = @($config.devices)
+  if ($devices.Count -eq 0) { throw 'KV_EIP_CONFIG_EMPTY: devices[] is empty' }
+  foreach ($d in $devices) { if (-not $d.model) { throw 'KV_EIP_CONFIG_INVALID: device.model is required' } }
+}
 $device = $devices[0]
 $candidates = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$ProjectName*" })
 if ($candidates.Count -eq 0) { throw "KV_EIP_PROJECT_NOT_OPEN: $ProjectName" }
@@ -235,6 +241,46 @@ if ($manual) {
   Start-Sleep -Seconds 2
   if (Wait-Window 'EtherNet/IP 设定' 2 '#32770') { Fail 'KV_EIP_MANUAL_MODE_NOT_SELECTED' 'manual mode dialog did not close' }
   Log 'manual_mode_selected'
+}
+if ($ReadConfigurationOnly) {
+  $gridRect = New-Object EipWrite.EipWinWrite+RECT
+  [void][EipWrite.EipWinWrite]::GetWindowRect([IntPtr]$eipWindow.hwnd, [ref]$gridRect)
+  [void][EipWrite.EipWinWrite]::SetForegroundWindow([IntPtr]$eipWindow.hwnd)
+  Start-Sleep -Milliseconds 500
+  [EipWrite.EipWinWrite]::Click(($gridRect.L + 300), ($gridRect.T + 760))
+  Start-Sleep -Milliseconds 400
+  Send-KvKeys -Keys '^a' -Step 'eip read configuration select all'
+  Start-Sleep -Milliseconds 250
+  Send-KvKeys -Keys '^c' -Step 'eip read configuration copy'
+  Start-Sleep -Milliseconds 800
+  $readText = [System.Windows.Forms.Clipboard]::GetText()
+  $lines = @($readText -split "`r?`n" | Where-Object { $_.Trim() })
+  $ips = @($lines | Where-Object { $_ -match '\b\d{1,3}(\.\d{1,3}){3}\b' } | ForEach-Object { [regex]::Match($_, '\b\d{1,3}(\.\d{1,3}){3}\b').Value } | Select-Object -Unique)
+  $closeEl = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$eipWindow.hwnd)
+  $cancel = Find-Button $closeEl '取消'
+  if ($cancel) {
+    $native = [long]$cancel.Current.NativeWindowHandle
+    if ($native -ne 0) { [void][EipWrite.EipWinWrite]::SendMessage([IntPtr]$native, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) } else { $cancel.SetFocus(); Send-KvKeys -Keys ' ' -Step 'eip read configuration cancel' }
+  }
+  Start-Sleep -Seconds 1
+  $readResult = [ordered]@{
+    ok = ($lines.Count -gt 0)
+    project = $ProjectName
+    project_path = $ProjectPath
+    row_count = $lines.Count
+    ip_count = $ips.Count
+    ips = $ips
+    rows = $lines
+    raw_table = $readText.Trim()
+    screenshot = (Save-Shot 'eip_configuration.png')
+  }
+  $outPath = if ($ConfigurationOutPath) { [IO.Path]::GetFullPath($ConfigurationOutPath) } else { Join-Path $OutDir 'eip_configuration.json' }
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $outPath) | Out-Null
+  $readResult | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $outPath -Encoding UTF8
+  Log 'read_configuration_done' @{ rows = $lines.Count; ips = $ips.Count; path = $outPath }
+  $readResult | ConvertTo-Json -Depth 4
+  if ($readResult.ok) { exit 0 }
+  exit 41
 }
 if ($PreflightOnly) {
   $shot = Save-Shot 'preflight.png'

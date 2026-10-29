@@ -752,6 +752,18 @@
                                                   "execution":  "flat_manifest_steps"
                                               },
                                               {
+                                                  "path":  "workflows/export_kv_eip_configuration.ps1",
+                                                  "status":  "published",
+                                                  "customer_callable":  true,
+                                                  "capabilities":  [
+                                                                       "read_eip_configuration"
+                                                                   ],
+                                                  "runner_children":  [
+                                                                          "runner_children/configure_eip_devices_guarded.ps1"
+                                                                      ],
+                                                  "execution":  "composed_eip_read"
+                                              },
+                                              {
                                                   "path":  "workflows/export_kv_axis_parameters.ps1",
                                                   "status":  "published",
                                                   "customer_callable":  true,

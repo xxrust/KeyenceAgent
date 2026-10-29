@@ -11,7 +11,7 @@
     "unit_configuration": { "snapshot_status": "wired_limited", "snapshot_artifact": "project/配置/单元/configuration.json", "snapshot_stage": "materialize_semantic_project", "restore_strategy": "configure_units", "depends_on": [], "limited_reason": "expansion units and KV-EC01 module assignment are not captured" },
     "ethercat_slave": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/EtherCAT/devices.json", "snapshot_stage": "ethercat_configuration", "restore_strategy": "configure_ethercat_nodes", "depends_on": ["unit_configuration"] },
     "ethercat_pdo": { "snapshot_status": "missing_route", "snapshot_artifact": "", "snapshot_stage": "", "restore_strategy": "configure_ethercat_nodes", "depends_on": ["ethercat_slave"], "missing_reason": "PDO mapping lives behind 详细设定; UIA exposes no cell values and clipboard copies one cell" },
-    "eip_node": { "snapshot_status": "not_wired", "snapshot_artifact": "", "snapshot_stage": "", "restore_strategy": "configure_eip_devices", "depends_on": ["unit_configuration"], "missing_reason": "read segment exists in configure_eip_devices_guarded.ps1; snapshot stage not wired yet" },
+    "eip_node": { "snapshot_status": "wired_limited", "snapshot_artifact": "project/配置/EtherNetIP/devices.json", "snapshot_stage": "eip_configuration", "restore_strategy": "configure_eip_devices", "depends_on": ["unit_configuration"], "limited_reason": "设定列表 clipboard exposes the IP column only; device names and connection assemblies are not captured yet" },
     "motion_axis": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/运动/axes.json", "snapshot_stage": "axis_parameters", "restore_strategy": "complete_axis_registration", "depends_on": ["ethercat_slave"] },
     "axis_parameter": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/运动/axis_parameters.tsv", "snapshot_stage": "axis_parameters", "restore_strategy": "axis_parameters_write", "depends_on": ["motion_axis"] }
   },
@@ -26,6 +26,7 @@
     "fb_arguments": { "producer": "set_kv_fb_arguments_snapshot" },
     "ethercat_configuration": { "producer": "read_ethercat_configuration" },
     "axis_parameters": { "producer": "read_axis_parameters" },
+    "eip_configuration": { "producer": "read_eip_configuration" },
     "inventory_final": { "producer": "export_kv_project_inventory" },
     "materialize_semantic_project": { "producer": "materialize_kv_project_snapshot" },
     "device_comment_coverage": { "producer": "annotate_kv_program_with_comments" }
@@ -37,6 +38,7 @@
     "export_kv_device_comments": { "script": "workflows/export_kv_device_comments.ps1", "assets": ["comments"], "evidence": ["tests/kv-interface-regression/21_export_device_comments"] },
     "read_ethercat_configuration": { "script": "workflows/export_kv_ethercat_configuration.ps1", "assets": ["ethercat_slave"], "evidence": ["C:/kvrun/ec_read2/ethercat_configuration.json"] },
     "read_axis_parameters": { "script": "workflows/export_kv_axis_parameters.ps1", "assets": ["motion_axis", "axis_parameter"], "evidence": ["C:/kvrun/axis_dump_test/axis_parameters_result.json"] },
+    "read_eip_configuration": { "script": "workflows/export_kv_eip_configuration.ps1", "assets": ["eip_node"], "evidence": ["C:/kvrun/eip_wf/eip_configuration_result.json"] },
     "configure_ethercat_nodes": { "script": "workflows/configure_kv_ethercat_nodes.ps1", "assets": ["ethercat_slave"], "evidence": ["tests/kv-interface-regression/07_ethercat_nodes"] },
     "configure_eip_devices": { "script": "workflows/configure_kv_eip_devices.ps1", "assets": ["eip_node"], "evidence": ["tests/eip-live-cycle"] },
     "axis_parameters_write": { "script": "runner_children/axis_parameters_guarded.ps1", "assets": ["axis_parameter"], "evidence": ["tests/axis-params"] },
@@ -50,7 +52,7 @@
   "relations": [
     { "from": "asset:ethercat_slave", "to": "capability:read_ethercat_configuration", "type": "produced_by" },
     { "from": "asset:axis_parameter", "to": "capability:read_axis_parameters", "type": "produced_by" },
-    { "from": "asset:eip_node", "to": "capability:configure_eip_devices", "type": "produced_by" },
+    { "from": "asset:eip_node", "to": "capability:read_eip_configuration", "type": "produced_by" },
     { "from": "asset:program", "to": "asset:global_variables", "type": "depends_on" },
     { "from": "asset:axis_parameter", "to": "asset:motion_axis", "type": "depends_on" },
     { "from": "asset:ethercat_slave", "to": "asset:unit_configuration", "type": "depends_on" }
