@@ -132,7 +132,8 @@ if (-not $KeepDialogs) {
 }
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-$safe = ($conn.title -replace '[^\w\u4e00-\u9fff]+', '_')
+$connName = [string]$fields.connection_name
+$safe = ((($conn.title + '_' + $connName).Trim('_')) -replace '[^\w\u4e00-\u9fff]+', '_')
 $rawPath = Join-Path $OutDir ($safe + '.tsv')
 [IO.File]::WriteAllText($rawPath, $raw, (New-Object Text.UTF8Encoding($false)))
 $report = [ordered]@{

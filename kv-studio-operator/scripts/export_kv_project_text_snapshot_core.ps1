@@ -488,17 +488,30 @@ if($axisStep.ok -and (Test-Path -LiteralPath $axisTsv -PathType Leaf)){
   }
 }
 
-# EtherNet/IP read-only probe: 设定列表 table (nodes, IPs, connections, RPI).
-# 软元件分配 maps are a separate asset (eip_connection, not wired yet).
+# EtherNet/IP read-only probe: 设定列表 table plus per-connection 软元件分配.
 if($eipStep.ok -and (Test-Path -LiteralPath $eipConfigPath -PathType Leaf)){
   $eipDir=Join-Path $snapshotRoot 'project\配置\EtherNetIP'
   New-Item -ItemType Directory -Force -Path $eipDir | Out-Null
   Copy-Item -LiteralPath $eipConfigPath -Destination (Join-Path $eipDir 'devices.json') -Force
   $eipData=Get-Content -Raw -LiteralPath $eipConfigPath -Encoding UTF8|ConvertFrom-Json
   Write-Json (Join-Path $eipDir 'connections.json') ([ordered]@{connection_count=[int]$eipData.connection_count;connections=@($eipData.connections)}) 8
-  Write-Json (Join-Path $eipDir 'entity.json') ([ordered]@{id='config:EtherNetIP';kind='ethernet_ip_configuration';display_name='EtherNet/IP';path='配置/EtherNetIP';artifacts=[ordered]@{devices='配置/EtherNetIP/devices.json';connections='配置/EtherNetIP/connections.json'};status=[ordered]@{ips='complete';devices='complete';connections='complete';assignment='not_wired'};restore=[ordered]@{order=25;strategy='configure_eip_devices';depends_on=@('config:单元')}}) 12
+  $eipAssignSrc=Join-Path $eipOut 'assignments'
+  $assignmentCount=0
+  if(Test-Path -LiteralPath $eipAssignSrc -PathType Container){
+    $eipAssignDst=Join-Path $eipDir 'assignments'
+    New-Item -ItemType Directory -Force -Path $eipAssignDst | Out-Null
+    Copy-Item -Path (Join-Path $eipAssignSrc '*') -Destination $eipAssignDst -Recurse -Force -ErrorAction SilentlyContinue
+    $assignmentCount=@(Get-ChildItem -LiteralPath $eipAssignDst -Filter '*.json' -ErrorAction SilentlyContinue).Count
+    $assignmentIndex=@()
+    foreach($f in @(Get-ChildItem -LiteralPath $eipAssignDst -Filter '*.json' -ErrorAction SilentlyContinue | Sort-Object Name)){
+      try{ $j=Get-Content -Raw -LiteralPath $f.FullName -Encoding UTF8|ConvertFrom-Json; $assignmentIndex += [ordered]@{file=$f.Name;connection_name=$j.fields.connection_name;rows=$j.assignment_row_count} }catch{}
+    }
+    Write-Json (Join-Path $eipDir 'assignments.json') ([ordered]@{assignment_count=$assignmentCount;connections=$assignmentIndex}) 8
+  }
+  $eipEntityStatus=if($assignmentCount -gt 0){[ordered]@{ips='complete';devices='complete';connections='complete';assignment='complete'}}else{[ordered]@{ips='complete';devices='complete';connections='complete';assignment='not_wired'}}
+  Write-Json (Join-Path $eipDir 'entity.json') ([ordered]@{id='config:EtherNetIP';kind='ethernet_ip_configuration';display_name='EtherNet/IP';path='配置/EtherNetIP';artifacts=[ordered]@{devices='配置/EtherNetIP/devices.json';connections='配置/EtherNetIP/connections.json';assignments='配置/EtherNetIP/assignments'};status=$eipEntityStatus;restore=[ordered]@{order=25;strategy='configure_eip_devices';depends_on=@('config:单元')}}) 12
   $uc=Join-Path $snapshotRoot 'project\配置\单元\configuration.json'
-  if(Test-Path -LiteralPath $uc){ try{ $u=Get-Content -Raw -LiteralPath $uc -Encoding UTF8|ConvertFrom-Json; $u.asset_status|Add-Member -NotePropertyName ethernet_ip -NotePropertyValue 'ui_read_complete' -Force; $u|Add-Member -NotePropertyName eip_ip_count -NotePropertyValue ([int]$eipData.ip_count) -Force; $u|Add-Member -NotePropertyName eip_connection_count -NotePropertyValue ([int]$eipData.connection_count) -Force; Write-Json $uc $u 20 }catch{} }
+  if(Test-Path -LiteralPath $uc){ try{ $u=Get-Content -Raw -LiteralPath $uc -Encoding UTF8|ConvertFrom-Json; $u.asset_status|Add-Member -NotePropertyName ethernet_ip -NotePropertyValue 'ui_read_complete' -Force; $u|Add-Member -NotePropertyName eip_ip_count -NotePropertyValue ([int]$eipData.ip_count) -Force; $u|Add-Member -NotePropertyName eip_connection_count -NotePropertyValue ([int]$eipData.connection_count) -Force; $u|Add-Member -NotePropertyName eip_assignment_count -NotePropertyValue $assignmentCount -Force; Write-Json $uc $u 20 }catch{} }
 }
 
 $index=@(); foreach($f in @(Get-ChildItem -LiteralPath $textRoot -File -Recurse | Sort-Object FullName)){

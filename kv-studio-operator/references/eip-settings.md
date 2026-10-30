@@ -79,7 +79,7 @@ CPU IP：`192.168.0.10`。连接超时 `RPI×16`，刷新优先权“一般”�
 - 读完关闭 EIP 窗口和 `单元编辑器`，下一 stage 不再被 modal 挡住
 
 样例结果：2 个 IP、3 条连接（NU-EP1 的 IN_100/IN_102，DL-EP1 的 IN_100）。
-`eip_node` 本体状态已改为 `wired`；`eip_connection`（软元件分配）仍是 `not_wired`。
+`eip_node` 与 `eip_connection` 本体状态均为 `wired`：每个连接的软元件分配已写入 `配置/EtherNetIP/assignments/`，并生成 `assignments.json` 索引。
 ## 写配置的现状
 
 仓库目前只有读取脚本；`EtherNet/IP 设定` 的写入（加设备/连接/分配）还没有 workflow。

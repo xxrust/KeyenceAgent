@@ -33,7 +33,7 @@ if (-not $PlanOnly) {
     elseif ($byCommandLine.Count -gt 1) { throw 'KV_TARGET_PROJECT_WINDOW_AMBIGUOUS' }
   }
   if (-not $process) { throw "KV_EIP_PROJECT_NOT_OPEN: $ProjectPath" }
-  & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -ProjectName $ProjectName -ProjectPath $ProjectPath -OutDir $OutDir -ReadConfigurationOnly -ConfigurationOutPath $configurationPath 1> (Join-Path $OutDir 'eip_read_stdout.txt') 2> (Join-Path $OutDir 'eip_read_stderr.txt')
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -ProjectName $ProjectName -ProjectPath $ProjectPath -OutDir $OutDir -ReadConfigurationOnly -ConfigurationOutPath $configurationPath -AssignmentsOutDir (Join-Path $OutDir 'assignments') 1> (Join-Path $OutDir 'eip_read_stdout.txt') 2> (Join-Path $OutDir 'eip_read_stderr.txt')
   if ($LASTEXITCODE -is [int]) { $exitCode = [int]$LASTEXITCODE }
   if ($exitCode -ne 0) { $errorText = ((Get-Content -LiteralPath (Join-Path $OutDir 'eip_read_stderr.txt') -Raw -Encoding UTF8 -ErrorAction SilentlyContinue) + ' ' + (Get-Content -LiteralPath (Join-Path $OutDir 'eip_read_stdout.txt') -Raw -Encoding UTF8 -ErrorAction SilentlyContinue)).Trim() }
 }
@@ -62,6 +62,7 @@ $result = [ordered]@{
   row_count = if ($configuration) { [int]$configuration.row_count } else { 0 }
   ip_count = if ($configuration) { [int]$configuration.ip_count } else { 0 }
   connection_count = if ($configuration) { [int]$configuration.connection_count } else { 0 }
+  assignment_count = @(Get-ChildItem -LiteralPath (Join-Path $OutDir 'assignments') -Filter '*.json' -ErrorAction SilentlyContinue).Count
   connections = if ($configuration) { @($configuration.connections) } else { @() }
   ips = if ($configuration) { @($configuration.ips) } else { @() }
   raw_table = if ($configuration) { [string]$configuration.raw_table } else { '' }

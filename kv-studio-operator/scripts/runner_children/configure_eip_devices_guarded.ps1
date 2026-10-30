@@ -6,7 +6,8 @@
   [int]$TimeoutSeconds = 180,
   [switch]$PreflightOnly,
   [switch]$ReadConfigurationOnly,
-  [string]$ConfigurationOutPath = ''
+  [string]$ConfigurationOutPath = '',
+  [string]$AssignmentsOutDir = ''
 )
 # Writes an EtherNet/IP device into the project that is currently open in
 # KV STUDIO. Verified flow (2026-10-26):
@@ -38,6 +39,9 @@ public delegate bool EnumProc(IntPtr h, IntPtr l);
 [DllImport("user32.dll")] public static extern bool AttachThreadInput(int idAttach, int idAttachTo, bool fAttach);
 [DllImport("user32.dll")] public static extern IntPtr SetFocus(IntPtr h);
 [DllImport("user32.dll")] public static extern IntPtr GetFocus();
+[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
+[DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
 [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
 public static System.Collections.Generic.List<string> Windows(int pid) {
   var res = new System.Collections.Generic.List<string>();
@@ -64,6 +68,14 @@ public static bool Focus(long h) {
   return ok;
 }
 public static long Focused() { return GetFocus().ToInt64(); }
+public static bool ForceForeground(long h) {
+  var w = new IntPtr(h); int pid; int target = GetWindowThreadProcessId(w, out pid);
+  int current = GetCurrentThreadId(); var fg = GetForegroundWindow(); int fpid; int fgThread = GetWindowThreadProcessId(fg, out fpid);
+  AttachThreadInput(current, fgThread, true); AttachThreadInput(current, target, true);
+  ShowWindow(w, 9); BringWindowToTop(w); bool ok = SetForegroundWindow(w);
+  AttachThreadInput(current, target, false); AttachThreadInput(current, fgThread, false);
+  return ok;
+}
 "@
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
@@ -257,17 +269,30 @@ if ($manual) {
 if ($ReadConfigurationOnly) {
   $gridRect = New-Object EipWrite.EipWinWrite+RECT
   [void][EipWrite.EipWinWrite]::GetWindowRect([IntPtr]$eipWindow.hwnd, [ref]$gridRect)
-  [void][EipWrite.EipWinWrite]::SetForegroundWindow([IntPtr]$eipWindow.hwnd)
-  Start-Sleep -Milliseconds 500
-  # Alt+6 activates the 设定列表 tab and focuses its grid (verified live), so no
-  # screen coordinates are needed. Handle focus and a control-center click stay
-  # as fallbacks only.
+  [void][EipWrite.EipWinWrite]::ForceForeground([long]$eipWindow.hwnd)
+  [void][EipWrite.EipWinWrite]::Focus([long]$eipWindow.hwnd)
+  Start-Sleep -Milliseconds 700
+  if ([EipWrite.EipWinWrite]::GetForegroundWindow() -ne [IntPtr]$eipWindow.hwnd) {
+    [EipWrite.EipWinWrite]::Click(($gridRect.L + 80), ($gridRect.T + 8))
+    Start-Sleep -Milliseconds 500
+  }
+  Log 'eip_foreground' @{ target = $eipWindow.hwnd; foreground = [EipWrite.EipWinWrite]::GetForegroundWindow().ToInt64() }
+  # Focus the 设定列表 grid by handle (no screen coordinates). Alt+6 and a
+  # control-center click stay as fallbacks; SetFocus is the reliable route when
+  # the window has just been opened by automation.
   $grids = @([EipWrite.EipWinWrite]::Children([long]$eipWindow.hwnd) | Where-Object { $_ -like '*|VSFlexGrid8N|*' })
   $gridHwnd = 0
   if ($grids.Count -gt 0) { $gridHwnd = [long](($grids[0] -split '\|')[0]) }
-  Send-KvKeys -Keys '%6' -Step 'eip read configuration activate 设定列表'
-  Start-Sleep -Milliseconds 600
-  Log 'grid_activation' @{ grid_hwnd = $gridHwnd; method = 'alt+6' }
+  $focusOk = $false
+  if ($gridHwnd -ne 0) {
+    $focusOk = [EipWrite.EipWinWrite]::Focus($gridHwnd)
+    Start-Sleep -Milliseconds 400
+  }
+  if (-not $focusOk) {
+    Send-KvKeys -Keys '%6' -Step 'eip read configuration activate 设定列表'
+    Start-Sleep -Milliseconds 600
+  }
+  Log 'grid_activation' @{ grid_hwnd = $gridHwnd; method = $(if ($focusOk) { 'setfocus' } else { 'alt+6' }) }
   Send-KvKeys -Keys '^{HOME}' -Step 'eip read configuration first cell'
   Start-Sleep -Milliseconds 250
   Send-KvKeys -Keys '^+{END}' -Step 'eip read configuration select table'
@@ -290,6 +315,23 @@ if ($ReadConfigurationOnly) {
     $lines = @($readText -split "`r?`n" | Where-Object { $_.Trim() })
     Log 'grid_focus_fallback' @{ grid_hwnd = $gridHwnd; rows = $lines.Count }
   }
+  if ($lines.Count -eq 0) {
+    # EIP can still be initialising; retry the Alt+6 -> whole-table copy a few times.
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+      [void][EipWrite.EipWinWrite]::SetForegroundWindow([IntPtr]$eipWindow.hwnd)
+      Start-Sleep -Milliseconds 800
+      Send-KvKeys -Keys '%6' -Step ('eip read configuration retry activate ' + $attempt)
+      Start-Sleep -Milliseconds 600
+      Send-KvKeys -Keys '^{HOME}' -Step ('eip read configuration retry home ' + $attempt)
+      Send-KvKeys -Keys '^+{END}' -Step ('eip read configuration retry range ' + $attempt)
+      Send-KvKeys -Keys '^c' -Step ('eip read configuration retry copy ' + $attempt)
+      Start-Sleep -Milliseconds 900
+      $readText = [System.Windows.Forms.Clipboard]::GetText()
+      $lines = @($readText -split "`r?`n" | Where-Object { $_.Trim() })
+      if ($lines.Count -gt 0) { break }
+    }
+    Log 'table_read_retry' @{ attempts = $attempt; rows = $lines.Count }
+  }
   $ips = @($lines | Where-Object { $_ -match '\b\d{1,3}(\.\d{1,3}){3}\b' } | ForEach-Object { [regex]::Match($_, '\b\d{1,3}(\.\d{1,3}){3}\b').Value } | Select-Object -Unique)
   # Columns: 节点 / 节点名称 / IP地址 / 连接名称 / RPI(IN) / RPI(OUT) / 超时 / 刷新优先权
   $connections = @()
@@ -306,6 +348,40 @@ if ($ReadConfigurationOnly) {
       rpi_out_ms = if ($cells.Count -gt 5) { $cells[5].Trim() } else { '' }
       timeout = if ($cells.Count -gt 6) { $cells[6].Trim() } else { '' }
       priority = if ($cells.Count -gt 7) { $cells[7].Trim() } else { '' }
+    }
+  }
+  if ($AssignmentsOutDir) {
+    New-Item -ItemType Directory -Force -Path $AssignmentsOutDir | Out-Null
+    $reader = Join-Path (Split-Path -Parent $PSScriptRoot) 'workflow_tools\get_kv_eip_connection_snapshot.ps1'
+    $viewHwnd = 0
+    foreach ($row in @([EipWrite.EipWinWrite]::Children([long]$eipWindow.hwnd))) {
+      $parts = $row -split '\|'
+      if ($parts[1] -like 'AfxFrameOrView140*') { $viewHwnd = [long]$parts[0]; break }
+    }
+    if ($viewHwnd -ne 0) {
+      $viewRect = New-Object EipWrite.EipWinWrite+RECT
+      [void][EipWrite.EipWinWrite]::GetWindowRect([IntPtr]$viewHwnd, [ref]$viewRect)
+      $processed = 0
+      $clicks = 0
+      $target = [int]$connections.Count
+      $y = $viewRect.T + 90
+      while ($y -lt ($viewRect.B - 40) -and $clicks -lt 80) {
+        $clicks++
+        [void][EipWrite.EipWinWrite]::SetForegroundWindow([IntPtr]$eipWindow.hwnd)
+        Start-Sleep -Milliseconds 250
+        [EipWrite.EipWinWrite]::Click(($viewRect.L + 110), $y)
+        Start-Sleep -Milliseconds 350
+        $connectionDialog = Wait-Window '连接设定' 1 ''
+        if ($connectionDialog) {
+          & powershell -NoProfile -ExecutionPolicy Bypass -File $reader -ConnectionTitle '连接设定' -OutDir $AssignmentsOutDir 1> (Join-Path $OutDir ('eip_assignment_' + $processed + '.log')) 2>&1 | Out-Null
+          $processed++
+          Start-Sleep -Milliseconds 500
+          $count = @(Get-ChildItem -LiteralPath $AssignmentsOutDir -Filter '*.json' -ErrorAction SilentlyContinue).Count
+          if ($target -gt 0 -and $count -ge $target) { break }
+        }
+        $y += 6
+      }
+      Log 'assignments_scan' @{ count = $processed; clicks = $clicks; out_dir = $AssignmentsOutDir }
     }
   }
   $closeEl = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$eipWindow.hwnd)
