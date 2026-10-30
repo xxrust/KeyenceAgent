@@ -68,6 +68,15 @@ function Get-VisibleKvsProcess([string]$ProjectNeedle, [int]$WaitSeconds = 10) {
     if ($process) { return $process }
     Start-Sleep -Milliseconds 250
   } while ((Get-Date) -lt $deadline)
+  # Window titles can be empty/renamed for a moment while KV STUDIO is busy.
+  # Fall back to the process command line, but only when it is unambiguous.
+  $byCommandLine = @()
+  foreach ($candidate in @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })) {
+    $commandLine = [string](Get-CimInstance Win32_Process -Filter "ProcessId=$($candidate.Id)" -ErrorAction SilentlyContinue).CommandLine
+    if ($commandLine -and $commandLine -like "*$ProjectNeedle*") { $byCommandLine += $candidate }
+  }
+  if ($byCommandLine.Count -eq 1) { return $byCommandLine[0] }
+  if ($byCommandLine.Count -gt 1) { throw 'KV_TARGET_PROJECT_WINDOW_AMBIGUOUS' }
   return $null
 }
 
