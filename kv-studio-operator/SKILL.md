@@ -291,6 +291,27 @@ B00/B0B0 等）见 `references/eip-settings.md`。
 注意：当前版本使用 KV 自动分配的节点地址/IP（配置里的值只做计划与日志），因为
 `适配器初始设定` 的 IP 分片输入尚未自动化；需要指定 IP 时在该弹窗手工改，或后续扩展 runner。
 
+## 能力缺口判定（强制，不得凭快照推断）
+
+**快照里没有 ≠ 能力不存在。** 在说“缺 / 没做过 / 需要补 / missing”之前，必须先运行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\get_kv_asset_gap.ps1 -Asset <asset-id>
+```
+
+然后把输出的 `PHRASING` 原样用于结论。规则：
+
+- `not_wired`：能力已存在（脚本 + evidence 都在），缺的只是快照 stage → 只能说“未接线”，禁止说“没有能力/需要补读取器”
+- `missing_route`：没有 capability 覆盖，才允许说“缺路线”，并把 `missing_reason` 一起引用
+- `wired` / `wired_limited`：产物已在快照里，限制写在 `limited_reason`
+- 新资产先登记 `assets/ontology.json`，再谈状态；未登记资产由该工具直接报 `KV_ASSET_NOT_DECLARED`
+
+门禁 `assert_kv_asset_coverage.ps1` 会拒绝两类矛盾：`missing_route` 但已有 capability、
+`not_wired`/`wired` 却没有 capability。也就是说，“把没接线说成没能力”在提交层面就过不了。
+
+判定顺序固定为：**本体 → manifest/脚本 → evidence 产物 → 测试**，最后才看快照产物；
+快照产物只能证明“没接线”，不能证明“没能力”。
+
 ## 选择接口
 
 唯一能力清单是 [scripts/script_manifest.json](scripts/script_manifest.json)。用只读查询获得实际路径、参数类型、必填参数和验证范围：

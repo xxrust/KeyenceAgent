@@ -1,4 +1,4 @@
-﻿param(
+param(
   [string]$OntologyPath = '',
   [string]$OutDir = ''
 )
@@ -65,6 +65,32 @@ foreach ($relation in @($ontology.relations)) {
     if ($known -notcontains $id) { Add-Error 'KV_RELATION_ENDPOINT_UNKNOWN' $endpoint "unknown $kind '$id'" }
   }
   if (-not [string]$relation.type) { Add-Error 'KV_RELATION_TYPE_MISSING' "$($relation.from)->$($relation.to)" 'relation type is required' }
+}
+# Cross-check status against capabilities so "snapshot missing" can never be
+# recorded as "capability missing" again:
+#   wired / wired_limited -> must have a capability covering the asset
+#   not_wired             -> must have a capability (only the stage is missing)
+#   missing_route         -> must have NO capability (otherwise it is not_wired)
+$capabilitiesByAsset = @{}
+foreach ($capability in $capabilities) {
+  foreach ($assetRef in @($capability.Value.assets)) {
+    if (-not $capabilitiesByAsset.ContainsKey([string]$assetRef)) { $capabilitiesByAsset[[string]$assetRef] = @() }
+    $capabilitiesByAsset[[string]$assetRef] += $capability.Name
+  }
+}
+foreach ($asset in $assets) {
+  $id = $asset.Name
+  $status = [string]$asset.Value.snapshot_status
+  $cover = @($capabilitiesByAsset[$id] | Where-Object { $_ })
+  if ($status -in @('wired', 'wired_limited') -and $cover.Count -eq 0) {
+    Add-Error 'KV_ASSET_WIRED_WITHOUT_CAPABILITY' $id 'wired asset has no capability that produces it'
+  }
+  if ($status -eq 'not_wired' -and $cover.Count -eq 0) {
+    Add-Error 'KV_ASSET_NOT_WIRED_WITHOUT_CAPABILITY' $id 'not_wired means the capability exists; add it or use missing_route'
+  }
+  if ($status -eq 'missing_route' -and $cover.Count -gt 0) {
+    Add-Error 'KV_ASSET_MISSING_ROUTE_WITH_CAPABILITY' $id ("capability already covers this asset: " + ($cover -join ', ') + '; use not_wired instead of claiming no route')
+  }
 }
 $report = [ordered]@{
   ok = ($errors.Count -eq 0)

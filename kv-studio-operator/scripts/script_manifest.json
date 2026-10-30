@@ -387,6 +387,14 @@
                                                                       ]
                                                  },
                                                  {
+                                                     "path":  "get_kv_asset_gap.ps1",
+                                                     "status":  "published",
+                                                     "customer_callable":  true,
+                                                     "capabilities":  [
+                                                                          "resolve_kv_asset_gap"
+                                                                      ]
+                                                 },
+                                                 {
                                                      "path":  "get_kvstudio_install.ps1",
                                                      "status":  "published",
                                                      "customer_callable":  true,
