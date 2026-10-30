@@ -376,6 +376,20 @@ $ethercatConfiguration=$null
 if(Test-Path -LiteralPath $ethercatConfigurationPath -PathType Leaf){ try{$ethercatConfiguration=Get-Content -Raw -LiteralPath $ethercatConfigurationPath -Encoding UTF8|ConvertFrom-Json}catch{} }
 
 
+$axisOut=Join-Path $rawRoot 'axis_parameters'
+$axisResult=Join-Path $axisOut 'axis_parameters_result.json'
+$axisWorkflow=Join-Path $scriptRoot 'workflows\export_kv_axis_parameters.ps1'
+$axisArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$axisOut,'-TimeoutSeconds',[string]$TimeoutSeconds)
+$axisStep=Invoke-Child $axisWorkflow $axisArgs $axisResult 'axis_parameters' -ResetPaths @($axisOut)
+$axisTsv=Join-Path $axisOut 'axes_params.tsv'
+
+$eipOut=Join-Path $rawRoot 'eip_configuration'
+$eipResult=Join-Path $eipOut 'eip_configuration_result.json'
+$eipWorkflow=Join-Path $scriptRoot 'workflows\export_kv_eip_configuration.ps1'
+$eipArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$eipOut)
+$eipStep=Invoke-Child $eipWorkflow $eipArgs $eipResult 'eip_configuration' -ResetPaths @($eipOut)
+$eipConfigPath=Join-Path $eipOut 'eip_configuration.json'
+
 $fbSteps=@()
 foreach($name in @($fbReadable|Sort-Object -Unique)){
   $fbOut=Join-Path $rawRoot ('fb_arguments\'+($name -replace '[\\/:*?""<>|]','_')); New-Item -ItemType Directory -Force -Path $fbOut|Out-Null
@@ -395,19 +409,7 @@ foreach($name in @($fbReadable|Sort-Object -Unique)){
   if(Test-Path $fbSnapshotPath){$fbSnapshot=Get-Content -Raw $fbSnapshotPath|ConvertFrom-Json;$fbTextDir=Join-Path $textRoot ('fb_arguments\'+($name -replace '[\\/:*?""<>|]','_'));$null=Copy-SnapshotFiles @($fbSnapshot.raw_path) $fbTextDir;Copy-Item $fbSnapshotPath (Join-Path $fbTextDir 'fb_snapshot_result.json') -Force}
 }
 
-$axisOut=Join-Path $rawRoot 'axis_parameters'
-$axisResult=Join-Path $axisOut 'axis_parameters_result.json'
-$axisWorkflow=Join-Path $scriptRoot 'workflows\export_kv_axis_parameters.ps1'
-$axisArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$axisOut,'-TimeoutSeconds',[string]$TimeoutSeconds)
-$axisStep=Invoke-Child $axisWorkflow $axisArgs $axisResult 'axis_parameters' -ResetPaths @($axisOut)
-$axisTsv=Join-Path $axisOut 'axes_params.tsv'
 
-$eipOut=Join-Path $rawRoot 'eip_configuration'
-$eipResult=Join-Path $eipOut 'eip_configuration_result.json'
-$eipWorkflow=Join-Path $scriptRoot 'workflows\export_kv_eip_configuration.ps1'
-$eipArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$eipOut)
-$eipStep=Invoke-Child $eipWorkflow $eipArgs $eipResult 'eip_configuration' -ResetPaths @($eipOut)
-$eipConfigPath=Join-Path $eipOut 'eip_configuration.json'
 
 $inventoryFinal=Join-Path $textRoot 'project_inventory.json'
 $inventoryFinalArgs=@('-ProjectPath',$ProjectPath,'-MnmDir',$mnmExportDir,'-OutDir',(Join-Path $rawRoot 'inventory_final'),'-StructureDefinitionsPath',(Join-Path $textRoot 'structure_definitions.json'))
@@ -486,15 +488,17 @@ if($axisStep.ok -and (Test-Path -LiteralPath $axisTsv -PathType Leaf)){
   }
 }
 
-# EtherNet/IP read-only probe: IP column + raw 设定列表 table (names/assemblies are not exposed by the grid yet).
+# EtherNet/IP read-only probe: 设定列表 table (nodes, IPs, connections, RPI).
+# 软元件分配 maps are a separate asset (eip_connection, not wired yet).
 if($eipStep.ok -and (Test-Path -LiteralPath $eipConfigPath -PathType Leaf)){
   $eipDir=Join-Path $snapshotRoot 'project\配置\EtherNetIP'
   New-Item -ItemType Directory -Force -Path $eipDir | Out-Null
   Copy-Item -LiteralPath $eipConfigPath -Destination (Join-Path $eipDir 'devices.json') -Force
   $eipData=Get-Content -Raw -LiteralPath $eipConfigPath -Encoding UTF8|ConvertFrom-Json
-  Write-Json (Join-Path $eipDir 'entity.json') ([ordered]@{id='config:EtherNetIP';kind='ethernet_ip_configuration';display_name='EtherNet/IP';path='配置/EtherNetIP';artifacts=[ordered]@{devices='配置/EtherNetIP/devices.json'};status=[ordered]@{ips='complete';devices='partial'};restore=[ordered]@{order=25;strategy='configure_eip_devices';depends_on=@('config:单元')}}) 12
+  Write-Json (Join-Path $eipDir 'connections.json') ([ordered]@{connection_count=[int]$eipData.connection_count;connections=@($eipData.connections)}) 8
+  Write-Json (Join-Path $eipDir 'entity.json') ([ordered]@{id='config:EtherNetIP';kind='ethernet_ip_configuration';display_name='EtherNet/IP';path='配置/EtherNetIP';artifacts=[ordered]@{devices='配置/EtherNetIP/devices.json';connections='配置/EtherNetIP/connections.json'};status=[ordered]@{ips='complete';devices='complete';connections='complete';assignment='not_wired'};restore=[ordered]@{order=25;strategy='configure_eip_devices';depends_on=@('config:单元')}}) 12
   $uc=Join-Path $snapshotRoot 'project\配置\单元\configuration.json'
-  if(Test-Path -LiteralPath $uc){ try{ $u=Get-Content -Raw -LiteralPath $uc -Encoding UTF8|ConvertFrom-Json; $u.asset_status|Add-Member -NotePropertyName ethernet_ip -NotePropertyValue 'ui_read_limited' -Force; $u|Add-Member -NotePropertyName eip_ip_count -NotePropertyValue ([int]$eipData.ip_count) -Force; Write-Json $uc $u 20 }catch{} }
+  if(Test-Path -LiteralPath $uc){ try{ $u=Get-Content -Raw -LiteralPath $uc -Encoding UTF8|ConvertFrom-Json; $u.asset_status|Add-Member -NotePropertyName ethernet_ip -NotePropertyValue 'ui_read_complete' -Force; $u|Add-Member -NotePropertyName eip_ip_count -NotePropertyValue ([int]$eipData.ip_count) -Force; $u|Add-Member -NotePropertyName eip_connection_count -NotePropertyValue ([int]$eipData.connection_count) -Force; Write-Json $uc $u 20 }catch{} }
 }
 
 $index=@(); foreach($f in @(Get-ChildItem -LiteralPath $textRoot -File -Recurse | Sort-Object FullName)){

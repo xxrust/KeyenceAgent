@@ -12,7 +12,7 @@
     "ethercat_slave": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/EtherCAT/devices.json", "snapshot_stage": "ethercat_configuration", "restore_strategy": "configure_ethercat_nodes", "depends_on": ["unit_configuration"] },
     "ethercat_pdo": { "snapshot_status": "missing_route", "snapshot_artifact": "", "snapshot_stage": "", "restore_strategy": "configure_ethercat_nodes", "depends_on": ["ethercat_slave"], "missing_reason": "PDO mapping lives behind 详细设定; UIA exposes no cell values and clipboard copies one cell" },
     "eip_connection": { "snapshot_status": "not_wired", "snapshot_artifact": "", "snapshot_stage": "", "restore_strategy": "configure_eip_devices", "depends_on": ["eip_node"], "missing_reason": "reader already produced real artifacts during the sample replication (C:/kvrun/eip/snap_test, assign_IN_*.tsv); only the snapshot stage that opens 连接设定 and calls it is missing" },
-    "eip_node": { "snapshot_status": "wired_limited", "snapshot_artifact": "project/配置/EtherNetIP/devices.json", "snapshot_stage": "eip_configuration", "restore_strategy": "configure_eip_devices", "depends_on": ["unit_configuration"], "limited_reason": "设定列表 clipboard exposes the IP column only; device names and connection assemblies are not captured yet" },
+    "eip_node": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/EtherNetIP/devices.json", "snapshot_stage": "eip_configuration", "restore_strategy": "configure_eip_devices", "depends_on": ["unit_configuration"] },
     "motion_axis": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/运动/axes.json", "snapshot_stage": "axis_parameters", "restore_strategy": "complete_axis_registration", "depends_on": ["ethercat_slave"] },
     "axis_parameter": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/运动/axis_parameters.tsv", "snapshot_stage": "axis_parameters", "restore_strategy": "axis_parameters_write", "depends_on": ["motion_axis"] }
   },
@@ -39,7 +39,7 @@
     "export_kv_device_comments": { "script": "workflows/export_kv_device_comments.ps1", "assets": ["comments"], "evidence": ["tests/kv-interface-regression/21_export_device_comments"] },
     "read_ethercat_configuration": { "script": "workflows/export_kv_ethercat_configuration.ps1", "assets": ["ethercat_slave"], "evidence": ["C:/kvrun/ec_read2/ethercat_configuration.json"] },
     "read_axis_parameters": { "script": "workflows/export_kv_axis_parameters.ps1", "assets": ["motion_axis", "axis_parameter"], "evidence": ["C:/kvrun/axis_dump_test/axis_parameters_result.json"] },
-    "read_eip_configuration": { "script": "workflows/export_kv_eip_configuration.ps1", "assets": ["eip_node"], "evidence": ["C:/kvrun/eip_wf/eip_configuration_result.json"] },
+    "read_eip_configuration": { "script": "workflows/export_kv_eip_configuration.ps1", "assets": ["eip_node"], "evidence": ["C:/kvrun/eip_fix3/eip_configuration_result.json"] },
     "snapshot_eip_connection": { "script": "workflow_tools/get_kv_eip_connection_snapshot.ps1", "assets": ["eip_connection"], "evidence": ["tests/eip-snapshot", "C:/kvrun/eip/snap_test/连接设定_1_NU_EP1.json", "C:/kvrun/eip/assign_IN_100.tsv", "references/eip-settings.md"] },
     "configure_ethercat_nodes": { "script": "workflows/configure_kv_ethercat_nodes.ps1", "assets": ["ethercat_slave"], "evidence": ["tests/kv-interface-regression/07_ethercat_nodes"] },
     "configure_eip_devices": { "script": "workflows/configure_kv_eip_devices.ps1", "assets": ["eip_node"], "evidence": ["tests/eip-live-cycle"] },

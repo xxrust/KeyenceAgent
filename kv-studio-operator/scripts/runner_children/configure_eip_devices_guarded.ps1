@@ -247,15 +247,48 @@ if ($ReadConfigurationOnly) {
   [void][EipWrite.EipWinWrite]::GetWindowRect([IntPtr]$eipWindow.hwnd, [ref]$gridRect)
   [void][EipWrite.EipWinWrite]::SetForegroundWindow([IntPtr]$eipWindow.hwnd)
   Start-Sleep -Milliseconds 500
-  [EipWrite.EipWinWrite]::Click(($gridRect.L + 300), ($gridRect.T + 760))
+  # Click the 设定列表 grid itself (VSFlexGrid8N); fixed offsets miss it when the
+  # window is not at the remembered position.
+  $grids = @([EipWrite.EipWinWrite]::Children([long]$eipWindow.hwnd) | Where-Object { $_ -like '*|VSFlexGrid8N|*' })
+  if ($grids.Count -gt 0) {
+    $gridHwnd = [long](($grids[0] -split '\|')[0])
+    [EipWrite.EipWinWrite]::ClickCenter($gridHwnd)
+  } else {
+    [EipWrite.EipWinWrite]::Click(($gridRect.L + 300), ($gridRect.T + 780))
+  }
   Start-Sleep -Milliseconds 400
-  Send-KvKeys -Keys '^a' -Step 'eip read configuration select all'
+  if ([EipFgWin2]::GetForegroundWindow() -ne [IntPtr]$eipWindow.hwnd) {
+    [void][EipWrite.EipWinWrite]::SetForegroundWindow([IntPtr]$eipWindow.hwnd)
+    Start-Sleep -Milliseconds 400
+    if ($grids.Count -gt 0) { [EipWrite.EipWinWrite]::ClickCenter($gridHwnd) } else { [EipWrite.EipWinWrite]::Click(($gridRect.L + 300), ($gridRect.T + 780)) }
+    Start-Sleep -Milliseconds 400
+  }
+  Send-KvKeys -Keys '^{HOME}' -Step 'eip read configuration first cell'
+  Start-Sleep -Milliseconds 250
+  Send-KvKeys -Keys '^+{END}' -Step 'eip read configuration select table'
   Start-Sleep -Milliseconds 250
   Send-KvKeys -Keys '^c' -Step 'eip read configuration copy'
   Start-Sleep -Milliseconds 800
   $readText = [System.Windows.Forms.Clipboard]::GetText()
   $lines = @($readText -split "`r?`n" | Where-Object { $_.Trim() })
   $ips = @($lines | Where-Object { $_ -match '\b\d{1,3}(\.\d{1,3}){3}\b' } | ForEach-Object { [regex]::Match($_, '\b\d{1,3}(\.\d{1,3}){3}\b').Value } | Select-Object -Unique)
+  # Columns: 节点 / 节点名称 / IP地址 / 连接名称 / RPI(IN) / RPI(OUT) / 超时 / 刷新优先权
+  $connections = @()
+  foreach ($line in $lines) {
+    $cells = $line -split "`t"
+    if ($cells.Count -lt 4) { continue }
+    if ($cells[2] -notmatch '^\d{1,3}(\.\d{1,3}){3}$') { continue }
+    $connections += [pscustomobject]@{
+      node = $cells[0].Trim()
+      node_name = $cells[1].Trim()
+      ip_address = $cells[2].Trim()
+      connection_name = $cells[3].Trim()
+      rpi_in_ms = if ($cells.Count -gt 4) { $cells[4].Trim() } else { '' }
+      rpi_out_ms = if ($cells.Count -gt 5) { $cells[5].Trim() } else { '' }
+      timeout = if ($cells.Count -gt 6) { $cells[6].Trim() } else { '' }
+      priority = if ($cells.Count -gt 7) { $cells[7].Trim() } else { '' }
+    }
+  }
   $closeEl = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$eipWindow.hwnd)
   $cancel = Find-Button $closeEl '取消'
   if ($cancel) {
@@ -263,6 +296,15 @@ if ($ReadConfigurationOnly) {
     if ($native -ne 0) { [void][EipWrite.EipWinWrite]::SendMessage([IntPtr]$native, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) } else { $cancel.SetFocus(); Send-KvKeys -Keys ' ' -Step 'eip read configuration cancel' }
   }
   Start-Sleep -Seconds 1
+  # Opening the EIP window also restores 单元编辑器; close it so the next snapshot
+  # stage does not abort on a modal window.
+  for ($i = 0; $i -lt 3; $i++) {
+    $editor = Wait-Window '单元编辑器' 2 'Afx*'
+    if (-not $editor) { break }
+    $editorEl = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$editor.hwnd)
+    if (-not (Press-Button $editorEl '取消')) { break }
+    Start-Sleep -Milliseconds 800
+  }
   $readResult = [ordered]@{
     ok = ($lines.Count -gt 0)
     project = $ProjectName
@@ -270,6 +312,8 @@ if ($ReadConfigurationOnly) {
     row_count = $lines.Count
     ip_count = $ips.Count
     ips = $ips
+    connection_count = $connections.Count
+    connections = $connections
     rows = $lines
     raw_table = $readText.Trim()
     screenshot = (Save-Shot 'eip_configuration.png')

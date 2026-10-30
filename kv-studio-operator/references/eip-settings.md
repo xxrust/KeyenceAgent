@@ -68,6 +68,18 @@ powershell -File <skill-root>\scripts\workflow_tools\get_kv_eip_connection_snaps
 这些是“读取能力已跑通”的直接证据；快照侧缺的只是把该读取器接进 stage。
 CPU IP：`192.168.0.10`。连接超时 `RPI×16`，刷新优先权“一般”。
 
+## 快照接入（2026-10-31）
+
+`export_kv_eip_configuration.ps1` 已接入快照 stage `eip_configuration`：
+
+- 打开 EtherNet/IP 设定 → 定位 `设定列表` 网格（按控件类 `VSFlexGrid8N`，不再用固定坐标）
+- `Ctrl+Home` / `Ctrl+Shift+End` / `Ctrl+C` 复制整表
+- 解析：节点 / 节点名称 / IP / 连接名称 / RPI(IN/OUT) / 超时 / 刷新优先权
+- 写 `project/配置/EtherNetIP/devices.json` + `connections.json`
+- 读完关闭 EIP 窗口和 `单元编辑器`，下一 stage 不再被 modal 挡住
+
+样例结果：2 个 IP、3 条连接（NU-EP1 的 IN_100/IN_102，DL-EP1 的 IN_100）。
+`eip_node` 本体状态已改为 `wired`；`eip_connection`（软元件分配）仍是 `not_wired`。
 ## 写配置的现状
 
 仓库目前只有读取脚本；`EtherNet/IP 设定` 的写入（加设备/连接/分配）还没有 workflow。
