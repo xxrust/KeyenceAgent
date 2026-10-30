@@ -15,9 +15,24 @@ $resultPath = Join-Path $OutDir 'axis_parameters_result.json'
 $exitCode = 0
 $errorText = ''
 if (-not $PlanOnly) {
-  $process = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }) | Select-Object -First 1
   $needle = [IO.Path]::GetFileNameWithoutExtension($ProjectPath)
-  if (-not $process -or $process.MainWindowTitle -notlike "*$needle*") { throw "KV_AXIS_PROJECT_NOT_OPEN: $ProjectPath" }
+  $process = $null
+  $deadline = (Get-Date).AddSeconds(5)
+  do {
+    $process = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*$needle*" }) | Select-Object -First 1
+    if ($process) { break }
+    Start-Sleep -Milliseconds 250
+  } while ((Get-Date) -lt $deadline)
+  if (-not $process) {
+    $byCommandLine = @()
+    foreach ($candidate in @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })) {
+      $commandLine = [string](Get-CimInstance Win32_Process -Filter "ProcessId=$($candidate.Id)" -ErrorAction SilentlyContinue).CommandLine
+      if ($commandLine -and $commandLine -like "*$ProjectPath*") { $byCommandLine += $candidate }
+    }
+    if ($byCommandLine.Count -eq 1) { $process = $byCommandLine[0] }
+    elseif ($byCommandLine.Count -gt 1) { throw 'KV_TARGET_PROJECT_WINDOW_AMBIGUOUS' }
+  }
+  if (-not $process) { throw "KV_AXIS_PROJECT_NOT_OPEN: $ProjectPath" }
   $stdout = Join-Path $OutDir 'axis_parameters_stdout.txt'
   $stderr = Join-Path $OutDir 'axis_parameters_stderr.txt'
   & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -OutDir $OutDir -Mode Dump -AllParams -NoSave 1> $stdout 2> $stderr
