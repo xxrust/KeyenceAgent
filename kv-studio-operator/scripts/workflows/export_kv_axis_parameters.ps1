@@ -34,6 +34,21 @@ if (Test-Path -LiteralPath $tsv -PathType Leaf) {
     if ($header.Count -gt 4) { $axes = @($header[4..($header.Count - 1)] | Where-Object { $_ }) }
   }
 }
+# Leave no modal/window behind for the next snapshot stage.
+try {
+  . (Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'scripts\kv_dialog_post.ps1')
+  $kvs = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }) | Select-Object -First 1
+  if ($kvs) {
+    foreach ($w in @(Get-KvTopWindow -ProcessId $kvs.Id -VisibleOnly)) {
+      if ($w.Title -notlike '*单元编辑器*') { continue }
+      foreach ($row in @([KvDlgPost]::ChildButtons($w.Hwnd))) {
+        $parts = $row -split [char]1
+        if ($parts[2] -eq '取消') { [void][KvDlgPost]::Click([IntPtr][long]$parts[0]); Start-Sleep -Milliseconds 800; break }
+      }
+    }
+  }
+} catch {}
+
 $result = [ordered]@{
   ok = ($exitCode -eq 0 -and $rows -gt 0)
   planned = [bool]$PlanOnly

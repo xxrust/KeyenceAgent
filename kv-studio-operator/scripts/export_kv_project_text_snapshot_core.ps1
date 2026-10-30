@@ -375,18 +375,6 @@ $ethercatConfigurationPath=Join-Path $ethercatOut 'ethercat_configuration.json'
 $ethercatConfiguration=$null
 if(Test-Path -LiteralPath $ethercatConfigurationPath -PathType Leaf){ try{$ethercatConfiguration=Get-Content -Raw -LiteralPath $ethercatConfigurationPath -Encoding UTF8|ConvertFrom-Json}catch{} }
 
-$axisOut=Join-Path $rawRoot 'axis_parameters'
-$axisResult=Join-Path $axisOut 'axis_parameters_result.json'
-$axisWorkflow=Join-Path $scriptRoot 'workflows\export_kv_axis_parameters.ps1'
-$axisArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$axisOut,'-TimeoutSeconds',[string]$TimeoutSeconds)
-$axisStep=Invoke-Child $axisWorkflow $axisArgs $axisResult 'axis_parameters' -ResetPaths @($axisOut)
-$axisTsv=Join-Path $axisOut 'axes_params.tsv'
-$eipOut=Join-Path $rawRoot 'eip_configuration'
-$eipResult=Join-Path $eipOut 'eip_configuration_result.json'
-$eipWorkflow=Join-Path $scriptRoot 'workflows\export_kv_eip_configuration.ps1'
-$eipArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$eipOut)
-$eipStep=Invoke-Child $eipWorkflow $eipArgs $eipResult 'eip_configuration' -ResetPaths @($eipOut)
-$eipConfigPath=Join-Path $eipOut 'eip_configuration.json'
 
 $fbSteps=@()
 foreach($name in @($fbReadable|Sort-Object -Unique)){
@@ -406,6 +394,20 @@ foreach($name in @($fbReadable|Sort-Object -Unique)){
   $fbSnapshotPath=Join-Path $fbOut 'artifacts\fb_arguments\fb_snapshot_result.json'
   if(Test-Path $fbSnapshotPath){$fbSnapshot=Get-Content -Raw $fbSnapshotPath|ConvertFrom-Json;$fbTextDir=Join-Path $textRoot ('fb_arguments\'+($name -replace '[\\/:*?""<>|]','_'));$null=Copy-SnapshotFiles @($fbSnapshot.raw_path) $fbTextDir;Copy-Item $fbSnapshotPath (Join-Path $fbTextDir 'fb_snapshot_result.json') -Force}
 }
+
+$axisOut=Join-Path $rawRoot 'axis_parameters'
+$axisResult=Join-Path $axisOut 'axis_parameters_result.json'
+$axisWorkflow=Join-Path $scriptRoot 'workflows\export_kv_axis_parameters.ps1'
+$axisArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$axisOut,'-TimeoutSeconds',[string]$TimeoutSeconds)
+$axisStep=Invoke-Child $axisWorkflow $axisArgs $axisResult 'axis_parameters' -ResetPaths @($axisOut)
+$axisTsv=Join-Path $axisOut 'axes_params.tsv'
+
+$eipOut=Join-Path $rawRoot 'eip_configuration'
+$eipResult=Join-Path $eipOut 'eip_configuration_result.json'
+$eipWorkflow=Join-Path $scriptRoot 'workflows\export_kv_eip_configuration.ps1'
+$eipArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$eipOut)
+$eipStep=Invoke-Child $eipWorkflow $eipArgs $eipResult 'eip_configuration' -ResetPaths @($eipOut)
+$eipConfigPath=Join-Path $eipOut 'eip_configuration.json'
 
 $inventoryFinal=Join-Path $textRoot 'project_inventory.json'
 $inventoryFinalArgs=@('-ProjectPath',$ProjectPath,'-MnmDir',$mnmExportDir,'-OutDir',(Join-Path $rawRoot 'inventory_final'),'-StructureDefinitionsPath',(Join-Path $textRoot 'structure_definitions.json'))
