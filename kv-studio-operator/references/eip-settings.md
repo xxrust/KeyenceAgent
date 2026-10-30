@@ -58,6 +58,14 @@ powershell -File <skill-root>\scripts\workflow_tools\get_kv_eip_connection_snaps
 | NU-EP1 | 1 / 192.168.0.1 | Sensor Output (Input Only) | IN_102 | 1 字 | `B0A0`~`B0A3` |
 | DL-EP1 | 2 / 192.168.0.3 | Monitor Data (Input Only) | IN_100 | 84 字 | `B0B0` 18字 偏移0；`W02C` 6字 偏移20 |
 
+## 复刻时的读取产物（沉淀）
+
+- `C:\kvrun\eip\snap_test\连接设定_1_NU_EP1.json` — 完整字段 + 199 行软元件分配
+- `C:\kvrun\eip\snap_test\连接设定_1_NU_EP1.tsv`
+- `C:\kvrun\eip\assign_IN_100.tsv`、`assign_IN_102.tsv`、`assign_DL_EP1.tsv`
+- `C:\kvrun\eip\assign_*.tsv` 来自 `get_kv_eip_connection_snapshot.ps1` 的实际运行
+
+这些是“读取能力已跑通”的直接证据；快照侧缺的只是把该读取器接进 stage。
 CPU IP：`192.168.0.10`。连接超时 `RPI×16`，刷新优先权“一般”。
 
 ## 写配置的现状
