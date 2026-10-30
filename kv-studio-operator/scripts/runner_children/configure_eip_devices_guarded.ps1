@@ -34,6 +34,10 @@ public delegate bool EnumProc(IntPtr h, IntPtr l);
 [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
 [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
 [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, string l);
+[DllImport("kernel32.dll")] public static extern int GetCurrentThreadId();
+[DllImport("user32.dll")] public static extern bool AttachThreadInput(int idAttach, int idAttachTo, bool fAttach);
+[DllImport("user32.dll")] public static extern IntPtr SetFocus(IntPtr h);
+[DllImport("user32.dll")] public static extern IntPtr GetFocus();
 [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
 public static System.Collections.Generic.List<string> Windows(int pid) {
   var res = new System.Collections.Generic.List<string>();
@@ -52,6 +56,14 @@ public static string StaticText(long p) {
 }
 public static void Click(int x, int y) { SetCursorPos(x, y); System.Threading.Thread.Sleep(120); mouse_event(0x0002, 0, 0, 0, IntPtr.Zero); System.Threading.Thread.Sleep(60); mouse_event(0x0004, 0, 0, 0, IntPtr.Zero); }
 public static void ClickCenter(long h) { RECT r; if (GetWindowRect(new IntPtr(h), out r)) Click((r.L + r.R) / 2, (r.T + r.B) / 2); }
+public static bool Focus(long h) {
+  var w = new IntPtr(h); int pid; int target = GetWindowThreadProcessId(w, out pid); int current = GetCurrentThreadId();
+  AttachThreadInput(current, target, true);
+  bool ok = SetFocus(w) != IntPtr.Zero;
+  AttachThreadInput(current, target, false);
+  return ok;
+}
+public static long Focused() { return GetFocus().ToInt64(); }
 "@
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
@@ -247,22 +259,15 @@ if ($ReadConfigurationOnly) {
   [void][EipWrite.EipWinWrite]::GetWindowRect([IntPtr]$eipWindow.hwnd, [ref]$gridRect)
   [void][EipWrite.EipWinWrite]::SetForegroundWindow([IntPtr]$eipWindow.hwnd)
   Start-Sleep -Milliseconds 500
-  # Click the 设定列表 grid itself (VSFlexGrid8N); fixed offsets miss it when the
-  # window is not at the remembered position.
+  # Alt+6 activates the 设定列表 tab and focuses its grid (verified live), so no
+  # screen coordinates are needed. Handle focus and a control-center click stay
+  # as fallbacks only.
   $grids = @([EipWrite.EipWinWrite]::Children([long]$eipWindow.hwnd) | Where-Object { $_ -like '*|VSFlexGrid8N|*' })
-  if ($grids.Count -gt 0) {
-    $gridHwnd = [long](($grids[0] -split '\|')[0])
-    [EipWrite.EipWinWrite]::ClickCenter($gridHwnd)
-  } else {
-    [EipWrite.EipWinWrite]::Click(($gridRect.L + 300), ($gridRect.T + 780))
-  }
-  Start-Sleep -Milliseconds 400
-  if ([EipFgWin2]::GetForegroundWindow() -ne [IntPtr]$eipWindow.hwnd) {
-    [void][EipWrite.EipWinWrite]::SetForegroundWindow([IntPtr]$eipWindow.hwnd)
-    Start-Sleep -Milliseconds 400
-    if ($grids.Count -gt 0) { [EipWrite.EipWinWrite]::ClickCenter($gridHwnd) } else { [EipWrite.EipWinWrite]::Click(($gridRect.L + 300), ($gridRect.T + 780)) }
-    Start-Sleep -Milliseconds 400
-  }
+  $gridHwnd = 0
+  if ($grids.Count -gt 0) { $gridHwnd = [long](($grids[0] -split '\|')[0]) }
+  Send-KvKeys -Keys '%6' -Step 'eip read configuration activate 设定列表'
+  Start-Sleep -Milliseconds 600
+  Log 'grid_activation' @{ grid_hwnd = $gridHwnd; method = 'alt+6' }
   Send-KvKeys -Keys '^{HOME}' -Step 'eip read configuration first cell'
   Start-Sleep -Milliseconds 250
   Send-KvKeys -Keys '^+{END}' -Step 'eip read configuration select table'
@@ -271,6 +276,20 @@ if ($ReadConfigurationOnly) {
   Start-Sleep -Milliseconds 800
   $readText = [System.Windows.Forms.Clipboard]::GetText()
   $lines = @($readText -split "`r?`n" | Where-Object { $_.Trim() })
+  if ($lines.Count -eq 0 -and $gridHwnd -ne 0) {
+    # Fallback 1: SetFocus by handle; fallback 2: click the control's center.
+    if (-not [EipWrite.EipWinWrite]::Focus($gridHwnd)) { [EipWrite.EipWinWrite]::ClickCenter($gridHwnd) }
+    Start-Sleep -Milliseconds 500
+    Send-KvKeys -Keys '^{HOME}' -Step 'eip read configuration retry first cell'
+    Start-Sleep -Milliseconds 250
+    Send-KvKeys -Keys '^+{END}' -Step 'eip read configuration retry select table'
+    Start-Sleep -Milliseconds 250
+    Send-KvKeys -Keys '^c' -Step 'eip read configuration retry copy'
+    Start-Sleep -Milliseconds 800
+    $readText = [System.Windows.Forms.Clipboard]::GetText()
+    $lines = @($readText -split "`r?`n" | Where-Object { $_.Trim() })
+    Log 'grid_focus_fallback' @{ grid_hwnd = $gridHwnd; rows = $lines.Count }
+  }
   $ips = @($lines | Where-Object { $_ -match '\b\d{1,3}(\.\d{1,3}){3}\b' } | ForEach-Object { [regex]::Match($_, '\b\d{1,3}(\.\d{1,3}){3}\b').Value } | Select-Object -Unique)
   # Columns: 节点 / 节点名称 / IP地址 / 连接名称 / RPI(IN) / RPI(OUT) / 超时 / 刷新优先权
   $connections = @()
