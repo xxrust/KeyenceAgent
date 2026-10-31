@@ -1,0 +1,15 @@
+﻿{
+  "schema_version": 1,
+  "description": "Device model -> asset class registry. A model is an instance; it must not be filed under a different asset class (e.g. KV-EC01 is an EtherCAT slave, not a CPU expansion unit).",
+  "allowed_classes": ["plc_cpu", "cpu_expansion_unit", "ethercat_slave", "eip_node"],
+  "models": {
+    "KV-X520": { "asset_class": "plc_cpu" },
+    "KV-EC01": { "asset_class": "ethercat_slave", "evidence": "EtherCAT 设备设定 -> 节点设定 -> 产品名称" },
+    "SGDXS-xxxxA0x EtherCAT(CoE) SERVOPACK Rev01.05": { "asset_class": "ethercat_slave" },
+    "CL3C-EC503(COE)": { "asset_class": "ethercat_slave" },
+    "YAKO MS-MINI3E": { "asset_class": "ethercat_slave" },
+    "SV630_1Axis_03713": { "asset_class": "ethercat_slave" },
+    "NU-EP1": { "asset_class": "eip_node" },
+    "DL-EP1": { "asset_class": "eip_node" }
+  }
+}

@@ -463,7 +463,7 @@ try {
 
   $assetStatus = [ordered]@{
     plc_cpu = if ($cpu) { 'extracted_from_WsTreeEnv' } else { 'missing' }
-    plc_expansion_units = if ($expansionUnits.Count -gt 0) { 'extracted_from_WsTreeEnv' } elseif ($sidecarExpansionCandidates.Count -gt 0) { 'none_in_tree_but_sidecar_candidates_found' } else { 'none_in_tree_or_not_expanded' }
+    plc_expansion_units = if ($expansionUnits.Count -gt 0) { 'extracted_from_WsTreeEnv' } elseif ($sidecarExpansionCandidates.Count -gt 0) { 'none_in_tree_but_sidecar_candidates_found' } else { 'none_present' }
     ethernet_ip = $ethernetIp.status
     ethercat = $ethercat.status
     motion_axes = if ($motionAxes.Count -gt 0) { 'axis_names_extracted_from_WsTreeEnv' } else { 'missing' }

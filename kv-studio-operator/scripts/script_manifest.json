@@ -1185,6 +1185,11 @@
                                        ],
                     "gate":  [
                                  {
+                                     "path":  "gates/assert_kv_asset_taxonomy.ps1",
+                                     "status":  "gate",
+                                     "customer_callable":  false
+                                 },
+                                 {
                                      "path":  "gates/assert_kv_asset_coverage.ps1",
                                      "status":  "gate",
                                      "customer_callable":  false

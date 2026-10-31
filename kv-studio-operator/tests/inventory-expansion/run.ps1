@@ -44,6 +44,21 @@ if (Test-Path -LiteralPath $reportPath) {
   Add-Case 'CPU slot 0 model KV-X520' (([int]$report.topology.cpu.slot -eq 0) -and ([string]$report.topology.cpu.model -eq 'KV-X520')) "$($report.topology.cpu.slot)/$($report.topology.cpu.model)"
 }
 
+  $taxonomyGate = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\scripts\gates\assert_kv_asset_taxonomy.ps1'))
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $taxonomyGate -InventoryPath $reportPath -OutDir (Join-Path $WorkRoot 'taxonomy') | Out-Null
+  Add-Case 'taxonomy gate accepts the real inventory' ($LASTEXITCODE -eq 0) "exit=$LASTEXITCODE"
+  $badStatusPath = Join-Path $WorkRoot 'inventory_bad_status.json'
+  $badStatus = Get-Content -LiteralPath $reportPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  $badStatus.asset_status.plc_expansion_units = 'missing'
+  $badStatus | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $badStatusPath -Encoding UTF8
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $taxonomyGate -InventoryPath $badStatusPath -OutDir (Join-Path $WorkRoot 'taxonomy_bad_status') | Out-Null
+  Add-Case 'taxonomy rejects 0 units with status missing' ($LASTEXITCODE -eq 41) "exit=$LASTEXITCODE"
+  $badModelsPath = Join-Path $WorkRoot 'models_bad.json'
+  $badModels = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\assets\models.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+  $badModels.models.'KV-EC01'.asset_class = 'cpu_expansion_unit'
+  $badModels | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $badModelsPath -Encoding UTF8
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $taxonomyGate -InventoryPath $reportPath -ModelsPath $badModelsPath -OutDir (Join-Path $WorkRoot 'taxonomy_bad_model') | Out-Null
+  Add-Case 'taxonomy rejects KV-EC01 as a CPU expansion unit' ($LASTEXITCODE -eq 41) "exit=$LASTEXITCODE"
 $failed = @($cases | Where-Object { -not $_.ok })
 $result = [ordered]@{ test = 'inventory-expansion'; passed = @($cases | Where-Object { $_.ok }).Count; failed = $failed.Count; cases = $cases.ToArray(); work_root = $WorkRoot }
 $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $WorkRoot 'test_result.json') -Encoding UTF8
