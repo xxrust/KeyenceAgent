@@ -121,3 +121,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\run-all-with-shots.ps1
 - 自动 1:1 导入：`false`（EtherCAT per-device parameters 只有截图）；人工复刻：`true`。
 - live 验收（EtherCAT 节点、EIP 读写、轴参数、13 快照 bat）必须在目标 KV STUDIO 环境单独执行，并在运行目录保留结果。
 - 已知边界：`高级设定` 无结构化导出路径（UIA/剪贴板/菜单/OCR 均失败），只保留截图。
+> 机器可读状态汇总见 [eferences/capability-status.generated.md](references/capability-status.generated.md)（由 manifest/ontology/最近测试与快照生成）。

@@ -86,3 +86,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\runner_children\set_
 - 需要真机 UI 的套件：`axis-rename-live`、`ethercat-node-live`、`eip-snapshot-live`、`eip-live-cycle`、`kv-interface-regression/13_project_text_snapshot`。
 - 这些 live 套件用 `-IncludeLive` 或各自的 `run.bat` 单独跑；结果以运行目录中的 `test_result.json` / `source_snapshot_manifest.json` 为准。
 - 最近记录：13 快照 `status=ready`，PDO 32/32，EIP 3 连接/3 分配；自动导入 `false`、人工复刻 `true`。
+> 机器可读状态汇总见 [eferences/capability-status.generated.md](references/capability-status.generated.md)（由 manifest/ontology/最近测试与快照生成）。

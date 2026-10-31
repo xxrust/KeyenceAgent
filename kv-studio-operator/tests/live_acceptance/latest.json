@@ -1,0 +1,17 @@
+﻿{
+    "recorded_at":  "2026-11-01T00:12:00.3989344+08:00",
+    "run_dir":  "H:\\KeyenceAgent\\kv-studio-operator\\tests\\kv-interface-regression\\runs\\13_project_text_snapshot_20261031_234517_953_4a82054f",
+    "snapshot_status":  "ready",
+    "stage_ok":  21,
+    "stage_total":  21,
+    "ready_for_full_1_to_1_import":  false,
+    "ready_for_manual_1_to_1_rebuild":  true,
+    "blocking_gaps":  [
+                          "ethercat_device_parameters"
+                      ],
+    "kvs_version":  "12.41.0.0",
+    "os":  "Microsoft Windows NT 10.0.26200.0",
+    "pdo_nodes":  32,
+    "eip_connections":  3,
+    "eip_assignments":  3
+}

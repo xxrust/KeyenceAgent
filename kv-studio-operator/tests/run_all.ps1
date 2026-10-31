@@ -22,6 +22,7 @@ $offline = @(
   'plan-runner',
   'inventory-expansion',
   'clone-readiness',
+  'capability-report',
   'ethercat-guard-contract',
   'script-hygiene',
   'eip-snapshot',
@@ -37,6 +38,7 @@ $live = @(
   'axis-rename-live',
   'ethercat-node-live',
   'eip-snapshot-live',
+  'live-acceptance',
   'eip-live-cycle'
 )
 $suites = @($offline)

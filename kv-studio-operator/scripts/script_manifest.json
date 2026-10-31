@@ -1,4 +1,4 @@
-{
+﻿{
     "schema_version":  2,
     "layout_policy":  "role_directories",
     "notes":  [
@@ -1092,6 +1092,11 @@
                                               }
                                              ],
                     "workflow_tool":  [
+                                          {
+                                              "path":  "workflow_tools/generate_kv_capability_report.ps1",
+                                              "status":  "approved",
+                                              "customer_callable":  false
+                                          },
                                           {
                                               "path":  "workflow_tools/compute_kv_clone_readiness.ps1",
                                               "status":  "approved",
