@@ -369,7 +369,7 @@ if(-not $PlanOnly){
 $ethercatOut=Join-Path $rawRoot 'ethercat_configuration'
 $ethercatResult=Join-Path $ethercatOut 'ethercat_configuration_result.json'
 $ethercatWorkflow=Join-Path $scriptRoot 'workflows\export_kv_ethercat_configuration.ps1'
-$ethercatArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$ethercatOut,'-ProjectName',[IO.Path]::GetFileNameWithoutExtension($ProjectPath),'-TimeoutSeconds',[string]$TimeoutSeconds)
+$ethercatArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$ethercatOut,'-ProjectName',[IO.Path]::GetFileNameWithoutExtension($ProjectPath),'-TimeoutSeconds',[string]([Math]::Max([int]$TimeoutSeconds,1800)))
 $ethercatStep=Invoke-Child $ethercatWorkflow $ethercatArgs $ethercatResult 'ethercat_configuration' -ResetPaths @($ethercatOut)
 $ethercatConfigurationPath=Join-Path $ethercatOut 'ethercat_configuration.json'
 $ethercatConfiguration=$null
@@ -441,6 +441,23 @@ if($ethercatStep.ok -and $ethercatConfiguration){
   $semanticEtherCatDir=Join-Path $snapshotRoot 'project\配置\EtherCAT'
   New-Item -ItemType Directory -Force -Path $semanticEtherCatDir | Out-Null
   Copy-Item -LiteralPath $ethercatConfigurationPath -Destination (Join-Path $semanticEtherCatDir 'devices.json') -Force
+  $etherCatDetailsSrc=Join-Path $ethercatOut 'details'
+  if(Test-Path -LiteralPath $etherCatDetailsSrc -PathType Container){
+    $etherCatDetailsDst=Join-Path $semanticEtherCatDir 'details'
+    New-Item -ItemType Directory -Force -Path $etherCatDetailsDst | Out-Null
+    Copy-Item -Path (Join-Path $etherCatDetailsSrc '*') -Destination $etherCatDetailsDst -Recurse -Force -ErrorAction SilentlyContinue
+    $pdoIndex=@()
+    foreach($n in @($ethercatConfiguration.configuration.nodes)){
+      if($n.details){
+        $pdoIndex += [ordered]@{node_address=$n.node_address;product_name=$n.product_name;pdo_rows=$n.details.pdo_rows;pdo_tsv=('配置/EtherCAT/details/node_' + ([int]$n.node_address).ToString('D2') + '/pdo.tsv');advanced_screenshot=$n.details.advanced_screenshot;ok=$n.details.ok}
+      }
+    }
+    Write-Json (Join-Path $semanticEtherCatDir 'pdo_index.json') ([ordered]@{node_count=$pdoIndex.Count;nodes=$pdoIndex}) 10
+    $entPath2=Join-Path $semanticEtherCatDir 'entity.json'
+    if(Test-Path -LiteralPath $entPath2 -PathType Leaf){
+      try{ $ent2=Get-Content -Raw -LiteralPath $entPath2 -Encoding UTF8|ConvertFrom-Json; $ent2.artifacts|Add-Member -NotePropertyName details -NotePropertyValue '配置/EtherCAT/details' -Force; $ent2.artifacts|Add-Member -NotePropertyName pdo_index -NotePropertyValue '配置/EtherCAT/pdo_index.json' -Force; $ent2.status|Add-Member -NotePropertyName pdo -NotePropertyValue 'complete' -Force; $ent2.status|Add-Member -NotePropertyName device_parameters -NotePropertyValue 'screenshot_only' -Force; Write-Json $entPath2 $ent2 20 }catch{}
+    }
+  }
   $etherCatEntityPath=Join-Path $semanticEtherCatDir 'entity.json'
   if(Test-Path -LiteralPath $etherCatEntityPath -PathType Leaf){
     try{

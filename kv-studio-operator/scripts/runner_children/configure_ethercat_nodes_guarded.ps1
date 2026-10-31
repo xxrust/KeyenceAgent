@@ -13,6 +13,9 @@
   [switch]$InspectOnly,
   [switch]$ReadConfigurationOnly,
   [string]$ConfigurationOutPath = '',
+  [switch]$ReadDetails,
+  [string]$DetailsOutDir = '',
+  [int]$DetailsNodeLimit = 0,
   [switch]$KeepWindowOpen
 )
 
@@ -1002,6 +1005,61 @@ function Select-EtherCatDeviceSettingTab([IntPtr]$Hwnd) {
   return $false
 }
 
+function Read-EtherCatNodeDetails {
+  param([IntPtr]$DialogHwnd, [int]$NodeAddress, [string]$OutDir)
+  $nodeDir = Join-Path $OutDir ('node_' + $NodeAddress.ToString('D2'))
+  New-Item -ItemType Directory -Force -Path $nodeDir | Out-Null
+  $dialogRoot = Get-ElementFromHwnd -Hwnd $DialogHwnd
+  $detailRow = Find-Descendant -Root $dialogRoot -Predicate {
+    param($e)
+    try { $e.Current.Name -eq '详细设定' -and $e.Current.ControlType.ProgrammaticName -eq 'ControlType.TreeItem' } catch { $false }
+  }
+  if (-not $detailRow) { return [pscustomobject]@{ ok = $false; error = 'detail_row_missing' } }
+  $invoke = $null
+  if ($detailRow.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern, [ref]$invoke)) { $invoke.Invoke() }
+  Start-Sleep -Milliseconds 500
+  Invoke-KvGuardedSendKeysScoped -TargetHwnd $DialogHwnd -Step 'EtherCAT open detailed settings' -Keys '{ENTER}' -ExpectedTitleLike '*' -OwnerProcessId (Get-KvsProcess).Id -SleepMs 1200
+  $detail = Wait-WindowTitleLike -TitleParts @('详细设定') -TimeoutMs 8000
+  if (-not $detail) { return [pscustomobject]@{ ok = $false; error = 'detail_window_missing' } }
+  $detailHwnd = [IntPtr]$detail.hwnd
+  $rect = New-Object KvEtherCatWin32+RECT
+  [void][KvEtherCatWin32]::GetWindowRect($detailHwnd, [ref]$rect)
+  Invoke-KvGuardedMouseClick -TargetHwnd $detailHwnd -Step 'EtherCAT PDO grid focus' -X ([int]($rect.Left + 500)) -Y ([int]($rect.Top + 200)) -ExpectedTitleLike '*' -SleepMs 250
+  Invoke-KvGuardedSendKeys -TargetHwnd $detailHwnd -Step 'EtherCAT PDO home' -Keys '^{HOME}' -ExpectedTitleLike '*' -SleepMs 200
+  Invoke-KvGuardedSendKeys -TargetHwnd $detailHwnd -Step 'EtherCAT PDO range' -Keys '^+{END}' -ExpectedTitleLike '*' -SleepMs 300
+  Invoke-KvGuardedSendKeys -TargetHwnd $detailHwnd -Step 'EtherCAT PDO copy' -Keys '^c' -ExpectedTitleLike '*' -SleepMs 600
+  $pdoText = [System.Windows.Forms.Clipboard]::GetText()
+  if ([string]::IsNullOrWhiteSpace($pdoText)) {
+    Invoke-KvGuardedMouseClick -TargetHwnd $detailHwnd -Step 'EtherCAT PDO grid retry focus' -X ([int]($rect.Left + 300)) -Y ([int]($rect.Top + 140)) -ExpectedTitleLike '*' -SleepMs 250
+    Invoke-KvGuardedSendKeys -TargetHwnd $detailHwnd -Step 'EtherCAT PDO retry range' -Keys '^+{END}' -ExpectedTitleLike '*' -SleepMs 300
+    Invoke-KvGuardedSendKeys -TargetHwnd $detailHwnd -Step 'EtherCAT PDO retry copy' -Keys '^c' -ExpectedTitleLike '*' -SleepMs 600
+    $pdoText = [System.Windows.Forms.Clipboard]::GetText()
+  }
+  $pdoPath = Join-Path $nodeDir 'pdo.tsv'
+  [IO.File]::WriteAllText($pdoPath, $pdoText, (New-Object Text.UTF8Encoding($false)))
+  $pdoRows = @($pdoText -split "`r?`n" | Where-Object { $_.Trim() }).Count
+  $detailRoot = Get-ElementFromHwnd -Hwnd $detailHwnd
+  $advancedTab = $null
+  $tabCondition = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::TabItem)
+  foreach ($tab in $detailRoot.FindAll([Windows.Automation.TreeScope]::Descendants, $tabCondition)) {
+    if ([string]$tab.Current.Name -eq '高级设定') { $advancedTab = $tab; break }
+  }
+  $advancedShot = ''
+  if ($advancedTab) {
+    try { $advancedTab.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select(); Start-Sleep -Milliseconds 800 } catch {}
+    try { $advancedShot = Save-Screenshot ('node_' + $NodeAddress.ToString('D2') + '_advanced.png'); } catch {}
+  }
+  $cancel = Invoke-ButtonByNamePart -Root $detailRoot -NamePart '取消'
+  Start-Sleep -Milliseconds 800
+  [pscustomobject]@{
+    ok = ($pdoRows -gt 0)
+    pdo_rows = $pdoRows
+    pdo_tsv = $pdoPath
+    advanced_screenshot = $advancedShot
+    error = if ($pdoRows -gt 0) { '' } else { 'pdo_copy_empty' }
+  }
+}
+
 function Read-EtherCatConfiguration([IntPtr]$DialogHwnd) {
   if(-not ('KvEcReadClick' -as [type])) {
     Add-Type -TypeDefinition @"
@@ -1035,7 +1093,7 @@ public class KvEcReadClick {
   $nodes=@()
   $seen=@{}
   for($index=0; $index -lt 200; $index++) {
-    Invoke-KvGuardedSendKeys -TargetHwnd $DialogHwnd -Step "EtherCAT read configuration node $($index+1)" -Keys '{DOWN}' -ExpectedTitleLike '*' -SleepMs 350
+    Invoke-KvGuardedSendKeys -TargetHwnd $DialogHwnd -Step "EtherCAT read configuration node $($index+1)" -Keys '{DOWN}' -ExpectedTitleLike '*' -SleepMs 700
     $detail=Read-EtherCatDetailValues -Hwnd $DialogHwnd
     $addressText=[string]$detail['节点地址']
     if([string]::IsNullOrWhiteSpace($addressText)){ break }
@@ -1056,6 +1114,22 @@ public class KvEcReadClick {
       explicit_device_id_check=[string]$detail['Explicit Device ID检查']
       reserved=[string]$detail['预留']
       values=$detail
+    }
+    }
+  if ($ReadDetails -and $DetailsOutDir) {
+    $detailLimit = if ($DetailsNodeLimit -gt 0) { [Math]::Min($DetailsNodeLimit, $nodes.Count) } else { $nodes.Count }
+    for ($nodeIndex = 0; $nodeIndex -lt $detailLimit; $nodeIndex++) {
+      try {
+        Invoke-KvGuardedMouseClick -TargetHwnd $DialogHwnd -Step ('EtherCAT detail focus list ' + $nodeIndex) -X ([int]($rect.Left + 62)) -Y ([int]($rect.Top + 195)) -ExpectedTitleLike '*' -SleepMs 300
+        Invoke-KvGuardedSendKeys -TargetHwnd $DialogHwnd -Step ('EtherCAT detail reset ' + $nodeIndex) -Keys '{UP 80}' -ExpectedTitleLike '*' -SleepMs 700
+        Invoke-KvGuardedSendKeys -TargetHwnd $DialogHwnd -Step ('EtherCAT detail select ' + $nodeIndex) -Keys ('{DOWN ' + ($nodeIndex + 1) + '}') -ExpectedTitleLike '*' -SleepMs 500
+        $current = Read-EtherCatDetailValues -Hwnd $DialogHwnd
+        if ([string]$current['节点地址'] -ne [string]$nodes[$nodeIndex].node_address) { continue }
+        $capture = Read-EtherCatNodeDetails -DialogHwnd $DialogHwnd -NodeAddress ([int]$nodes[$nodeIndex].node_address) -OutDir $DetailsOutDir
+        $nodes[$nodeIndex] | Add-Member -NotePropertyName details -NotePropertyValue $capture -Force
+      } catch {
+        $nodes[$nodeIndex] | Add-Member -NotePropertyName details -NotePropertyValue ([pscustomobject]@{ ok = $false; error = $_.Exception.Message }) -Force
+      }
     }
   }
   [pscustomobject]@{

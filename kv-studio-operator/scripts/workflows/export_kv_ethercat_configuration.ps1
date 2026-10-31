@@ -22,6 +22,8 @@ Add-KvWorkflowStep -Plan $plan -Name 'read_configuration' -Script 'runner_childr
   OutDir = $plan.run_root
   ReadConfigurationOnly = $true
   ConfigurationOutPath = $configurationPath
+  ReadDetails = $true
+  DetailsOutDir = (Join-Path $plan.run_root 'details')
 }
 $exitCode = 0
 try {
@@ -34,6 +36,9 @@ if (Test-Path -LiteralPath $configurationPath -PathType Leaf) {
   try { $configuration = Get-Content -Raw -LiteralPath $configurationPath -Encoding UTF8 | ConvertFrom-Json } catch {}
   $publicConfiguration = Join-Path $OutDir 'ethercat_configuration.json'
   if ([IO.Path]::GetFullPath($publicConfiguration) -ne [IO.Path]::GetFullPath($configurationPath)) { Copy-Item -LiteralPath $configurationPath -Destination $publicConfiguration -Force }
+  $publicDetails = Join-Path $OutDir 'details'
+  $runDetails = Join-Path $plan.run_root 'details'
+  if ((Test-Path -LiteralPath $runDetails -PathType Container) -and ([IO.Path]::GetFullPath($publicDetails) -ne [IO.Path]::GetFullPath($runDetails))) { New-Item -ItemType Directory -Force -Path $publicDetails | Out-Null; Copy-Item -Path (Join-Path $runDetails '*') -Destination $publicDetails -Recurse -Force }
 }
 $nodes = @()
 $master = $null
@@ -53,6 +58,7 @@ $result = [ordered]@{
   master_settings = $master
   nodes = $nodes
   source_result = $configurationPath
+  details_dir = (Join-Path $OutDir 'details')
 }
 $resultPath = Join-Path $OutDir 'ethercat_configuration_result.json'
 $result | ConvertTo-Json -Depth 14 | Set-Content -LiteralPath $resultPath -Encoding UTF8
