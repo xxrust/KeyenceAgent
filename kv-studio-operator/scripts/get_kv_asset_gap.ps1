@@ -27,9 +27,11 @@ foreach ($capability in @($ontology.capabilities.PSObject.Properties)) {
     foreach ($item in @($capability.Value.evidence)) {
       if (-not $item) { continue }
       $path = [string]$item
+      $portable = $true
+      if ($path -like 'local:*') { $path = $path.Substring(6); $portable = $false }
       $resolved = if ([IO.Path]::IsPathRooted($path)) { $path } else { Join-Path $skillRoot $path }
       $exists = Test-Path -LiteralPath $resolved
-      $evidence += [ordered]@{ item = $path; exists = $exists }
+      $evidence += [ordered]@{ item = $path; portable = $portable; exists = $exists }
     }
     $scriptPath = Join-Path $scriptsRoot ([string]$capability.Value.script)
     $capabilities += [ordered]@{
@@ -62,7 +64,7 @@ if ($status -eq 'missing_route' -and $capabilityNames.Count -gt 0) { $errors += 
 if ($CheckEvidence) {
   foreach ($capability in $capabilities) {
     if (-not $capability.script_exists) { $errors += "capability $($capability.name) script missing: $($capability.script)" }
-    if (@($capability.evidence | Where-Object { $_.exists }).Count -eq 0) { $errors += "capability $($capability.name) has no existing evidence" }
+    if (@($capability.evidence | Where-Object { $_.exists -and $_.portable }).Count -eq 0) { $errors += "capability $($capability.name) has no existing portable evidence" }
   }
 }
 $result = [ordered]@{

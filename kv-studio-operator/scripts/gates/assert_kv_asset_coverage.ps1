@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$OntologyPath = '',
   [string]$OutDir = ''
 )
@@ -53,6 +53,8 @@ foreach ($capability in $capabilities) {
   $scriptPath = Join-Path $scriptsRoot ([string]$value.script)
   if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) { Add-Error 'KV_CAPABILITY_SCRIPT_MISSING' $id "script not found: $($value.script)" }
   if (@($value.evidence | Where-Object { $_ }).Count -eq 0) { Add-Error 'KV_CAPABILITY_EVIDENCE_MISSING' $id 'evidence is required' }
+  $portableEvidence = @($value.evidence | Where-Object { $_ -and $_ -notlike 'local:*' })
+  if ($portableEvidence.Count -eq 0) { Add-Error 'KV_CAPABILITY_EVIDENCE_NOT_PORTABLE' $id 'at least one repo-relative evidence item is required (prefix machine-local artifacts with local:)' }
   foreach ($assetRef in @($value.assets)) {
     if ($assetIds -notcontains [string]$assetRef) { Add-Error 'KV_CAPABILITY_ASSET_UNKNOWN' $id "asset '$assetRef' is not declared" }
   }

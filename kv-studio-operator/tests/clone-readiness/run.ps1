@@ -14,6 +14,7 @@ function New-Inventory([hashtable]$Status, [int]$ExpansionCount) {
   }
 }
 $complete = @{
+  program_fb = 'complete'; variables = 'complete'; data_types = 'complete'
   ethercat_pdo = 'ui_read_complete'; ethercat_device_parameters = 'structured'
   ethernet_ip = 'ui_read_complete'; eip_connection = 'ui_read_complete'
   motion_axes = 'ui_dump_complete'; axis_parameters = 'ui_dump_complete'
@@ -36,6 +37,12 @@ Add-Case 'zero units never emits an expansion gap' (-not (@($noUnits.blocking_ga
 $partialPdo = $complete.Clone(); $partialPdo['ethercat_pdo'] = 'partial'
 $pdo = & $helper -Inventory (New-Inventory $partialPdo 0)
 Add-Case 'partial PDO blocks readiness' (@($pdo.blocking_gaps | ForEach-Object { $_.id }) -contains 'ethercat_pdo') ''
+$eipPartial = $complete.Clone(); $eipPartial['eip_connection'] = 'partial'; $eipPartial['ethernet_ip'] = 'ui_read_complete'
+$eip = & $helper -Inventory (New-Inventory $eipPartial 0)
+Add-Case 'EIP assignment missing blocks readiness' (@($eip.blocking_gaps | ForEach-Object { $_.id }) -contains 'eip_connection') ''
+$baseMissing = $complete.Clone(); $baseMissing['program_fb'] = 'missing'
+$base = & $helper -Inventory (New-Inventory $baseMissing 0)
+Add-Case 'missing program/FB blocks readiness' (@($base.blocking_gaps | ForEach-Object { $_.id }) -contains 'program_fb') ''
 $failed = @($cases | Where-Object { -not $_.ok })
 $result = [ordered]@{ test = 'clone-readiness'; passed = @($cases | Where-Object { $_.ok }).Count; failed = $failed.Count; cases = $cases.ToArray(); work_root = $WorkRoot }
 $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $WorkRoot 'test_result.json') -Encoding UTF8

@@ -160,6 +160,7 @@ if(-not(Test-Path -LiteralPath $ProjectPath -PathType Leaf)){throw "ProjectPath 
 $projectRoot=Split-Path -Parent $ProjectPath
 if(-not $SnapshotId){$SnapshotId='snapshot_'+(Get-Date -Format 'yyyyMMdd_HHmmss')}
 $snapshotRoot=Join-Path $OutDir $SnapshotId
+$mergeFailures=New-Object System.Collections.Generic.List[object]
 $rawRoot=Join-Path $snapshotRoot 'raw'; $textRoot=Join-Path $snapshotRoot 'text'; $architectureRoot=Join-Path $snapshotRoot 'architecture'
 New-Item -ItemType Directory -Force -Path $rawRoot,$textRoot,$architectureRoot | Out-Null
 $fingerprint=Fingerprint $projectRoot
@@ -571,7 +572,14 @@ if(Test-Path -LiteralPath $inventoryPath -PathType Leaf){
   try{
     $inv=Get-Content -Raw -LiteralPath $inventoryPath -Encoding UTF8|ConvertFrom-Json
     if($ethercatStep.ok){ $inv.asset_status.ethercat='ui_read_complete' }
-    if($eipStep.ok){ $inv.asset_status.ethernet_ip='ui_read_complete'; $inv.asset_status | Add-Member -NotePropertyName eip_connection -NotePropertyValue 'ui_read_complete' -Force }
+    if($eipStep.ok){
+      $eipConnectionCount = if($eipData){ [int]$eipData.connection_count } else { 0 }
+      $eipStatus = if($eipConnectionCount -gt 0){ 'ui_read_complete' } else { 'partial' }
+      $assignmentTotal = [int]$assignmentCount
+      $eipAssignStatus = if($assignmentTotal -gt 0 -and $assignmentTotal -ge $eipConnectionCount){ 'ui_read_complete' } else { 'partial' }
+      $inv.asset_status.ethernet_ip=$eipStatus
+      $inv.asset_status | Add-Member -NotePropertyName eip_connection -NotePropertyValue $eipAssignStatus -Force
+    }
     if($axisStep.ok){ $inv.asset_status.motion_axes='ui_dump_complete'; $inv.asset_status.axis_parameters='ui_dump_complete' }
     if($motionStep.ok){ $inv.asset_status | Add-Member -NotePropertyName motion_axis_groups -NotePropertyValue 'ui_dump_complete' -Force; $inv.asset_status | Add-Member -NotePropertyName motion_point_parameters -NotePropertyValue 'ui_dump_complete' -Force; $inv.asset_status | Add-Member -NotePropertyName motion_common_settings -NotePropertyValue 'ui_dump_complete' -Force; $inv.asset_status | Add-Member -NotePropertyName motion_sync_settings -NotePropertyValue 'ui_dump_complete' -Force }
     if($inv.topology.ethercat){ $inv.topology.ethercat | Add-Member -NotePropertyName status -NotePropertyValue 'ui_read_complete' -Force; $inv.topology.ethercat | Add-Member -NotePropertyName ui_devices -NotePropertyValue '配置/EtherCAT/devices.json' -Force }
@@ -589,13 +597,25 @@ if(Test-Path -LiteralPath $inventoryPath -PathType Leaf){
       $inv.asset_status | Add-Member -NotePropertyName ethercat_device_parameters -NotePropertyValue 'screenshot_only' -Force
     }
 
+    $baseProgram = if($mnmStep.ok){ 'complete' } else { 'missing' }
+    $baseVariables = if($variablesStep.ok -and @($allLocalVariableSteps | Where-Object { -not $_.ok }).Count -eq 0){ 'complete' } else { 'missing' }
+    $baseTypes = if($structureStep.ok){ 'complete' } else { 'missing' }
+    $inv.asset_status | Add-Member -NotePropertyName program_fb -NotePropertyValue $baseProgram -Force
+    $inv.asset_status | Add-Member -NotePropertyName variables -NotePropertyValue $baseVariables -Force
+    $inv.asset_status | Add-Member -NotePropertyName data_types -NotePropertyValue $baseTypes -Force
     $readiness = & (Join-Path $scriptRoot 'workflow_tools\compute_kv_clone_readiness.ps1') -Inventory $inv
     $inv.clone_readiness | Add-Member -NotePropertyName ready_for_full_1_to_1_import -NotePropertyValue ([bool]$readiness.ready_for_full_1_to_1_import) -Force
     $inv.clone_readiness | Add-Member -NotePropertyName ready_for_manual_1_to_1_rebuild -NotePropertyValue ([bool]$readiness.ready_for_manual_1_to_1_rebuild) -Force
     $inv.clone_readiness | Add-Member -NotePropertyName blocking_gaps -NotePropertyValue @($readiness.blocking_gaps) -Force
     $inv.clone_readiness | Add-Member -NotePropertyName reason -NotePropertyValue ([string]$readiness.reason) -Force
     Write-Json $inventoryPath $inv 20
-  }catch{}
+  }catch{
+    $mergeFailures.Add([pscustomobject]@{stage='inventory_sync';error=$_.Exception.Message;path=$inventoryPath})
+  }
+}
+
+if($mergeFailures.Count -gt 0){
+  Write-Json (Join-Path $rawRoot 'merge_errors.json') ([ordered]@{count=$mergeFailures.Count;errors=$mergeFailures.ToArray()}) 8
 }
 
 $index=@(); foreach($f in @(Get-ChildItem -LiteralPath $textRoot -File -Recurse | Sort-Object FullName)){
@@ -603,7 +623,7 @@ $index=@(); foreach($f in @(Get-ChildItem -LiteralPath $textRoot -File -Recurse 
 }
 Write-Json (Join-Path $snapshotRoot 'text_index.json') $index 8
 $statuses=@($inventoryStep,$mnmStep,$structureStep,$variablesStep,$ethercatStep,$axisStep,$eipStep,$motionStep)+@($allLocalVariableSteps)+@($fbSteps)+@($inventoryFinalStep,$materializationStep,$commentsStep,$annotateStep)
-$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($allLocalVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $ethercatStep.ok){$missing+='ethercat_configuration'}; if(-not $axisStep.ok){$missing+='axis_parameters'}; if(-not $eipStep.ok){$missing+='eip_configuration'}; if(-not $motionStep.ok){$missing+='motion_settings'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}
+$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($allLocalVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $ethercatStep.ok){$missing+='ethercat_configuration'}; if(-not $axisStep.ok){$missing+='axis_parameters'}; if(-not $eipStep.ok){$missing+='eip_configuration'}; if(-not $motionStep.ok){$missing+='motion_settings'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}; if($mergeFailures.Count -gt 0){$missing+='snapshot_merge'}
 $semanticStatus=if($materializationStep.ok){'complete'}else{'failed'}
 $semanticWarnings=@()
 if($materializationStep.result -and $materializationStep.result.warnings){$semanticWarnings=@($materializationStep.result.warnings)}

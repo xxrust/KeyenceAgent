@@ -7,6 +7,9 @@
 $status = $Inventory.asset_status
 $gaps = @()
 function Add-Gap([string]$Id, [string]$Text) { $script:gaps += [pscustomobject]@{ id = $Id; text = $Text } }
+if ([string]$status.program_fb -ne 'complete') { Add-Gap 'program_fb' '程序/FB 未成功采集' }
+if ([string]$status.variables -ne 'complete') { Add-Gap 'variables' '变量未成功采集' }
+if ([string]$status.data_types -ne 'complete') { Add-Gap 'data_types' '数据类型未成功采集' }
 if ([string]$status.ethercat_pdo -ne 'ui_read_complete') { Add-Gap 'ethercat_pdo' 'EtherCAT PDO 映射未完整采集' }
 if ([string]$status.ethercat_device_parameters -ne 'structured') { Add-Gap 'ethercat_device_parameters' 'EtherCAT per-device parameters 仅截图，无结构化键值' }
 if ([string]$status.ethernet_ip -ne 'ui_read_complete') { Add-Gap 'ethernet_ip' 'EtherNet/IP 设备/连接未完整采集' }

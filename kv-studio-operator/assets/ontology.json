@@ -1,4 +1,4 @@
-{
+﻿{
   "schema_version": 1,
   "generated_from": "manual v1; keep in sync with script_manifest.json",
   "assets": {
@@ -42,16 +42,16 @@
     "snapshot_kv_global_variables_all_groups": { "script": "workflows/snapshot_kv_global_variables_all_groups.ps1", "assets": ["global_variables"], "evidence": ["tests/kv-interface-regression/20_global_variable_groups"] },
     "export_kv_structure_definitions": { "script": "workflows/export_kv_structure_definitions.ps1", "assets": ["data_types"], "evidence": ["tests/kv-interface-regression/04_structures_snapshot"] },
     "export_kv_device_comments": { "script": "workflows/export_kv_device_comments.ps1", "assets": ["comments"], "evidence": ["tests/kv-interface-regression/21_export_device_comments"] },
-    "read_ethercat_configuration": { "script": "workflows/export_kv_ethercat_configuration.ps1", "assets": ["ethercat_slave", "ethercat_pdo", "ethercat_device_parameters"], "evidence": ["C:/kvrun/ec_read2/ethercat_configuration.json", "C:/kvrun/ec_wf_details/details"] },
-    "read_axis_parameters": { "script": "workflows/export_kv_axis_parameters.ps1", "assets": ["motion_axis", "axis_parameter"], "evidence": ["C:/kvrun/axis_dump_test/axis_parameters_result.json"] },
-    "read_motion_settings": { "script": "workflows/export_kv_motion_settings.ps1", "assets": ["motion_axis_group", "motion_point_parameter", "motion_common_settings"], "evidence": ["C:/kvrun/motion_wf1/motion_settings_workflow_result.json"] },
-    "read_eip_configuration": { "script": "workflows/export_kv_eip_configuration.ps1", "assets": ["eip_node"], "evidence": ["C:/kvrun/eip_fix3/eip_configuration_result.json"] },
-    "snapshot_eip_connection": { "script": "workflow_tools/get_kv_eip_connection_snapshot.ps1", "assets": ["eip_connection"], "evidence": ["tests/eip-snapshot", "C:/kvrun/eip_assign2/assignments", "references/eip-settings.md"] },
+    "read_ethercat_configuration": { "script": "workflows/export_kv_ethercat_configuration.ps1", "assets": ["ethercat_slave", "ethercat_pdo", "ethercat_device_parameters"], "evidence": ["tests/ethercat-configuration/README.md", "local:C:/kvrun/ec_read2/ethercat_configuration.json", "local:C:/kvrun/ec_wf_details/details"] },
+    "read_axis_parameters": { "script": "workflows/export_kv_axis_parameters.ps1", "assets": ["motion_axis", "axis_parameter"], "evidence": ["tests/axis-params", "local:C:/kvrun/axis_dump_test/axis_parameters_result.json"] },
+    "read_motion_settings": { "script": "workflows/export_kv_motion_settings.ps1", "assets": ["motion_axis_group", "motion_point_parameter", "motion_common_settings"], "evidence": ["tests/kv-interface-regression/13_project_text_snapshot/README.md", "local:C:/kvrun/motion_wf1/motion_settings_workflow_result.json"] },
+    "read_eip_configuration": { "script": "workflows/export_kv_eip_configuration.ps1", "assets": ["eip_node"], "evidence": ["tests/eip-snapshot", "local:C:/kvrun/eip_fix3/eip_configuration_result.json"] },
+    "snapshot_eip_connection": { "script": "workflow_tools/get_kv_eip_connection_snapshot.ps1", "assets": ["eip_connection"], "evidence": ["tests/eip-snapshot", "local:C:/kvrun/eip_assign2/assignments", "references/eip-settings.md"] },
     "configure_ethercat_nodes": { "script": "workflows/configure_kv_ethercat_nodes.ps1", "assets": ["ethercat_slave"], "evidence": ["tests/kv-interface-regression/07_ethercat_nodes"] },
     "configure_eip_devices": { "script": "workflows/configure_kv_eip_devices.ps1", "assets": ["eip_node"], "evidence": ["tests/eip-live-cycle"] },
     "axis_parameters_write": { "script": "runner_children/axis_parameters_guarded.ps1", "assets": ["axis_parameter"], "evidence": ["tests/axis-params"] },
     "compile_kv_project": { "script": "workflows/compile_kv_project.ps1", "assets": ["program", "fb", "global_variables"], "evidence": ["tests/kv-interface-regression/05_compile"] },
-    "materialize_kv_project_snapshot": { "script": "workflow_tools/materialize_kv_project_snapshot.ps1", "assets": ["program", "fb", "data_types", "global_variables"], "evidence": ["C:/kvrun/snap_resume/s2/project/_index/materialization_result.json"] },
+    "materialize_kv_project_snapshot": { "script": "workflow_tools/materialize_kv_project_snapshot.ps1", "assets": ["program", "fb", "data_types", "global_variables"], "evidence": ["tests/kv-interface-regression/13_project_text_snapshot/README.md", "local:C:/kvrun/snap_resume/s2/project/_index/materialization_result.json"] },
     "annotate_kv_program_with_comments": { "script": "workflows/annotate_kv_program_with_comments.ps1", "assets": ["comments"], "evidence": ["tests/kv-interface-regression/22_annotate_program_comments"] },
     "set_kv_fb_arguments_snapshot": { "script": "workflows/set_kv_fb_arguments.ps1", "assets": ["fb_arguments"], "evidence": ["tests/kv-interface-regression/01_fb_arguments"] },
     "set_kv_variables_snapshot": { "script": "workflows/set_kv_variables.ps1", "assets": ["global_variables", "fb_arguments"], "evidence": ["tests/kv-interface-regression/03_variables_snapshot"] },

@@ -113,3 +113,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\run-all-with-shots.ps1
 - 失败时**先看图**（新的 skill `kv-ui-screenshot-verification` 把这个定成铁律）
 
 详见 → [`tests/README.md`](tests/README.md)
+
+## 当前验收状态（2026-11-01）
+
+- 离线：16 suites / 175 cases（`tests/run_all.ps1`），**不包含 live UI**。
+- 最近一次完整快照：`status=ready`；EtherCAT PDO 32/32；EIP 3 条连接 + 3 份软元件分配。
+- 自动 1:1 导入：`false`（EtherCAT per-device parameters 只有截图）；人工复刻：`true`。
+- live 验收（EtherCAT 节点、EIP 读写、轴参数、13 快照 bat）必须在目标 KV STUDIO 环境单独执行，并在运行目录保留结果。
+- 已知边界：`高级设定` 无结构化导出路径（UIA/剪贴板/菜单/OCR 均失败），只保留截图。

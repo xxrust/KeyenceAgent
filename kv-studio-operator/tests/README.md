@@ -79,3 +79,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\runner_children\set_
 - **fixture 必须干净** ✗（残留 `execution_plan.json` 会让 harness 判 `STALE`）
 - 改大表前**先关向导** ✗（模态会吞键盘导航）
 - **失败先看截图** ✗ 不要先看退出码（见技能 `kv-ui-screenshot-verification`）
+
+## 8. 当前验收状态（2026-11-01）
+
+- `run_all.ps1` 的 16 个 suite / 175 个 case 全部是离线契约测试，**不驱动 KV STUDIO**。
+- 需要真机 UI 的套件：`axis-rename-live`、`ethercat-node-live`、`eip-snapshot-live`、`eip-live-cycle`、`kv-interface-regression/13_project_text_snapshot`。
+- 这些 live 套件用 `-IncludeLive` 或各自的 `run.bat` 单独跑；结果以运行目录中的 `test_result.json` / `source_snapshot_manifest.json` 为准。
+- 最近记录：13 快照 `status=ready`，PDO 32/32，EIP 3 连接/3 分配；自动导入 `false`、人工复刻 `true`。
