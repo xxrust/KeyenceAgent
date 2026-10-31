@@ -1,4 +1,4 @@
-﻿param(
+param(
   [string]$InventoryPath = '',
   [string]$ModelsPath = '',
   [string]$OutDir = ''
@@ -54,6 +54,19 @@ if ($inventory) {
     if (-not $model) { continue }
     if ($models.ContainsKey($model) -and [string]$models[$model].asset_class -ne 'eip_node') {
       Add-Error 'KV_MODEL_CLASS_CONFLICT' $model ("model class is '" + $models[$model].asset_class + "' but it appears as an EtherNet/IP device")
+    }
+  }
+  foreach ($gap in @($inventory.clone_readiness.blocking_gaps)) {
+    $gapId = [string]$gap.id
+    if (-not $gapId) { continue }
+    if ($gapId -eq 'plc_expansion_units' -and @($inventory.topology.expansion_units).Count -eq 0) {
+      Add-Error 'KV_GAP_CONTRADICTS_INVENTORY' $gapId 'blocking gap says expansion units are missing but the topology has none'
+    }
+    if ($gapId -eq 'ethercat_pdo' -and [string]$inventory.asset_status.ethercat_pdo -eq 'ui_read_complete') {
+      Add-Error 'KV_GAP_CONTRADICTS_INVENTORY' $gapId 'blocking gap says PDO is missing but status is ui_read_complete'
+    }
+    if ($gapId -eq 'ethercat_device_parameters' -and [string]$inventory.asset_status.ethercat_device_parameters -eq 'structured') {
+      Add-Error 'KV_GAP_CONTRADICTS_INVENTORY' $gapId 'blocking gap says parameters are unstructured but status is structured'
     }
   }
 }

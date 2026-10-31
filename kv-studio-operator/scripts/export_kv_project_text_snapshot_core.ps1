@@ -579,10 +579,20 @@ if(Test-Path -LiteralPath $inventoryPath -PathType Leaf){
     if($inv.topology.motion){ $inv.topology.motion | Add-Member -NotePropertyName status -NotePropertyValue 'ui_dump_complete' -Force; if($axisNames.Count -gt 0){ $inv.topology.motion | Add-Member -NotePropertyName axes -NotePropertyValue @($axisNames) -Force }; $inv.topology.motion | Add-Member -NotePropertyName missing_for_clone -NotePropertyValue @() -Force }
     $expansionCount = @($inv.topology.expansion_units).Count
     $inv.asset_status | Add-Member -NotePropertyName plc_expansion_units -NotePropertyValue $(if ($expansionCount -eq 0) { 'none_present' } else { 'captured' }) -Force
-    if ($ethercatConfiguration) { $inv.asset_status | Add-Member -NotePropertyName ethercat_pdo -NotePropertyValue 'ui_read_complete' -Force; $inv.asset_status | Add-Member -NotePropertyName ethercat_device_parameters -NotePropertyValue 'screenshot_only' -Force }
+    if ($ethercatConfiguration) {
+      $pdoIndexPath = Join-Path $snapshotRoot 'project\配置\EtherCAT\pdo_index.json'
+      $pdoCaptured = 0
+      if (Test-Path -LiteralPath $pdoIndexPath -PathType Leaf) { try { $pdoCaptured = [int](Get-Content -Raw -LiteralPath $pdoIndexPath -Encoding UTF8 | ConvertFrom-Json).node_count } catch {} }
+      $pdoTotal = [int]$ethercatConfiguration.configuration.node_count
+      $pdoStatus = if ($pdoTotal -gt 0 -and $pdoCaptured -ge $pdoTotal) { 'ui_read_complete' } else { 'partial' }
+      $inv.asset_status | Add-Member -NotePropertyName ethercat_pdo -NotePropertyValue $pdoStatus -Force
+      $inv.asset_status | Add-Member -NotePropertyName ethercat_device_parameters -NotePropertyValue 'screenshot_only' -Force
+    }
 
-    $inv.clone_readiness | Add-Member -NotePropertyName ready_for_full_1_to_1_import -NotePropertyValue $false -Force
-    $inv.clone_readiness | Add-Member -NotePropertyName reason -NotePropertyValue 'per-device parameters 仍为截图级（无结构化键值）；CPU 无扩展单元（仅 [0] KV-X520）；程序/FB/变量/类型/注释/EIP/轴参数/运动点参数与通用设定、EtherCAT PDO 已采集' -Force
+    $readiness = & (Join-Path $scriptRoot 'workflow_tools\compute_kv_clone_readiness.ps1') -Inventory $inv
+    $inv.clone_readiness | Add-Member -NotePropertyName ready_for_full_1_to_1_import -NotePropertyValue ([bool]$readiness.ready_for_full_1_to_1_import) -Force
+    $inv.clone_readiness | Add-Member -NotePropertyName blocking_gaps -NotePropertyValue @($readiness.blocking_gaps) -Force
+    $inv.clone_readiness | Add-Member -NotePropertyName reason -NotePropertyValue ([string]$readiness.reason) -Force
     Write-Json $inventoryPath $inv 20
   }catch{}
 }

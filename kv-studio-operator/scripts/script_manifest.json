@@ -1093,6 +1093,11 @@
                                              ],
                     "workflow_tool":  [
                                           {
+                                              "path":  "workflow_tools/compute_kv_clone_readiness.ps1",
+                                              "status":  "approved",
+                                              "customer_callable":  false
+                                          },
+                                          {
                                               "path":  "workflow_tools/assert_kv_st_module_result.ps1",
                                               "status":  "internal",
                                               "customer_callable":  false

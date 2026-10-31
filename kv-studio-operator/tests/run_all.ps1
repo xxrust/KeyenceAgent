@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$WorkRoot = '',
   [switch]$IncludeLive,
   [string[]]$Only = @()
@@ -21,6 +21,7 @@ $offline = @(
   'variable-dependencies',
   'plan-runner',
   'inventory-expansion',
+  'clone-readiness',
   'ethercat-guard-contract',
   'script-hygiene',
   'eip-snapshot',
