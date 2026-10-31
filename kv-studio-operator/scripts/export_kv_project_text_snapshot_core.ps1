@@ -382,6 +382,11 @@ $axisWorkflow=Join-Path $scriptRoot 'workflows\export_kv_axis_parameters.ps1'
 $axisArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$axisOut,'-TimeoutSeconds',[string]$TimeoutSeconds)
 $axisStep=Invoke-Child $axisWorkflow $axisArgs $axisResult 'axis_parameters' -ResetPaths @($axisOut)
 $axisTsv=Join-Path $axisOut 'axes_params.tsv'
+$motionOut=Join-Path $rawRoot 'motion_settings'
+$motionResult=Join-Path $motionOut 'motion_settings_workflow_result.json'
+$motionWorkflow=Join-Path $scriptRoot 'workflows\export_kv_motion_settings.ps1'
+$motionArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$motionOut)
+$motionStep=Invoke-Child $motionWorkflow $motionArgs $motionResult 'motion_settings' -ResetPaths @($motionOut)
 
 $eipOut=Join-Path $rawRoot 'eip_configuration'
 $eipResult=Join-Path $eipOut 'eip_configuration_result.json'
@@ -488,6 +493,35 @@ if($axisStep.ok -and (Test-Path -LiteralPath $axisTsv -PathType Leaf)){
   }
 }
 
+# Motion settings views (轴组/通用/点参数/同步/点胶): clipboard tables + screenshots.
+if($motionStep.ok -and (Test-Path -LiteralPath $motionOut -PathType Container)){
+  $motionDir=Join-Path $snapshotRoot 'project\配置\运动'
+  New-Item -ItemType Directory -Force -Path $motionDir | Out-Null
+  $motionTableCount=0
+  foreach($mf in @(Get-ChildItem -LiteralPath $motionOut -File | Where-Object { $_.Extension -eq '.tsv' -or $_.Extension -eq '.png' })){
+    Copy-Item -LiteralPath $mf.FullName -Destination (Join-Path $motionDir $mf.Name) -Force
+    if($mf.Extension -eq '.tsv'){ $motionTableCount++ }
+  }
+  $motionEntityPath=Join-Path $motionDir 'entity.json'
+  if(Test-Path -LiteralPath $motionEntityPath -PathType Leaf){
+    try{
+      $me=Get-Content -Raw -LiteralPath $motionEntityPath -Encoding UTF8|ConvertFrom-Json
+      $me.artifacts | Add-Member -NotePropertyName motion_settings -NotePropertyValue '配置/运动' -Force
+      foreach($k in @('axis_groups','point_parameters','motion_common_settings','motion_sync_settings','point_tables')){ $me.status | Add-Member -NotePropertyName $k -NotePropertyValue 'complete' -Force }
+      Write-Json $motionEntityPath $me 12
+    }catch{}
+  }
+  $ucMotion=Join-Path $snapshotRoot 'project\配置\单元\configuration.json'
+  if(Test-Path -LiteralPath $ucMotion -PathType Leaf){
+    try{
+      $um=Get-Content -Raw -LiteralPath $ucMotion -Encoding UTF8|ConvertFrom-Json
+      foreach($k in @('motion_axis_groups','motion_point_parameters','motion_common_settings','motion_sync_settings')){ $um.asset_status | Add-Member -NotePropertyName $k -NotePropertyValue 'ui_dump_complete' -Force }
+      $um | Add-Member -NotePropertyName motion_table_count -NotePropertyValue $motionTableCount -Force
+      Write-Json $ucMotion $um 20
+    }catch{}
+  }
+}
+
 # EtherNet/IP read-only probe: 设定列表 table plus per-connection 软元件分配.
 if($eipStep.ok -and (Test-Path -LiteralPath $eipConfigPath -PathType Leaf)){
   $eipDir=Join-Path $snapshotRoot 'project\配置\EtherNetIP'
@@ -514,12 +548,30 @@ if($eipStep.ok -and (Test-Path -LiteralPath $eipConfigPath -PathType Leaf)){
   if(Test-Path -LiteralPath $uc){ try{ $u=Get-Content -Raw -LiteralPath $uc -Encoding UTF8|ConvertFrom-Json; $u.asset_status|Add-Member -NotePropertyName ethernet_ip -NotePropertyValue 'ui_read_complete' -Force; $u|Add-Member -NotePropertyName eip_ip_count -NotePropertyValue ([int]$eipData.ip_count) -Force; $u|Add-Member -NotePropertyName eip_connection_count -NotePropertyValue ([int]$eipData.connection_count) -Force; $u|Add-Member -NotePropertyName eip_assignment_count -NotePropertyValue $assignmentCount -Force; Write-Json $uc $u 20 }catch{} }
 }
 
+# Keep text/project_inventory.json consistent with the semantic merges above.
+$inventoryPath=Join-Path $textRoot 'project_inventory.json'
+if(Test-Path -LiteralPath $inventoryPath -PathType Leaf){
+  try{
+    $inv=Get-Content -Raw -LiteralPath $inventoryPath -Encoding UTF8|ConvertFrom-Json
+    if($ethercatStep.ok){ $inv.asset_status.ethercat='ui_read_complete' }
+    if($eipStep.ok){ $inv.asset_status.ethernet_ip='ui_read_complete'; $inv.asset_status | Add-Member -NotePropertyName eip_connection -NotePropertyValue 'ui_read_complete' -Force }
+    if($axisStep.ok){ $inv.asset_status.motion_axes='ui_dump_complete'; $inv.asset_status.axis_parameters='ui_dump_complete' }
+    if($motionStep.ok){ $inv.asset_status | Add-Member -NotePropertyName motion_axis_groups -NotePropertyValue 'ui_dump_complete' -Force; $inv.asset_status | Add-Member -NotePropertyName motion_point_parameters -NotePropertyValue 'ui_dump_complete' -Force; $inv.asset_status | Add-Member -NotePropertyName motion_common_settings -NotePropertyValue 'ui_dump_complete' -Force; $inv.asset_status | Add-Member -NotePropertyName motion_sync_settings -NotePropertyValue 'ui_dump_complete' -Force }
+    if($inv.topology.ethercat){ $inv.topology.ethercat | Add-Member -NotePropertyName status -NotePropertyValue 'ui_read_complete' -Force; $inv.topology.ethercat | Add-Member -NotePropertyName ui_devices -NotePropertyValue '配置/EtherCAT/devices.json' -Force }
+    if($inv.topology.ethernet_ip){ $inv.topology.ethernet_ip | Add-Member -NotePropertyName status -NotePropertyValue 'ui_read_complete' -Force; if($eipData -and $eipData.connections){ $inv.topology.ethernet_ip | Add-Member -NotePropertyName devices -NotePropertyValue @($eipData.connections) -Force } }
+    if($inv.topology.motion){ $inv.topology.motion | Add-Member -NotePropertyName status -NotePropertyValue 'ui_dump_complete' -Force; if($axisNames.Count -gt 0){ $inv.topology.motion | Add-Member -NotePropertyName axes -NotePropertyValue @($axisNames) -Force }; $inv.topology.motion | Add-Member -NotePropertyName missing_for_clone -NotePropertyValue @() -Force }
+    $inv.clone_readiness | Add-Member -NotePropertyName ready_for_full_1_to_1_import -NotePropertyValue $false -Force
+    $inv.clone_readiness | Add-Member -NotePropertyName reason -NotePropertyValue 'EtherCAT PDO/详细设定、per-device parameters、CPU 扩展单元仍未采集；程序/FB/变量/类型/注释/EIP/轴参数/运动点参数与通用设定已采集' -Force
+    Write-Json $inventoryPath $inv 20
+  }catch{}
+}
+
 $index=@(); foreach($f in @(Get-ChildItem -LiteralPath $textRoot -File -Recurse | Sort-Object FullName)){
   $index += [ordered]@{path=(Rel $snapshotRoot $f.FullName);format=$f.Extension.TrimStart('.');length=$f.Length;sha256=(Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 }
 Write-Json (Join-Path $snapshotRoot 'text_index.json') $index 8
-$statuses=@($inventoryStep,$mnmStep,$structureStep,$variablesStep,$ethercatStep,$axisStep,$eipStep)+@($allLocalVariableSteps)+@($fbSteps)+@($inventoryFinalStep,$materializationStep,$commentsStep,$annotateStep)
-$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($allLocalVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $ethercatStep.ok){$missing+='ethercat_configuration'}; if(-not $axisStep.ok){$missing+='axis_parameters'}; if(-not $eipStep.ok){$missing+='eip_configuration'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}
+$statuses=@($inventoryStep,$mnmStep,$structureStep,$variablesStep,$ethercatStep,$axisStep,$eipStep,$motionStep)+@($allLocalVariableSteps)+@($fbSteps)+@($inventoryFinalStep,$materializationStep,$commentsStep,$annotateStep)
+$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($allLocalVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $ethercatStep.ok){$missing+='ethercat_configuration'}; if(-not $axisStep.ok){$missing+='axis_parameters'}; if(-not $eipStep.ok){$missing+='eip_configuration'}; if(-not $motionStep.ok){$missing+='motion_settings'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}
 $semanticStatus=if($materializationStep.ok){'complete'}else{'failed'}
 $semanticWarnings=@()
 if($materializationStep.result -and $materializationStep.result.warnings){$semanticWarnings=@($materializationStep.result.warnings)}
@@ -531,7 +583,7 @@ $manifest=[ordered]@{
   schema_version=2; snapshot_schema='kv_project_text_snapshot'; status=$status; generated_at=(Get-Date).ToUniversalTime().ToString('o')
   project=[ordered]@{path=$ProjectPath;root=$projectRoot;fingerprint=$fingerprint}
   layout=[ordered]@{snapshot_root='.';project='project';text='text';raw='raw';architecture='architecture';text_index='text_index.json'}
-  artifacts=[ordered]@{semantic_project='project';inventory='text/project_inventory.json';mnm='text/mnm';variables='text/variables';structures='text/structure_definitions.json';fb_arguments='text/fb_arguments';comments='text/comments';ethercat_devices='project/配置/EtherCAT/devices.json';axis_parameters='project/配置/运动/axis_parameters.tsv';eip_devices='project/配置/EtherNetIP/devices.json'}
+  artifacts=[ordered]@{semantic_project='project';inventory='text/project_inventory.json';mnm='text/mnm';variables='text/variables';structures='text/structure_definitions.json';fb_arguments='text/fb_arguments';comments='text/comments';ethercat_devices='project/配置/EtherCAT/devices.json';axis_parameters='project/配置/运动/axis_parameters.tsv';motion_settings='project/配置/运动';eip_devices='project/配置/EtherNetIP/devices.json'}
   workflow_status=$statuses; discovered_modules=$moduleNames; discovered_fb_modules=@($fbModules|Sort-Object -Unique); discovered_program_local_modules=@($programLocalCandidates)
   semantic_project_status=$semanticStatus; semantic_warnings=$semanticWarnings; missing_capabilities=@($missing); skipped_capabilities=$fbSkipped; version_control=[ordered]@{deterministic_index='text_index.json';file_hashes='sha256';binary_project_files='referenced_by_project.fingerprint_only';generated_files='isolated_snapshot_directory'}
   resume=[ordered]@{enabled=[bool]$Resume;state_path='snapshot_state.json';invalidated_by_fingerprint=[bool]$script:resumeInvalidated;reused_stages=@($script:reusedStages|Sort-Object -Unique)}

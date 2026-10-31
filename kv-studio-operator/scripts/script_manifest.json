@@ -772,6 +772,18 @@
                                                   "execution":  "composed_eip_read"
                                               },
                                               {
+                                                  "path":  "workflows/export_kv_motion_settings.ps1",
+                                                  "status":  "published",
+                                                  "customer_callable":  true,
+                                                  "capabilities":  [
+                                                                       "read_motion_settings"
+                                                                   ],
+                                                  "runner_children":  [
+                                                                          "runner_children/dump_motion_views_guarded.ps1"
+                                                                      ],
+                                                  "execution":  "composed_motion_views"
+                                              },
+                                              {
                                                   "path":  "workflows/export_kv_axis_parameters.ps1",
                                                   "status":  "published",
                                                   "customer_callable":  true,
@@ -900,6 +912,12 @@
                                                }
                                            ],
                     "runner_child_approved":  [
+                                                  {
+                                                      "path":  "runner_children/dump_motion_views_guarded.ps1",
+                                                      "status":  "approved",
+                                                      "customer_callable":  false,
+                                                      "ui_guard_required":  true
+                                                  },
                                                   {
                                                       "path":  "runner_children/complete_axis_registration_guarded.ps1",
                                                       "status":  "approved",
