@@ -577,8 +577,12 @@ if(Test-Path -LiteralPath $inventoryPath -PathType Leaf){
     if($inv.topology.ethercat){ $inv.topology.ethercat | Add-Member -NotePropertyName status -NotePropertyValue 'ui_read_complete' -Force; $inv.topology.ethercat | Add-Member -NotePropertyName ui_devices -NotePropertyValue '配置/EtherCAT/devices.json' -Force }
     if($inv.topology.ethernet_ip){ $inv.topology.ethernet_ip | Add-Member -NotePropertyName status -NotePropertyValue 'ui_read_complete' -Force; if($eipData -and $eipData.connections){ $inv.topology.ethernet_ip | Add-Member -NotePropertyName devices -NotePropertyValue @($eipData.connections) -Force } }
     if($inv.topology.motion){ $inv.topology.motion | Add-Member -NotePropertyName status -NotePropertyValue 'ui_dump_complete' -Force; if($axisNames.Count -gt 0){ $inv.topology.motion | Add-Member -NotePropertyName axes -NotePropertyValue @($axisNames) -Force }; $inv.topology.motion | Add-Member -NotePropertyName missing_for_clone -NotePropertyValue @() -Force }
+    $expansionCount = @($inv.topology.expansion_units).Count
+    $inv.asset_status | Add-Member -NotePropertyName plc_expansion_units -NotePropertyValue $(if ($expansionCount -eq 0) { 'none_present' } else { 'captured' }) -Force
+    if ($ethercatConfiguration) { $inv.asset_status | Add-Member -NotePropertyName ethercat_pdo -NotePropertyValue 'ui_read_complete' -Force; $inv.asset_status | Add-Member -NotePropertyName ethercat_device_parameters -NotePropertyValue 'screenshot_only' -Force }
+
     $inv.clone_readiness | Add-Member -NotePropertyName ready_for_full_1_to_1_import -NotePropertyValue $false -Force
-    $inv.clone_readiness | Add-Member -NotePropertyName reason -NotePropertyValue 'EtherCAT PDO/详细设定、per-device parameters、CPU 扩展单元仍未采集；程序/FB/变量/类型/注释/EIP/轴参数/运动点参数与通用设定已采集' -Force
+    $inv.clone_readiness | Add-Member -NotePropertyName reason -NotePropertyValue 'per-device parameters 仍为截图级（无结构化键值）；CPU 无扩展单元（仅 [0] KV-X520）；程序/FB/变量/类型/注释/EIP/轴参数/运动点参数与通用设定、EtherCAT PDO 已采集' -Force
     Write-Json $inventoryPath $inv 20
   }catch{}
 }
