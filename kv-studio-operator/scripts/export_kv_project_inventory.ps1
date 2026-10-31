@@ -217,7 +217,7 @@ try {
     }
   }
 
-  $ethercat = [ordered]@{ nodes = @(); evidence = 'WsTreeEnv.xml'; status = 'not_found' }
+  $ethercat = [ordered]@{ nodes = @(); evidence = 'WsTreeEnv.xml'; status = $(if ($cpuNode) { 'none_present' } else { 'not_found' }) }
   if ($cpuNode) {
     $ecRoot = @($treeNodes | Where-Object { $_.parent_id -eq $cpuNode.id -and $_.text -eq 'EtherCAT' } | Select-Object -First 1)
     if ($ecRoot) {
@@ -230,7 +230,7 @@ try {
         }
       })
       $ethercat = [ordered]@{
-        status = 'tree_summary_extracted'
+        status = if ($ecNodes.Count -gt 0) { 'tree_summary_extracted' } else { 'none_present' }
         root_tree_text = $ecRoot.text
         nodes = $ecNodes
         evidence = 'WsTreeEnv.xml'
@@ -239,7 +239,7 @@ try {
     }
   }
 
-  $ethernetIp = [ordered]@{ devices = @(); evidence = 'WsTreeEnv.xml'; status = 'not_found' }
+  $ethernetIp = [ordered]@{ devices = @(); evidence = 'WsTreeEnv.xml'; status = $(if ($cpuNode) { 'none_present' } else { 'not_found' }) }
   if ($cpuNode) {
     $eipRoot = @($treeNodes | Where-Object { $_.parent_id -eq $cpuNode.id -and $_.text -match '^EtherNet/IP\b' } | Select-Object -First 1)
     if ($eipRoot) {
@@ -254,7 +254,7 @@ try {
         }
       })
       $ethernetIp = [ordered]@{
-        status = 'tree_summary_extracted'
+        status = if ($eipDevices.Count -gt 0) { 'tree_summary_extracted' } else { 'none_present' }
         root_tree_text = $eipRoot.text
         relay_start = if ($rMatch.Success) { 'R' + $rMatch.Groups[1].Value } else { $null }
         dm_start = if ($dmMatch.Success) { 'DM' + $dmMatch.Groups[1].Value } else { $null }
@@ -495,7 +495,7 @@ try {
       ethercat = $ethercat
       ethernet_ip = $ethernetIp
       motion = [ordered]@{
-        status = if ($motionAxes.Count -gt 0) { 'tree_summary_extracted' } else { 'not_found' }
+        status = if ($motionAxes.Count -gt 0) { 'tree_summary_extracted' } elseif ($cpuNode) { 'none_present' } else { 'not_found' }
         axes = $motionAxes
         missing_for_clone = @('axis control parameters', 'axis group settings', 'point parameters', 'motion common settings')
       }

@@ -15,7 +15,7 @@ function New-Inventory([hashtable]$Status, [int]$ExpansionCount) {
 }
 $complete = @{
   program_fb = 'complete'; variables = 'complete'; data_types = 'complete'
-  ethercat_pdo = 'ui_read_complete'; ethercat_device_parameters = 'structured'
+  ethercat_pdo = 'ui_read_complete'; ethercat_device_parameters = 'structured'; fb_arguments = 'complete'
   ethernet_ip = 'ui_read_complete'; eip_connection = 'ui_read_complete'
   motion_axes = 'ui_dump_complete'; axis_parameters = 'ui_dump_complete'
   motion_axis_groups = 'ui_dump_complete'; motion_point_parameters = 'ui_dump_complete'
@@ -43,6 +43,13 @@ Add-Case 'EIP assignment missing blocks readiness' (@($eip.blocking_gaps | ForEa
 $baseMissing = $complete.Clone(); $baseMissing['program_fb'] = 'missing'
 $base = & $helper -Inventory (New-Inventory $baseMissing 0)
 Add-Case 'missing program/FB blocks readiness' (@($base.blocking_gaps | ForEach-Object { $_.id }) -contains 'program_fb') ''
+$noOptionalAssets = $complete.Clone()
+foreach ($key in @('ethercat_pdo','ethercat_device_parameters','ethernet_ip','eip_connection','motion_axes','axis_parameters','motion_axis_groups','motion_point_parameters','motion_common_settings')) { $noOptionalAssets[$key] = 'none_present' }
+$noOptional = & $helper -Inventory (New-Inventory $noOptionalAssets 0)
+Add-Case 'absent fieldbus and motion assets do not block' ([bool]$noOptional.ready_for_full_1_to_1_import) "gaps=$(@($noOptional.blocking_gaps | ForEach-Object { $_.id }) -join ',')"
+$fbArgumentsMissing = $complete.Clone(); $fbArgumentsMissing['fb_arguments'] = 'missing'
+$fbArgs = & $helper -Inventory (New-Inventory $fbArgumentsMissing 0)
+Add-Case 'missing FB arguments block readiness' (@($fbArgs.blocking_gaps | ForEach-Object { $_.id }) -contains 'fb_arguments') ''
 $failed = @($cases | Where-Object { -not $_.ok })
 $result = [ordered]@{ test = 'clone-readiness'; passed = @($cases | Where-Object { $_.ok }).Count; failed = $failed.Count; cases = $cases.ToArray(); work_root = $WorkRoot }
 $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $WorkRoot 'test_result.json') -Encoding UTF8

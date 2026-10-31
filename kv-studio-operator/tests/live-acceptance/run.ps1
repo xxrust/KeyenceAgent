@@ -1,7 +1,7 @@
 ﻿param(
   [string]$SnapshotRunPath = '',
   [switch]$Record,
-  [string]$OutDir = ''
+  [Alias('WorkRoot')][string]$OutDir = ''
 )
 $ErrorActionPreference = 'Stop'
 $skillRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))

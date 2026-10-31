@@ -161,6 +161,9 @@ $projectRoot=Split-Path -Parent $ProjectPath
 if(-not $SnapshotId){$SnapshotId='snapshot_'+(Get-Date -Format 'yyyyMMdd_HHmmss')}
 $snapshotRoot=Join-Path $OutDir $SnapshotId
 $mergeFailures=New-Object System.Collections.Generic.List[object]
+function Add-MergeFailure([string]$Stage,[string]$Path,[string]$Message) {
+  $mergeFailures.Add([pscustomobject]@{stage=$Stage;path=$Path;error=$Message})
+}
 $rawRoot=Join-Path $snapshotRoot 'raw'; $textRoot=Join-Path $snapshotRoot 'text'; $architectureRoot=Join-Path $snapshotRoot 'architecture'
 New-Item -ItemType Directory -Force -Path $rawRoot,$textRoot,$architectureRoot | Out-Null
 $fingerprint=Fingerprint $projectRoot
@@ -374,7 +377,7 @@ $ethercatArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$ethercatOut,'-ProjectNa
 $ethercatStep=Invoke-Child $ethercatWorkflow $ethercatArgs $ethercatResult 'ethercat_configuration' -ResetPaths @($ethercatOut)
 $ethercatConfigurationPath=Join-Path $ethercatOut 'ethercat_configuration.json'
 $ethercatConfiguration=$null
-if(Test-Path -LiteralPath $ethercatConfigurationPath -PathType Leaf){ try{$ethercatConfiguration=Get-Content -Raw -LiteralPath $ethercatConfigurationPath -Encoding UTF8|ConvertFrom-Json}catch{} }
+if(Test-Path -LiteralPath $ethercatConfigurationPath -PathType Leaf){ try{$ethercatConfiguration=Get-Content -Raw -LiteralPath $ethercatConfigurationPath -Encoding UTF8|ConvertFrom-Json}catch{ Add-MergeFailure 'ethercat_configuration_parse' $ethercatConfigurationPath $_.Exception.Message } }
 
 
 $axisOut=Join-Path $rawRoot 'axis_parameters'
@@ -446,7 +449,7 @@ if($ethercatStep.ok -and $ethercatConfiguration){
   if(Test-Path -LiteralPath $etherCatDetailsSrc -PathType Container){
     $etherCatDetailsDst=Join-Path $semanticEtherCatDir 'details'
     New-Item -ItemType Directory -Force -Path $etherCatDetailsDst | Out-Null
-    Copy-Item -Path (Join-Path $etherCatDetailsSrc '*') -Destination $etherCatDetailsDst -Recurse -Force -ErrorAction SilentlyContinue
+    try { Copy-Item -Path (Join-Path $etherCatDetailsSrc '*') -Destination $etherCatDetailsDst -Recurse -Force -ErrorAction Stop } catch { Add-MergeFailure 'ethercat_details_copy' $etherCatDetailsDst $_.Exception.Message }
     $pdoIndex=@()
     foreach($n in @($ethercatConfiguration.configuration.nodes)){
       if($n.details){
@@ -456,7 +459,7 @@ if($ethercatStep.ok -and $ethercatConfiguration){
     Write-Json (Join-Path $semanticEtherCatDir 'pdo_index.json') ([ordered]@{node_count=$pdoIndex.Count;nodes=$pdoIndex}) 10
     $entPath2=Join-Path $semanticEtherCatDir 'entity.json'
     if(Test-Path -LiteralPath $entPath2 -PathType Leaf){
-      try{ $ent2=Get-Content -Raw -LiteralPath $entPath2 -Encoding UTF8|ConvertFrom-Json; $ent2.artifacts|Add-Member -NotePropertyName details -NotePropertyValue '配置/EtherCAT/details' -Force; $ent2.artifacts|Add-Member -NotePropertyName pdo_index -NotePropertyValue '配置/EtherCAT/pdo_index.json' -Force; $ent2.status|Add-Member -NotePropertyName pdo -NotePropertyValue 'complete' -Force; $ent2.status|Add-Member -NotePropertyName device_parameters -NotePropertyValue 'screenshot_only' -Force; Write-Json $entPath2 $ent2 20 }catch{}
+      try{ $ent2=Get-Content -Raw -LiteralPath $entPath2 -Encoding UTF8|ConvertFrom-Json; $ent2.artifacts|Add-Member -NotePropertyName details -NotePropertyValue '配置/EtherCAT/details' -Force; $ent2.artifacts|Add-Member -NotePropertyName pdo_index -NotePropertyValue '配置/EtherCAT/pdo_index.json' -Force; $ent2.status|Add-Member -NotePropertyName pdo -NotePropertyValue 'complete' -Force; $ent2.status|Add-Member -NotePropertyName device_parameters -NotePropertyValue 'screenshot_only' -Force; Write-Json $entPath2 $ent2 20 }catch{ Add-MergeFailure 'ethercat_entity_pdo' $entPath2 $_.Exception.Message }
     }
   }
   $etherCatEntityPath=Join-Path $semanticEtherCatDir 'entity.json'
@@ -466,16 +469,16 @@ if($ethercatStep.ok -and $ethercatConfiguration){
       $entity.artifacts | Add-Member -NotePropertyName devices -NotePropertyValue '配置/EtherCAT/devices.json' -Force
       $entity.status | Add-Member -NotePropertyName devices -NotePropertyValue 'complete' -Force
       Write-Json $etherCatEntityPath $entity 20
-    }catch{}
+    }catch{ Add-MergeFailure 'ethercat_entity_devices' $etherCatEntityPath $_.Exception.Message }
   }
   $unitConfigPath=Join-Path $snapshotRoot 'project\配置\单元\configuration.json'
   if(Test-Path -LiteralPath $unitConfigPath -PathType Leaf){
     try{
       $unitConfig=Get-Content -Raw -LiteralPath $unitConfigPath -Encoding UTF8|ConvertFrom-Json
-      $unitConfig.asset_status | Add-Member -NotePropertyName ethercat -NotePropertyValue 'ui_read_complete' -Force
-      $unitConfig | Add-Member -NotePropertyName ethercat_node_count -NotePropertyValue ([int]$ethercatConfiguration.node_count) -Force
+      $unitConfig.asset_status | Add-Member -NotePropertyName ethercat -NotePropertyValue $(if([int]$ethercatConfiguration.configuration.node_count -eq 0){'none_present'}else{'ui_read_complete'}) -Force
+      $unitConfig | Add-Member -NotePropertyName ethercat_node_count -NotePropertyValue ([int]$ethercatConfiguration.configuration.node_count) -Force
       Write-Json $unitConfigPath $unitConfig 20
-    }catch{}
+    }catch{ Add-MergeFailure 'ethercat_unit_configuration' $unitConfigPath $_.Exception.Message }
   }
 }
 
@@ -503,11 +506,12 @@ if($axisStep.ok -and (Test-Path -LiteralPath $axisTsv -PathType Leaf)){
   if(Test-Path -LiteralPath $unitConfigPath2 -PathType Leaf){
     try{
       $unitConfig2=Get-Content -Raw -LiteralPath $unitConfigPath2 -Encoding UTF8|ConvertFrom-Json
-      $unitConfig2.asset_status | Add-Member -NotePropertyName motion_axes -NotePropertyValue 'ui_dump_complete' -Force
-      $unitConfig2.asset_status | Add-Member -NotePropertyName axis_parameters -NotePropertyValue 'ui_dump_complete' -Force
+      $axisReadState=if($axisNames.Count -eq 0){'none_present'}else{'ui_dump_complete'}
+      $unitConfig2.asset_status | Add-Member -NotePropertyName motion_axes -NotePropertyValue $axisReadState -Force
+      $unitConfig2.asset_status | Add-Member -NotePropertyName axis_parameters -NotePropertyValue $axisReadState -Force
       $unitConfig2 | Add-Member -NotePropertyName axis_count -NotePropertyValue $axisNames.Count -Force
       Write-Json $unitConfigPath2 $unitConfig2 20
-    }catch{}
+    }catch{ Add-MergeFailure 'motion_unit_configuration' $unitConfigPath2 $_.Exception.Message }
   }
 }
 
@@ -527,16 +531,17 @@ if($motionStep.ok -and (Test-Path -LiteralPath $motionOut -PathType Container)){
       $me.artifacts | Add-Member -NotePropertyName motion_settings -NotePropertyValue '配置/运动' -Force
       foreach($k in @('axis_groups','point_parameters','motion_common_settings','motion_sync_settings','point_tables')){ $me.status | Add-Member -NotePropertyName $k -NotePropertyValue 'complete' -Force }
       Write-Json $motionEntityPath $me 12
-    }catch{}
+    }catch{ Add-MergeFailure 'motion_entity_settings' $motionEntityPath $_.Exception.Message }
   }
   $ucMotion=Join-Path $snapshotRoot 'project\配置\单元\configuration.json'
   if(Test-Path -LiteralPath $ucMotion -PathType Leaf){
     try{
       $um=Get-Content -Raw -LiteralPath $ucMotion -Encoding UTF8|ConvertFrom-Json
-      foreach($k in @('motion_axis_groups','motion_point_parameters','motion_common_settings','motion_sync_settings')){ $um.asset_status | Add-Member -NotePropertyName $k -NotePropertyValue 'ui_dump_complete' -Force }
+      $motionSettingsState=if(-not $axisStep.ok){'missing'}elseif($axisNames.Count -eq 0){'none_present'}else{'ui_dump_complete'}
+      foreach($k in @('motion_axis_groups','motion_point_parameters','motion_common_settings','motion_sync_settings')){ $um.asset_status | Add-Member -NotePropertyName $k -NotePropertyValue $motionSettingsState -Force }
       $um | Add-Member -NotePropertyName motion_table_count -NotePropertyValue $motionTableCount -Force
       Write-Json $ucMotion $um 20
-    }catch{}
+    }catch{ Add-MergeFailure 'motion_unit_settings' $ucMotion $_.Exception.Message }
   }
 }
 
@@ -552,18 +557,19 @@ if($eipStep.ok -and (Test-Path -LiteralPath $eipConfigPath -PathType Leaf)){
   if(Test-Path -LiteralPath $eipAssignSrc -PathType Container){
     $eipAssignDst=Join-Path $eipDir 'assignments'
     New-Item -ItemType Directory -Force -Path $eipAssignDst | Out-Null
-    Copy-Item -Path (Join-Path $eipAssignSrc '*') -Destination $eipAssignDst -Recurse -Force -ErrorAction SilentlyContinue
-    $assignmentCount=@(Get-ChildItem -LiteralPath $eipAssignDst -Filter '*.json' -ErrorAction SilentlyContinue).Count
+    try { Copy-Item -Path (Join-Path $eipAssignSrc '*') -Destination $eipAssignDst -Recurse -Force -ErrorAction Stop } catch { Add-MergeFailure 'eip_assignment_copy' $eipAssignDst $_.Exception.Message }
     $assignmentIndex=@()
     foreach($f in @(Get-ChildItem -LiteralPath $eipAssignDst -Filter '*.json' -ErrorAction SilentlyContinue | Sort-Object Name)){
-      try{ $j=Get-Content -Raw -LiteralPath $f.FullName -Encoding UTF8|ConvertFrom-Json; $assignmentIndex += [ordered]@{file=$f.Name;connection_name=$j.fields.connection_name;rows=$j.assignment_row_count} }catch{}
+      try{ $j=Get-Content -Raw -LiteralPath $f.FullName -Encoding UTF8|ConvertFrom-Json; $assignmentIndex += [ordered]@{file=$f.Name;connection_name=$j.fields.connection_name;rows=$j.assignment_row_count} }catch{ Add-MergeFailure 'eip_assignment_index' $f.FullName $_.Exception.Message }
     }
+    $assignmentCount=$assignmentIndex.Count
     Write-Json (Join-Path $eipDir 'assignments.json') ([ordered]@{assignment_count=$assignmentCount;connections=$assignmentIndex}) 8
   }
-  $eipEntityStatus=if($assignmentCount -gt 0){[ordered]@{ips='complete';devices='complete';connections='complete';assignment='complete'}}else{[ordered]@{ips='complete';devices='complete';connections='complete';assignment='not_wired'}}
+  $eipConnectionTotal=[int]$eipData.connection_count
+  $eipEntityStatus=if($eipConnectionTotal -eq 0){[ordered]@{ips='none_present';devices='none_present';connections='none_present';assignment='none_present'}}elseif($assignmentCount -ge $eipConnectionTotal){[ordered]@{ips='complete';devices='complete';connections='complete';assignment='complete'}}else{[ordered]@{ips='complete';devices='complete';connections='complete';assignment='partial'}}
   Write-Json (Join-Path $eipDir 'entity.json') ([ordered]@{id='config:EtherNetIP';kind='ethernet_ip_configuration';display_name='EtherNet/IP';path='配置/EtherNetIP';artifacts=[ordered]@{devices='配置/EtherNetIP/devices.json';connections='配置/EtherNetIP/connections.json';assignments='配置/EtherNetIP/assignments'};status=$eipEntityStatus;restore=[ordered]@{order=25;strategy='configure_eip_devices';depends_on=@('config:单元')}}) 12
   $uc=Join-Path $snapshotRoot 'project\配置\单元\configuration.json'
-  if(Test-Path -LiteralPath $uc){ try{ $u=Get-Content -Raw -LiteralPath $uc -Encoding UTF8|ConvertFrom-Json; $u.asset_status|Add-Member -NotePropertyName ethernet_ip -NotePropertyValue 'ui_read_complete' -Force; $u|Add-Member -NotePropertyName eip_ip_count -NotePropertyValue ([int]$eipData.ip_count) -Force; $u|Add-Member -NotePropertyName eip_connection_count -NotePropertyValue ([int]$eipData.connection_count) -Force; $u|Add-Member -NotePropertyName eip_assignment_count -NotePropertyValue $assignmentCount -Force; Write-Json $uc $u 20 }catch{} }
+  if(Test-Path -LiteralPath $uc){ try{ $u=Get-Content -Raw -LiteralPath $uc -Encoding UTF8|ConvertFrom-Json; $eipState=if($eipConnectionTotal -eq 0){'none_present'}else{'ui_read_complete'}; $u.asset_status|Add-Member -NotePropertyName ethernet_ip -NotePropertyValue $eipState -Force; $u|Add-Member -NotePropertyName eip_ip_count -NotePropertyValue ([int]$eipData.ip_count) -Force; $u|Add-Member -NotePropertyName eip_connection_count -NotePropertyValue $eipConnectionTotal -Force; $u|Add-Member -NotePropertyName eip_assignment_count -NotePropertyValue $assignmentCount -Force; Write-Json $uc $u 20 }catch{ Add-MergeFailure 'eip_unit_configuration' $uc $_.Exception.Message } }
 }
 
 # Keep text/project_inventory.json consistent with the semantic merges above.
@@ -571,38 +577,58 @@ $inventoryPath=Join-Path $textRoot 'project_inventory.json'
 if(Test-Path -LiteralPath $inventoryPath -PathType Leaf){
   try{
     $inv=Get-Content -Raw -LiteralPath $inventoryPath -Encoding UTF8|ConvertFrom-Json
-    if($ethercatStep.ok){ $inv.asset_status.ethercat='ui_read_complete' }
+    $expectedEcNodes=@($inv.topology.ethercat.nodes).Count
+    $expectedMotionAxes=@($inv.topology.motion.axes).Count
+    $ecCaptured=if($ethercatConfiguration){ [int]$ethercatConfiguration.configuration.node_count } else { 0 }
+    if($ethercatStep.ok){ $inv.asset_status.ethercat=$(if($ecCaptured -gt 0){ 'ui_read_complete' }elseif($expectedEcNodes -eq 0){ 'none_present' }else{ 'missing' }) }
     if($eipStep.ok){
       $eipConnectionCount = if($eipData){ [int]$eipData.connection_count } else { 0 }
-      $eipStatus = if($eipConnectionCount -gt 0){ 'ui_read_complete' } else { 'partial' }
+      $eipStatus = if($eipConnectionCount -gt 0){ 'ui_read_complete' } else { 'none_present' }
       $assignmentTotal = [int]$assignmentCount
-      $eipAssignStatus = if($assignmentTotal -gt 0 -and $assignmentTotal -ge $eipConnectionCount){ 'ui_read_complete' } else { 'partial' }
+      $eipAssignStatus = if($eipConnectionCount -eq 0){ 'none_present' } elseif($assignmentTotal -ge $eipConnectionCount){ 'ui_read_complete' } else { 'partial' }
       $inv.asset_status.ethernet_ip=$eipStatus
       $inv.asset_status | Add-Member -NotePropertyName eip_connection -NotePropertyValue $eipAssignStatus -Force
     }
-    if($axisStep.ok){ $inv.asset_status.motion_axes='ui_dump_complete'; $inv.asset_status.axis_parameters='ui_dump_complete' }
-    if($motionStep.ok){ $inv.asset_status | Add-Member -NotePropertyName motion_axis_groups -NotePropertyValue 'ui_dump_complete' -Force; $inv.asset_status | Add-Member -NotePropertyName motion_point_parameters -NotePropertyValue 'ui_dump_complete' -Force; $inv.asset_status | Add-Member -NotePropertyName motion_common_settings -NotePropertyValue 'ui_dump_complete' -Force; $inv.asset_status | Add-Member -NotePropertyName motion_sync_settings -NotePropertyValue 'ui_dump_complete' -Force }
-    if($inv.topology.ethercat){ $inv.topology.ethercat | Add-Member -NotePropertyName status -NotePropertyValue 'ui_read_complete' -Force; $inv.topology.ethercat | Add-Member -NotePropertyName ui_devices -NotePropertyValue '配置/EtherCAT/devices.json' -Force }
-    if($inv.topology.ethernet_ip){ $inv.topology.ethernet_ip | Add-Member -NotePropertyName status -NotePropertyValue 'ui_read_complete' -Force; if($eipData -and $eipData.connections){ $inv.topology.ethernet_ip | Add-Member -NotePropertyName devices -NotePropertyValue @($eipData.connections) -Force } }
+    $capturedAxes=if($axisNames){ $axisNames.Count } else { 0 }
+    $motionState=if($capturedAxes -gt 0){ 'ui_dump_complete' }elseif($expectedMotionAxes -eq 0){ 'none_present' }else{ 'missing' }
+    if($axisStep.ok){ $inv.asset_status.motion_axes=$motionState; $inv.asset_status.axis_parameters=$motionState }
+    if($motionStep.ok){ $motionSettingsState=if($axisNames.Count -eq 0){'none_present'}else{'ui_dump_complete'}; $inv.asset_status | Add-Member -NotePropertyName motion_axis_groups -NotePropertyValue $motionSettingsState -Force; $inv.asset_status | Add-Member -NotePropertyName motion_point_parameters -NotePropertyValue $motionSettingsState -Force; $inv.asset_status | Add-Member -NotePropertyName motion_common_settings -NotePropertyValue $motionSettingsState -Force; $inv.asset_status | Add-Member -NotePropertyName motion_sync_settings -NotePropertyValue $motionSettingsState -Force }
+    if($ethercatStep.ok -and $inv.topology.ethercat){ $inv.topology.ethercat | Add-Member -NotePropertyName status -NotePropertyValue $(if($ecCaptured -gt 0){'ui_read_complete'}elseif($expectedEcNodes -eq 0){'none_present'}else{'missing'}) -Force; $inv.topology.ethercat | Add-Member -NotePropertyName ui_devices -NotePropertyValue '配置/EtherCAT/devices.json' -Force }
+    if($eipStep.ok -and $inv.topology.ethernet_ip){ $inv.topology.ethernet_ip | Add-Member -NotePropertyName status -NotePropertyValue $(if($eipConnectionCount -eq 0){'none_present'}else{'ui_read_complete'}) -Force; if($eipData -and $eipData.connections){ $inv.topology.ethernet_ip | Add-Member -NotePropertyName devices -NotePropertyValue @($eipData.connections) -Force } }
     if($inv.topology.motion){ $inv.topology.motion | Add-Member -NotePropertyName status -NotePropertyValue 'ui_dump_complete' -Force; if($axisNames.Count -gt 0){ $inv.topology.motion | Add-Member -NotePropertyName axes -NotePropertyValue @($axisNames) -Force }; $inv.topology.motion | Add-Member -NotePropertyName missing_for_clone -NotePropertyValue @() -Force }
     $expansionCount = @($inv.topology.expansion_units).Count
     $inv.asset_status | Add-Member -NotePropertyName plc_expansion_units -NotePropertyValue $(if ($expansionCount -eq 0) { 'none_present' } else { 'captured' }) -Force
+    if([string]$inv.topology.ethercat.status -eq 'none_present'){
+      $inv.asset_status | Add-Member -NotePropertyName ethercat_pdo -NotePropertyValue 'none_present' -Force
+      $inv.asset_status | Add-Member -NotePropertyName ethercat_device_parameters -NotePropertyValue 'none_present' -Force
+    }
+    if([string]$inv.topology.ethernet_ip.status -eq 'none_present'){
+      $inv.asset_status | Add-Member -NotePropertyName ethernet_ip -NotePropertyValue 'none_present' -Force
+      $inv.asset_status | Add-Member -NotePropertyName eip_connection -NotePropertyValue 'none_present' -Force
+    }
+    if([string]$inv.topology.motion.status -eq 'none_present'){
+      foreach($key in @('motion_axes','axis_parameters','motion_axis_groups','motion_point_parameters','motion_common_settings')){
+        $inv.asset_status | Add-Member -NotePropertyName $key -NotePropertyValue 'none_present' -Force
+      }
+    }
     if ($ethercatConfiguration) {
       $pdoIndexPath = Join-Path $snapshotRoot 'project\配置\EtherCAT\pdo_index.json'
       $pdoCaptured = 0
-      if (Test-Path -LiteralPath $pdoIndexPath -PathType Leaf) { try { $pdoCaptured = [int](Get-Content -Raw -LiteralPath $pdoIndexPath -Encoding UTF8 | ConvertFrom-Json).node_count } catch {} }
+      if (Test-Path -LiteralPath $pdoIndexPath -PathType Leaf) { try { $pdoCaptured = [int](Get-Content -Raw -LiteralPath $pdoIndexPath -Encoding UTF8 | ConvertFrom-Json).node_count } catch { Add-MergeFailure 'ethercat_pdo_index' $pdoIndexPath $_.Exception.Message } }
       $pdoTotal = [int]$ethercatConfiguration.configuration.node_count
-      $pdoStatus = if ($pdoTotal -gt 0 -and $pdoCaptured -ge $pdoTotal) { 'ui_read_complete' } else { 'partial' }
+      $pdoStatus = if ($pdoTotal -eq 0) { 'none_present' } elseif ($pdoCaptured -ge $pdoTotal) { 'ui_read_complete' } else { 'partial' }
       $inv.asset_status | Add-Member -NotePropertyName ethercat_pdo -NotePropertyValue $pdoStatus -Force
-      $inv.asset_status | Add-Member -NotePropertyName ethercat_device_parameters -NotePropertyValue 'screenshot_only' -Force
+      $inv.asset_status | Add-Member -NotePropertyName ethercat_device_parameters -NotePropertyValue $(if($pdoTotal -eq 0){'none_present'}else{'screenshot_only'}) -Force
     }
 
     $baseProgram = if($mnmStep.ok){ 'complete' } else { 'missing' }
     $baseVariables = if($variablesStep.ok -and @($allLocalVariableSteps | Where-Object { -not $_.ok }).Count -eq 0){ 'complete' } else { 'missing' }
     $baseTypes = if($structureStep.ok){ 'complete' } else { 'missing' }
+    $baseFbArguments = if($fbModules.Count -eq 0){ 'none_present' } elseif(@($fbSteps | Where-Object { -not $_.ok }).Count -eq 0){ 'complete' } else { 'missing' }
     $inv.asset_status | Add-Member -NotePropertyName program_fb -NotePropertyValue $baseProgram -Force
     $inv.asset_status | Add-Member -NotePropertyName variables -NotePropertyValue $baseVariables -Force
     $inv.asset_status | Add-Member -NotePropertyName data_types -NotePropertyValue $baseTypes -Force
+    $inv.asset_status | Add-Member -NotePropertyName fb_arguments -NotePropertyValue $baseFbArguments -Force
     $readiness = & (Join-Path $scriptRoot 'workflow_tools\compute_kv_clone_readiness.ps1') -Inventory $inv
     $inv.clone_readiness | Add-Member -NotePropertyName ready_for_full_1_to_1_import -NotePropertyValue ([bool]$readiness.ready_for_full_1_to_1_import) -Force
     $inv.clone_readiness | Add-Member -NotePropertyName ready_for_manual_1_to_1_rebuild -NotePropertyValue ([bool]$readiness.ready_for_manual_1_to_1_rebuild) -Force
@@ -610,7 +636,7 @@ if(Test-Path -LiteralPath $inventoryPath -PathType Leaf){
     $inv.clone_readiness | Add-Member -NotePropertyName reason -NotePropertyValue ([string]$readiness.reason) -Force
     Write-Json $inventoryPath $inv 20
   }catch{
-    $mergeFailures.Add([pscustomobject]@{stage='inventory_sync';error=$_.Exception.Message;path=$inventoryPath})
+    Add-MergeFailure 'inventory_sync' $inventoryPath $_.Exception.Message
   }
 }
 
