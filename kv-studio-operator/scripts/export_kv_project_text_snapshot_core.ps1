@@ -591,6 +591,7 @@ if(Test-Path -LiteralPath $inventoryPath -PathType Leaf){
 
     $readiness = & (Join-Path $scriptRoot 'workflow_tools\compute_kv_clone_readiness.ps1') -Inventory $inv
     $inv.clone_readiness | Add-Member -NotePropertyName ready_for_full_1_to_1_import -NotePropertyValue ([bool]$readiness.ready_for_full_1_to_1_import) -Force
+    $inv.clone_readiness | Add-Member -NotePropertyName ready_for_manual_1_to_1_rebuild -NotePropertyValue ([bool]$readiness.ready_for_manual_1_to_1_rebuild) -Force
     $inv.clone_readiness | Add-Member -NotePropertyName blocking_gaps -NotePropertyValue @($readiness.blocking_gaps) -Force
     $inv.clone_readiness | Add-Member -NotePropertyName reason -NotePropertyValue ([string]$readiness.reason) -Force
     Write-Json $inventoryPath $inv 20

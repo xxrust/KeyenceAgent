@@ -20,11 +20,14 @@ $expansionUnits = @($Inventory.topology.expansion_units)
 if ($expansionUnits.Count -gt 0 -and [string]$status.plc_expansion_units -notin @('captured', 'ui_read_complete', 'extracted_from_WsTreeEnv')) {
   Add-Gap 'plc_expansion_units' ("CPU 扩展单元已存在但未采集 (" + $expansionUnits.Count + " 个)")
 }
+$manualGaps = @($gaps | Where-Object { $_.id -ne 'ethercat_device_parameters' })
 $ready = ($gaps.Count -eq 0)
+$manualReady = ($manualGaps.Count -eq 0)
 $captured = '程序/FB/变量/类型/注释/EIP/轴参数/运动点参数/运动通用设定/EtherCAT PDO'
 $reason = if ($ready) { "全部结构化资产已采集；$captured" } else { ("未完成：" + (($gaps | ForEach-Object { $_.text }) -join '；') + "；已采集：$captured") }
 [pscustomobject]@{
   ready_for_full_1_to_1_import = $ready
+  ready_for_manual_1_to_1_rebuild = $manualReady
   blocking_gaps = @($gaps)
   reason = $reason
 }

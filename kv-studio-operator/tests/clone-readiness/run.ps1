@@ -26,6 +26,7 @@ $screenshot = $complete.Clone(); $screenshot['ethercat_device_parameters'] = 'sc
 $params = & $helper -Inventory (New-Inventory $screenshot 0)
 $ids = @($params.blocking_gaps | ForEach-Object { $_.id })
 Add-Case 'screenshot-only parameters block readiness' ((-not $params.ready_for_full_1_to_1_import) -and ($ids -contains 'ethercat_device_parameters')) ($ids -join ',')
+Add-Case 'screenshot-only parameters still allow manual rebuild' ([bool]$params.ready_for_manual_1_to_1_rebuild) ''
 $withUnits = $complete.Clone(); $withUnits['plc_expansion_units'] = 'captured'
 $unitsOk = & $helper -Inventory (New-Inventory $withUnits 2)
 Add-Case 'captured expansion units do not block' ([bool]$unitsOk.ready_for_full_1_to_1_import) "gaps=$(@($unitsOk.blocking_gaps).Count)"
