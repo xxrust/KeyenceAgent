@@ -14,7 +14,8 @@ $ErrorActionPreference = 'Stop'
 $skillRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 . (Join-Path $PSScriptRoot '..\_helpers\invoke_tool.ps1')
 $wrapper = Join-Path $skillRoot 'scripts\workflow_tools\get_kv_eip_connection_snapshot.ps1'
-$kvsExe = 'H:\Keyence\KVS12\KVS\Kvs.exe'
+$kvsExe = & (Join-Path $PSScriptRoot '..\_helpers\resolve-kvs-exe.ps1') -OperatorRoot $skillRoot -AllowMissing
+$script:OwnedKvsPid = 0
 
 if (-not $WorkRoot) { $WorkRoot = Join-Path $env:TEMP ('kv-eip-live-' + [guid]::NewGuid().ToString('N').Substring(0, 8)) }
 $WorkRoot = [IO.Path]::GetFullPath($WorkRoot)
@@ -25,12 +26,17 @@ function Add-Case([string]$Name, [bool]$Ok, [string]$Detail = '') {
   $cases.Add([pscustomobject]@{ name = $Name; ok = $Ok; detail = $Detail })
 }
 function Save-Result([bool]$Skipped = $false) {
+  if ($script:OwnedKvsPid -gt 0) { Stop-Process -Id $script:OwnedKvsPid -Force -ErrorAction SilentlyContinue; $script:OwnedKvsPid = 0 }
   $failed = @($cases | Where-Object { -not $_.ok })
   $result = [ordered]@{ test = 'eip-snapshot-live'; skipped = $Skipped; passed = @($cases | Where-Object { $_.ok }).Count; failed = $failed.Count; cases = $cases.ToArray(); work_root = $WorkRoot }
   $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $WorkRoot 'test_result.json') -Encoding UTF8
   $result | ConvertTo-Json -Depth 3
   if ($failed.Count -gt 0) { exit 41 }
   exit 0
+}
+trap {
+  if ($script:OwnedKvsPid -gt 0) { Stop-Process -Id $script:OwnedKvsPid -Force -ErrorAction SilentlyContinue; $script:OwnedKvsPid = 0 }
+  throw
 }
 
 Add-Type -AssemblyName UIAutomationClient
@@ -82,20 +88,24 @@ if (-not (Test-Path -LiteralPath $SampleProjectPath -PathType Leaf)) {
   Add-Case 'sample project exists' $true 'skipped: sample project not found'
   Save-Result $true
 }
-if (-not (Test-Path -LiteralPath $kvsExe -PathType Leaf)) {
+if (-not $kvsExe -or -not (Test-Path -LiteralPath $kvsExe -PathType Leaf)) {
   Add-Case 'KV STUDIO executable exists' $true 'skipped: Kvs.exe not found'
   Save-Result $true
 }
 
-# Always start from a clean single instance; the scratch project is saved.
-Get-Process Kvs -ErrorAction SilentlyContinue | ForEach-Object { try { Stop-Process -Id $_.Id -Force } catch {} }
-Start-Sleep -Seconds 3
-Start-Process -FilePath $kvsExe -ArgumentList @(('"' + $SampleProjectPath + '"')) | Out-Null
+# Do not disturb any project already open in KV STUDIO.
+$existing = @(Get-Process Kvs -ErrorAction SilentlyContinue)
+if ($existing.Count -gt 0) {
+  Add-Case 'no unrelated KV STUDIO session' $false 'close existing KV STUDIO sessions before running this live test'
+  Save-Result $false
+}
+$started = Start-Process -FilePath $kvsExe -ArgumentList @(('"' + $SampleProjectPath + '"')) -PassThru
+$script:OwnedKvsPid = $started.Id
 $deadline = (Get-Date).AddSeconds(90)
 $process = $null
 do {
   Start-Sleep -Seconds 2
-  $process = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }) | Select-Object -First 1
+  $process = Get-Process -Id $script:OwnedKvsPid -ErrorAction SilentlyContinue
 } while ((-not $process -or $process.MainWindowTitle -notlike '*KVX样例程序_v100*') -and (Get-Date) -lt $deadline)
 Add-Case 'sample project opened' ($process -and $process.MainWindowTitle -like '*KVX样例程序_v100*') $process.MainWindowTitle
 if (-not $process) { Save-Result $true }
@@ -170,7 +180,7 @@ if ($connectionHwnd -eq 0) { Save-Result $false }
 $outDir = Join-Path $WorkRoot 'snapshot'
 $exit = Invoke-TestTool -ScriptPath $wrapper -Arguments @('-ConnectionTitle', '连接设定', '-OutDir', $outDir)
 Add-Case 'snapshot exits 0' ($exit -eq 0) "exit=$exit"
-$reportPath = Join-Path $outDir '连接设定_1_NU_EP1.json'
+$reportPath = Get-ChildItem -LiteralPath $outDir -Filter '*.json' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { $_.FullName }
 $report = if (Test-Path -LiteralPath $reportPath) { Get-Content -LiteralPath $reportPath -Raw -Encoding UTF8 | ConvertFrom-Json } else { $null }
 Add-Case 'snapshot report ok' ([bool]($report -and $report.ok)) "ok=$($report.ok)"
 Add-Case 'connection point is IN_100' ([string]($report.fields.in_connection_point) -eq 'IN_100') ([string]$report.fields.in_connection_point)
@@ -201,7 +211,8 @@ if ($eipHwnd2 -ne 0) {
     Start-Sleep -Seconds 2
   }
 }
-Get-Process Kvs -ErrorAction SilentlyContinue | ForEach-Object { try { Stop-Process -Id $_.Id -Force } catch {} }
+Stop-Process -Id $script:OwnedKvsPid -Force -ErrorAction SilentlyContinue
+$script:OwnedKvsPid = 0
 Start-Sleep -Seconds 2
 $stillRunning = @(Get-Process Kvs -ErrorAction SilentlyContinue).Count
 Add-Case 'KV STUDIO closed after sampling' ($stillRunning -eq 0) "instances=$stillRunning"

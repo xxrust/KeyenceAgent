@@ -14,6 +14,7 @@ $ErrorActionPreference = 'Stop'
 $skillRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 . (Join-Path $PSScriptRoot '..\_helpers\invoke_tool.ps1')
 $workflow = Join-Path $skillRoot 'scripts\workflows\configure_kv_ethercat_nodes.ps1'
+$kvsExe = & (Join-Path $PSScriptRoot '..\_helpers\resolve-kvs-exe.ps1') -OperatorRoot $skillRoot -AllowMissing
 
 if (-not $WorkRoot) { $WorkRoot = Join-Path $env:TEMP ('kv-ethercat-live-' + [guid]::NewGuid().ToString('N').Substring(0, 8)) }
 $WorkRoot = [IO.Path]::GetFullPath($WorkRoot)
@@ -45,7 +46,16 @@ if (-not (Test-Path -LiteralPath $wsPath)) {
 
 $process = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }) | Select-Object -First 1
 if (-not $process) {
-  Start-Process -FilePath 'H:\Keyence\KVS12\KVS\Kvs.exe' -ArgumentList @(('"' + $ProjectPath + '"')) | Out-Null
+  if (-not $kvsExe) {
+    Add-Case 'KV STUDIO executable exists' $true 'skipped: Kvs.exe not found'
+    Save-Result $true
+  }
+  $existing = @(Get-Process Kvs -ErrorAction SilentlyContinue)
+  if ($existing.Count -gt 0) {
+    Add-Case 'no unrelated KV STUDIO session' $false 'close the other KV STUDIO project before running this live test'
+    Save-Result $false
+  }
+  Start-Process -FilePath $kvsExe -ArgumentList @(('"' + $ProjectPath + '"')) | Out-Null
   $deadline = (Get-Date).AddSeconds(60)
   do {
     Start-Sleep -Seconds 2
@@ -53,6 +63,8 @@ if (-not $process) {
   } while (-not $process -and (Get-Date) -lt $deadline)
 }
 Add-Case 'KV STUDIO is running' ($null -ne $process) 'process'
+$titleDeadline=(Get-Date).AddSeconds(60)
+while($process -and $process.MainWindowTitle -notlike '*KVXEcTest*' -and (Get-Date) -lt $titleDeadline){ Start-Sleep -Milliseconds 500; $process.Refresh() }
 if (-not $process) { Save-Result $true }
 Add-Case 'project window is the scratch project' ($process.MainWindowTitle -like '*KVXEcTest*') $process.MainWindowTitle
 Add-Case 'project is saved (no unsaved marker)' ($process.MainWindowTitle -notmatch '\*') $process.MainWindowTitle
