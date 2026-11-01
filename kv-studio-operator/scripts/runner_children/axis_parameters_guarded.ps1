@@ -14,7 +14,7 @@
 #   写：定位 → 读回校验 → F2/Ctrl+A/键入/Enter → 整表 diff 必须**恰好 1 格**变化且位置正确 ✓ → 保存
 #   表：轴控制设定（多轴并排）→ 列 = 轴，行 = 参数
 $ErrorActionPreference = 'Stop'
-$repo = 'H:\KeyenceAgent\kv-studio-operator'
+$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 . "$repo\scripts\kv_dialog_post.ps1"
 . "$repo\scripts\guards\kv_ui_guard.ps1"
 Add-Type -AssemblyName UIAutomationClient

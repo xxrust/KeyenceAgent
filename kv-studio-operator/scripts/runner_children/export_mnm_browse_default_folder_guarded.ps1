@@ -482,14 +482,17 @@ try {
   }
   if ($bound.Count -gt 1) { throw 'KV_EXPORT_PROJECT_PROCESS_AMBIGUOUS' }
   if ($RestartKvs) {
-    # 重启：杀掉**所有**匹配的 KVS 并**等它们真正退出**（否则下一段会看到"正在退出"的进程并误判 ✗）
-    $allMatching = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 })
-    $script:StoppedProcessIds = @($allMatching | ForEach-Object { $_.Id })
-    $allMatching | Stop-Process -Force -ErrorAction SilentlyContinue
+    $allMatching = @(Get-Process Kvs -ErrorAction SilentlyContinue)
+    if ($bound.Count -ne 1 -or $allMatching.Count -ne 1 -or $allMatching[0].Id -ne $bound[0].Id) {
+      throw 'KV_EXPORT_RESTART_REFUSED: restart requires one path-bound KV STUDIO process and no other open sessions.'
+    }
+    if ($bound[0].MainWindowTitle -match '\*') { throw 'KV_EXPORT_RESTART_REFUSED: project has unsaved changes.' }
+    $script:StoppedProcessIds = @($bound[0].Id)
+    Stop-Process -Id $bound[0].Id -Force -ErrorAction Stop
     $waitDeadline = (Get-Date).AddSeconds(20)
     while ((Get-Date) -lt $waitDeadline) {
-      $aliveKvs = @(Get-Process Kvs -ErrorAction SilentlyContinue)
-      if ($aliveKvs.Count -eq 0) { break }
+      $aliveTarget = Get-Process -Id $script:StoppedProcessIds[0] -ErrorAction SilentlyContinue
+      if (-not $aliveTarget) { break }
       Start-Sleep -Milliseconds 400
     }
     Start-Sleep -Milliseconds 800

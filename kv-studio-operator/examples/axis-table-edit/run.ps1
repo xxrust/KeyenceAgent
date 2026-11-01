@@ -11,7 +11,7 @@
 #             (ok=true, exactly one diff at row 39).
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$kvsExe = if ($env:KV_STUDIO_EXE) { $env:KV_STUDIO_EXE } else { 'H:\Keyence\KVS12\KVS\Kvs.exe' }
+$kvsExe = & (Join-Path $PSScriptRoot '..\tests\_helpers\resolve-kvs-exe.ps1') -OperatorRoot $repo
 $fixture = Join-Path $repo 'tests\table-cell\fixtures\QA_BlankProject'
 $openTable = Join-Path $repo 'tests\table-cell\open-table.ps1'
 $verify = Join-Path $repo 'tests\table-cell\verify.ps1'

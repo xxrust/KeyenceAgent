@@ -32,6 +32,7 @@ $offline = @(
   'variable-attributes',
   'scaffold-variable-attributes',
   'library-dependencies',
+  'write-ontology',
   'system-layout'
 )
 $live = @(

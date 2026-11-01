@@ -1,6 +1,6 @@
 ﻿param(
   [string]$WorkRoot = '',
-  [string]$ProjectPath = 'C:\kvrun\ec_test\KVXEcTest\KVXEcTest.kpr',
+  [string]$ProjectPath = '',
   [string]$CatalogModel = 'SV630_1Axis_03713'
 )
 
@@ -15,16 +15,24 @@ $skillRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 . (Join-Path $PSScriptRoot '..\_helpers\invoke_tool.ps1')
 $workflow = Join-Path $skillRoot 'scripts\workflows\configure_kv_ethercat_nodes.ps1'
 $kvsExe = & (Join-Path $PSScriptRoot '..\_helpers\resolve-kvs-exe.ps1') -OperatorRoot $skillRoot -AllowMissing
+$fixtureProjectPath = Join-Path $PSScriptRoot 'fixtures\KVXEcTest\KVXEcTest.kpr'
+if (-not $ProjectPath) { $ProjectPath = $fixtureProjectPath }
+$sourceProjectPath = [IO.Path]::GetFullPath($ProjectPath)
 
 if (-not $WorkRoot) { $WorkRoot = Join-Path $env:TEMP ('kv-ethercat-live-' + [guid]::NewGuid().ToString('N').Substring(0, 8)) }
 $WorkRoot = [IO.Path]::GetFullPath($WorkRoot)
 New-Item -ItemType Directory -Force -Path $WorkRoot | Out-Null
 
 $cases = New-Object System.Collections.Generic.List[object]
+$script:OwnedKvsPid = 0
 function Add-Case([string]$Name, [bool]$Ok, [string]$Detail = '') {
   $cases.Add([pscustomobject]@{ name = $Name; ok = $Ok; detail = $Detail })
 }
 function Save-Result([bool]$Skipped = $false) {
+  if ($script:OwnedKvsPid -gt 0) {
+    Stop-Process -Id $script:OwnedKvsPid -Force -ErrorAction SilentlyContinue
+    $script:OwnedKvsPid = 0
+  }
   $failed = @($cases | Where-Object { -not $_.ok })
   $result = [ordered]@{ test = 'ethercat-node-live'; skipped = $Skipped; passed = @($cases | Where-Object { $_.ok }).Count; failed = $failed.Count; cases = $cases.ToArray(); work_root = $WorkRoot }
   $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $WorkRoot 'test_result.json') -Encoding UTF8
@@ -32,11 +40,23 @@ function Save-Result([bool]$Skipped = $false) {
   if ($failed.Count -gt 0) { exit 41 }
   exit 0
 }
+trap {
+  if ($script:OwnedKvsPid -gt 0) { Stop-Process -Id $script:OwnedKvsPid -Force -ErrorAction SilentlyContinue; $script:OwnedKvsPid = 0 }
+  throw
+}
 
-if (-not (Test-Path -LiteralPath $ProjectPath -PathType Leaf)) {
-  Add-Case 'scratch project exists' $true 'skipped: project not found'
+if (-not (Test-Path -LiteralPath $sourceProjectPath -PathType Leaf)) {
+  Add-Case 'scratch project exists' $true "skipped: project not found: $sourceProjectPath"
   Save-Result $true
 }
+$projectCopyRoot = Join-Path $WorkRoot 'project'
+if (Test-Path -LiteralPath $projectCopyRoot) { throw "KV_ETHERCAT_LIVE_COPY_EXISTS: $projectCopyRoot" }
+New-Item -ItemType Directory -Force -Path $projectCopyRoot | Out-Null
+$projectCopyDir = Join-Path $projectCopyRoot (Split-Path -Leaf (Split-Path -Parent $sourceProjectPath))
+Copy-Item -LiteralPath (Split-Path -Parent $sourceProjectPath) -Destination $projectCopyDir -Recurse
+$ProjectPath = Join-Path $projectCopyDir (Split-Path -Leaf $sourceProjectPath)
+$docInfo = Join-Path $projectCopyDir 'DocumentWindowInfo.xml'
+if (Test-Path -LiteralPath $docInfo) { Remove-Item -LiteralPath $docInfo -Force }
 $projectDir = Split-Path -Parent $ProjectPath
 $wsPath = Join-Path $projectDir 'WsTreeEnv.xml'
 if (-not (Test-Path -LiteralPath $wsPath)) {
@@ -44,24 +64,23 @@ if (-not (Test-Path -LiteralPath $wsPath)) {
   Save-Result $true
 }
 
-$process = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }) | Select-Object -First 1
-if (-not $process) {
-  if (-not $kvsExe) {
-    Add-Case 'KV STUDIO executable exists' $true 'skipped: Kvs.exe not found'
-    Save-Result $true
-  }
-  $existing = @(Get-Process Kvs -ErrorAction SilentlyContinue)
-  if ($existing.Count -gt 0) {
-    Add-Case 'no unrelated KV STUDIO session' $false 'close the other KV STUDIO project before running this live test'
-    Save-Result $false
-  }
-  Start-Process -FilePath $kvsExe -ArgumentList @(('"' + $ProjectPath + '"')) | Out-Null
-  $deadline = (Get-Date).AddSeconds(60)
-  do {
-    Start-Sleep -Seconds 2
-    $process = @(Get-Process Kvs -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }) | Select-Object -First 1
-  } while (-not $process -and (Get-Date) -lt $deadline)
+if (-not $kvsExe) {
+  Add-Case 'KV STUDIO executable exists' $true 'skipped: Kvs.exe not found'
+  Save-Result $true
 }
+$existing = @(Get-Process Kvs -ErrorAction SilentlyContinue)
+if ($existing.Count -gt 0) {
+  Add-Case 'no unrelated KV STUDIO session' $false 'close the other KV STUDIO project before running this live test'
+  Save-Result $false
+}
+$started = Start-Process -FilePath $kvsExe -ArgumentList @(('"' + $ProjectPath + '"')) -PassThru
+$script:OwnedKvsPid = $started.Id
+$deadline = (Get-Date).AddSeconds(60)
+$process = $null
+do {
+  Start-Sleep -Seconds 2
+  $process = Get-Process -Id $script:OwnedKvsPid -ErrorAction SilentlyContinue
+} while (-not $process -and (Get-Date) -lt $deadline)
 Add-Case 'KV STUDIO is running' ($null -ne $process) 'process'
 $titleDeadline=(Get-Date).AddSeconds(60)
 while($process -and $process.MainWindowTitle -notlike '*KVXEcTest*' -and (Get-Date) -lt $titleDeadline){ Start-Sleep -Milliseconds 500; $process.Refresh() }
@@ -83,6 +102,7 @@ $nodesPath = Join-Path $WorkRoot 'nodes.json'
 } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $nodesPath -Encoding UTF8
 
 $outDir = Join-Path $WorkRoot 'workflow'
+if (Test-Path -LiteralPath $outDir) { throw "KV_ETHERCAT_LIVE_OUTPUT_EXISTS: $outDir" }
 $exit = Invoke-TestTool -ScriptPath $workflow -Arguments @('-ProjectPath', $ProjectPath, '-NodesConfigPath', $nodesPath, '-OutDir', $outDir, '-TimeoutSeconds', '900')
 Add-Case 'workflow exits 0' ($exit -eq 0) "exit=$exit"
 $resultPath = Join-Path $outDir 'workflow_result.json'

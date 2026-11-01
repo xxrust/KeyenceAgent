@@ -14,7 +14,7 @@ if ($Stage -eq 'result') {
 }
 if ($Stage -eq 'reopen') {
     Add-Type -AssemblyName UIAutomationClient
-    $repo = 'H:\KeyenceAgent\kv-studio-operator'
+    $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
     . "$repo\scripts\kv_dialog_post.ps1"
     $p = Get-Process -Name 'Kvs' -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $p) { & $fail 'KVS not running after reopen' }

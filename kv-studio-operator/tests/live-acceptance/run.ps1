@@ -26,7 +26,7 @@ if ($Record -and $SnapshotRunPath) {
     $stageOk = @($stages | Where-Object { $_.ok }).Count
     $inventory = $null
     if (Test-Path -LiteralPath $inventoryPath -PathType Leaf) { $inventory = Get-Content -Raw -LiteralPath $inventoryPath -Encoding UTF8 | ConvertFrom-Json }
-    $kvs = 'H:\Keyence\KVS12\KVS\Kvs.exe'
+    $kvs = & (Join-Path $PSScriptRoot '_helpers\resolve-kvs-exe.ps1') -OperatorRoot $skillRoot -AllowMissing
     $kvsVersion = if (Test-Path -LiteralPath $kvs) { (Get-Item -LiteralPath $kvs).VersionInfo.FileVersion } else { 'unknown' }
     $autoReady = $false; $manualReady = $false; $gaps = @()
     if ($inventory) {

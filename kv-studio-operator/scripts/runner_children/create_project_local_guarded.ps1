@@ -465,8 +465,10 @@ try {
   Log ('admin credential source=' + $adminCredential.Source)
 
   if ($RestartKvs) {
-    Get-Process Kvs -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 1
+    $existingKvs = @(Get-Process Kvs -ErrorAction SilentlyContinue)
+    if ($existingKvs.Count -gt 0) {
+      throw ("KV_CREATE_RESTART_REFUSED: close existing KV STUDIO sessions first; process IDs: {0}" -f (($existingKvs | ForEach-Object { $_.Id }) -join ','))
+    }
   }
   $allKvs = @(Get-Process Kvs -ErrorAction SilentlyContinue)
   $visibleKvs = @($allKvs | Where-Object { $_.MainWindowHandle -ne 0 })

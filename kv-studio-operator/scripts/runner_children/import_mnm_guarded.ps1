@@ -2069,6 +2069,9 @@ try{
   }
   if($boundProcesses.Count -gt 1){ throw 'KV_IMPORT_PROJECT_PROCESS_AMBIGUOUS' }
   if($RestartKvs){
+    if($boundProcesses.Count -gt 0 -and $boundProcesses[0].MainWindowTitle -match '\*'){
+      throw 'KV_IMPORT_RESTART_REFUSED: target project has unsaved changes.'
+    }
     $boundProcesses | Stop-Process -Force -ErrorAction Stop
     if($boundProcesses.Count){ Start-Sleep -Seconds 2 }
     $boundProcesses=@()

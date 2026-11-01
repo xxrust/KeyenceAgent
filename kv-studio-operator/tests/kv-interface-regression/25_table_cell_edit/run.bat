@@ -3,9 +3,20 @@ setlocal
 set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%"
 set "PAUSE_AFTER=1"
-if /I "%~1"=="-NoPause" (set "PAUSE_AFTER=0" & shift)
+set "SCRIPT_ARGS="
+if /I "%~1"=="-NoPause" goto NOPAUSE
+goto COLLECT_ARGS
+:NOPAUSE
+set "PAUSE_AFTER=0"
+shift
+:COLLECT_ARGS
+if "%~1"=="" goto RUN_SCRIPT
+set SCRIPT_ARGS=%SCRIPT_ARGS% %1
+shift
+goto COLLECT_ARGS
+:RUN_SCRIPT
 echo Running %~n0 ...
-powershell -STA -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%run.ps1" %*
+powershell -STA -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%run.ps1" %SCRIPT_ARGS%
 set RC=%ERRORLEVEL%
 echo.
 echo exit=%RC%

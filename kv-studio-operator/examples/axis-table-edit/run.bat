@@ -14,7 +14,7 @@ exit /b %errorlevel%
 
 :interactive
 set "HERE=%~dp0"
-set "REPO=H:\KeyenceAgent\kv-studio-operator"
+for %%I in ("%HERE%..\..") do set "REPO=%%~fI"
 set "OUT=%TEMP%\kv-table-edit-%RANDOM%"
 set "SCRIPT=%REPO%\scripts\runner_children\set_axis_table_cell_guarded.ps1"
 

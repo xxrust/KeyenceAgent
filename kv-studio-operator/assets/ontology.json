@@ -1,6 +1,6 @@
 ﻿{
   "schema_version": 1,
-  "generated_from": "manual v1; keep in sync with script_manifest.json",
+  "generated_from": "manual v2; read and write routes cross-checked with script_manifest.json",
   "assets": {
     "program": { "snapshot_status": "wired", "snapshot_artifact": "project/程序", "snapshot_stage": "mnm_export", "restore_strategy": "import_body_then_set_locals", "depends_on": ["data_types", "global_variables"] },
     "fb": { "snapshot_status": "wired", "snapshot_artifact": "project/功能块", "snapshot_stage": "mnm_export", "restore_strategy": "import_body_then_set_arguments_then_set_locals", "depends_on": ["data_types"] },
@@ -56,6 +56,33 @@
     "set_kv_fb_arguments_snapshot": { "script": "workflows/set_kv_fb_arguments.ps1", "assets": ["fb_arguments"], "evidence": ["tests/kv-interface-regression/01_fb_arguments"] },
     "set_kv_variables_snapshot": { "script": "workflows/set_kv_variables.ps1", "assets": ["global_variables", "fb_arguments"], "evidence": ["tests/kv-interface-regression/03_variables_snapshot"] },
     "export_kv_project_inventory": { "script": "export_kv_project_inventory.ps1", "assets": ["unit_configuration", "data_types"], "evidence": ["tests/inventory-expansion"] }
+  },
+  "write_capabilities": {
+    "create_project": { "script": "workflows/create_kv_project.ps1", "assets": ["unit_configuration"], "inputs": ["project_name", "cpu_model"], "outputs": ["saved_project", "workflow_result.json"], "depends_on": [], "evidence": ["tests/kv-interface-regression/16_create_project"] },
+    "write_data_types": { "script": "workflows/mutate_kv_structure_definitions.ps1", "assets": ["data_types"], "inputs": ["structure_plan.json", "project_path"], "outputs": ["workflow_result.json", "structure_mutation_result.json", "saved_project"], "depends_on": ["create_project"], "evidence": ["tests/kv-interface-regression/11_structure_mutation"] },
+    "configure_expansion_units": { "script": "workflows/configure_kv_expansion_units.ps1", "assets": ["unit_configuration"], "inputs": ["unit_configuration_request"], "outputs": ["saved_project", "workflow_result.json"], "depends_on": ["create_project"], "evidence": ["tests/kv-interface-regression/06_expansion_units"] },
+    "configure_ethercat_nodes": { "script": "workflows/configure_kv_ethercat_nodes.ps1", "assets": ["ethercat_slave"], "inputs": ["ethercat_node_configuration"], "outputs": ["saved_project", "workflow_result.json"], "depends_on": ["configure_expansion_units"], "evidence": ["tests/kv-interface-regression/07_ethercat_nodes"] },
+    "configure_eip_devices": { "script": "workflows/configure_kv_eip_devices.ps1", "assets": ["eip_node", "eip_connection"], "inputs": ["eip_device_configuration", "action:Add|Modify|Delete"], "outputs": ["saved_project", "eip_write_result.json", "eip_edit_result.json", "ip_readback"], "depends_on": ["configure_expansion_units"], "evidence": ["tests/eip-live-cycle", "tests/eip-write-contract"] },
+    "set_fb_program_body": { "script": "workflows/set_kv_fb_program_body.ps1", "assets": ["fb"], "inputs": ["module_path", "program_body"], "outputs": ["saved_project", "workflow_result.json"], "depends_on": ["write_data_types"], "evidence": ["tests/kv-interface-regression/02_fb_program_body"] },
+    "set_fb_arguments": { "script": "workflows/set_kv_fb_arguments.ps1", "assets": ["fb_arguments"], "inputs": ["fb_argument_rows"], "outputs": ["saved_project", "argument_readback"], "depends_on": ["set_fb_program_body"], "evidence": ["tests/kv-interface-regression/01_fb_arguments"] },
+    "import_fb_module": { "script": "workflows/import_kv_fb_module.ps1", "assets": ["fb"], "inputs": ["project_path", "fb_mnm", "expected_module_name"], "outputs": ["saved_project", "module_placement_readback"], "depends_on": ["create_project"], "evidence": ["tests/kv-interface-regression/09_import_fb"] },
+    "import_module": { "script": "workflows/import_kv_module.ps1", "assets": ["program", "fb"], "inputs": ["project_path", "mnm_path", "module_category", "parent_path"], "outputs": ["saved_project", "module_placement_readback"], "depends_on": ["create_project"], "evidence": ["tests/kv-interface-regression/17_st_numeric_scan", "tests/kv-interface-regression/18_st_numeric_fb"], "validation_scope": "composed as a step of the published create_st_module workflow; import alone does not assert declarations or compilation" },
+    "save_project_as": { "script": "workflows/save_kv_project_as.ps1", "assets": ["program", "fb", "global_variables"], "inputs": ["source_project_path", "destination_directory", "destination_project_name", "comment"], "outputs": ["saved_copy_project", "save_as_result.json"], "depends_on": [], "evidence": ["tests/kv-interface-regression/08_save_as"] },
+    "set_variables": { "script": "workflows/set_kv_variables.ps1", "assets": ["global_variables", "program"], "inputs": ["variable_rows", "scope", "module_path"], "outputs": ["saved_project", "variable_readback"], "depends_on": ["write_data_types", "configure_expansion_units"], "evidence": ["tests/kv-interface-regression/03_variables_snapshot", "tests/kv-interface-regression/20_global_variable_groups"] },
+    "create_complete_module": { "script": "workflows/create_kv_complete_module.ps1", "assets": ["program"], "inputs": ["complete_module_contract", "body_mnm", "local_variable_rows"], "outputs": ["saved_project", "module_readback", "compile_result"], "depends_on": ["write_data_types", "configure_expansion_units", "set_variables"], "evidence": ["tests/kv-interface-regression/14_complete_scan_module"] },
+    "create_st_module": { "script": "workflows/create_kv_st_module.ps1", "assets": ["program"], "inputs": ["st_module_contract", "st_source", "local_variable_rows"], "outputs": ["saved_project", "module_readback", "compile_result"], "depends_on": ["write_data_types", "configure_expansion_units", "set_variables"], "evidence": ["tests/kv-interface-regression/17_st_numeric_scan", "tests/kv-interface-regression/18_st_numeric_fb"] },
+    "compile_project": { "script": "workflows/compile_kv_project.ps1", "assets": ["program", "fb", "global_variables"], "inputs": ["saved_project"], "outputs": ["compile_result", "compile_diagnostics"], "depends_on": ["create_complete_module"], "evidence": ["tests/kv-interface-regression/05_compile"] },
+    "rename_motion_axes": { "script": "workflow_tools/rename_kv_axes.ps1", "assets": ["motion_axis"], "inputs": ["axis_index_to_name_mapping"], "outputs": ["axis_rename_result.json", "saved_project", "tree_text_readback"], "depends_on": [], "evidence": ["tests/axis-rename-live"], "validation_status": "approved", "validation_scope": "Live regression uses a configured scratch project and skips when that project is unavailable or unsaved; this status follows manifest approval and is not a claim that this environment ran the test." },
+    "annotate_exported_programs": { "script": "workflows/annotate_kv_program_with_comments.ps1", "assets": ["comments", "program"], "inputs": ["comments.csv", "exported_mnm_directory"], "outputs": ["comments.tsv", "usage.tsv", "coverage.json", "program_annotations.md"], "depends_on": [], "evidence": ["tests/kv-interface-regression/22_annotate_program_comments"], "target_kind": "derived_artifacts", "limitation": "Read-only join; source comment table and MNM bodies are not modified and no KV STUDIO project write occurs." }
+  },
+  "write_acceptance_recipes": {
+    "complete_scan_module_compile": {
+      "scenario": "tests/kv-interface-regression/14_complete_scan_module/scenario.json",
+      "required_capabilities": ["create_complete_module"],
+      "required_evidence": ["workflow_result.ok", "saved_project", "local_variable_readback", "compile_success"],
+      "evidence": ["tests/kv-interface-regression/ACCEPTANCE_20261101.md"],
+      "limitation": "Compile verifies declaration consistency; it does not simulate PLC behavior or prove hardware execution."
+    }
   },
   "relations": [
     { "from": "asset:ethercat_slave", "to": "capability:read_ethercat_configuration", "type": "produced_by" },

@@ -11,7 +11,7 @@
 # node 3 (inserted right after the PLC).
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$kvsExe = if ($env:KV_STUDIO_EXE) { $env:KV_STUDIO_EXE } else { 'H:\Keyence\KVS12\KVS\Kvs.exe' }
+$kvsExe = & (Join-Path $PSScriptRoot '..\_helpers\resolve-kvs-exe.ps1') -OperatorRoot $repo
 $workflow = Join-Path $repo 'scripts\workflows\configure_kv_eip_devices.ps1'
 $fixture = Join-Path $repo 'references\KVX样例程序_v100'
 $fixtureKpr = Join-Path $fixture 'KVX样例程序_v100.kpr'

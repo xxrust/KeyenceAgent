@@ -6,7 +6,7 @@
     [double]$RatioOut = 0,
     [double]$RatioMotor = 0,
     [int]$StepTimeoutSeconds = 3,
-    [string]$RepoRoot = 'H:\KeyenceAgent\kv-studio-operator'
+    [string]$RepoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 )
 # 改轴参数（螺距 = 「输出轴转 1 圈的移动量」）—— 已验证路径 2026-10-20 ✓
 # 轴设定 → 轴n → 轴控制设定 →「坐标转换计算(C)」→ 向导 → 写 _textBoxParameter → 执行计算 → 退出向导 → 保存

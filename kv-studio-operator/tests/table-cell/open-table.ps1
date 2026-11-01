@@ -1,6 +1,6 @@
 ﻿param([int]$WaitSeconds = 0)
 $ErrorActionPreference = 'Stop'
-$repo = 'H:\KeyenceAgent\kv-studio-operator'
+$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 . "$repo\scripts\kv_dialog_post.ps1"
 Add-Type -AssemblyName UIAutomationClient
 if ($WaitSeconds -gt 0) { Start-Sleep -Seconds $WaitSeconds }

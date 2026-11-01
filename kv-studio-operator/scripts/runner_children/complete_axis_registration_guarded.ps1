@@ -2,7 +2,7 @@
     [Parameter(Mandatory=$true)][string]$OutDir,
     [string]$PitchCsv = '20,40',
     [int]$StepTimeoutSec = 12,
-    [string]$RepoRoot = 'H:\KeyenceAgent\kv-studio-operator'
+    [string]$RepoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 )
 # 轴向导状态机 —— 全程 **不碰前台**（无 SetForegroundWindow / AttachThreadInput / keybd_event）
 # 输入一律 PostMessage：按钮 BM_CLICK、输入框 WM_SETTEXT；每步硬超时，超时立刻抛错并截图。

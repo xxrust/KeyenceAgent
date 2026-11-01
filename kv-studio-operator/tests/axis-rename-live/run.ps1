@@ -15,6 +15,7 @@ $ErrorActionPreference = 'Stop'
 $skillRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 . (Join-Path $PSScriptRoot '..\_helpers\invoke_tool.ps1')
 $wrapper = Join-Path $skillRoot 'scripts\workflow_tools\rename_kv_axes.ps1'
+$kvsExe = & (Join-Path $PSScriptRoot '..\_helpers\resolve-kvs-exe.ps1') -OperatorRoot $skillRoot -AllowMissing
 
 if (-not $WorkRoot) { $WorkRoot = Join-Path $env:TEMP ('kv-axis-live-' + [guid]::NewGuid().ToString('N').Substring(0, 8)) }
 $WorkRoot = [IO.Path]::GetFullPath($WorkRoot)
@@ -44,7 +45,16 @@ function Find-ProjectProcess {
 }
 $process = Find-ProjectProcess
 if (-not $process) {
-  Start-Process -FilePath 'H:\Keyence\KVS12\KVS\Kvs.exe' -ArgumentList @(('"' + $ProjectPath + '"')) | Out-Null
+  if (-not $kvsExe) {
+    Add-Case 'KV STUDIO executable exists' $true 'skipped: Kvs.exe not found'
+    Save-Result $true
+  }
+  $existing = @(Get-Process Kvs -ErrorAction SilentlyContinue)
+  if ($existing.Count -gt 0) {
+    Add-Case 'no unrelated KV STUDIO session' $false 'close the other KV STUDIO project before running this live test'
+    Save-Result $false
+  }
+  Start-Process -FilePath $kvsExe -ArgumentList @(('"' + $ProjectPath + '"')) | Out-Null
   $deadline = (Get-Date).AddSeconds(90)
   do {
     Start-Sleep -Seconds 2

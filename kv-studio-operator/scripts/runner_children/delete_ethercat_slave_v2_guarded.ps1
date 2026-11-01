@@ -5,7 +5,7 @@
 )
 # 删除 EtherCAT 从站（对象级 ✓）：点进树→↑×N 到根→↓×k→DELETE→确认→保存→名单验证
 $ErrorActionPreference = 'Stop'
-$repo = 'H:\KeyenceAgent\kv-studio-operator'
+$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 . "$repo\scripts\kv_dialog_post.ps1"
 . "$repo\scripts\guards\kv_ui_guard.ps1"
 Add-Type -AssemblyName UIAutomationClient

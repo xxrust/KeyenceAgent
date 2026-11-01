@@ -5,7 +5,7 @@
     [switch]$PlanOnly
 )
 $ErrorActionPreference = 'Continue'
-$repo = 'H:\KeyenceAgent\kv-studio-operator'
+$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $root = Join-Path $repo 'tests\kv-interface-regression'
 if (-not $OutRoot) { $OutRoot = Join-Path $env:TEMP ('kv-suite-' + (Get-Date).ToString('yyyyMMdd_HHmmss')) }
 $null = New-Item -ItemType Directory -Force -Path $OutRoot

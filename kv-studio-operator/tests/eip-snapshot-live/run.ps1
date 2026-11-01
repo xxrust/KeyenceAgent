@@ -1,20 +1,23 @@
 ﻿param(
   [string]$WorkRoot = '',
-  [string]$SampleProjectPath = 'C:\kvrun\snapshot_sample\KVX样例程序_v100\KVX样例程序_v100.kpr',
-  [string]$RestoreProjectPath = 'C:\kvrun\ec_test\KVXEcTest\KVXEcTest.kpr'
+  [string]$SampleProjectPath = '',
+  [string]$RestoreProjectPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
 
 # Live regression for get_kv_eip_connection_snapshot.ps1.
-# Opens the real sample project, opens EtherNet/IP settings and the NU-EP1
+# Copies the sample fixture, opens EtherNet/IP settings and the NU-EP1
 # Monitor Data 连接设定 dialog, runs the snapshot and asserts the parsed fields
-# and assignment rows. Closes everything without saving the sample project.
+# and assignment rows. Closes the copied project without saving it.
 
 $skillRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 . (Join-Path $PSScriptRoot '..\_helpers\invoke_tool.ps1')
 $wrapper = Join-Path $skillRoot 'scripts\workflow_tools\get_kv_eip_connection_snapshot.ps1'
 $kvsExe = & (Join-Path $PSScriptRoot '..\_helpers\resolve-kvs-exe.ps1') -OperatorRoot $skillRoot -AllowMissing
+$fixtureProjectPath = Join-Path $PSScriptRoot 'fixtures\KVX样例程序_v100\KVX样例程序_v100.kpr'
+if (-not $SampleProjectPath) { $SampleProjectPath = $fixtureProjectPath }
+$sourceProjectPath = [IO.Path]::GetFullPath($SampleProjectPath)
 $script:OwnedKvsPid = 0
 
 if (-not $WorkRoot) { $WorkRoot = Join-Path $env:TEMP ('kv-eip-live-' + [guid]::NewGuid().ToString('N').Substring(0, 8)) }
@@ -36,6 +39,7 @@ function Save-Result([bool]$Skipped = $false) {
 }
 trap {
   if ($script:OwnedKvsPid -gt 0) { Stop-Process -Id $script:OwnedKvsPid -Force -ErrorAction SilentlyContinue; $script:OwnedKvsPid = 0 }
+  Write-Host ("KV_EIP_LIVE_TRAP: " + $_.Exception.Message)
   throw
 }
 
@@ -84,8 +88,8 @@ public class EipLive {
 }
 "@
 
-if (-not (Test-Path -LiteralPath $SampleProjectPath -PathType Leaf)) {
-  Add-Case 'sample project exists' $true 'skipped: sample project not found'
+if (-not (Test-Path -LiteralPath $sourceProjectPath -PathType Leaf)) {
+  Add-Case 'sample project exists' $true "skipped: sample project not found: $sourceProjectPath"
   Save-Result $true
 }
 if (-not $kvsExe -or -not (Test-Path -LiteralPath $kvsExe -PathType Leaf)) {
@@ -99,6 +103,14 @@ if ($existing.Count -gt 0) {
   Add-Case 'no unrelated KV STUDIO session' $false 'close existing KV STUDIO sessions before running this live test'
   Save-Result $false
 }
+$projectCopyRoot = Join-Path $WorkRoot 'project'
+if (Test-Path -LiteralPath $projectCopyRoot) { throw "KV_EIP_SNAPSHOT_COPY_EXISTS: $projectCopyRoot" }
+New-Item -ItemType Directory -Force -Path $projectCopyRoot | Out-Null
+$projectCopyDir = Join-Path $projectCopyRoot (Split-Path -Leaf (Split-Path -Parent $sourceProjectPath))
+Copy-Item -LiteralPath (Split-Path -Parent $sourceProjectPath) -Destination $projectCopyDir -Recurse
+$SampleProjectPath = Join-Path $projectCopyDir (Split-Path -Leaf $sourceProjectPath)
+$docInfo = Join-Path $projectCopyDir 'DocumentWindowInfo.xml'
+if (Test-Path -LiteralPath $docInfo) { Remove-Item -LiteralPath $docInfo -Force }
 $started = Start-Process -FilePath $kvsExe -ArgumentList @(('"' + $SampleProjectPath + '"')) -PassThru
 $script:OwnedKvsPid = $started.Id
 $deadline = (Get-Date).AddSeconds(90)
@@ -178,6 +190,7 @@ Add-Case 'connection settings dialog opened' ($connectionHwnd -ne 0) "hwnd=$conn
 if ($connectionHwnd -eq 0) { Save-Result $false }
 
 $outDir = Join-Path $WorkRoot 'snapshot'
+if (Test-Path -LiteralPath $outDir) { throw "KV_EIP_SNAPSHOT_OUTPUT_EXISTS: $outDir" }
 $exit = Invoke-TestTool -ScriptPath $wrapper -Arguments @('-ConnectionTitle', '连接设定', '-OutDir', $outDir)
 Add-Case 'snapshot exits 0' ($exit -eq 0) "exit=$exit"
 $reportPath = Get-ChildItem -LiteralPath $outDir -Filter '*.json' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { $_.FullName }
@@ -218,7 +231,7 @@ $stillRunning = @(Get-Process Kvs -ErrorAction SilentlyContinue).Count
 Add-Case 'KV STUDIO closed after sampling' ($stillRunning -eq 0) "instances=$stillRunning"
 
 # Hand the scratch project back so later live suites can run.
-if (Test-Path -LiteralPath $RestoreProjectPath -PathType Leaf) {
+if ($RestoreProjectPath -and (Test-Path -LiteralPath $RestoreProjectPath -PathType Leaf)) {
   Start-Process -FilePath $kvsExe -ArgumentList @(('"' + $RestoreProjectPath + '"')) | Out-Null
   $restoreDeadline = (Get-Date).AddSeconds(60)
   do {

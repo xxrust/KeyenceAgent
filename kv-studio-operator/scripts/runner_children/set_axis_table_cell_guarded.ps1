@@ -12,7 +12,7 @@
 #   写入：F2 → Ctrl+A → 键入 → Enter
 #   校验：Ctrl+A/C 整表 diff → **恰好一行变化且索引=目标行** ✓
 $ErrorActionPreference = 'Stop'
-$repo = 'H:\KeyenceAgent\kv-studio-operator'
+$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 . "$repo\scripts\kv_dialog_post.ps1"
 . "$repo\scripts\guards\kv_ui_guard.ps1"
 Add-Type -AssemblyName UIAutomationClient
