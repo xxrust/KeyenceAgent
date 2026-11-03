@@ -1,0 +1,60 @@
+{"id": "h_new_01", "cat": "cn_colloquial", "q": "怎么让伺服电机断电", "expect": ["MC_Power"]}
+{"id": "h_new_02", "cat": "cn_colloquial", "q": "字符串按某个字符切分", "expect": ["SplitN", "DisperseString"]}
+{"id": "h_new_03", "cat": "cn_colloquial", "q": "电机扭矩上限设置", "expect": ["MC_SetTorqueLimit", "MC_TorqueLimitClutch"]}
+{"id": "h_new_04", "cat": "cn_colloquial", "q": "在运行中修改定位目标", "expect": ["MC_ChangeTargetPosition", "U_PosWriteChgTargetPos"]}
+{"id": "h_new_05", "cat": "cn_colloquial", "q": "关闭TCP连接", "expect": ["SocketClose"]}
+{"id": "h_new_06", "cat": "cn_colloquial", "q": "查看SD卡空间", "expect": ["StorageGetCapacity"]}
+{"id": "h_new_07", "cat": "cn_colloquial", "q": "小数四舍五入", "expect": ["TRUNC", "ROUND"]}
+{"id": "h_new_08", "cat": "cn_colloquial", "q": "整数除法余数", "expect": ["MOD"]}
+{"id": "h_new_09", "cat": "cn_colloquial", "q": "数值在两个之间选一个", "expect": ["MUX", "SEL"]}
+{"id": "h_new_10", "cat": "cn_colloquial", "q": "清除socket接收缓存", "expect": ["SocketClearRecvBuf"]}
+{"id": "h_new_11", "cat": "cn_colloquial", "q": "计算有多少bit是1", "expect": ["BitCount"]}
+{"id": "h_new_12", "cat": "cn_colloquial", "q": "创建目录在存储卡", "expect": ["MMKDIR", "StorageMakeDir"]}
+{"id": "h_new_13", "cat": "cn_colloquial", "q": "PWM脉冲宽度调制输出", "expect": ["TimeProportionalOut"]}
+{"id": "h_new_14", "cat": "cn_colloquial", "q": "伺服轴停止运动", "expect": ["MC_Stop", "MC_Halt"]}
+{"id": "h_new_15", "cat": "cn_colloquial", "q": "读取轴当前位置", "expect": ["MC_ReadActualPosition"]}
+{"id": "h_new_16", "cat": "cn_colloquial", "q": "多个轴同时启动插补", "expect": ["MC_MoveLinearAbsolute", "MC_MoveCircularAbsolute"]}
+{"id": "h_new_17", "cat": "cn_colloquial", "q": "检查文件是否存在", "expect": ["StorageGetFileStatus", "FSTAT"]}
+{"id": "h_new_18", "cat": "cn_colloquial", "q": "字符串长度", "expect": ["LEN", "LENGTH"]}
+{"id": "h_new_19", "cat": "cn_colloquial", "q": "把整数转成字符串", "expect": ["INT_TO_STRING", "DINT_TO_STRING"]}
+{"id": "h_new_20", "cat": "cn_colloquial", "q": "定时器用完重启", "expect": ["TON", "TONR"]}
+{"id": "h_new_21", "cat": "cn_colloquial", "q": "检测上升沿", "expect": ["R_TRIG", "TRIG"]}
+{"id": "h_new_22", "cat": "cn_colloquial", "q": "PLC当前日期时间", "expect": ["GetSystemTime", "NOW"]}
+{"id": "h_new_23", "cat": "cn_colloquial", "q": "数组元素个数", "expect": ["SIZEOF", "ARRAYSIZE"]}
+{"id": "h_new_24", "cat": "cn_colloquial", "q": "位左移", "expect": ["SHL", "SHIFTL"]}
+{"id": "h_new_25", "cat": "cn_colloquial", "q": "两个字符串是否相同", "expect": ["STREQ", "STRING_COMPARE"]}
+{"id": "h_new_26", "cat": "cn_colloquial", "q": "打开文件准备读写", "expect": ["FOPEN", "StorageOpenFile"]}
+{"id": "h_new_27", "cat": "cn_colloquial", "q": "从文件读一行", "expect": ["StorageReadLine", "FGETS"]}
+{"id": "h_new_28", "cat": "cn_colloquial", "q": "往文件写字符串", "expect": ["StorageWriteLine", "FPUTS"]}
+{"id": "h_new_29", "cat": "cn_colloquial", "q": "伺服报警复位", "expect": ["MC_Reset"]}
+{"id": "h_new_30", "cat": "cn_colloquial", "q": "点动控制电机", "expect": ["MC_Jog"]}
+{"id": "h_new_31", "cat": "cn_colloquial", "q": "cam凸轮运动", "expect": ["MC_CamIn", "MC_CamTableSelect"]}
+{"id": "h_new_32", "cat": "cn_colloquial", "q": "主站从站同步", "expect": ["MC_GearIn", "MC_GearInPos"]}
+{"id": "h_new_33", "cat": "cn_colloquial", "q": "轴回零找原点", "expect": ["MC_Home"]}
+{"id": "h_new_34", "cat": "cn_colloquial", "q": "读DM寄存器", "expect": ["DM", "ReadDM"]}
+{"id": "h_new_35", "cat": "cn_colloquial", "q": "写EM区域", "expect": ["EM", "WriteEM"]}
+{"id": "h_new_36", "cat": "cn_colloquial", "q": "TCP服务器等待连接", "expect": ["SocketTCP_PassiveOpen"]}
+{"id": "h_new_37", "cat": "cn_colloquial", "q": "UDP发送数据", "expect": ["SocketUDP_SendTo"]}
+{"id": "h_new_38", "cat": "cn_colloquial", "q": "EtherNet/IP显式消息", "expect": ["EIP_ExplicitMessage", "EIP_SendExplicitMsg"]}
+{"id": "h_new_39", "cat": "cn_colloquial", "q": "PROFINET写从站参数", "expect": ["PN_WriteRecord"]}
+{"id": "h_new_40", "cat": "cn_colloquial", "q": "CC-Link远程I/O刷新", "expect": ["CCL_RefreshIO"]}
+{"id": "h_new_41", "cat": "cn_colloquial", "q": "ASCII字符转数值", "expect": ["VAL", "STRING_TO_INT"]}
+{"id": "h_new_42", "cat": "cn_colloquial", "q": "16进制字符串转整数", "expect": ["HEX_TO_INT"]}
+{"id": "h_new_43", "cat": "cn_colloquial", "q": "BCD码转二进制", "expect": ["BCD_TO_INT"]}
+{"id": "h_new_44", "cat": "cn_colloquial", "q": "浮点数转整数", "expect": ["REAL_TO_INT", "TRUNC"]}
+{"id": "h_new_45", "cat": "cn_colloquial", "q": "数组排序从小到大", "expect": ["SORT", "ArraySort"]}
+{"id": "h_new_46", "cat": "cn_colloquial", "q": "在数组中查找", "expect": ["FIND", "ArraySearch"]}
+{"id": "h_new_47", "cat": "cn_colloquial", "q": "数组最大值", "expect": ["MAX", "ArrayMax"]}
+{"id": "h_new_48", "cat": "cn_colloquial", "q": "累加求和", "expect": ["SUM", "Accumulate"]}
+{"id": "h_new_49", "cat": "cn_colloquial", "q": "平方根运算", "expect": ["SQRT"]}
+{"id": "h_new_50", "cat": "cn_colloquial", "q": "绝对值", "expect": ["ABS"]}
+{"id": "h_new_51", "cat": "cn_colloquial", "q": "三角函数正弦", "expect": ["SIN"]}
+{"id": "h_new_52", "cat": "cn_colloquial", "q": "弧度转角度", "expect": ["RAD_TO_DEG"]}
+{"id": "h_new_53", "cat": "cn_colloquial", "q": "随机数生成", "expect": ["RAND", "Random"]}
+{"id": "h_new_54", "cat": "cn_colloquial", "q": "PID调节", "expect": ["PID", "PID_Control"]}
+{"id": "h_new_55", "cat": "cn_colloquial", "q": "斜坡上升下降", "expect": ["RAMP", "RampGenerator"]}
+{"id": "h_new_56", "cat": "cn_colloquial", "q": "模拟量采样平均", "expect": ["AverageFilter", "MovingAverage"]}
+{"id": "h_new_57", "cat": "cn_colloquial", "q": "温度单元读取", "expect": ["TempRead", "U_TempRead"]}
+{"id": "h_new_58", "cat": "cn_colloquial", "q": "高速计数器当前值", "expect": ["HSC_Read", "U_HSCRead"]}
+{"id": "h_new_59", "cat": "cn_colloquial", "q": "模拟量输出设定", "expect": ["AnalogOut", "U_AnalogOut"]}
+{"id": "h_new_60", "cat": "cn_colloquial", "q": "编码器位置读取", "expect": ["EncoderRead", "U_EncoderRead"]}

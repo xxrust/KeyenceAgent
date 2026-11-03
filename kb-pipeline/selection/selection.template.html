@@ -1,0 +1,272 @@
+<title>KV 选型对比表</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: control-cabinet datasheet — a labelled tab rail over wide scrollable tables; evidence folds out under each row. */
+:root {
+  --bg: #f3f4f2;        /* cabinet-panel grey with a green bias */
+  --panel: #ffffff;
+  --ink: #1d2422;
+  --muted: #5c6763;
+  --line: #d5dad7;
+  --accent: #c27a00;    /* status-LED amber */
+  --accent-ink: #ffffff;
+  --ok: #2f7d4f;
+  --ok-bg: #e0f1e6;
+  --warn: #a35a00;
+  --warn-bg: #fff1dc;
+  --miss: #8a3b3b;
+  --miss-bg: #f8e6e4;
+  --rowhover: #eef1ef;
+  --font-display: "Barlow Condensed", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-body: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "SFMono-Regular", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151a19; --panel: #1c2321; --ink: #e3e8e5; --muted: #9aa6a1; --line: #2e3835;
+    --accent: #f0a63a; --accent-ink: #1a1405; --ok: #6cc28f; --ok-bg: #1c3326; --warn: #f0b768; --warn-bg: #3a2c14;
+    --miss: #f09a92; --miss-bg: #3b2321; --rowhover: #222b28; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151a19; --panel: #1c2321; --ink: #e3e8e5; --muted: #9aa6a1; --line: #2e3835;
+  --accent: #f0a63a; --accent-ink: #1a1405; --ok: #6cc28f; --ok-bg: #1c3326; --warn: #f0b768; --warn-bg: #3a2c14;
+  --miss: #f09a92; --miss-bg: #3b2321; --rowhover: #222b28; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.6 var(--font-body); }
+.wrap { max-width: 1280px; margin: 0 auto; padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 20px; }
+header { display: grid; gap: 6px; }
+.eyebrow { font: 600 12px/1 var(--font-mono); letter-spacing: .08em; color: var(--accent); text-transform: uppercase; }
+h1 { font: 700 clamp(30px, 5vw, 44px)/1.05 var(--font-display); letter-spacing: .01em; margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 70ch; margin: 0; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 18px; font: 13px var(--font-mono); color: var(--muted); }
+.stats b { color: var(--ink); font-weight: 600; }
+nav { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 2px solid var(--ink); padding-bottom: 0; }
+nav a { font: 600 17px/1 var(--font-display); letter-spacing: .03em; color: var(--muted); text-decoration: none;
+  padding: 10px 14px 9px; border: 1px solid transparent; border-bottom: none; border-radius: 4px 4px 0 0; }
+nav a:hover { color: var(--ink); }
+nav a[aria-current="page"] { background: var(--ink); color: var(--bg); }
+nav a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.count { font: 12px var(--font-mono); opacity: .7; margin-left: 4px; }
+section[hidden] { display: none; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 10px; }
+.toolbar input { font: 14px var(--font-body); padding: 7px 10px; border: 1px solid var(--line); border-radius: 4px;
+  background: var(--panel); color: var(--ink); min-width: 0; width: min(320px, 100%); }
+.toolbar label { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--muted); }
+.scroller { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
+table { border-collapse: collapse; font-size: 13px; width: max-content; min-width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { font: 600 13px/1.2 var(--font-display); letter-spacing: .04em; color: var(--muted); background: var(--panel);
+  position: sticky; top: 0; white-space: nowrap; }
+td { max-width: 260px; }
+td.model, th.model { position: sticky; left: 0; background: var(--panel); z-index: 1; }
+th.model { z-index: 2; }
+td.model { font: 600 13px var(--font-mono); white-space: nowrap; }
+tbody tr.row:hover td { background: var(--rowhover); }
+.num { font-variant-numeric: tabular-nums; }
+.chip { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; white-space: nowrap; font-weight: 500; }
+.chip.warn { background: var(--warn-bg); color: var(--warn); }
+.chip.miss { background: var(--miss-bg); color: var(--miss); }
+.chip.ok { background: var(--ok-bg); color: var(--ok); }
+.evbtn { font: 12px var(--font-mono); color: var(--accent); background: none; border: 1px solid var(--line);
+  border-radius: 3px; padding: 1px 6px; cursor: pointer; margin-left: 6px; }
+tr.ev td { background: var(--bg); font: 12px/1.6 var(--font-mono); color: var(--muted); max-width: none; }
+tr.ev ul { margin: 0; padding-left: 18px; columns: 2 340px; }
+tr.ev code { color: var(--ink); word-break: break-all; }
+.prose { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 20px clamp(16px, 3vw, 28px);
+  display: grid; gap: 14px; max-width: 920px; }
+.prose h2 { font: 700 24px/1.2 var(--font-display); margin: 0; letter-spacing: .02em; }
+.prose h3 { font: 600 18px/1.3 var(--font-display); margin: 8px 0 0; letter-spacing: .02em; }
+.prose p, .prose li { max-width: 72ch; margin: 0; }
+.prose ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.req { display: flex; flex-wrap: wrap; gap: 8px; }
+.req span { font: 13px var(--font-mono); border: 1px solid var(--line); border-radius: 3px; padding: 3px 8px; }
+.bom { overflow-x: auto; }
+.bom table { width: 100%; min-width: 520px; }
+.bom td, .bom th { position: static; }
+.bom tfoot td { font-weight: 700; border-bottom: none; }
+.tag { font: 600 11px var(--font-mono); letter-spacing: .06em; padding: 2px 7px; border-radius: 3px; background: var(--accent); color: var(--accent-ink); }
+.ref { font: 12px var(--font-mono); color: var(--muted); word-break: break-all; }
+.note { border-left: 3px solid var(--warn); padding: 6px 12px; background: var(--warn-bg); color: var(--ink); border-radius: 0 4px 4px 0; }
+.verify { display: grid; gap: 14px; }
+.verify li code { font: 12px var(--font-mono); }
+footer { color: var(--muted); font-size: 12px; max-width: 80ch; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">KV STUDIO 12 · 手册整理 · 非官方</div>
+    <h1>KV 选型对比表</h1>
+    <p class="lede">从本机知识库（KEYENCE 手册解析文本）整理的 CPU 与扩展单元规格。每个数值都能展开看到出处的 chunk_id；标“待核实”的格子需要对照原 PDF。下单前以基恩士最新样本和手册为准。</p>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <nav id="tabs" aria-label="表格切换"></nav>
+
+  <section id="view-example" data-view="example">
+    <div class="prose">
+      <h2>示例：3 轴 EtherCAT 伺服 + 2 台 IO 电机 + 23 入 / 30 出</h2>
+      <div class="req"><span>EtherCAT 伺服 ×3</span><span>IO 电机 ×2（CW/CCW）</span><span>输入 23 点</span><span>输出 30 点</span></div>
+
+      <h3><span class="tag">推荐</span> KV-X310 一台 CPU 搞定伺服</h3>
+      <p>KV-X310 自带 EtherCAT 主站口（PORT2），可控 12 轴，3 轴绰绰有余，不用另配运动单元。它还自带 16 点输入、16 点输出，这是 KV-X500 系列 CPU 没有的。</p>
+      <ul>
+        <li><span class="chip ok">PDF 核实</span> 内置输入 <b>不分极性</b>（光耦内反向并联双 LED，24V 电源正负极任意接），所以漏型/源型传感器都能直接接。</li>
+        <li><span class="chip ok">PDF 核实</span> 内置输出是 MOSFET N-ch 漏型输出，DC30V 0.2A/点（1.6A/公共点），负载接在 +24V 与 OUT 之间。输出要工作，必须给 CPU 的 39 脚（24V）和 40 脚（0V）供电。</li>
+        <li><span class="chip ok">PDF 核实</span> X5xx（X500/520/530/550）的系统规格表里没有“CPU 单元 I/O 点数”，没有内置 I/O，且只有 X520/530/550 带 EtherCAT 口（X500 没有）。</li>
+      </ul>
+      <p class="ref">KVSHARDX3H.pdf PDF页33–34（印刷 2-11、2-12）· KVSHARDX5H.pdf PDF页26、30 · 轴数 pdf::KvsMotion::chunk-017</p>
+
+      <h3>“IO 电机”分两种情况</h3>
+      <div class="bom">
+        <table>
+          <thead><tr><th>情况</th><th>配置</th><th>输入合计</th><th>输出合计</th><th>需求</th></tr></thead>
+          <tbody>
+            <tr><td>a. 普通正反转电机（接触器/继电器切 CW/CCW）</td><td>KV-X310 + KV-C32XTD（32 入 / 32 出）</td><td class="num">16 + 32 = 48</td><td class="num">16 + 32 = 48</td><td class="num">23 入 / 34 出（30 + 2×2）</td></tr>
+            <tr><td>b. 脉冲型步进/伺服（CW/CCW 双脉冲）</td><td>KV-X310 + KV-SH04PL + KV-C16XTD（16 入 / 16 出）</td><td class="num">16 + 16 = 32</td><td class="num">16 + 16 = 32</td><td class="num">23 入 / 30 出</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li>情况 a：接触器线圈电流超过 0.2A 时，晶体管输出带不动，改用继电器输出单元（如 KV-B16RC，2A/点）或加中间继电器。</li>
+        <li>情况 b：KV-SH04PL 默认就是双脉冲（正转 FP / 反转 RP），4 轴。<span class="chip ok">PDF 核实</span> 输出频率 1Hz～8MHz；用集电极开路输出时，单/双脉冲最高 200kHz，2 相 1/2/4 倍频分别 50/100/200kHz，负载电流 5～100mA。差动线驱动和集电极开路按轴用单元底部开关切换。<span class="ref">KV-SH04PL.pdf PDF页26、43</span></li>
+        <li>情况 b 的输出余量只有 2 点。想多留余量就把 KV-C16XTD 换成 KV-C32XTD。</li>
+        <li><span class="chip ok">PDF 核实</span> KV-C16XTD：输入不分极性，有 5V/24V 切换，输入 4.3kΩ；<b>每点输出 0.2A</b>（30VDC，16 点一个公共端），OFF→ON ≤100μs。KV-C32XTD：输入只有 24V 模式，每点输出 0.2A（32 点两个公共端，OFF→ON ≤150μs）。只有 KV-B8XTD 是 0.3A。<span class="ref">KVSHARDX3H.pdf PDF页56、58；KV-7000 手册 KVSHARDG4.pdf PDF页62 一致</span></li>
+        <li>以后要扩到十几轴以上：换 KV-X520（32 轴）。X520 没有内置 I/O，所有 I/O 都要靠单元。</li>
+      </ul>
+
+      <h3>下单前必须确认</h3>
+      <ul>
+        <li>伺服驱动器要支持 EtherCAT CiA402，并在 KV STUDIO 里登记它的 ESI 文件。</li>
+        <li>KV-C32XTD / KV-B8XTD 的输入接线图（极性）还没对过原 PDF（KVSHARDX3H.pdf PDF页57、59）；X310 内置输入和 C16XTD 已核实为不分极性。</li>
+        <li>接触器线圈电流超过输出单元每点电流（0.2A / 0.3A）时，晶体管输出带不动，请加中间继电器。</li>
+      </ul>
+      <p class="note">这是按手册规格推出的配置草案。接线、电源容量和安全回路要按实际设备设计。</p>
+    </div>
+  </section>
+
+  <section id="view-verify" data-view="verify" hidden>
+    <div class="prose verify">
+      <h2>需要原 PDF 核实的页</h2>
+      <p>下面这些页在知识库里是乱码、表格错位，或者几本手册说法不一致。按优先级排序：第一组直接影响上面的选型结论。</p>
+      <h3>第一组：影响 KV-X 选型</h3>
+      <p>手册目录：<code>C:\Users\Public\Documents\KEYENCE\KVS12\ManualHelp\2052</code>。页码为 PDF 页码，和印刷页码相差约 22。</p>
+      <ul>
+        <li><span class="chip ok">已核实</span> <code>KVSHARDX3H.pdf</code> p33–34（X310 内置 I/O 规格和接线）、p56（XTD 规格表）、p58（C16XTD 接线）</li>
+        <li><span class="chip ok">已核实</span> <code>KVSHARDX5H.pdf</code> p26（X5xx 无 CPU 内置 I/O）、p30（EtherCAT 规格）</li>
+        <li><span class="chip ok">已核实</span> <code>KV-SH04PL.pdf</code> p26（输出频率 8MHz）、p43（集电极开路 200kHz）</li>
+        <li><code>KVSHARDX3H.pdf</code> 还没看：p36–37（SIR32XT）、p40–44（XC 输入单元）、p46–48（TC/TCP/TD 输出表）、p57、p59（B8XTD / C32XTD 接线）</li>
+        <li><code>KVSHARDX5H.pdf</code> 还没看：p489–491（适用设备一览）</li>
+        <li><code>KV-XHECL.pdf</code> 还没看：p38（适用 CPU 与功能版本，表格有合并单元格）；对照旧版 <code>KV-XHEC.pdf</code> p35</li>
+      </ul>
+      <h3>第二组：KV-8000 / 7000 及旧系列</h3>
+      <ul>
+        <li><code>KvsHARD8000.pdf</code> p29（“扩展时最大 3072 点”）、p649–651（适用设备一览，KV-DA40V 是否列入）</li>
+        <li><code>KVSHARDG4.pdf</code> p29、p52–54（继电器 ON→OFF 响应、TC/TD 表）、p60–61（XTD 输出列）、p562–564（ML/MC 单元可用性）</li>
+        <li><code>KV-ML_MC.pdf</code> p39–40（适用 CPU、最大 4MHz）；<code>KvsMotion.pdf</code> p511（XH EC 每节点 128 字节、仅线型拓扑）</li>
+        <li><code>KVSHARD.pdf</code> p43–51（A 型 I/O 单元：B16XA 接线、C64XA/XB 各列、B16RA “22A” 疑似笔误）</li>
+      </ul>
+      <h3>第三组：模拟量、温度、通信单元</h3>
+      <ul>
+        <li><code>KV-TF40.pdf</code> p21–24（性能规格项目名全是乱码，必须核）；<code>KV-TP40.pdf</code> p16–19（μV/μA 单位丢失）</li>
+        <li><code>KV-AD_DA.pdf</code> p103–104（DA40V 精度）、p159–161（AM40V）、p307–308（AD40）、p343–344（DA40）</li>
+        <li><code>KV-SC20V.pdf</code> p161（与 KV-SC20 的差异，列标题缺失）；<code>SimplePos.pdf</code> p289–292（KV-H20S/H40S/H20G 规格）</li>
+        <li><code>KvsEtherNetIP_KVS11.pdf</code> p32–34（KV-EP21V 与 CPU 内置口共用一张表）</li>
+      </ul>
+      <h3>知识库里没有规格的型号</h3>
+      <p>KV-XCA02、KV-L20、KV-H20、KV-SC20、KL-N20V（只在适用设备表里出现）；KV-LM20V 只有差异表。</p>
+    </div>
+  </section>
+
+  <div id="tables"></div>
+
+  <footer>数据来源：H:\llm-wiki-v2-keyence\v3\wiki.v3.db（手册解析文本）与 KV STUDIO 12 的 DllInfo.ini 单元清单。整理方式：逐型号查规格章节，每个数值记录 chunk_id；乱码或无法确定的格子不填数值。源文件：kb-pipeline/selection/*.csv。</footer>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const VIEWS = [{ key: "example", label: "选型示例" }, ...DATA.map(t => ({ key: t.key, label: t.label, n: t.rows.length })), { key: "verify", label: "待核实清单" }];
+const flagged = v => /未找到|待核实|无该型号/.test(v);
+let totalRows = 0, totalFlag = 0, totalVer = 0;
+DATA.forEach(t => t.rows.forEach(r => { totalRows++; if (Object.values(r.cells).some(v => /✔PDF核实/.test(v))) totalVer++; Object.values(r.cells).forEach(v => { if (flagged(v)) totalFlag++; }); }));
+document.getElementById("stats").innerHTML =
+  `<span><b>${DATA[0].rows.length}</b> 款 CPU</span><span><b>${totalRows - DATA[0].rows.length}</b> 个单元</span><span><b>${totalFlag}</b> 个格子待核实/未找到</span><span><b>${totalVer}</b> 行已对原 PDF 核实</span>`;
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function cellHtml(v) {
+  if (!v) return "";
+  let h = esc(v);
+  h = h.replace(/✔(PDF核实)/g, '<span class="chip ok">$1</span>');
+  h = h.replace(/(待核实[^；;，,）)]*[）)]?)/g, '<span class="chip warn">$1</span>')
+       .replace(/(未找到|知识库无该型号资料)/g, '<span class="chip miss">$1</span>');
+  return h;
+}
+
+const tablesEl = document.getElementById("tables");
+DATA.forEach(t => {
+  const sec = document.createElement("section");
+  sec.id = "view-" + t.key; sec.dataset.view = t.key; sec.hidden = true;
+  const cols = t.cols;
+  sec.innerHTML = `
+    <div class="toolbar">
+      <input id="q-${t.key}" type="search" placeholder="筛选：型号、接口、系列…" aria-label="筛选${t.label}">
+      <label><input id="f-${t.key}" type="checkbox"> 只看有待核实的行</label>
+      <div class="legend"><span class="chip warn">待核实</span><span class="chip miss">未找到</span><span class="chip ok">PDF核实</span><span>点“依据”看出处</span></div>
+    </div>
+    <div class="scroller"><table>
+      <thead><tr>${cols.map(([k, l], i) => `<th class="${i === 0 ? "model" : ""}">${esc(l)}</th>`).join("")}</tr></thead>
+      <tbody></tbody>
+    </table></div>`;
+  const tbody = sec.querySelector("tbody");
+  t.rows.forEach((r, idx) => {
+    const tr = document.createElement("tr");
+    tr.className = "row";
+    tr.dataset.text = Object.values(r.cells).join(" ").toLowerCase();
+    tr.dataset.flag = Object.values(r.cells).some(flagged) ? "1" : "";
+    tr.innerHTML = cols.map(([k], i) => i === 0
+      ? `<td class="model">${esc(r.cells[k])}<button class="evbtn" type="button" aria-expanded="false" aria-controls="ev-${t.key}-${idx}">依据</button></td>`
+      : `<td class="${/points|axes|in_points|out_points/.test(k) ? "num" : ""}">${cellHtml(r.cells[k])}</td>`).join("");
+    const ev = document.createElement("tr");
+    ev.className = "ev"; ev.id = `ev-${t.key}-${idx}`; ev.hidden = true;
+    const labelOf = Object.fromEntries(cols);
+    const items = Object.entries(r.ev).map(([f, ids]) => `<li>${esc(labelOf[f] || f)}：${ids.map(i => `<code>${esc(i)}</code>`).join(", ")}</li>`).join("");
+    ev.innerHTML = `<td colspan="${cols.length}">${items ? `<ul>${items}</ul>` : "无记录"}</td>`;
+    tr.querySelector(".evbtn").addEventListener("click", e => {
+      ev.hidden = !ev.hidden; e.currentTarget.setAttribute("aria-expanded", String(!ev.hidden));
+    });
+    tbody.append(tr, ev);
+  });
+  const q = sec.querySelector(`#q-${t.key}`), f = sec.querySelector(`#f-${t.key}`);
+  const apply = () => {
+    const s = q.value.trim().toLowerCase();
+    tbody.querySelectorAll("tr.row").forEach(tr => {
+      const show = (!s || tr.dataset.text.includes(s)) && (!f.checked || tr.dataset.flag);
+      tr.hidden = !show;
+      const ev = tr.nextElementSibling;
+      if (!show) ev.hidden = true;
+    });
+  };
+  q.addEventListener("input", apply); f.addEventListener("change", apply);
+  tablesEl.append(sec);
+});
+
+const nav = document.getElementById("tabs");
+nav.innerHTML = VIEWS.map(v => `<a href="#${v.key}" data-key="${v.key}">${esc(v.label)}${v.n ? `<span class="count">${v.n}</span>` : ""}</a>`).join("");
+function show() {
+  const key = (location.hash || "#example").slice(1);
+  const valid = VIEWS.some(v => v.key === key) ? key : "example";
+  document.querySelectorAll("[data-view]").forEach(s => { s.hidden = s.dataset.view !== valid; });
+  nav.querySelectorAll("a").forEach(a => a.toggleAttribute("aria-current", a.dataset.key === valid));
+  nav.querySelectorAll("a").forEach(a => { if (a.dataset.key === valid) a.setAttribute("aria-current", "page"); });
+}
+window.addEventListener("hashchange", show);
+show();
+</script>

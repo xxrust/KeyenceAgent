@@ -121,3 +121,27 @@ $RECYCLE.BIN/
 
 # Operator work root written inside the repository by mistake (run output, not source)
 /kvOp/
+
+# ---------------------------------------------------------------------------
+# Knowledge base (kb-pipeline)
+# The database itself (~450 MB) and its vector matrix are distributed outside git
+# (cloud drive, then copied under wiki_root); only the build code, the curated
+# lexicon and the evaluation sets belong in the repository.
+# ---------------------------------------------------------------------------
+# MinerU page dumps and images: reproducible from the PDFs, ~100 MB
+/kb-pipeline/mineru_batch/
+# MinerU output for the extra textbooks, reproducible with the documented command
+/kb-pipeline/extra_docs/
+# rendered page images for the selection tables
+/kb-pipeline/selection/pages/
+# per-run benchmark output; the case sets (*.jsonl) are tracked, the results are not
+/kb-pipeline/benchmark/results/
+# release packaging for the knowledge base (cloud-drive upload staging)
+/dist/
+
+# Local backup / work-in-progress copies of operator scripts
+*.bak-*
+*.wip-*
+
+# Official KEYENCE PDFs and sample-program archives used as KB inputs (not redistributable)
+/其他文件/

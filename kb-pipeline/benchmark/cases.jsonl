@@ -1,0 +1,90 @@
+{"id": "exact_ton", "cat": "exact", "q": "TON", "expect": ["TON"]}
+{"id": "exact_mc_home", "cat": "exact", "q": "MC_Home", "expect": ["MC_Home"]}
+{"id": "exact_mc_moveabs", "cat": "exact", "q": "MC_MoveAbsolute", "expect": ["MC_MoveAbsolute"]}
+{"id": "exact_concat", "cat": "exact", "q": "CONCAT", "expect": ["CONCAT"]}
+{"id": "exact_socket_open", "cat": "exact", "q": "SocketTCP_ActiveOpen", "expect": ["SocketTCP_ActiveOpen"]}
+{"id": "exact_sdo_read", "cat": "exact", "q": "EC_CoE_SDORead", "expect": ["EC_CoE_SDORead"]}
+{"id": "exact_uread", "cat": "exact", "q": "UREAD", "expect": ["UREAD"]}
+{"id": "exact_endh", "cat": "exact", "q": "ENDH", "expect": ["ENDH", "END"]}
+{"id": "exact_ctud", "cat": "exact", "q": "CTUD", "expect": ["CTUD"]}
+{"id": "exact_fifo", "cat": "exact", "q": "FIFOWrite", "expect": ["FIFOWrite"]}
+{"id": "cn_home", "cat": "cn_colloquial", "q": "伺服回原点怎么写", "expect": ["MC_Home", "MC_FastMoveToHome", "原点复位"]}
+{"id": "cn_home2", "cat": "synonym", "q": "原点回归", "expect": ["MC_Home", "MC_FastMoveToHome", "原点复位"]}
+{"id": "cn_abs_move", "cat": "cn_colloquial", "q": "轴走到绝对位置", "expect": ["MC_MoveAbsolute"]}
+{"id": "cn_rel_move", "cat": "cn_colloquial", "q": "相对移动一段距离", "expect": ["MC_MoveRelative"]}
+{"id": "cn_jog", "cat": "cn_colloquial", "q": "点动正转反转", "expect": ["MC_Jog", "JOG"]}
+{"id": "cn_servo_on", "cat": "cn_colloquial", "q": "伺服使能上电", "expect": ["MC_Power", "MC_OperationEnable"]}
+{"id": "cn_alarm_reset", "cat": "cn_colloquial", "q": "轴报警复位", "expect": ["MC_Reset"]}
+{"id": "cn_axis_stop", "cat": "cn_colloquial", "q": "轴减速停止", "expect": ["MC_Stop"]}
+{"id": "cn_estop", "cat": "cn_colloquial", "q": "所有轴紧急立即停止", "expect": ["MC_ImmediateStopAll", "MC_ImmediateStop"]}
+{"id": "cn_velocity", "cat": "cn_colloquial", "q": "轴以恒定速度一直转", "expect": ["MC_MoveVelocity", "MC_VelocityControl"]}
+{"id": "cn_torque", "cat": "cn_colloquial", "q": "转矩控制模式", "expect": ["MC_TorqueControl"]}
+{"id": "cn_override", "cat": "cn_colloquial", "q": "运行中修改速度倍率", "expect": ["MC_SetOverride", "MC_ChangeTargetVelocity"]}
+{"id": "cn_set_pos", "cat": "cn_colloquial", "q": "把当前位置改成0", "expect": ["MC_SetPosition"]}
+{"id": "cn_linear", "cat": "cn_colloquial", "q": "两轴直线插补", "expect": ["MC_MoveLinearAbsolute", "MC_MoveLinearRelative", "直线插补"]}
+{"id": "cn_circular", "cat": "cn_colloquial", "q": "圆弧插补", "expect": ["MC_MoveCircular", "圆弧插补", "MC_MoveCircularAbsolute", "MC_MoveCircularRelative"]}
+{"id": "cn_cam", "cat": "cn_colloquial", "q": "电子凸轮表生成", "expect": ["MC_CamGenerate", "MC_CamWrite", "凸轮"]}
+{"id": "cn_servo_param", "cat": "cn_colloquial", "q": "读取伺服驱动器参数", "expect": ["EC_CoE_SDORead", "MC_SV3_ReadServoParameter"]}
+{"id": "cn_delay_on", "cat": "cn_colloquial", "q": "延时3秒后输出", "expect": ["TON", "TMR", "通电延时"]}
+{"id": "cn_delay_off", "cat": "cn_colloquial", "q": "断电延时", "expect": ["TOF", "断电延时"]}
+{"id": "cn_pulse", "cat": "cn_colloquial", "q": "输出一个固定宽度的脉冲", "expect": ["TP", "SHOT"]}
+{"id": "cn_count_up", "cat": "cn_colloquial", "q": "产品计数加一", "expect": ["CTU", "C", "OUTC", "计数器"]}
+{"id": "cn_rising", "cat": "cn_colloquial", "q": "上升沿检测", "expect": ["R_TRIG", "LDP", "DIFU"]}
+{"id": "cn_flipflop", "cat": "cn_colloquial", "q": "置位复位保持", "expect": ["SR", "SET", "RS"]}
+{"id": "cn_toggle", "cat": "cn_colloquial", "q": "按一下亮再按一下灭", "expect": ["ALT"]}
+{"id": "cn_str_join", "cat": "synonym", "q": "字符串拼接", "expect": ["CONCAT", "UNIS", "字符串结合"]}
+{"id": "cn_str_len", "cat": "cn_colloquial", "q": "字符串长度", "expect": ["LEN"]}
+{"id": "cn_str_sub", "cat": "cn_colloquial", "q": "截取字符串中间几位", "expect": ["MID", "SMID"]}
+{"id": "cn_str_find", "cat": "cn_colloquial", "q": "在字符串里查找子串位置", "expect": ["FIND", "StringSearch", "SFIND"]}
+{"id": "cn_num_to_str", "cat": "cn_colloquial", "q": "数字转成字符串", "expect": ["NumToDecString", "RealToString", "VariableToString", "DASC"]}
+{"id": "cn_str_to_num", "cat": "cn_colloquial", "q": "字符串转数值", "expect": ["DecStringToNum", "StringToReal", "RDASC"]}
+{"id": "cn_type_conv", "cat": "cn_colloquial", "q": "INT转REAL类型转换", "expect": ["*_TO_**", "TO_**", "数据类型转换"]}
+{"id": "cn_array_max", "cat": "cn_colloquial", "q": "数组求最大值", "expect": ["AryMax", "MAX"]}
+{"id": "cn_array_avg", "cat": "cn_colloquial", "q": "数组求平均", "expect": ["AryMean", "AVG"]}
+{"id": "cn_sort", "cat": "cn_colloquial", "q": "数据排序", "expect": ["SORT", "StructSort", "SORTN"]}
+{"id": "cn_block_copy", "cat": "cn_colloquial", "q": "批量复制一段数据", "expect": ["BMOV", "BlockMove", "BlockCopy"]}
+{"id": "cn_fill", "cat": "cn_colloquial", "q": "把一段寄存器全部清零", "expect": ["FMOV", "FillMove", "AryReset", "Clear", "ZRES"]}
+{"id": "cn_shift", "cat": "cn_colloquial", "q": "移位寄存器", "expect": ["ShiftRegister", "SFT", "WSR", "WSL"]}
+{"id": "cn_limit", "cat": "cn_colloquial", "q": "限制数值上下限", "expect": ["LIMIT", "ZONE"]}
+{"id": "cn_sqrt", "cat": "cn_colloquial", "q": "开平方", "expect": ["SQRT", "ROOT"]}
+{"id": "cn_crc", "cat": "cn_colloquial", "q": "计算CRC校验", "expect": ["AryCRC", "CRC"]}
+{"id": "cn_ramp", "cat": "cn_colloquial", "q": "斜坡函数平滑变化", "expect": ["Ramp"]}
+{"id": "cn_pid", "cat": "cn_colloquial", "q": "PID温度控制", "expect": ["PID"]}
+{"id": "cn_tcp_client", "cat": "cn_colloquial", "q": "PLC作为TCP客户端连接", "expect": ["SocketTCP_ActiveOpen"]}
+{"id": "cn_tcp_server", "cat": "cn_colloquial", "q": "TCP服务器等待连接", "expect": ["SocketTCP_PassiveOpen"]}
+{"id": "cn_tcp_send", "cat": "cn_colloquial", "q": "网口发送数据", "expect": ["SocketTCP_Send", "SocketUDP_Send"]}
+{"id": "cn_udp", "cat": "cn_colloquial", "q": "UDP接收", "expect": ["SocketUDP_Recv"]}
+{"id": "cn_ping", "cat": "cn_colloquial", "q": "检测网络通不通", "expect": ["Ping"]}
+{"id": "cn_modbus", "cat": "cn_colloquial", "q": "Modbus TCP 通信", "expect": ["Modbus", "MBUSE"]}
+{"id": "cn_eip_msg", "cat": "cn_colloquial", "q": "EtherNet/IP 读取属性", "expect": ["CipGetAttributeSingle", "CipMsgService"]}
+{"id": "cn_calendar", "cat": "cn_colloquial", "q": "读取当前日期时间", "expect": ["LDWK", "WriteCalendarTime", "日期", "时刻", "DtToSec"]}
+{"id": "cn_weekday", "cat": "cn_colloquial", "q": "今天星期几", "expect": ["GetDayOfWeek"]}
+{"id": "cn_sd_write", "cat": "cn_colloquial", "q": "数据写到SD卡文件", "expect": ["StorageWriteBin", "StoragePrint", "MWRIT"]}
+{"id": "cn_sd_read", "cat": "cn_colloquial", "q": "从存储卡读文件", "expect": ["StorageReadBin", "StorageReadLine", "MREAD"]}
+{"id": "cn_logging", "cat": "cn_colloquial", "q": "数据记录日志触发", "expect": ["LoggingTrigger", "LoggingEnable"]}
+{"id": "cn_interrupt", "cat": "cn_colloquial", "q": "输入中断设置", "expect": ["SetInputInterruptCondition", "EnableInterrupt", "中断"]}
+{"id": "cn_buffer_read", "cat": "cn_colloquial", "q": "读取模块缓冲存储器", "expect": ["UnitBufMemRead", "UREAD", "UnitBufMemBlockRead", "缓冲存储器"]}
+{"id": "cn_for", "cat": "cn_colloquial", "q": "ST 里写循环", "expect": ["FOR", "ST语法", "ST (", "04_00_ST"]}
+{"id": "cn_assign", "cat": "cn_colloquial", "q": "ST 赋值怎么写", "expect": ["赋值语句"]}
+{"id": "cn_if", "cat": "cn_colloquial", "q": "ST IF 条件判断语法", "expect": ["IF", "ST语法", "04_00_ST", "STUse"]}
+{"id": "cn_fb_args", "cat": "cn_colloquial", "q": "功能块自变量方向 IN OUT", "expect": ["自变量", "FUN/FB的通用自变量", "KvsHARD8000", "fb_arg"]}
+{"id": "cn_local_var", "cat": "cn_colloquial", "q": "局部变量怎么定义", "expect": ["局部变量"]}
+{"id": "cn_reserved", "cat": "cn_colloquial", "q": "变量名不能用的保留字", "expect": ["保留字", "STUse"]}
+{"id": "cn_module_start", "cat": "cn_colloquial", "q": "启动停止某个程序模块", "expect": ["ModuleStart", "ModuleStop"]}
+{"id": "cn_sdo_write", "cat": "cn_colloquial", "q": "EtherCAT 写从站对象字典", "expect": ["EC_CoE_SDOWrite"]}
+{"id": "addr_xh_dm", "cat": "address", "q": "KV-XH 软元件分配", "expect": ["KV-XH_DeviceMap", "软元件分配"]}
+{"id": "addr_x_buf", "cat": "address", "q": "KV-X 缓冲存储器地址", "expect": ["KV-X_DeviceMap", "缓冲存储器"]}
+{"id": "addr_sh04pl", "cat": "address", "q": "KV-SH04PL 缓冲存储器", "expect": ["KV-SH04PL"]}
+{"id": "hw_ad", "cat": "hardware", "q": "模拟量输入模块 4-20mA", "expect": ["KV-AD", "KV-SAD", "KV-XAD", "模拟量", "KV-AD_DA"]}
+{"id": "hw_hsc", "cat": "hardware", "q": "高速计数器模块", "expect": ["KV-SSC02", "高速计数", "KV-SC20V"]}
+{"id": "hw_temp", "cat": "hardware", "q": "温度控制模块 热电偶", "expect": ["KV-TF40", "KV-TP40", "温度"]}
+{"id": "hw_serial", "cat": "hardware", "q": "RS-232C 串口通信模块", "expect": ["KV-L21V", "KV-L20V", "KV-XL", "串行"]}
+{"id": "hw_ec01", "cat": "hardware", "q": "KV-EC01 EtherCAT 耦合器", "expect": ["KV-EC01"]}
+{"id": "hw_xhec", "cat": "hardware", "q": "EtherCAT 运动控制单元 KV-XH16EC", "expect": ["KV-XHEC", "XH16EC", "KV-XHECL"]}
+{"id": "hw_pos", "cat": "hardware", "q": "脉冲定位模块", "expect": ["KV-SH04PL", "SimplePos", "KV-ML", "定位"]}
+{"id": "hw_eip_unit", "cat": "hardware", "q": "EtherNet/IP 单元", "expect": ["KV-XLE", "KV-EP02", "KvsEtherNetIP", "EtherNet/IP"]}
+{"id": "ui_esi", "cat": "ui", "q": "注册 ESI 文件", "expect": ["ESI", "KvsEtherCAT"]}
+{"id": "ui_eds", "cat": "ui", "q": "添加 EDS 文件", "expect": ["EDS", "KvsEtherNetIP"]}
+{"id": "ui_unit_edit", "cat": "ui", "q": "单元编辑器添加模块", "expect": ["单元编辑", "UNITEDT"]}
+{"id": "ui_var_editor", "cat": "ui", "q": "变量编辑窗口", "expect": ["变量编辑"]}
+{"id": "ui_axis_conf", "cat": "ui", "q": "轴设定 批量登录轴", "expect": ["批量登录", "轴设定"]}

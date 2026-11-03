@@ -1,0 +1,15 @@
+## 技术规格
+
+<table><tr><td colspan="3">型号</td><td colspan="2">KV-B8XTD(8 + 8点)</td><td colspan="2">KV-C16XTD(16 + 16点)</td><td colspan="2">KV-C32XTD(32 + 32点)</td></tr><tr><td colspan="3">外部连接方式</td><td colspan="2">可拆卸端子排</td><td colspan="2">连接器(MIL 标准)*1</td><td colspan="2"></td></tr><tr><td rowspan="16">输入</td><td colspan="2">输入点数</td><td colspan="2">8点</td><td colspan="2">16点</td><td colspan="2">32点</td></tr><tr><td colspan="2">输入模式</td><td>24VDC 模式</td><td>5VDC 模式</td><td>24VDC 模式</td><td>5VDC 模式</td><td colspan="2">24VDC 模式*3</td></tr><tr><td colspan="2">最大输入电压</td><td colspan="6">26.4 VDC</td></tr><tr><td colspan="2">额定输入电压</td><td>24VDC/5.3mA</td><td>5VDC/1mA</td><td>24VDC/5.3mA</td><td>5VDC/1mA</td><td colspan="2">24VDC/4.1mA</td></tr><tr><td colspan="2">额定输入电压</td><td>19V</td><td>3.5V</td><td>19V</td><td>3.5V</td><td colspan="2">19V</td></tr><tr><td colspan="2">最大 OFF 电流</td><td>1.5mA</td><td>-</td><td>1.5mA</td><td>-</td><td colspan="2">1.5mA</td></tr><tr><td colspan="2">最大 OFF 电压</td><td>-</td><td>1.5V</td><td>-</td><td>1.5V</td><td colspan="2">-</td></tr><tr><td colspan="2">公共点方式</td><td colspan="2">8点/公共点(1个端子)*4</td><td colspan="2">16点/公共点(1个端子)*4</td><td colspan="2">32点/公共点(2个端子)*2</td></tr><tr><td rowspan="7" colspan="2">输入时间常数</td><td colspan="6"></td></tr><tr><td rowspan="2">输入时间常数设定</td><td colspan="2">OFF→ON</td><td colspan="3">ON→OFF</td></tr><tr><td>TYP</td><td>MAX</td><td>TYP</td><td colspan="2">MAX</td></tr><tr><td>25μs</td><td>25μs</td><td>65μs</td><td>75μs</td><td colspan="2">120μs</td></tr><tr><td>300μs</td><td>275μs</td><td>365μs</td><td>275μs</td><td colspan="2">420μs</td></tr><tr><td>1ms</td><td>1ms</td><td>1.2ms</td><td>1ms</td><td colspan="2">1.2ms</td></tr><tr><td>10ms</td><td>10ms</td><td>12ms</td><td>10ms</td><td colspan="2">12ms</td></tr><tr><td colspan="2">输入阻抗</td><td colspan="4">4.3kΩ</td><td colspan="2">5.6kΩ</td></tr><tr><td rowspan="8">输出</td><td colspan="2">输出点数</td><td colspan="2">8点</td><td colspan="2">16点</td><td colspan="2">32点</td></tr><tr><td colspan="2">输出模式</td><td colspan="6">MOSFET(N-ch)(具有过电流保护功能)</td></tr><tr><td colspan="2">额定负载</td><td colspan="2">30VDC 0.3A</td><td colspan="4">30VDC 0.2A</td></tr><tr><td colspan="2">OFF时泄漏电流</td><td colspan="6">100μA以下</td></tr><tr><td colspan="2">ON时剩余电压</td><td colspan="6">0.5V以下</td></tr><tr><td colspan="2">公共点方式</td><td colspan="2">8点/公共点(1个端子)*4</td><td colspan="2">16点/公共点(1个端子)*4</td><td colspan="2">32点/公共点(2个端子)*2</td></tr><tr><td rowspan="2">运行时间</td><td>OFF→ON</td><td colspan="4">100μs以下</td><td colspan="2">150μs以下</td></tr><tr><td>ON→OFF</td><td colspan="6">300μs以下</td></tr><tr><td colspan="3">内部消耗电流</td><td colspan="2">30mA以下</td><td colspan="2">40mA以下</td><td colspan="2">65mA以下</td></tr><tr><td colspan="3">重量</td><td colspan="2">约130g</td><td colspan="2">约110g</td><td colspan="2">约130g</td></tr></table>
+
+\*1 依据 MIL-C-83503
+
+\*2 KV-C32XTD 各有 2 点输入用 COM 和输出用 COM，且内部通用。输入和输出的 COM 分别独立。
+
+\*3 所有端子均支持 2 线制（但是，不支持 2 线制接近传感器 EV 系列）
+
+\*4 输入和输出的 COM 分别独立。
+
+☐ “KV-B8XTD 内部回路图（输入）”，第 2-35 页 ☐ “KV-C16XTD 内部回路图（输入）”，第 2-36 页
+
+“KV-C32XTD 内部回路图（输入）”，第 2-37 页

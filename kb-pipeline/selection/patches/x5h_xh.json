@@ -1,0 +1,392 @@
+[
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH64EC",
+  "field": "compatible_cpus",
+  "old": "KV-X550/X530/X520/X500/X310；KV-8000/8000A；KV-7500/7300（各有功能版本要求，合并单元格对应关系需核对原PDF）",
+  "new": "KV-X550/X530/X520/X500/X310：功能版本1.0或更高；KV-8000/8000A：功能版本2.6或更高；KV-7500/7300：功能版本2.4或更高",
+  "status": "corrected",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": "合并单元格按线条判断：64EC与32EC共用一个合并格(X系列1.0、8000/8000A 2.6、7500/7300 2.4)，16EC单独一列(1.0/1.0/2.3)；原值缺版本要求"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH32EC",
+  "field": "compatible_cpus",
+  "old": "KV-X550/X530/X520/X500/X310；KV-8000/8000A；KV-7500/7300（各有功能版本要求，合并单元格对应关系需核对原PDF）",
+  "new": "KV-X550/X530/X520/X500/X310：功能版本1.0或更高；KV-8000/8000A：功能版本2.6或更高；KV-7500/7300：功能版本2.4或更高",
+  "status": "corrected",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": "合并单元格按线条判断：64EC与32EC共用一个合并格(X系列1.0、8000/8000A 2.6、7500/7300 2.4)，16EC单独一列(1.0/1.0/2.3)；原值缺版本要求"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH16EC",
+  "field": "compatible_cpus",
+  "old": "KV-X550/X530/X520/X500/X310；KV-8000/8000A；KV-7500/7300（各有功能版本要求，合并单元格对应关系需核对原PDF）",
+  "new": "KV-X550/X530/X520/X500/X310：功能版本1.0或更高；KV-8000/8000A：功能版本1.0或更高；KV-7500/7300：功能版本2.3或更高",
+  "status": "corrected",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": "合并单元格按线条判断：64EC与32EC共用一个合并格(X系列1.0、8000/8000A 2.6、7500/7300 2.4)，16EC单独一列(1.0/1.0/2.3)；原值缺版本要求"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH64EC",
+  "field": "max_units_per_cpu",
+  "old": "3台/CPU",
+  "new": "3台/CPU",
+  "status": "confirmed",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": ""
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH32EC",
+  "field": "max_units_per_cpu",
+  "old": "7台/CPU",
+  "new": "7台/CPU",
+  "status": "confirmed",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": ""
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH16EC",
+  "field": "max_units_per_cpu",
+  "old": "14台/CPU（KV-7300时最多15台）",
+  "new": "14台/CPU（KV-7300时最多15台）",
+  "status": "confirmed",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": "脚注*1：CPU为KV-7300时最多15台"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH16EC",
+  "field": "notes(旧版手册对照)",
+  "old": "旧版KV-XHEC.pdf写可连CPU为KV-8000/8000A/7500/7300、最大15台",
+  "new": "旧版确为：可连接CPU KV-8000/8000A7500/7300(印刷无分隔)、最大连接台数15台、控制周期125µs~、内部消耗160mA以下、约190g、16轴",
+  "status": "confirmed",
+  "source": "KV-XHEC.pdf PDF页36(印刷1-18)",
+  "note": "旧版无X系列、无功能版本、无14台/KV-7300才15台的区分；新版XHECL已更新为14台(7300为15台)，现有note描述正确"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH16EC",
+  "field": "控制周期",
+  "old": "125µs～2ms",
+  "new": "125µs~2ms",
+  "status": "confirmed",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": "旧版KV-XHEC为\"125µs~\""
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH64EC",
+  "field": "控制周期",
+  "old": "125µs～4ms",
+  "new": "125µs~4ms(2ms以后以1ms为单位)",
+  "status": "confirmed",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": ""
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH64EC",
+  "field": "内部消耗电流",
+  "old": "400mA以下",
+  "new": "400mA以下",
+  "status": "confirmed",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": "宽度48mm 重量约310g"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH32EC",
+  "field": "控制周期",
+  "old": "125µs～4ms",
+  "new": "125µs~4ms(2ms以后以1ms为单位)",
+  "status": "confirmed",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": ""
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH32EC",
+  "field": "内部消耗电流",
+  "old": "400mA以下",
+  "new": "400mA以下",
+  "status": "confirmed",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": "宽度48mm 重量约310g"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH16EC",
+  "field": "内部消耗电流",
+  "old": "160mA以下",
+  "new": "160mA以下",
+  "status": "confirmed",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": "宽42mm 重量约190g"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH64EC",
+  "field": "axes",
+  "old": "64",
+  "new": "64",
+  "status": "confirmed",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": "XHECL写64轴；KvsMotion附-5控制轴数行印刷为16轴(与同表控制周期行500µs:~64轴矛盾,疑手册笔误)，以XHECL为准"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH32EC",
+  "field": "axes",
+  "old": "32",
+  "new": "32",
+  "status": "confirmed",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": ""
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH16EC",
+  "field": "axes",
+  "old": "16",
+  "new": "16",
+  "status": "confirmed",
+  "source": "KV-XHECL.pdf PDF页38(印刷1-18)",
+  "note": ""
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH64EC",
+  "field": "每节点传输字节数",
+  "old": "128字节",
+  "new": "128字节",
+  "status": "confirmed",
+  "source": "KvsMotion.pdf PDF页626-627(印刷625-626,附录A-5;任务所给p511是16-1示例程序,非附-5)",
+  "note": "每个节点的传输字节数：X550/530/520/310为1434，XH EC为128"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH64EC",
+  "field": "拓扑",
+  "old": "仅线型拓扑",
+  "new": "仅线型(X系列为线形/星形/环形)",
+  "status": "confirmed",
+  "source": "KvsMotion.pdf PDF页626-627(印刷625-626,附录A-5;任务所给p511是16-1示例程序,非附-5)",
+  "note": ""
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH64EC",
+  "field": "max_ethercat_nodes",
+  "old": "",
+  "new": "64台",
+  "status": "new",
+  "source": "KvsMotion.pdf PDF页626-627(印刷625-626,附录A-5;任务所给p511是16-1示例程序,非附-5)",
+  "note": "连接节点数(附-5表)；另：XH EC将所有EtherCAT节点计入轴数；无自动配置、无PDO停止/重开、通信错误时与所有节点停止通信；KV STUDIO 要求XH64/32EC Ver.11.60以上、XH16EC Ver.9.45以上；点数/轴 5/5/100(附录次页)"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH32EC",
+  "field": "每节点传输字节数",
+  "old": "128字节",
+  "new": "128字节",
+  "status": "confirmed",
+  "source": "KvsMotion.pdf PDF页626-627(印刷625-626,附录A-5;任务所给p511是16-1示例程序,非附-5)",
+  "note": "每个节点的传输字节数：X550/530/520/310为1434，XH EC为128"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH32EC",
+  "field": "拓扑",
+  "old": "仅线型拓扑",
+  "new": "仅线型(X系列为线形/星形/环形)",
+  "status": "confirmed",
+  "source": "KvsMotion.pdf PDF页626-627(印刷625-626,附录A-5;任务所给p511是16-1示例程序,非附-5)",
+  "note": ""
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH32EC",
+  "field": "max_ethercat_nodes",
+  "old": "",
+  "new": "32台",
+  "status": "new",
+  "source": "KvsMotion.pdf PDF页626-627(印刷625-626,附录A-5;任务所给p511是16-1示例程序,非附-5)",
+  "note": "连接节点数(附-5表)；另：XH EC将所有EtherCAT节点计入轴数；无自动配置、无PDO停止/重开、通信错误时与所有节点停止通信；KV STUDIO 要求XH64/32EC Ver.11.60以上、XH16EC Ver.9.45以上；点数/轴 5/5/100(附录次页)"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH16EC",
+  "field": "每节点传输字节数",
+  "old": "128字节",
+  "new": "128字节",
+  "status": "confirmed",
+  "source": "KvsMotion.pdf PDF页626-627(印刷625-626,附录A-5;任务所给p511是16-1示例程序,非附-5)",
+  "note": "每个节点的传输字节数：X550/530/520/310为1434，XH EC为128"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH16EC",
+  "field": "拓扑",
+  "old": "仅线型拓扑",
+  "new": "仅线型(X系列为线形/星形/环形)",
+  "status": "confirmed",
+  "source": "KvsMotion.pdf PDF页626-627(印刷625-626,附录A-5;任务所给p511是16-1示例程序,非附-5)",
+  "note": ""
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH16EC",
+  "field": "max_ethercat_nodes",
+  "old": "",
+  "new": "16台",
+  "status": "new",
+  "source": "KvsMotion.pdf PDF页626-627(印刷625-626,附录A-5;任务所给p511是16-1示例程序,非附-5)",
+  "note": "连接节点数(附-5表)；另：XH EC将所有EtherCAT节点计入轴数；无自动配置、无PDO停止/重开、通信错误时与所有节点停止通信；KV STUDIO 要求XH64/32EC Ver.11.60以上、XH16EC Ver.9.45以上；点数/轴 5/5/100(附录次页)"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH04ML",
+  "field": "compatible_cpus(KV-X500)",
+  "old": "KV-X500含",
+  "new": "○",
+  "status": "confirmed",
+  "source": "KVSHARDX5H.pdf PDF页491(印刷附-25)适用设备一览",
+  "note": "KV-XH16ML/KV-XH04ML 适用○"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH16ML",
+  "field": "compatible_cpus(KV-X500)",
+  "old": "KV-X500含",
+  "new": "○",
+  "status": "confirmed",
+  "source": "KVSHARDX5H.pdf PDF页491(印刷附-25)适用设备一览",
+  "note": "KV-XH16ML/KV-XH04ML 适用○"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-ML16V",
+  "field": "compatible_cpus(KV-X500)",
+  "old": "KV-X500/X300系列为“－”不可用",
+  "new": "－(不可使用)",
+  "status": "confirmed",
+  "source": "KVSHARDX5H.pdf PDF页491(印刷附-25)适用设备一览",
+  "note": "KV-ML16V/MC20V/MC40V/MX1 同行\"-\"；本手册为KV-X500系列手册，KV-X300未单独列"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-MC20V",
+  "field": "compatible_cpus(KV-X500)",
+  "old": "KV-X500/X300系列为“－”不可用",
+  "new": "－(不可使用)",
+  "status": "confirmed",
+  "source": "KVSHARDX5H.pdf PDF页491(印刷附-25)适用设备一览",
+  "note": "KV-ML16V/MC20V/MC40V/MX1 同行\"-\"；本手册为KV-X500系列手册，KV-X300未单独列"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-MC40V",
+  "field": "compatible_cpus(KV-X500)",
+  "old": "KV-X500/X300系列为“－”不可用",
+  "new": "－(不可使用)",
+  "status": "confirmed",
+  "source": "KVSHARDX5H.pdf PDF页491(印刷附-25)适用设备一览",
+  "note": "KV-ML16V/MC20V/MC40V/MX1 同行\"-\"；本手册为KV-X500系列手册，KV-X300未单独列"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH64EC",
+  "field": "compatible_cpus(KV-X500,适用设备一览)",
+  "old": "",
+  "new": "○(该表未标功能版本)",
+  "status": "new",
+  "source": "KVSHARDX5H.pdf PDF页491(印刷附-25)适用设备一览",
+  "note": "同一格含KV-XH64EC/XH32EC/XH16EC；版本要求以KV-XHECL为准"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH32EC",
+  "field": "compatible_cpus(KV-X500,适用设备一览)",
+  "old": "",
+  "new": "○(该表未标功能版本)",
+  "status": "new",
+  "source": "KVSHARDX5H.pdf PDF页491(印刷附-25)适用设备一览",
+  "note": "同一格含KV-XH64EC/XH32EC/XH16EC；版本要求以KV-XHECL为准"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-XH16EC",
+  "field": "compatible_cpus(KV-X500,适用设备一览)",
+  "old": "",
+  "new": "○(该表未标功能版本)",
+  "status": "new",
+  "source": "KVSHARDX5H.pdf PDF页491(印刷附-25)适用设备一览",
+  "note": "同一格含KV-XH64EC/XH32EC/XH16EC；版本要求以KV-XHECL为准"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-SH04PL",
+  "field": "compatible_cpus(KV-X500)",
+  "old": "KV-X550/X530/X520/X500/X310；KV-8000/8000A；KV-7500/7300",
+  "new": "",
+  "status": "unreadable",
+  "source": "KVSHARDX5H.pdf PDF页491(印刷附-25)适用设备一览",
+  "note": "KVSHARDX5H p491适用设备一览表未列KV-SH04PL(该表无此型号)，无法用本页核实；p489/490为用户认证页,与任务无关"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-SIR32XT",
+  "field": "compatible_series(KV-X500)",
+  "old": "KV-X500/KV-X300(适用设备一览○)",
+  "new": "○",
+  "status": "confirmed",
+  "source": "KVSHARDX5H.pdf PDF页491(印刷附-25)适用设备一览",
+  "note": "分类\"高速输入输出单元\"；KV-X300本页未出现"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TD",
+  "field": "compatible_series(KV-X500)",
+  "old": "○（原文写作KVB16TD）",
+  "new": "○",
+  "status": "confirmed",
+  "source": "KVSHARDX5H.pdf PDF页491(印刷附-25)适用设备一览",
+  "note": "输出单元行，印刷为KVB16TD"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64XB",
+  "field": "compatible_series(KV-X500)",
+  "old": "○（原文写作KVC64XB）",
+  "new": "○",
+  "status": "confirmed",
+  "source": "KVSHARDX5H.pdf PDF页491(印刷附-25)适用设备一览",
+  "note": "输入单元行，印刷为KVC64XB"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B/C系列",
+  "field": "compatible_series(KV-X500)",
+  "old": "○",
+  "new": "输入:B16XA/B16XC/C32XA/C32XC/C64XA/C64XB/C64XC○；输出:B8RC/B16RA/B16RC/B16TA/B16TC/B16TD/B16TAP/B16TCP/C32TA/C32TC/C32TD/C32TAP/C32TCP/C64TA/C64TC/C64TD/C64TAP/C64TCP○；输入输出:B8XTD/C16XTD/C32XTD○",
+  "status": "confirmed",
+  "source": "KVSHARDX5H.pdf PDF页491(印刷附-25)适用设备一览",
+  "note": ""
+ },
+ {
+  "file": "cpu.csv",
+  "model": "KV-X530",
+  "field": "max_axes",
+  "old": "64",
+  "new": "64(保留原值)",
+  "status": "unreadable",
+  "source": "KvsMotion.pdf PDF页626-627(印刷625-626,附录A-5;任务所给p511是16-1示例程序,非附-5)",
+  "note": "KvsMotion附-5印刷\"控制轴数\"X530为16轴，但同表控制周期行为500µs:~64轴，且KV-X530连接节点256台，印刷疑为笔误；无法确定，建议人工查KV-X500/X300系列运动控制手册他处。X550 256/X520 32/X310 12 印刷如此"
+ }
+]

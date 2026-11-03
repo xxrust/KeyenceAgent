@@ -1,0 +1,899 @@
+cn_desc	identifier	df
+原点复归	MC_Home	2531
+原点复归	ORG	2531
+减速停止	MC_Stop	1670
+速度更改	CHGSP	1477
+同步控制	MC_SyncControl	1421
+定位速度更改	MC_ChangeTargetVelocity	1226
+同步凸轮切换	MC_SwitchCam	1155
+定时器	TMR	1153
+目标坐标更改	CHGTGT	1105
+转矩控制	MC_TorqueControl	1082
+示教	MC_Teach	1013
+示教	TCH	1013
+定位目标坐标更改	MC_ChangeTargetPosition	1009
+主轴相位补偿	MC_MainAxisPhasing	1003
+高速原点移动	MC_FastMoveToHome	893
+最小	MIN	772
+标号	LABEL	745
+动作使能	MC_OperationEnable	657
+文件名	Src	596
+伺服ON	MC_Power	522
+辅助轴相位补偿	MC_AuxAxisPhasing	458
+定位运转	PSTRT	380
+立即停止	MC_ImmediateStop	312
+绝对值	ABS	287
+置位	SET	265
+置位	BSET	265
+计数器（当前值）	CC	249
+消零	CR2814	231
+定位M代码OFF指令	MC_MCodeOff	230
+JOG运转	MC_Jog	206
+凸轮曲线	Curve	203
+位移	Displacement	199
+特殊数据	Dst	197
+0 位	Dst	184
+0 位	Result	184
+0 位	Detail	184
+定时器（当前值）	TC	180
+完成通知	Result	175
+目标值	SV	158
+加法	ADD	154
+减法	SUB	146
+开始速度V0	StartVel*1	132
+程序编号	Detail	132
+结束速度V1	EndVel*2	131
+批量传输	FillMove	120
+绝对值编码器	ABSENC	120
+JOG 动作	JOG	118
+中断使能	EI	111
+取出	MPP	103
+处理内容	Src	103
+条件分支	CJ	96
+积分常数	Ti	86
+加 1	INC	85
+输入刷新	RFSX	80
+正弦	SIN	78
+右移	CAL>>	72
+右移	SHR	72
+加法运算	CAL+	69
+加法运算	C_ADD	69
+左移	CAL<<	67
+左移	SHL	67
+参数保存	MC_SaveParameter	63
+异或	XOR	61
+减法运算	CAL-	60
+减法运算	C_SUB	60
+“与”A	C_ANDA	56
+除法	DIV	56
+升序	TRUE	54
+中断禁止	DisableInterrupt	53
+正切	TAN	53
+同步接点输出参数更改	MC_UpdateSyncContactParameter	52
+输出刷新	RFSY	48
+乘法	MUL	46
+减 1	DEC	46
+余弦	COS	45
+微分常数	Td	45
+邮件发送完成代码	SendResult	44
+除法运算	CAL/	44
+除法运算	C_DIV	44
+读取当前速度	U_PosReadActVel	43
+写入当前坐标更改	U_PosWriteChgPos	42
+模块执行开始	MDSTRT	42
+读取当前坐标	U_PosReadActPos	42
+启动单元程序	UPSTRT	41
+范围比较	ZoneCmp	36
+降序	FALSE	36
+读取定位M代码编号	U_PosReadMCode	33
+运算周期	CalcTime	33
+单元程序强制结束	UPStop	32
+单元程序强制结束	UPSTOP	32
+逻辑“或”	CAL	31
+逻辑或	OR	31
+单元程序开始	UPStart	30
+乘法运算	CAL*	28
+乘法运算	C_MUL	28
+写入速度控制速度指令	U_PosWriteVelCtrlCmdVel	28
+取反输出	OUB	28
+用户信息显示	AWSHOW	28
+读取指令速度	U_PosReadCmdVel	28
+平方根	SQRT	27
+平方根	ROOT	27
+数据比较	C_CMP	27
+逻辑“异或”	C_EORA	27
+逻辑异或	CAL^	27
+采样周期（TS）	Param	27
+位计数	BitCount	26
+数据交换	Exchange	26
+重写	MC_SetOverride	26
+读取指令坐标	U_PosReadCmdPos	25
+并联连接	ORL	22
+中断禁止范围	DisableInterruptRange	21
+以太网端口号	Port	21
+写入速度控制转矩限制	U_PosWriteVelCtrlTrqLimit	21
+折线近似	ApproxCal	21
+日志数据获取	TRGD	21
+模块执行停止	MDSTOP	21
+获取邮件发送结果	U_MailStatus	21
+AT滞后	ATHys	20
+延时断开	OFDL	20
+循环右移	ROR	20
+循环左移	ROL	20
+用户消息显示	AWSHOW	20
+读取缓冲数据	U_ReadBuf	20
+倾斜信号	Ramp	19
+倾斜信号	RAMP	19
+闪变	FLIK	19
+数据扩展	C_EXT	18
+串联连接	ANL	17
+写入转矩控制转矩指令	U_PosWriteTrqCtrlCmdTrq	17
+逻辑“或”运算	ORA	17
+逻辑与	CAL&	17
+逻辑与	AND	17
+中断允许	EnableInterrupt	16
+交变	ALT	16
+加一	Inc	16
+读取隐式(I/O)报文通信登录节点表	U_CyclicReadRegister	16
+CIP 消息创建	CPMSET	15
+字节组合	UniteByte	15
+字节组合	UNIB	15
+时间分割比例输出	TimeProportionalOut	15
+时间分割比例输出	TPOUT	15
+读取频率	U_CntReadHz	15
+余弦值→角度弧度	ACOS	14
+余弦值→角度（弧度）	ACOS	14
+动作允许	MC_OperationEnable	14
+取反装入	LDB	14
+延时接通	ONDL	14
+正切值→角度（弧度）	ATAN	14
+正弦值→角度（弧度）	ASIN	14
+缓冲存储器读取	UREAD	14
+逻辑“与”运算	ANDA	14
+逻辑“异或”运算	EORA	14
+CIP 消息获取	CPMGET	13
+“或”A	C_ORA	13
+同步型跟踪控制	MC_SyncTypeFollowUpControl	13
+字节分离	DISB	13
+字节分解	DisperseByte	13
+字节分解	DISB	13
+符号求反	NEG	13
+主控程序	MC	12
+区域控制	ZONE	12
+读取转速	U_CntReadRPM	12
+.L（32 位有符号数据型）	Z*	11
+ON/OFF 状态反转	INV	11
+存储 A	C_STA	11
+缓冲存储器写入	UWRIT	11
+角度（弧度）→余弦值	COS	11
+角度（弧度）→正切值	TAN	11
+角度（弧度）→正弦值	SIN	11
+位或	BOR	10
+写入平均常数	U_ADWriteAverage	10
+排序顺序	Order	10
+日志、跟踪使能	LoggingEnable	10
+8 位编码	ENCO	9
+8位编码	Encode	9
+截取字符串	MID	9
+截取字符串	SMID	9
+暂停流程	UFSuspend	9
+更改D/A转换输出数据	U_DAWrite	9
+移动到起始位置	HOME	9
+读取A/D转换特殊数据	U_ADRead	9
+8 位解码	DECO	8
+8位解码	Decode	8
+上限/下限值控制	LIMIT	8
+去能记录/跟踪	LOGD	8
+坐标→角度(弧度)	ATAN2	8
+坐标→角度（弧度）	ATAN2	8
+符号取反	C_NEG	8
+读取隐式(I/O)报文通信错误中节点表	U_CyclicReadErr	8
+部分传输	PartialMove	8
+“＋”号省略	CR2815	7
+使能记录/跟踪	LOGE	7
+全部结束	ENDH	7
+点运转	MC_MoveToPoint	7
+获取 CIP 消息	CPMGET	7
+'如果 R1000 为 OFF，	ELSE	6
+中断条件设定	IEDGE	6
+位输出	BOUT	6
+写入 FIFO 表	FIFOW	6
+区间控制	ZONE	6
+数据传送	MOV	6
+暂停单元程序	UFSUS	6
+最大值检索	AryMax	6
+最小值检索	AryMin	6
+0（等速度）	Curve	5
+4 位数据解码	MPX	5
+下一个	NEXT	5
+主控程序复位	MCR	5
+写入 LIFO 表	LIFOW	5
+写入KV套接字UDP通信目标	U_SockUDPTo	5
+单元类型判定	IS_***	5
+右移（位单位）	SRA	5
+字符串查找	FIND	5
+字符串查找	INSTR	5
+字符串查找	SFIND	5
+字符串查找	SFINDN	5
+存储地址减 1	ADRDEC	5
+存储地址加 1	ADRINC	5
+将指定位的输出置于 OFF	RES	5
+左移（位单位）	SLA	5
+恢复单元程序	UFRSM	5
+指定位的输出 ON	SET	5
+插补运行定位目标坐标更改	MC_ChangeTargetGroupPositions	5
+数据检索	DataSearch	5
+自然对数运算	LN	5
+自然对数运算	LOG	5
+FIFO写入	FIFOWrite	4
+PING发送	Ping	4
+减一	Dec	4
+右移（以位为单位）	SHR	4
+字符串插入	INSERT	4
+字符串插入	C_SINS	4
+字符串插入	SINS	4
+左移（以位为单位）	SHL	4
+批量传送	FMOV	4
+无变化	CR2009	4
+无变化	CR2010	4
+无变化	CR2011	4
+无变化	CR2012	4
+日期/时间数据→秒数据	SEC	4
+流程重新开始	UFRSM	4
+测量值	PV	4
+获取记录数据	TRGD	4
+设定邮件正文	U_MailText	4
+连续传输	BlockMove	4
+隐式(I/O)报文通信输入数据刷新	RefreshCyclicInput	4
+'则结束该循环控制	BREAK	3
+'如果 R0002 为 OFF，	ELSE	3
+'如果 R1000 不为 ON（OFF），	ELSE	3
+.D（无符号 32 位数据型）	CTH	3
+4 位数据的 7 段译码	SEG	3
+与星期 OFF	ANDWKB	3
+与星期 ON	ANDWK	3
+二进制→BCD 数转换	TBCD	3
+位状态	BLD	3
+分数据（0～59）	Min	3
+删除存储文件	StorageDeleteFile	3
+字符串比较	StringCmp	3
+字符串比较	C_SCMP	3
+将连续的位信息传输到指定位置	PMOV	3
+将连续的位信息传送到指定位置	PMOV	3
+将连续的字节串信息传输到指定位置（H→L）	BYBMOV	3
+将连续的字节串信息传输到指定位置（L→H）	BYLMOV	3
+将连续的字节串信息传送至指定位置（H→L）	BYBMOV	3
+将连续的字节串信息传送至指定位置（L→H）	BYLMOV	3
+年数据（0～99）	Year	3
+度（°）→以弧度为单位转换	RAD	3
+度（°）→弧度单位换算	RAD	3
+弧度→度（°）单位换算	DEG	3
+循环通信输入更改	RFSCI	3
+成批传送字块数据	BMOV	3
+或星期 OFF	ORWKB	3
+或星期 ON	ORWK	3
+数值数据 → ASCII 码	STR	3
+日志、跟踪去能	LoggingDisable	3
+日数据（1～31）	Day	3
+时数据（0～23）	Hour	3
+时间→秒转换	TimeToSec	3
+星期 OFF	LDWKB	3
+星期 ON	LDWK	3
+星期数据（0～6）	DayOfWeek	3
+更改循环通信输出	RFSCO	3
+更新运动系统变量	MC_RefreshMotionVariable	3
+月数据（1～12）	Month	3
+有自动矫正功能的PID控制	PIDAT	3
+滞后时间 (T1)	LagTime	3
+生成 CIP 消息	CPMSET	3
+用户信息显示解除	AWHIDE	3
+秒数据→日期/时间数据	RSEC	3
+秒数据（0～59）	Sec	3
+立即停止所有轴	MC_ImmediateStopAll	3
+算术右移（位单位）	ASRA	3
+算术左移（位单位）	ASLA	3
+装入 A	C_LDA	3
+计算指定块的 CRC 值	CRC	3
+设定KV套接字TCP(无协议)接收	U_SockNonProcRecvSetting	3
+读出 FIFO 表	FIFOR	3
+读出 LIFO 表	LIFOR	3
+超前时间 (T2)	LeadTime	3
+4 位数据的 7 段解码	SEG	2
+AT调整参数（0.01～10.0）	ATFineTune	2
+BIN→格雷码转换	BinToGrayCode	2
+CoE PDO通信停止	EC_CoE_PDOStop	2
+CoE PDO通信重新开始	EC_CoE_PDORestart	2
+CoE SDO写入	EC_CoE_SDOWrite	2
+CoE SDO读取	EC_CoE_SDORead	2
+FIFO读取	FIFORead	2
+TCP套接字接收(指定数据长度)	SocketTCP_Recv	2
+中断条件设置	IEDGE	2
+从 FIFO 表读取	FIFOR	2
+从 LIFO 表读取	LIFOR	2
+位与	BAND	2
+停止同步仿真机械同步	MC_StopSimMechanicalSync	2
+写入存储文件(BIN数据)	StorageWriteBin	2
+写入计数当前值	U_CntWriteCounter	2
+减算存储地址	ADRSUB	2
+加算存储地址	ADRADD	2
+动作方向（TRUE：正动作、FALSE：逆动作）	Direction	2
+十六进制 ASCII 代码→字符转换	CHR	2
+十六进制 ASCII 码→字符转换	CHR	2
+十六进制ASCII字符码→BIN数据转换	AsciiToBinary	2
+取余	MOD	2
+变量复位	Clear	2
+四舍五入（多重定义）	TRUNC_**	2
+复位优先保持	RS	2
+复制存储文件	StorageCopy	2
+复用器	MUX	2
+字符串→UTF-16数据转换	StringToUTF16Code	2
+字符串两端的半角空格・标签删除	TRIM	2
+字符串右端的半角空格・标签删除	RTRIM	2
+字符串左端的半角空格・标签删除	LTRIM	2
+字符串截取	MID	2
+字符串截取	SMID	2
+字符串指定位置的半角空格・标签删除	STRIM	2
+字符串检索	FIND	2
+字符串检索	INSTR	2
+字符串检索	SFIND	2
+字符串检索	SFINDN	2
+字节连续传输	ByteBlockMove	2
+小数舍去	TRUNC_**	2
+带自动矫正功能的 PID 控制	PIDAT	2
+弧度→度（°）单换转换	DEG	2
+弧度→角度转换	RadToDeg	2
+微秒→时间转换	MicroSecToTime	2
+恢复流程	UFResume	2
+手动模式切换	ManualMode	2
+执行GetAttributeSingle	CipGetAttributeSingle	2
+执行SetAttributeSingle	CipSetAttributeSingle	2
+指定刷新输入状态的对象的开头	Start	2
+指定块内的 CRC 值计算	CRC	2
+指定块的复位（存储 0）	ZRES	2
+指定隐式(I/O)报文通信停止请求对象节点	U_CyclicStop	2
+指定隐式(I/O)报文通信重新开始请求对象节点	U_CyclicStart	2
+收件人组编号	AddressGroup	2
+数组右移	AryShiftR	2
+数组复位	AryReset	2
+数组左移	AryShiftL	2
+日志、跟踪触发	LoggingTrigger	2
+日志记录数据获取	TRGD	2
+日期和时间→秒转换	DtToSec	2
+时间→微秒转换	TimeToMicroSec	2
+时间→毫秒转换	TimeToMilliSec	2
+时间乘法	MUL_TIME	2
+时间减法	SUB_TIME	2
+时间加法	ADD_TIME	2
+时间除法	DIV_TIME	2
+星期获取	GetDayOfWeek	2
+更改当前坐标	MC_SetPosition	2
+格雷码→BIN转换	GrayCodeToBin	2
+毫秒→时间转换	MilliSecToTime	2
+流程暂停	UFSUS	2
+用户消息显示解除	AWHIDE	2
+秒→日期和时间转换	SecToDt	2
+秒→时间转换	SecToTime	2
+移动存储文件	StorageMove	2
+算术右移（以位为单位）	ASRA	2
+算术左移（以位为单位）	ASLA	2
+置位优先保持	SR	2
+自然指数运算	EXP	2
+获取存储可用空间	StorageGetCapacity	2
+获取存储文件列表	StorageGetFileList	2
+获取存储文件状态	StorageGetStatus	2
+获取数组结束编号	UPPER_BOUND	2
+获取运转记录数据	OperationRecordCapture	2
+角度→弧度转换	DegToRad	2
+解除定位待机	MC_ReleaseStandby	2
+设定KV套接字打开	U_SockOpen	2
+设定输入中断检测条件	SetInputInterruptCondition	2
+设定邮件主题	U_MailSubject	2
+读取全部类型的A/D转换数据	U_ADReadBlock	2
+读取存储文件(BIN数据)	StorageReadBin	2
+读取计数当前值	U_CntReadCounter	2
+超前滞后过滤	LeadLagFilter	2
+隐式(I/O)报文通信输出数据刷新	RefreshCyclicOutput	2
+'加上增量值，返回 FOR~	NEXT	1
+4位数据译码	MPX	1
+下降沿检测	F_TRIG	1
+传感器参数写入	SPWR	1
+传感器参数读取	SPRD	1
+位复位	BitReset	1
+位置位	BitSet	1
+写入上下限报警值	U_DAWriteUpperLowerLimit	1
+写入定位开始点编号	U_PosWritePointNo	1
+写入定位速度更改	U_PosWriteChgVel	1
+功能块调用	FBCALL	1
+功能块调用	FBEXEC	1
+子程序返回	RET	1
+字符串分解	SplitN	1
+字符串分解	SPLIT	1
+字符串部分删除	DELETE	1
+字符串部分删除	C_SDEL	1
+字符串部分删除	SDEL	1
+成块传送	BMOV	1
+按字节单位反转位的排列（顺序）	BitOrder	1
+操作量	MV	1
+缓冲存储器批量写入	UnitBufMemFill	1
+获取数组要素数	GetAryCount	1
+设定输出过电流保护功能	U_DisableOverCP	1
+读取KV套接字处理状态	U_SockStatus	1
+读取定位当前点编号	U_PosReadCurrentPointNo	1
+（始终省略）	TRUE	1
+.D 数据类型转换	TOD	0
+.L 数据类型转换	TOL	0
+.S 数据类型转换	TOS	0
+.U 数据类型转换	TOU	0
+100ms32位减定时器	TMR	0
+100ms32位减法定时器	TMR	0
+10ms32位减定时器	TMH	0
+10ms32位减法定时器	TMH	0
+10ms高速定时器	TMH	0
+10µs32位减定时器	TMU	0
+10μs 高速定时器	TMU	0
+10μs32位减法定时器	TMU	0
+10进制 ASCII 字符串→二进制数据	RDASC	0
+16进制 ASCII 字符串→二进制数据	RHASC	0
+1ms 高速定时器	TMS	0
+1ms32位减定时器	TMS	0
+1ms32位减法定时器	TMS	0
+2自由度参数α（0.0～1.0）	Alpha	0
+2自由度参数β（0.0～1.99…）	Beta	0
+2自由度参数γ（0.0～2.0）	Gamma	0
+32位加法计数器	CNT	0
+32位加计数器	CNT	0
+4 位数据编码	DMX	0
+BCD → 二进制数转换	TBIN	0
+BCD 数据→二进制数据转换	TBIN	0
+BCD 数据类型转换（多重定义）	TO_BCD_**	0
+BCD 数据转换（数据类型指定）	*_TO_BCD_**	0
+BCD→BIN数据类型转换	BCD_TO_**	0
+BIN→BCD数据类型转换	TO_BCD_**	0
+BIN数据→十六进制ASCII字符码转换	BinaryToAscii	0
+BIN数据→十六进制字符码转换	NumToHexString	0
+BIN数据→十进制字符串转换	NumToDecString	0
+CIP 字符串转换	CPSASC	0
+CIP 字符串逆转换	RCPSASC	0
+CIP字符串→字符串转换	CipStringToString	0
+CIP字符串的逆转换	RCPSASC	0
+CIP字符串转换	CPSASC	0
+CRC校验值计算	AryCRC	0
+FIFO删除	FIFODelete	0
+FIFO插入	FIFOInsert	0
+FREE RUN 计数器刷新	RFSFRC	0
+TCP套接字主动打开	SocketTCP_ActiveOpen	0
+TCP套接字发送	SocketTCP_Send	0
+TCP套接字接收(指定定界符)	SocketTCP_RecvDelimiter	0
+TCP套接字被动打开	SocketTCP_PassiveOpen	0
+UDP套接字发送	SocketUDP_Send	0
+UDP套接字接收	SocketUDP_Recv	0
+UTF-16数据→字符串转换	UTF16CodeToString	0
+上下限限制	LIMIT	0
+上升沿差分	DIFU	0
+上升沿检测	R_TRIG	0
+下降沿差分	DIFD	0
+与反脉冲上升沿	ANPB	0
+与反脉冲下降沿	ANFB	0
+与脉冲上升沿	ANP	0
+与脉冲下降沿	ANF	0
+中断去能	DI	0
+中断去能范围的设置	DIC	0
+中断定位连续运转	MC_SuspendNextPositioning	0
+临时存储器	TM	0
+主离合器控制	MC_MainClutch	0
+二路选择器	SEL	0
+二进制→倍精度浮动小数点型实数转换	DFLOAT	0
+二进制→倍精度浮动小数点型实数转换	TODF	0
+二进制→十六进制 ASCII 代码转换	ASC	0
+二进制→十六进制 ASCII 字符串转换	HASC	0
+二进制→十进制 ASCII 字符串转换	DASC	0
+二进制→单精度小数点型实数数据转换	FLOAT	0
+二进制→单精度浮动小数点型实数转换	FLOAT	0
+二进制→单精度浮动小数点型实数转换	TOF	0
+二进制→双精度小数点型实数数据转换	DFLOAT	0
+二进制数据 → 十六进制 ASCII 字符串	HASC	0
+二进制数据 → 十进制 ASCII 字符串	DASC	0
+二进制数据→ 十六进制 ASCII 代码转换	ASC	0
+二进制数据→BCD 数据转换	TBCD	0
+二进制数据→格雷码转换	GRY	0
+二进制数据分解排序	SORTN	0
+二进制数据拆分排序	SORTN	0
+二进制数据排序	SORT	0
+从存储体(存储卡/CPU存储器)的文件读取1行	MREADL	0
+从软元件信息写入位列	DevInfoWrite	0
+从软元件信息读取位列	DevInfoRead	0
+从软元件信息读取位列（带偏移量）	DevInfoOffsetRead	0
+从软元件写入位列	DevInfoOffsetWrite	0
+从软元件读取位列	DevInfoOffsetRead	0
+任意的标签	IN-OUT	0
+位加载	BitLoad	0
+位取反	C_COM	0
+位取反	NOT	0
+位取反与	BANB	0
+位取反或	BORB	0
+位取反输出	BOUB	0
+位批量传输	BitFillMove	0
+位状态取反	BLDB	0
+位软元件右移	BSR	0
+位软元件左移	BSL	0
+位连续传输	BitBlockMove	0
+使能日志记录指定ID	LOGE	0
+停止传感器检测去能	MC_MaskStopSensor	0
+停止程序模块	ModuleStop	0
+关闭套接字	SocketClose	0
+内部辅助继电器	MR	0
+写入KV套接字发送数据	U_SockWriteBuf	0
+写入SV3伺服参数	MC_SV3_WriteServoParameter	0
+写入传感器参数	SPWR	0
+写入存储字符串	StoragePrint	0
+写入定位目标坐标更改(坐标)	U_PosWriteChgTargetPos	0
+写入定位目标坐标更改(速度)	U_PosWriteChgTargetVel	0
+写入定位速度倍率	U_PosWriteOverride	0
+写入定标设定值	U_ADWriteScaling	0
+写入定标设定值	U_DAWriteScaling	0
+写入控制模式更改	U_PosWriteCtrlMode	0
+写入显式报文通信发送数据	U_MsgSend	0
+写入比较器设定值	U_ADWriteCmpLimit	0
+写入比较器设定值0	U_CntWriteCTC0	0
+写入比较器设定值1	U_CntWriteCTC1	0
+写入特殊功能选择	U_PosWriteSelectSpecialFunc	0
+写入缓冲存储器	UWRIT	0
+写入转矩控制速度限制	U_PosWriteTrqCtrlVelLimit	0
+写入预设设定值	U_CntWritePreset	0
+减存储地址	ADRSUB	0
+减法计数器	CTD	0
+减法计数器（DINT）	CTD_DINT	0
+减法计数器（UDINT）	CTD_UDINT	0
+减速停止(轴群组)	MC_GroupStop	0
+凸轮数据写入	MC_CamWrite	0
+凸轮数据自动生成	MC_CamGenerate	0
+凸轮数据读取	MC_CamRead	0
+创建存储文件夹	StorageMakeDir	0
+删除字符串两端的半角空白・标号	TRIM	0
+删除字符串右端的半角空白・标号	RTRIM	0
+删除字符串左端的半角空白・标号	LTRIM	0
+删除字符串指定位置的半角空白・标号	STRIM	0
+删除存储体(存储卡/CPU存储器)文件夹	MRMDIR	0
+删除存储文件夹	StorageRemoveDir	0
+删除数据表指定位置	FDEL	0
+刷新当前值	RFSPS	0
+功能块开始	FBSTRT	0
+功能块的结束	FEND	0
+加减定时器	UpDownTimer	0
+加减计数器	CTUD	0
+加减计数器（DINT）	CTUD_DINT	0
+加减计数器（UDINT）	CTUD_UDINT	0
+加存储地址	ADRADD	0
+加法计数器	CTU	0
+加法计数器（DINT）	CTU_DINT	0
+加法计数器（UDINT）	CTU_UDINT	0
+十六进制 ASCII 代码→二进制转换	RASC	0
+十六进制 ASCII 字符串→二进制转换	RHASC	0
+十六进制 ASCII 码 → 二进制数据转换	RASC	0
+十六进制ASCII字符码→字符串转换	AsciiToString	0
+十六进制字符串→BIN数据转换	HexStringToNum	0
+十进制 ASCII 字符串→二进制转换	RDASC	0
+十进制字符串→BIN数据转换	DecStringToNum	0
+半字节分离	DISN	0
+半字节分解	DisperseNibble	0
+半字节分解	DISN	0
+半字节组合	UniteNibble	0
+半字节组合	UNIN	0
+单次定时器	TP	0
+单次触发	SHOT	0
+单精度/倍精度浮动小数点型实数→二进制数据转换	INTG	0
+单精度小数点型实数→字符串转换	RealToString	0
+单精度小数点型实数→字符串转换	FASC	0
+单精度小数点型实数数据→二进制转换	INTG	0
+单精度小数点型实数的尾数与指数分离	DISF	0
+单精度浮动小数点型实数→字符串	FASC	0
+单精度浮动小数点型实数的尾数与指数分解	DISF	0
+去能日志记录指定ID	LOGD	0
+双精度小数点型实数→字符串转换	LrealToString	0
+反余弦	ACOS	0
+反正切	ATAN	0
+反正弦	ASIN	0
+取反与	ANB	0
+取反或	ORB	0
+取反脉冲上升沿	LDPB	0
+取反脉冲下降沿	LDFB	0
+取最大值	MAX	0
+取最小值	MIN	0
+取脉冲上升沿	LDP	0
+取脉冲下降沿	LDF	0
+变址寄存器出栈恢复	ZPOP	0
+变址寄存器进栈保护	ZPUSH	0
+变量值→字符串转换	VariableToString	0
+右截取字符串	RIGHT	0
+右截取字符串	SRGHT	0
+合并尾数和指数为单精度小数点型实数	UNIF	0
+合并尾数和指数为单精度浮动小数点型实数	UNIF	0
+同步转矩限制离合器控制	MC_TorqueLimitClutch	0
+启动指定的子程序	CALL	0
+启动程序模块	ModuleStart	0
+和校验计算	ArySum	0
+四舍五入（数据类型指定）	*_TRUNC_**	0
+圆弧插补相对位置定位控制	MC_MoveCircularRelative	0
+圆弧插补绝对位置定位控制	MC_MoveCircularAbsolute	0
+在字符串中代入相同的值	FMOV	0
+在存储体(存储卡/CPU存储器)的文件中写入文本	MPRINT	0
+在数据列中带入相同的值	FMOV	0
+在日历定时器中写入时间数据	WTIME	0
+在缓冲存储器的数据串中插入相同的值	UFILL	0
+在缓冲存储器的数据列中插入相同的值	UFILL	0
+坐标指定反正切	ATAN2	0
+块与值的数据比较	BCMPI	0
+块互换	BSWAP	0
+块数据比较	BCMPI	0
+基准位置移动	MC_MoveToBasePosition	0
+复位指定块	ZRES	0
+复制存储体(存储卡/CPU 存储器)的文件	MCOPY	0
+复制存储体(存储卡/CPU存储器)的文件	MCOPY	0
+多控制段比较器	MCMP	0
+多路选择器	MUX	0
+子程序入口	SBN	0
+子程序型宏的启动	MCALL	0
+子程序调用	CALL	0
+字块的批量数据传输	BMOV	0
+字大小获取	WSIZE	0
+字数据的指定位信息	BLD	0
+字数据的指定位反转信息	BLDB	0
+字数据的指定位反转输出	BOUB	0
+字数据的指定位取反信息	BLDB	0
+字数据的指定位输出	BOUT	0
+字数据的指定位输出 OFF	BRES	0
+字数据的指定位输出 ON	BSET	0
+字符串→CIP字符串转换	StringToCipString	0
+字符串→单精度小数点型实数转换	StringToReal	0
+字符串→单精度小数点型实数转换	RFASC	0
+字符串→单精度小数点型实数转换	VAL	0
+字符串→单精度浮动小数点型实数转换	RFASC	0
+字符串→单精度浮动小数点型实数转换	VAL	0
+字符串→双精度小数点型实数转换	StringToLreal	0
+字符串→变量值转换	StringToVariable	0
+字符串两端空格删除	Trim	0
+字符串中间截取	MID	0
+字符串中间截取	C_SMID	0
+字符串传输	StringMove	0
+字符串分离	SPLIT	0
+字符串右截取	RIGHT	0
+字符串右空格删除	TrimR	0
+字符串合并	UNIS	0
+字符串字节分离	DISS	0
+字符串字节分解	DisperseString	0
+字符串字节分解	DISS	0
+字符串字节组合	UniteString	0
+字符串左截取	LEFT	0
+字符串左空格删除	TrimL	0
+字符串组合	CONCAT	0
+字符串连接	CONCAT	0
+字符串部分替换	REPLACE	0
+字符串部分置换	REPLACE	0
+字符串部分置换	SRPLC	0
+字符串长度检测	LEN	0
+字节合计值算出	ByteSum	0
+字节字符串合并	UNIS	0
+字软元件右移	WSR	0
+字软元件左移	WSL	0
+存储体(存储卡/CPU 存储器)写入	MWRIT	0
+存储体(存储卡/CPU 存储器)文件删除	MDEL	0
+存储体(存储卡/CPU 存储器)的文件状态获取	MSTAT	0
+存储体(存储卡/CPU存储器)写入	MWRIT	0
+存储体(存储卡/CPU存储器)文件删除	MDEL	0
+存储体(存储卡/CPU存储器)读取	MREAD	0
+存储体（存储卡/CPU 存储器）文件夹创建	MMKDIR	0
+存储体（存储卡/CPU 存储器）文件夹删除	MRMDIR	0
+定位停止传感器请求	MC_InternalStopSensor	0
+定位原点传感器请求	MC_InternalHomeSensor	0
+定位指定位置停止	MC_StopAtTargetPosition	0
+定位控制(点参数)	MC_MoveToPoint	0
+定位目标坐标更改（插补运行）	MC_ChangeTargetGroupPositions	0
+定时器（设定值）	TS	0
+对象的 ON 位计数	BCNT	0
+小数位数	SubDecCount	0
+左截取字符串	LEFT	0
+左截取字符串	SLEFT	0
+带自动调谐的PID控制	PID	0
+带进位循环右移	RRA	0
+带进位循环左移	RLA	0
+常用对数运算	LOG	0
+常用对数运算	LOG10	0
+幂运算	EXPT	0
+开始加速度A0	StartAcc*3	0
+异或非运算	ENRA	0
+强制执行下一点定位	MC_MoveToNextPoint	0
+总位数	FullCount	0
+成批读出文件寄存器	FRLDM	0
+或反脉冲上升沿	ORPB	0
+或反脉冲下降沿	ORFB	0
+或脉冲上升沿	ORP	0
+或脉冲下降沿	ORF	0
+手动操作量	ManualMV	0
+打开UDP套接字	SocketUDP_Open	0
+执行传感器服务	SSVC	0
+执行显式报文通信	CipMsgService	0
+执行运转记录保存	OperationRecordSave	0
+扩展数据存储器	EM	0
+折线近似（定标）	APR	0
+指定KV套接字以太网端口号	U_SockSelectPort	0
+指定位的上升沿微分	LDP	0
+指定位的上升沿微分的反转	LDPB	0
+指定位的下降沿微分	LDF	0
+指定位的下降沿微分的反转	LDFB	0
+指定块之间的数据比较	BCMP	0
+指定块内的数据检测	SER	0
+指定块内的最大值查找	MAX_RANGE	0
+指定块内的最小值查找	MIN_RANGE	0
+指定块内的检测数据计数	DCNT	0
+指定块数值总计	WSUM	0
+指定块的平均值	AVG	0
+指定子程序的启动	CALL	0
+指定显式报文通信对象	U_MsgTo	0
+指定范围内的数据查找	DSER	0
+指定范围内的数据检索	DSER	0
+指定选择对象	In0	0
+指数函数运算	EXP	0
+按位求反	COM	0
+按字节总计指定块	BSUM	0
+控制存储器	CM	0
+控制继电器	CR	0
+推进迟滞滤波器	LLFLT	0
+插入数据表指定位置	FINS	0
+操作量限制上限值	LimitMaxMV	0
+操作量限制下限值	LimitMinMV	0
+改写数据表指定位置	FWRIT	0
+数值数据→ASCII 字符串转换	STR	0
+数据存储器写入	DW	0
+数据类型转换	*_TO_**	0
+数据类型转换	TO_**	0
+数据类型转换（多重定义）	BCD_TO_**	0
+数据类型转换（多重定义）	TO_**	0
+数据类型转换（数据类型指定）	*_BCD_TO_**	0
+数据类型转换（数据类型指定）	*_TO_**	0
+数据表指定位置的删除	FDEL	0
+数据表指定位置的覆写	FWRIT	0
+数组平均值	AryMean	0
+数组要素数取得	ACNT	0
+文件寄存器模式的切换	FRSET	0
+文件寄存器的成批保存	FRSTM	0
+文件寄存器的批量保存	FRSTM	0
+文件寄存器的批量读取	FRLDM	0
+文件寄存器的组切换	FRSET	0
+文件寄存器（组方式）	FM	0
+文件寄存器（连号方式）	ZF	0
+断电延时定时器	TOF	0
+无条件分支	GOTO	0
+无符号十进制	DM1000.U	0
+无符号十进制	DM1000.D	0
+无进位循环右移	RRNCA	0
+无进位循环右移	ROR	0
+无进位循环左移	RLNCA	0
+无进位循环左移	ROL	0
+日历定时器写入	WriteCalendarTime	0
+日历定时器调整	AJST	0
+日期时间数据转换为秒格式	SEC	0
+显示指定格式	Fmt	0
+显示访问窗消息 1	AWNUM	0
+显示访问窗消息 2	AWMSG	0
+更改存储体(存储卡/CPU 存储器)中的文件名	MREN	0
+更改存储体(存储卡/CPU存储器)中的文件名	MREN	0
+更改特殊数据偏移值	U_ADWriteOffset	0
+更改输出数据偏移值	U_DAWriteOffset	0
+有符号十进制	DM1000.S	0
+有符号十进制	DM1000.L	0
+根据软元件信息写入位列（带偏移量）	DevInfoOffsetWrite	0
+格雷码→二进制数据转换	RGRY	0
+检测指定块内的数据	SER	0
+检索指定块内的最大值	MAX	0
+检索指定块内的最小值	MIN	0
+模块间子例行程序命令	ECALL	0
+模块间子程序调用	ECALL	0
+死区控制	BANDC	0
+求乘方	**	0
+求值的逻辑非值	NOT*3	0
+求值的逻辑非值	NOT*4	0
+浮动小数点型实数有效确认	IS_VALID	0
+清除处理时间最大值	MC_ClearMaxCycleTime	0
+清除套接字接收缓存	SocketClearRecvBuf	0
+清除轴错误/驱动器报警	MC_Reset	0
+清除轴错误／驱动器报警	MC_Reset	0
+状态无变化	_CalcResultNeg	0
+状态无变化	_CalcResultPos	0
+状态无变化	_CalcResultEqual	0
+状态无变化	CR2012	0
+状态无变化	CR2009	0
+状态无变化	CR2010	0
+状态无变化	CR2011	0
+生成存储体（存储卡/CPU存储器）文件夹	MMKDIR	0
+直线插补相对位置定位控制	MC_MoveLinearRelative	0
+直线插补绝对位置定位控制	MC_MoveLinearAbsolute	0
+相对位置定位控制	MC_MoveRelative	0
+确保缓冲存储器	UMALLOC	0
+禁止记录指定ID	LOGD	0
+秒转换为日期时间数据格式	RSEC	0
+移位寄存器	ShiftRegister	0
+移动存储体(存储卡/CPU存储器)的文件	MMOV	0
+结束加速度A1	EndAcc*4	0
+结构体复位	StructReset	0
+结构体排序	StructSort	0
+绝对位置定位控制	MC_MoveAbsolute	0
+绝对位置跟踪控制	MC_AbsolutePosFollowUpControl	0
+缓冲存储器值写入	UnitBufMemWrite	0
+缓冲存储器值读取	UnitBufMemRead	0
+缓冲存储器确保	UMALLOC	0
+缓冲存储器连续写入	UnitBufMemBlockWrite	0
+缓冲存储器连续读取	UnitBufMemBlockRead	0
+自保型宏的启动	MSTRT	0
+自保型宏的结束	MEND	0
+自动调谐执行中	ATBusy	0
+自动调谐执行完成	ATDone	0
+自动调谐执行开始	ATStart	0
+自由运行计数器刷新	RefreshFreerunCounter	0
+自由运行计数器刷新	RFSFRC	0
+范围指定字符串检索	StringSearch	0
+获取位大小	GetBitSize	0
+获取字大小	GetWordSize	0
+获取字大小	WSIZE	0
+获取字节大小	GetByteSize	0
+获取存储体(存储卡/CPU存储器)的文件状态	MSTAT	0
+获取数组起始编号	LOWER_BOUND	0
+获取软元件/变量数据	TRGR	0
+获取软元件信息	DevInfoGet	0
+获取软元件地址	DevAddressGet	0
+获取阵列要素数	ACNT	0
+计数器（设定值）	CS	0
+计算2个数据（位数据关系、字数据关系）的逻辑与	AND*4	0
+计算2个数据（位数据关系、字数据关系）的逻辑与	AND*3	0
+设定中断去能范围	DIC	0
+设定同步控制外部参照指令值	MC_SetSyncExternalReference	0
+设定输入过电压保护功能	U_DisableOverVP	0
+设定邮件收件人地址	U_MailTo	0
+设定邮件收件人组	U_MailToGroup	0
+设定邮件附加文件名	U_MailAttach	0
+读取FTP文件传输状态	U_FTPClientStatus	0
+读取KV套接字接收数据	U_SockReadBuf	0
+读取SV3伺服参数	MC_SV3_ReadServoParameter	0
+读取传感器参数	SPRD	0
+读取反馈转矩监控器	U_PosReadFeedbackTrq	0
+读取存储文件(多行字符串)	StorageReadLine	0
+读取定时器/计数器的当前值	CURVAL	0
+读取当前控制模式	U_PosReadCtrlMode	0
+读取显式报文通信完成代码	U_MsgStatus	0
+读取显式报文通信接收数据	U_MsgRecv	0
+读取缓冲存储器	UREAD	0
+读取轴错误代码	U_PosReadAxisErrCode	0
+读取输入捕获0	U_CntReadInputCapture0	0
+读取输入捕获1	U_CntReadInputCapture1	0
+超前滞后滤波器	LLFLT	0
+转矩前馈值更改	MC_SetTorqueFeedforward	0
+转矩前馈值更改	MC_SetTorqueFeedforwardd	0
+转矩限制值更改	MC_SetTorqueLimit	0
+软元件/变量数据获取	TRGR	0
+软元件地址减一	DevAddressDec	0
+软元件地址减法	DevAddressSub	0
+软元件地址加一	DevAddressInc	0
+软元件地址加法	DevAddressAdd	0
+软元件记录数据获取	TRGR	0
+辅助离合器控制	MC_AuxClutch	0
+输入继电器状态刷新	RefreshX	0
+输出继电器状态刷新	RefreshY	0
+输出计数器	OUTC	0
+运算周期[s]	CalcTime	0
+进行 2 个值的除法运算，返回其余数	MOD*1	0
+进行 2 个值的除法运算，返回其余数	MOD*2	0
+连续高低字节互换	BlockSwap	0
+通电延时定时器	TON	0
+速度前馈值更改	MC_SetVelocityFeedforward	0
+速度控制（CSP）	MC_MoveVelocity	0
+速度控制（CSV）	MC_VelocityControl	0
+逻辑“异或非”	C_ENRA	0
+重命名存储文件	StorageRename	0
+重新开始定位运转	MC_ResumePositioning	0
+锁存继电器	LR	0
+间接指定对象的地址存储	ADRSET	0
+随机数发生	RND	0
+隐式报文通信输入刷新	RFSCI	0
+隐式报文通信输出刷新	RFSCO	0
+高低字节替换	SWAP	0
+高低字节转换	SWAP	0
+高速计数器更改	RFSCTH	0

@@ -1,0 +1,121 @@
+# Field-verified findings (real KV STUDIO runs). Transcribed from the skill docs that
+# recorded them; `field_evidence` points at that record. Keep one finding per entry.
+- type: ErrorCode
+  code: "214"
+  title: 梯形图中存在未注册变量
+  aliases: [错误214, 未注册变量]
+  symptom: 编译报 [错误214] 梯形图中存在未注册变量
+  cause: 变量没写进变量表；FBEXEC/FBEAND 调用的 FB 实例变量未在局部变量登记；分组全局变量不在模型里
+  fix: 在调用模块的局部变量登记 scope=local, name=<实例名>, data_type=<FB名>；先写变量再编译
+  kvs_version: KVS12
+  date: 2026-10-24
+  field_evidence: keyence-plc-programmer/SKILL.md#MNM与声明; kv-studio-operator/SKILL.md#弹窗之后先编译
+- type: ErrorCode
+  code: "709"
+  title: 变量编辑窗口中存在不正确的变量定义
+  aliases: [错误709]
+  symptom: 粘贴变量后编译报 709
+  cause: 粘贴后类型/分配目标被写坏（如轴引用行被 Axis_N 占用），该变量仍留在表里
+  fix: 轴变量通过轴设定页改轴名（rename_kv_axes.ps1），不要用变量粘贴创建 _MC_AXIS_REF 变量
+  kvs_version: KVS12
+  date: 2026-10-24
+  field_evidence: kv-studio-operator/SKILL.md#弹窗之后先编译
+- type: ErrorCode
+  code: "1232"
+  title: ST 里发现非法的字符串
+  aliases: [错误1232]
+  symptom: ST 模块编译报 1232
+  cause: ST 使用的标识符未定义（变量没写进表）
+  fix: 先修第一个失败的变量写入步骤，再编译；不要零星补变量
+  kvs_version: KVS12
+  date: 2026-10-24
+  field_evidence: kv-studio-operator/SKILL.md#弹窗之后先编译
+- type: ErrorCode
+  code: "602"
+  title: Pos 不在范围内
+  aliases: [错误602]
+  symptom: 编译报 602
+  cause: ST 参数/点号越界
+  fix: 检查数组下标、点号范围
+  kvs_version: KVS12
+  date: 2026-10-24
+  field_evidence: kv-studio-operator/SKILL.md#弹窗之后先编译
+- type: ErrorCode
+  code: "61"
+  title: 同一定时器编号在多个 TMR/TMH/TMS/TMU 指令中使用
+  aliases: [错误61, 定时器编号重复]
+  symptom: 改写副本与原模块共存时编译报 61
+  cause: 两个模块使用同一 TMR 号
+  fix: 正式切换时删除原模块，或把副本定时器移到专用号段
+  kvs_version: KVS12
+  cpu: KV-X310
+  field_evidence: keyence-plc-programmer/SKILL.md#MNM与声明
+- type: ErrorCode
+  code: "33"
+  title: 可以省略 ENDH 命令
+  aliases: [错误33]
+  symptom: 编译出现 33
+  cause: 仅为警告
+  fix: 无需处理
+  field_evidence: kv-studio-operator/SKILL.md#弹窗之后先编译
+- type: FieldFinding
+  title: MNM 首行 DEVICE 码与编码按目标 CPU 取证
+  aliases: [DEVICE码, MNM编码, UTF-16LE, DEVICE:60]
+  symptom: 导入 ST MNM 失败或乱码
+  cause: KV-X520 导出 DEVICE:60，KV-X310 工程导出 DEVICE:59；MNM 为 UTF-16LE+BOM
+  fix: 先从目标工程导出一次读首行；用 new_kv_st_mnm.ps1 -DeviceCode <证据值> -OutputEncoding Utf16LE
+  kvs_version: KVS12
+  cpu: KV-X520/KV-X310
+  field_evidence: keyence-plc-programmer/SKILL.md#MNM与声明
+- type: FieldFinding
+  title: 比较触点不能用 32 位字作操作数（读取助记符列表失败）
+  aliases: [读取助记符列表失败, "AND= DM.L"]
+  symptom: 导入时报“读取助记符列表失败”
+  cause: AND= DM12118.L #0 这类 32 位比较触点被助记符读取器拒绝
+  fix: 让 ST 把结论写成一个位，梯形图侧用位触点 AND DM12119.0
+  kvs_version: KVS12
+  cpu: KV-X310
+  field_evidence: keyence-plc-programmer/SKILL.md#MNM与声明
+- type: FieldFinding
+  title: 导出体中的 ??? 未指定实参可以原样导入
+  aliases: ["???", 未指定实参]
+  symptom: 导出 MNM 中出现 ???
+  cause: 导出器用 ??? 表示未指定的 FB 实参
+  fix: 原样回导可编译，不需要先补齐
+  field_evidence: keyence-plc-programmer/SKILL.md#MNM与声明
+- type: FieldFinding
+  title: 编译要求目标工程已打开且只有一个同名 Kvs 进程
+  aliases: [KV_COMPILE_PROJECT_PROCESS_AMBIGUOUS, 多个KVS实例]
+  symptom: 步骤 exit=0 但工程没变，或报 KV_COMPILE_PROJECT_PROCESS_AMBIGUOUS
+  cause: 编译只绑定现成 Kvs.exe 进程；多个实例时按标题绑定落到旧进程
+  fix: 保持单一 KVS 进程，或给步骤传 -CreatedProjectResultPath
+  field_evidence: keyence-plc-programmer/SKILL.md#MNM与声明; kv-studio-operator/SKILL.md#工程绑定与多KVS实例
+- type: FieldFinding
+  title: 只有 2 步的“转换结果 OK”是空工程
+  aliases: [编译OK, 转换结果OK, 总步数]
+  symptom: 编译显示转换结果 OK 但工程无内容
+  cause: 空工程也能转换通过
+  fix: 同时检查总步数/模块数、模块完成度 100%、扫描顺序一致
+  field_evidence: kv-studio-operator/SKILL.md#退出码与编译OK的含金量
+- type: FieldFinding
+  title: 轴变量名不能靠变量粘贴创建，要改轴名
+  aliases: [轴改名, Axis_1, _MC_Axis, 批量登录轴]
+  symptom: 粘贴样例轴变量名被忽略或留下 709
+  cause: 批量登录轴自动生成 Axis_N 并占用 _MC_Axis[n]
+  fix: rename_kv_axes.ps1 走轴设定页+属性对话框改名；有轴时不要 -ClearGlobalRows
+  date: 2026-10-26
+  field_evidence: kv-studio-operator/SKILL.md#轴变量命名
+- type: FieldFinding
+  title: 写入依赖顺序：结构体→轴→全局变量→逐模块(MNM→自变量→局部变量)→编译
+  aliases: [写入顺序, 依赖顺序, 无效数据类型]
+  symptom: 粘贴/编译阶段报无效数据类型或未注册变量
+  cause: 先写顶层程序后补变量，或跳过结构体直接写 FB 自变量
+  fix: 按依赖自底向上写入；先跑 plan_kv_variable_dependencies.ps1 确认 blocked_count=0
+  field_evidence: kv-studio-operator/SKILL.md#写入依赖顺序
+- type: FieldFinding
+  title: ST 保留字与软元件名冲突
+  aliases: [保留字, 变量名冲突, C0]
+  symptom: 变量名 B/C/T/V 或 C0 等报错
+  cause: B、C、T、V 为保留字，C0 等与软元件名冲突（STUse.pdf p302-304）
+  fix: 使用描述性标识符并先跑声明预检
+  field_evidence: keyence-plc-programmer/SKILL.md#MNM与声明

@@ -1,0 +1,80 @@
+# KEYENCE KV programming ontology (v0.1)
+#
+# Purpose: give the knowledge base a fixed shape so retrieval can return "the thing"
+# (an FB with its signature and applicability) instead of a page fragment, and so
+# every claim is tied to evidence. Kept deliberately small: 12 entity types.
+#
+# Rules
+# - Every card MUST carry `evidence: [chunk_id, ...]` pointing into wiki.v3.db `chunks`,
+#   or `field_evidence` (a run artifact / commit) for kind=field_finding.
+# - `confidence`: manual (parsed from official manual structure) > field_verified
+#   (reproduced on a real KV STUDIO) > extracted (heuristic/LLM, needs review).
+# - Cards are data (table `cards`), this file is the schema. Changing a type here
+#   means re-running stage4.
+
+version: 0.1
+
+entity_types:
+  Series:          # product family; scopes applicability of almost everything else
+    fields: [name, generation, notes]
+    examples: [KV-X, KV-XH, KV-8000, KV-5000/3000, KV-Nano, KV-NanoC]
+
+  CPU:
+    fields: [model, series, builtin_ports, motion_axes_max, notes]
+    examples: [KV-X520, KV-X310, KV-8000]
+
+  Unit:            # expansion / network / motion module
+    fields: [model, category, series_compat, manual]
+    category_enum: [analog_in, analog_out, counter, positioning, motion_ethercat, motion_ml,
+                    ethernet, ethernet_ip, serial, temperature, coupler, io, other]
+    examples: [KV-XH16EC, KV-EC01, KV-XLE02, KV-SSC02, KV-AD40]
+
+  FunctionBlock:   # FUN or FB usable in ST and ladder (htmlhelp 03_xx_FBFUN_*)
+    fields: [name, kind(FB|FUN), cn_name, category, st_call, params, behavior, error_condition,
+             series, examples]
+
+  Instruction:     # ladder-only instruction (htmlhelp 02_xx_Instruction_*, chm KVSREF pages)
+    fields: [name, variants, cn_name, category, operands, flags, behavior, series]
+
+  Parameter:       # embedded in FunctionBlock/Instruction cards, not a standalone card
+    fields: [name, direction(IN|OUT|IN-OUT|UNIT), data_type, default, comment]
+
+  DataType:
+    fields: [name, kind(elementary|struct|axis_ref|string|time), size, notes]
+    examples: [BOOL, INT, LREAL, STRING, TIME, _MC_AXIS_REF, _MC_AXIS_GROUP_REF]
+
+  DeviceArea:      # soft-device / buffer memory areas and address maps (table sources)
+    fields: [name, unit_or_cpu, range, meaning]
+    examples: [R, DM, EM, CR, CM, MR, LR, TM, "KV-XH16EC buffer memory"]
+
+  Concept:         # task-level idea an engineer asks about; bridge from colloquial words
+    fields: [name, aliases, implemented_by, notes]
+    examples: [原点复归, 通电延时, TCP客户端通信, 字符串结合, 绝对定位]
+
+  ErrorCode:       # compile/convert errors and runtime ErrorIDs
+    fields: [code, scope(compile|motion|socket|unit), message, causes, fixes]
+
+  Procedure:       # KV STUDIO UI operation; links manual semantics to operator capability
+    fields: [name, steps_summary, operator_capability, manual_ref]
+    examples: [注册ESI文件, 添加EDS文件, 批量登录轴, 变量编辑窗口粘贴]
+
+  FieldFinding:    # verified-on-real-KV-STUDIO lesson (kv-studio-operator / programmer)
+    fields: [title, symptom, cause, fix, kvs_version, cpu, date, field_evidence]
+
+relations:          # stored as card fields; graph view is derived, not hand-kept
+  - [FunctionBlock, has_param, Parameter]
+  - [Parameter, has_type, DataType]
+  - [FunctionBlock, applies_to, Series]
+  - [Instruction, applies_to, Series]
+  - [Unit, compatible_with, Series]
+  - [Concept, implemented_by, FunctionBlock|Instruction|Procedure]
+  - [FunctionBlock, requires, Unit|DataType]       # e.g. MC_* requires _MC_AXIS_REF / axis config
+  - [ErrorCode, fixed_by, FieldFinding|Procedure]
+  - [FieldFinding, about, FunctionBlock|Instruction|Procedure|ErrorCode]
+  - [Procedure, executed_by, operator_capability]
+  - ["*", evidenced_by, chunk]
+
+card_storage:
+  table: cards
+  columns: [card_id, type, name, cn_name, aliases, series, summary, body_json, evidence, confidence, origin]
+  fts: cards_fts(name, cn_name+aliases, summary, body)

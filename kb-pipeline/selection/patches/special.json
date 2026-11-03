@@ -1,0 +1,301 @@
+[
+ {
+  "file": "special_units.csv",
+  "model": "KV-TF40",
+  "field": "resolution_or_speed",
+  "old": "待核实(乱码)",
+  "new": "热电偶K/J/T/E/N在较窄范围分辨率0.1℃(K -199.9~800.0、J 0.0~600.0、T -199.9~400.0、E 0.0~500.0、N 0.0~1000.0)，其余范围1℃(K -200~1300、J 0~1000、T -200~400、E 0~800、R 0~1700、B 0~1800、N 0~1300、S 0~1700、W5Re/W26Re 0~2300)；RTD Pt100 -199.9~650.0℃、JPt100 -199.9~600.0℃分辨率0.1℃",
+  "status": "corrected",
+  "source": "KV-TF40.pdf PDF页23-24(印刷1-13~1-14)",
+  "note": "分辨率取自输入类型和测量范围表的“分辨率(℃)”列，图像清晰"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-TF40",
+  "field": "conversion_or_cycle_time",
+  "old": "待核实(乱码)",
+  "new": "采样周期125ms/ch(500ms/4ch)；控制周期1~100秒",
+  "status": "corrected",
+  "source": "KV-TF40.pdf PDF页23-24(印刷1-13~1-14)",
+  "note": "性能规格表采样周期、控制周期两行，图像清晰"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-TF40",
+  "field": "notes",
+  "old": "",
+  "new": "指示精度±0.3%满刻度±1digit(@25℃)、±0.7%满刻度±1digit(@0~50℃)；冷接点补偿精度±1℃；内部消耗电流210mA以下；控制输出/警报输出均为晶体管(漏型)，额定负载最大DC30V 100mA；CT输入4ch(OP-6694，另购)，电流测量精度为输入值±5%或±2A取大者；输入类型可在各通道单独设定",
+  "status": "new",
+  "source": "KV-TF40.pdf PDF页23-24(印刷1-13~1-14)",
+  "note": "原CSV notes中“均未采信”的210mA、125ms/ch已由图像确认"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-TF40",
+  "field": "signal_range_or_protocol",
+  "old": "热电偶 K/J/T/E/R/B/N/S/W5Re-W26Re；RTD JPt100/Pt100",
+  "new": "热电偶 K/J/T/E/R/B/N/S/W5Re/W26Re；RTD JPt100/Pt100",
+  "status": "confirmed",
+  "source": "KV-TF40.pdf PDF页23-24(印刷1-13~1-14)",
+  "note": "类型集合一致"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-TF40",
+  "field": "channels_or_ports",
+  "old": "温度输入4ch",
+  "new": "温度输入4ch",
+  "status": "confirmed",
+  "source": "KV-TF40.pdf PDF页23-24(印刷1-13~1-14)"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-TP40",
+  "field": "resolution_or_speed",
+  "old": "电压0.5mV(1/40000~1/8000)；mV档原文“5V(1/40000)/5V(1/20000)”(μ符号疑丢失，待核实)；电流原文“2A(1/10000)/2A(1/8000)”(待核实)；热电偶0.1℃(R/S/B/WRe5-26为0.5℃)；铂电阻0.1℃",
+  "new": "电压：-10~+10V 0.5mV(1/40000)、0~10V 0.5mV(1/20000)、-5~+5V 0.5mV(1/20000)、0~5V 0.5mV(1/10000)、1~5V 0.5mV(1/8000)；-100~+100mV 5μV(1/40000)、0~100mV 5μV(1/20000)；电流0~20mA 2μA(1/10000)、4~20mA 2μA(1/8000)；热电偶K/J/T/E/N 0.1℃、R/S/B/WRe5-26 0.5℃；铂电阻Pt100/JPt100 0.1℃",
+  "status": "corrected",
+  "source": "KV-TP40.pdf PDF页18-19(印刷1-10~1-11)",
+  "note": "补回μ：mV档为5μV，电流为2μA；各电压档分辨率逐行核对"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-TP40",
+  "field": "conversion_or_cycle_time",
+  "old": "50ms/4ch",
+  "new": "50ms/4ch",
+  "status": "confirmed",
+  "source": "KV-TP40.pdf PDF页18-19(印刷1-10~1-11)"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-TP40",
+  "field": "notes",
+  "old": "转换精度±0.2%F.S.@25℃±5℃、±0.4%F.S.@0~50℃；冷接点补偿精度±1℃",
+  "new": "转换精度(电压/电流/热电偶/铂电阻)均±0.2%F.S.@25℃±5℃、±0.4%F.S.@0~50℃；冷接点补偿精度±1℃；输入阻抗电压1MΩ/电流250Ω；绝对最大输入电压±15V/电流30mA；允许配线电阻100Ω以下/线；内部消耗电流90mA以下",
+  "status": "confirmed",
+  "source": "KV-TP40.pdf PDF页18-19(印刷1-10~1-11)",
+  "note": "原有数值与图一致，另补输入阻抗等"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-DA40V",
+  "field": "notes",
+  "old": "精度：电压±0.1%F.S.@25℃±5℃/±0.3%@0~50℃，第二行原文亦标“电压”±0.2%/±0.3%（疑为电流，待核实）",
+  "new": "转换精度分左右两列：左列“电压：±0.1%F.S.(@25℃±5℃)、±0.3%(@0~50℃)”；右列印刷为“电压：±0.2%F.S.(@25℃±5℃)、±0.3%(@0~50℃)”，位置对应电流列(与分辨率行左电压/右电流布局一致)，右列标签“电压”应为手册印刷错误，实指电流(推断)；最小负载电压1kΩ、最大负载电流500Ω；内部消耗电流170mA以下",
+  "status": "confirmed",
+  "source": "KV-AD_DA.pdf PDF页104(印刷3-2)",
+  "note": "放大核对：右列标签确实印“电压”，数值±0.2%/±0.3%；p103为章扉页无规格"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-DA40V",
+  "field": "resolution_or_speed",
+  "old": "",
+  "new": "-10~10V 0.5mV(1/40000)；0~10V 0.5mV(1/20000)；0~5V 0.25mV(1/20000)；1~5V 0.25mV(1/16000)；0~20mA 1μA(1/20000)；4~20mA 1μA(1/16000)；转换速度25μs/ch",
+  "status": "confirmed",
+  "source": "KV-AD_DA.pdf PDF页104(印刷3-2)",
+  "note": "与CSV现有值一致"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-AM40V",
+  "field": "resolution_or_speed",
+  "old": "",
+  "new": "A/D：-10~+10V 1.25mV(1/16000)；0~10V 1.25mV(1/8000)；-5~+5V 0.625mV(1/16000)；0~5V 0.625mV(1/8000)；1~5V 0.625mV(1/6400)；0~20mA 2.5μA(1/8000)；4~20mA 2.5μA(1/6400)。D/A：-10~+10V 1.25mV(1/16000)；0~10V 1.25mV(1/8000，印刷为“-0~+10V”，排版错)；0~5V 0.625mV(1/8000)；1~5V 0.625mV(印刷“1/64)00”，应为1/6400)；0~20mA 2.5μA(1/8000)；4~20mA 2.5μA(1/6400)",
+  "status": "confirmed",
+  "source": "KV-AD_DA.pdf PDF页160-161(印刷4-2~4-3)",
+  "note": "数值与现有一致，补充D/A排版错的具体写法"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-AM40V",
+  "field": "notes",
+  "old": "A/D精度±0.2%F.S.@25℃±5℃（温漂补偿时0~50℃亦±0.2%）；D/A精度±0.2%@25℃/±0.4%@0~50℃；电流输出最大负载600Ω；内部消耗电流≤140mA",
+  "new": "A/D精度：启用温度漂移补偿时电压/电流±0.2%F.S.(@25℃±5℃)、±0.2%(@0~50℃)；禁用补偿时±0.2%(@25℃±5℃)、±0.4%(@0~50℃)。D/A精度电压/电流±0.2%(@25℃±5℃)、±0.4%(@0~50℃)；D/A最小负载电压1kΩ、最大负载电流600Ω；A/D输入电阻电压5MΩ(共用公共点时2.5MΩ)/电流250Ω；内部消耗电流≤140mA；占用R 96点(6通道)、DM 50字",
+  "status": "corrected",
+  "source": "KV-AD_DA.pdf PDF页160-161",
+  "note": "旧值缺“禁用温漂补偿时0~50℃为±0.4%”，其余一致"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-AM40V",
+  "field": "conversion_or_cycle_time",
+  "old": "80μs/ch（A/D与D/A独立运行；A/D使用温漂补偿时更新周期=80μs×通道数+80μs）",
+  "new": "80μs/ch（A/D与D/A独立运行；A/D使用温度漂移补偿时另加80μs，与使用通道数无关）",
+  "status": "confirmed",
+  "source": "KV-AD_DA.pdf PDF页160(印刷4-2)",
+  "note": "脚注*1只说补偿时另加80μs，与通道数无关；旧值“80μs×通道数+80μs”与图一致(=各通道+一次补偿)，无需改"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-AD40",
+  "field": "resolution_or_speed",
+  "old": "-10~10V:2.5mV(1/8000)；0~10V:2.5mV(1/4000)；0~5V:1.25mV(1/4000)；1~5V:1.25mV(1/3200)；0~20mA:5μA(1/4000)；4~20mA:原文“1μA(1/3200)”（与满量程不符，待核实）",
+  "new": "-10~+10V 2.5mV(1/8000)；0~10V 2.5mV(1/4000)；0~5V 1.25mV(1/4000)；1~5V 1.25mV(1/3200)；0~20mA 5μA(1/4000)；4~20mA 手册印刷为1μA(1/3200)",
+  "status": "confirmed",
+  "source": "KV-AD_DA.pdf PDF页308(印刷6-2)",
+  "note": "放大核对：4~20mA确实印“1μA 1/3200”；按16mA/3200应为5μA，疑为手册笔误，但印刷如此，不自行更改"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-AD40",
+  "field": "conversion_or_cycle_time",
+  "old": "80μs/ch",
+  "new": "80μs/ch",
+  "status": "confirmed",
+  "source": "KV-AD_DA.pdf PDF页308(印刷6-2)"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-AD40",
+  "field": "notes",
+  "old": "综合精度±0.2%F.S.（@25℃±5℃及@0~50℃）；触发应答时间最大200μs；内部消耗电流110mA以下",
+  "new": "综合精度电压/电流±0.2%F.S.@25℃±5℃、±0.2%F.S.@0~50℃；触发输入NPN集电极开路/无电压接点，应答时间最大200μs，最大ON电压1V，最大OFF电流0.1mA；输入阻抗电压1MΩ/电流250Ω；内部消耗电流110mA以下",
+  "status": "confirmed",
+  "source": "KV-AD_DA.pdf PDF页308(印刷6-2)",
+  "note": "p307为章扉页"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-DA40",
+  "field": "resolution_or_speed",
+  "old": "-10~10V:2.5mV(1/8000)；0~10V:2.5mV(1/4000)；0~5V:1.25mV(1/4000)；1~5V:1.25mV(1/3200)；0~20mA:5μA(1/4000)；4~20mA:原文“1μA(1/3200)”（待核实）",
+  "new": "-10~+10V 2.5mV(1/8000)；0~10V 2.5mV(1/4000)；0~5V 1.25mV(1/4000)；1~5V 1.25mV(1/3200)；0~20mA 5μA(1/4000)；4~20mA 手册印刷为1μA(1/3200)",
+  "status": "confirmed",
+  "source": "KV-AD_DA.pdf PDF页344(印刷7-2)",
+  "note": "“4~20mA 1μA”确为手册印刷，与0~20mA 5μA(1/4000)及16mA/3200=5μA不符，应是手册笔误，印刷值保留"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-DA40",
+  "field": "conversion_or_cycle_time",
+  "old": "80μs/ch",
+  "new": "80μs/ch",
+  "status": "confirmed",
+  "source": "KV-AD_DA.pdf PDF页344(印刷7-2)"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-DA40",
+  "field": "notes",
+  "old": "综合精度±0.2%F.S.@25℃±5℃、±0.4%F.S.@0~50℃；电流最大负载原文“400”无单位；内部消耗电流230mA以下（最大输出时）",
+  "new": "综合精度电压/电流±0.2%F.S.@25℃±5℃、±0.4%F.S.@0~50℃；最小负载电压1kΩ；电流最大负载印刷为“400”(无单位，推测Ω)；内部消耗电流230mA以下(最大输出时)",
+  "status": "confirmed",
+  "source": "KV-AD_DA.pdf PDF页344(印刷7-2)",
+  "note": "p343为章扉页(未单独看)，无规格"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-SC20",
+  "field": "notes",
+  "old": "知识库无该型号资料（规格）；仅见适用设备表及KV-SC20V手册附录“与KV-SC20的区别”表（该表列标题缺失，待核实）",
+  "new": "区别表列标题实为“项目 / KV-SC20V / KV-SC20 / 参照页”(图中清晰)。KV-SC20相对KV-SC20V：不支持直接刷新、不支持单元专用指令；频率计数器/转速计仅限CH0(KV-SC20V可用CH0/CH1，仅CPU为KV-5000/3000时)；转速计每转脉冲数1~32767(KV-SC20V为1~65535)；环形模式上限设定值须为0以外(0时出错)，且上限小于一定值时不检测上溢(双相4倍频24000、双相2倍频或内部1μs 12000、其它6000)",
+  "status": "corrected",
+  "source": "KV-SC20V.pdf PDF页161(印刷A-9)",
+  "note": "原值称列标题缺失，实际图中两列标题完整，可直接对应"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-H20S",
+  "field": "notes",
+  "old": "规格表标签与数值分列且部分标签乱码，对应关系待核实",
+  "new": "标签与数值对应已看图核实(日文，清晰)：控制轴数 同时2轴(直线插补)/独立2轴；适用PLC KV-700；最大连结台数48台(96轴)(16台以上需扩展单元)；占用设备 每2轴输入6ch/输出6ch、DM 320字；记忆点400点(每轴)；速度设定1~1000000p/s；加减速控制单位 独立/直线插补2ms；脉冲输出线驱动、1/2脉冲方式切换；起动时间 独立1.5ms/直线插补1.8ms(零起动1μs以下)；5V电源5V±5%最大20mA；消耗电流120mA以下(接HP1/HPD1时200mA以下)、I/O侧90mA以下；质量约150g",
+  "status": "corrected",
+  "source": "SimplePos.pdf PDF页289-291(印刷付-61~付-63)",
+  "note": "数值与原CSV一致，仅补全并消除“对应待核实”"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-H20S",
+  "field": "conversion_or_cycle_time",
+  "old": "加减速控制单位2ms；起动时间独立1.5ms/直线插补1.8ms",
+  "new": "加减速控制单位2ms；起动时间独立1.5ms/直线插补1.8ms",
+  "status": "confirmed",
+  "source": "SimplePos.pdf PDF页289-291(印刷付-61~付-63)(p290)"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-H20S",
+  "field": "resolution_or_speed",
+  "old": "速度设定1~1000000p/s",
+  "new": "速度设定1~1000000p/s",
+  "status": "confirmed",
+  "source": "SimplePos.pdf PDF页289-291(印刷付-61~付-63)(p290)"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-H40S",
+  "field": "notes",
+  "old": "规格表标签与数值分列且部分标签乱码，对应关系待核实",
+  "new": "标签与数值对应已看图核实：控制轴数 同时2~4轴(直线插补)/独立4轴；最大连结台数24台(96轴)；占用设备 每4轴输入12ch/输出12ch、DM 600字；记忆点200点(每轴)；速度、加减速、起动时间、5V电源同KV-H20S；消耗电流130mA以下(接HP1/HPD1时220mA以下)、I/O侧180mA以下；质量约200g",
+  "status": "corrected",
+  "source": "SimplePos.pdf PDF页289-291(印刷付-61~付-63)",
+  "note": "数值与原CSV一致，仅补全并消除“对应待核实”"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-H40S",
+  "field": "conversion_or_cycle_time",
+  "old": "加减速控制单位2ms；起动时间独立1.5ms/直线插补1.8ms",
+  "new": "加减速控制单位2ms；起动时间独立1.5ms/直线插补1.8ms",
+  "status": "confirmed",
+  "source": "SimplePos.pdf PDF页289-291(印刷付-61~付-63)(p290)"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-H20G",
+  "field": "notes",
+  "old": "规格表标签与数值分列且部分标签乱码，对应关系待核实",
+  "new": "标签与数值对应已看图核实：同时2轴(直线插补、圆弧插补、同步控制)/独立2轴；最大连结台数32台(64轴)；占用设备 每2轴输入8ch/输出10ch、DM 600字；记忆点400点(每轴)；加减速控制单位 独立/直线/圆弧/同期控制2ms；起动时间 独立1.5ms/直线1.8ms/圆弧4.0ms(零起动1μs以下)；高速计数器500kpps(INC)/10kpps(ABS格雷码)；5V电源5V±5%最大100mA；消耗电流130mA以下(接HP1/HPD1时220mA以下)、I/O侧150mA以下(5V 100mA输出时)；质量约200g",
+  "status": "corrected",
+  "source": "SimplePos.pdf PDF页291-292(印刷付-63~付-64)",
+  "note": "数值与原CSV一致，仅补全；“同期控制”加减速单位2ms为新增"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-H20G",
+  "field": "resolution_or_speed",
+  "old": "速度设定1~1000000p/s；高速计数器500kpps(INC)/10kpps(ABS格雷码)",
+  "new": "速度设定1~1000000p/s；高速计数器500kpps(INC)/10kpps(ABS格雷码)",
+  "status": "confirmed",
+  "source": "SimplePos.pdf PDF页291-292(印刷付-63~付-64)(p292)"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-EP21V",
+  "field": "notes",
+  "old": "无独立手册（收录于EtherNet/IP功能手册）；隐式连接数256；pps/最大刷新字数表与CPU内置口共列，对应列待核实；消耗电流原文“□100mA”；KV-EP02.pdf为KV Nano用EtherNet/IP适配器，非本型号",
+  "new": "无独立手册（收录于EtherNet/IP功能手册）；隐式连接数256；表头列序为 KV-EP21V / KV-8000(A)、KV-7500、KV-5500 / KV-NC1EP，EP21V为第一数据列：允许通信带宽@504Byte 12000pps、@1444Byte 6000pps，最大刷新字数24k字；(同表CPU内置口列为10000pps/5000pps/16k字，KV-NC1EP为6000/3000/8k字，勿混用)；每连接最大数据504字节或1444字节；消耗电流≤100mA；显式报文Class3连接数256、UCMM客户端同时执行32/服务器96；质量约120g；支持CPU KV-8000/8000A、KV-7500/7300、功能版本2以上KV-5500/5000/3000",
+  "status": "corrected",
+  "source": "KvsEtherNetIP_KVS11.pdf PDF页32-34(印刷1-8~1-10)",
+  "note": "按表头对齐确认；旧notes“□100mA”实为≤100mA"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-EP21V",
+  "field": "resolution_or_speed",
+  "old": "10Mbps/100Mbps",
+  "new": "10Mbps/100Mbps",
+  "status": "confirmed",
+  "source": "KvsEtherNetIP_KVS11.pdf PDF页32-34(印刷1-8~1-10)(p33通用传输规格为10BASE-T 10Mbps/100BASE-TX 100Mbps，但该表在KV-NC1EP节后，为通用表)"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-EP21V",
+  "field": "conversion_or_cycle_time",
+  "old": "EtherNet/IP RPI 0.5~10000ms（0.5ms单位）",
+  "new": "EtherNet/IP RPI 0.5~10000ms(单位0.5ms)，可对每个连接设定",
+  "status": "confirmed",
+  "source": "KvsEtherNetIP_KVS11.pdf PDF页32-34(印刷1-8~1-10)(p34)"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-EP21V",
+  "field": "signal_range_or_protocol",
+  "old": "",
+  "new": "隐式(I/O)报文通信：发送触发 输出至适配器=Cyclic，从适配器输入=Cyclic/Change of state；显式报文：Class3(连接型)服务器连接数256、UCMM(非连接型)客户端同时执行32/服务器96；组播过滤支持IGMP客户端功能",
+  "status": "new",
+  "source": "KvsEtherNetIP_KVS11.pdf PDF页32-34(印刷1-8~1-10)(p34)"
+ }
+]

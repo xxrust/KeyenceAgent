@@ -1,0 +1,738 @@
+[
+ {
+  "file": "cpu.csv",
+  "model": "KV-X310",
+  "field": "max_io_points",
+  "old": "3104点（含内置32点；64点单元×48台）",
+  "new": "3104点(含内置32点;64点单元×48台=3072,+32=3104)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页26(印刷2-4)",
+  "note": "表内写\"3104点(安装64点单元48台时)\";48×64=3072,差32正为内置16入+16出,故含内置32点。原文未逐字写\"含内置\",此为算术推断。"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-SIR32XT",
+  "field": "input_type",
+  "old": "未找到",
+  "new": "无极性(光耦内为反向并联双LED,接线图输入电源实线/虚线两种极性均画出)",
+  "status": "new",
+  "source": "KVSHARDX3H.pdf PDF页37(印刷2-15) 内部回路图(输入回路)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-SIR32XT",
+  "field": "output_type",
+  "old": "MOSFET(N-ch,带过电流保护)",
+  "new": "MOSFET(N-ch,有过电流保护功能)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页36(印刷2-14)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-SIR32XT",
+  "field": "rated_voltage",
+  "old": "IN 24VDC 5.1mA(最大28.8VDC) / 5VDC 8.8mA(最大6.0VDC,仅IN100~115,带过电压保护); OUT 30VDC",
+  "new": "IN 24VDC/5.1mA(最大28.8VDC,最小ON 19V,最大OFF 1.5mA) / 5VDC/8.8mA(最大6.0VDC,仅IN100~115,最小ON 3.5V,最大OFF电压1.5V,带过电压保护); OUT 30VDC",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页36(印刷2-14)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-SIR32XT",
+  "field": "out_current_per_point",
+  "old": "0.2A(1.6A/1公共点)",
+  "new": "0.2A(1.6A/1公共点)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页36(印刷2-14)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-SIR32XT",
+  "field": "points_per_common",
+  "old": "IN 16点/1公共点(2端子)×2; OUT 16点/1公共点(2端子)×2; COM0~COM3相互隔离",
+  "new": "IN 16点/1公共点(2端子)×2; OUT 16点/1公共点(2端子)×2; COM0~COM3相互隔离",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页36(印刷2-14)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-SIR32XT",
+  "field": "connector",
+  "old": "MIL连接器(40针,选件)×2(左/右侧,个数据接线图推断)",
+  "new": "MIL连接器(40针)×2(左侧/右侧连接器,各40针)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页37(印刷2-15)",
+  "note": "接线图明确画出左侧、右侧两个连接器;'选件'字样不在本页,未核"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-SIR32XT",
+  "field": "response_time",
+  "old": "IN:输入时间常数可设,最快档典型1.2μs(ON→OFF 0.7μs)/最大2.6μs,最慢档约9.0ms/9.6ms(列对应待核实); OUT: OFF→ON ≤1μs, ON→OFF ≤5μs(负载5~200mA)",
+  "new": "IN输入时间常数9档(TYP/MAX; 括号为ON→OFF): 1μs 1.2(0.7)/2.6μs; 10μs 2.4(1.9)/3.9μs; 20μs 10/12μs; 100μs 73/82μs; 500μs 420/450μs; 1ms 840/900μs; 5ms 4.5/4.8ms; 10ms 9.0/9.6ms; 50ms 45/48ms; OUT: OFF→ON ≤1μs, ON→OFF ≤5μs(负载5mA~200mA)",
+  "status": "corrected",
+  "source": "KVSHARDX3H.pdf PDF页36(印刷2-14)",
+  "note": "原值把最慢档写成9.0ms/9.6ms,实际最慢档是50ms(45ms/48ms),9.0/9.6ms是10ms档"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16XC",
+  "field": "input_type",
+  "old": "未找到",
+  "new": "无极性(光耦内为反向并联双LED,接线图输入电源实线/虚线两种极性均画出)",
+  "status": "new",
+  "source": "KVSHARDX3H.pdf PDF页41-43 内部回路图"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16XC",
+  "field": "response_time",
+  "old": "输入时间常数4级切换(原表含25μs/300μs/1ms/10ms等档及典型/最大值,列对齐丢失,待核实)",
+  "new": "输入时间常数4级(TYP/MAX): 25μs: OFF→ON 25/65μs, ON→OFF 75/120μs; 300μs: OFF→ON 275/365μs, ON→OFF 275/420μs; 1ms: 1/1.2ms(OFF→ON), 1/1.2ms(ON→OFF); 10ms: 10/12ms(OFF→ON), 10/12ms(ON→OFF)",
+  "status": "corrected",
+  "source": "KVSHARDX3H.pdf PDF页40(印刷2-18)",
+  "note": "原值为'列对齐丢失,待核实',现按图逐格补全;C32XC/C64XC共用同一张表"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16XC",
+  "field": "points_per_common",
+  "old": "16点/1公共(2端子,内部公用)",
+  "new": "16点/1公共(2端子,内部公用)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页40(印刷2-18)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16XC",
+  "field": "rated_voltage",
+  "old": "24VDC 5.3mA / 5VDC 1mA(输入电压选择开关切换); 最大26.4VDC",
+  "new": "24VDC 5.3mA / 5VDC 1mA; 最大26.4VDC; 最小ON 19V(24V)/3.5V(5V); 最大OFF 1.5mA(24V)/1.5V(5V)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页40(印刷2-18)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XC",
+  "field": "input_type",
+  "old": "未找到",
+  "new": "无极性(光耦内为反向并联双LED,接线图输入电源实线/虚线两种极性均画出)",
+  "status": "new",
+  "source": "KVSHARDX3H.pdf PDF页41-43 内部回路图"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XC",
+  "field": "response_time",
+  "old": "输入时间常数4级切换(原表含25μs/300μs/1ms/10ms等档及典型/最大值,列对齐丢失,待核实)",
+  "new": "输入时间常数4级(TYP/MAX): 25μs: OFF→ON 25/65μs, ON→OFF 75/120μs; 300μs: OFF→ON 275/365μs, ON→OFF 275/420μs; 1ms: 1/1.2ms(OFF→ON), 1/1.2ms(ON→OFF); 10ms: 10/12ms(OFF→ON), 10/12ms(ON→OFF)",
+  "status": "corrected",
+  "source": "KVSHARDX3H.pdf PDF页40(印刷2-18)",
+  "note": "原值为'列对齐丢失,待核实',现按图逐格补全;C32XC/C64XC共用同一张表"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XC",
+  "field": "points_per_common",
+  "old": "32点/1公共(2端子,内部公用)",
+  "new": "32点/1公共(2端子,内部公用)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页40(印刷2-18)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XC",
+  "field": "rated_voltage",
+  "old": "24VDC 5.3mA / 5VDC 1mA(输入电压选择开关切换); 最大26.4VDC",
+  "new": "24VDC 5.3mA / 5VDC 1mA(开关切换); 最大26.4VDC",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页40(印刷2-18)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64XC",
+  "field": "input_type",
+  "old": "未找到",
+  "new": "无极性(光耦内为反向并联双LED,接线图输入电源实线/虚线两种极性均画出)",
+  "status": "new",
+  "source": "KVSHARDX3H.pdf PDF页41-43 内部回路图"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64XC",
+  "field": "response_time",
+  "old": "输入时间常数4级切换(原表含25μs/300μs/1ms/10ms等档及典型/最大值,列对齐丢失,待核实)",
+  "new": "输入时间常数4级(TYP/MAX): 25μs: OFF→ON 25/65μs, ON→OFF 75/120μs; 300μs: OFF→ON 275/365μs, ON→OFF 275/420μs; 1ms: 1/1.2ms(OFF→ON), 1/1.2ms(ON→OFF); 10ms: 10/12ms(OFF→ON), 10/12ms(ON→OFF)",
+  "status": "corrected",
+  "source": "KVSHARDX3H.pdf PDF页40(印刷2-18)",
+  "note": "原值为'列对齐丢失,待核实',现按图逐格补全;C32XC/C64XC共用同一张表"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64XC",
+  "field": "points_per_common",
+  "old": "32点/1公共(2端子)×2(H侧/L侧,两组间内部不短路)",
+  "new": "32点/1公共(2端子)×2(COM0,1内部短路; COM2,3内部短路; 两组间不短路)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页40(印刷2-18)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64XC",
+  "field": "rated_voltage",
+  "old": "24VDC 4.1mA(仅24V模式); 最大26.4VDC",
+  "new": "24VDC 4.1mA(仅24V模式); 最大26.4VDC",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页40(印刷2-18)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64XC",
+  "field": "connector",
+  "old": "MIL连接器(34针)×2(H侧/L侧),须用OP-42224,不能用OP-23139",
+  "new": "MIL连接器(34针)×2(L侧/H侧); 64点单元须用OP-42224,不能用OP-23139",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页43-44(印刷2-21~2-22)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TCP",
+  "field": "output_type",
+  "old": "晶体管PNP",
+  "new": "晶体管PNP",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TCP",
+  "field": "rated_voltage",
+  "old": "30VDC",
+  "new": "30VDC",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TCP",
+  "field": "out_current_per_point",
+  "old": "0.2A",
+  "new": "0.2A",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TCP",
+  "field": "points_per_common",
+  "old": "16点/公共点(2端子,内部短路)",
+  "new": "16点/公共点(2端子,内部短路)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TCP",
+  "field": "response_time",
+  "old": "OFF→ON ≤10μs; ON→OFF ≤200μs",
+  "new": "OFF→ON ≤10μs; ON→OFF ≤200μs",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TCP",
+  "field": "output_type",
+  "old": "晶体管PNP",
+  "new": "晶体管PNP",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TCP",
+  "field": "rated_voltage",
+  "old": "30VDC",
+  "new": "30VDC",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TCP",
+  "field": "out_current_per_point",
+  "old": "0.2A(1.6A/公共点)",
+  "new": "0.2A(1.6A/公共点)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TCP",
+  "field": "points_per_common",
+  "old": "32点/公共点(2端子,内部短路)",
+  "new": "32点/公共点(2端子,内部短路)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TCP",
+  "field": "response_time",
+  "old": "OFF→ON ≤50μs; ON→OFF ≤200μs",
+  "new": "OFF→ON ≤10μs; ON→OFF ≤200μs",
+  "status": "corrected",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)",
+  "note": "OFF→ON行中'10μs以下'单元格横跨B16TCP+C32TCP两列(线条边界核实),'50μs以下'仅C64TCP"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TCP",
+  "field": "output_type",
+  "old": "晶体管PNP",
+  "new": "晶体管PNP",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TCP",
+  "field": "rated_voltage",
+  "old": "30VDC",
+  "new": "30VDC",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TCP",
+  "field": "out_current_per_point",
+  "old": "0.2A(1.6A/公共点)",
+  "new": "0.2A(1.6A/公共点)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TCP",
+  "field": "points_per_common",
+  "old": "64点/公共点(4端子,内部短路)",
+  "new": "64点/公共点(4端子,内部短路)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TCP",
+  "field": "response_time",
+  "old": "OFF→ON ≤50μs; ON→OFF ≤200μs",
+  "new": "OFF→ON ≤50μs; ON→OFF ≤200μs",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页47(印刷2-25)",
+  "note": "OFF→ON行中'10μs以下'单元格横跨B16TCP+C32TCP两列(线条边界核实),'50μs以下'仅C64TCP"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TC",
+  "field": "output_type",
+  "old": "晶体管NPN",
+  "new": "晶体管NPN(C型)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TC",
+  "field": "rated_voltage",
+  "old": "30VDC",
+  "new": "30VDC",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TC",
+  "field": "out_current_per_point",
+  "old": "0.2A",
+  "new": "0.2A",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)",
+  "note": "B16列分C型0.2A/D型0.3A; C32/C64两列合并单元格均为0.2A(1.6A/公共点)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TC",
+  "field": "points_per_common",
+  "old": "16点/公共点(2端子,内部短路)",
+  "new": "16点/公共点(2端子,内部短路)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TC",
+  "field": "response_time",
+  "old": "OFF→ON ≤10μs; ON→OFF ≤200μs",
+  "new": "OFF→ON ≤10μs; ON→OFF ≤200μs",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TC",
+  "field": "output_type",
+  "old": "晶体管NPN",
+  "new": "晶体管NPN(C型)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TC",
+  "field": "rated_voltage",
+  "old": "30VDC",
+  "new": "30VDC",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TC",
+  "field": "out_current_per_point",
+  "old": "0.2A(1.6A/公共点)",
+  "new": "0.2A(1.6A/公共点)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TC",
+  "field": "points_per_common",
+  "old": "32点/公共点(2端子,内部短路)",
+  "new": "32点/公共点(2端子,内部短路)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TC",
+  "field": "response_time",
+  "old": "OFF→ON ≤50μs; ON→OFF ≤200μs",
+  "new": "OFF→ON ≤10μs; ON→OFF ≤200μs",
+  "status": "corrected",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)",
+  "note": "OFF→ON行合并单元格:'10μs/100μs'横跨B16+C32两列,'50μs/150μs'仅C64(线条边界核实)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TC",
+  "field": "output_type",
+  "old": "晶体管NPN",
+  "new": "晶体管NPN(C型)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TC",
+  "field": "rated_voltage",
+  "old": "30VDC",
+  "new": "30VDC",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TC",
+  "field": "out_current_per_point",
+  "old": "0.2A(1.6A/公共点)",
+  "new": "0.2A(1.6A/公共点)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TC",
+  "field": "points_per_common",
+  "old": "64点/公共点(4端子,内部短路)",
+  "new": "64点/公共点(4端子,内部短路)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TC",
+  "field": "response_time",
+  "old": "OFF→ON ≤50μs; ON→OFF ≤200μs",
+  "new": "OFF→ON ≤50μs; ON→OFF ≤200μs",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TD",
+  "field": "output_type",
+  "old": "MOSFET(N-ch,带过电流保护)",
+  "new": "MOSFET(N-ch,有过电流保护功能)(D型)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TD",
+  "field": "rated_voltage",
+  "old": "30VDC",
+  "new": "30VDC",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TD",
+  "field": "out_current_per_point",
+  "old": "0.3A",
+  "new": "0.3A",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)",
+  "note": "B16列分C型0.2A/D型0.3A; C32/C64两列合并单元格均为0.2A(1.6A/公共点)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TD",
+  "field": "points_per_common",
+  "old": "16点/公共点(2端子,内部短路)",
+  "new": "16点/公共点(2端子,内部短路)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TD",
+  "field": "response_time",
+  "old": "OFF→ON ≤100μs; ON→OFF ≤300μs",
+  "new": "OFF→ON ≤100μs; ON→OFF ≤300μs",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TD",
+  "field": "output_type",
+  "old": "MOSFET(N-ch,带过电流保护)",
+  "new": "MOSFET(N-ch,有过电流保护功能)(D型)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TD",
+  "field": "rated_voltage",
+  "old": "30VDC",
+  "new": "30VDC",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TD",
+  "field": "out_current_per_point",
+  "old": "0.2A(1.6A/公共点)",
+  "new": "0.2A(1.6A/公共点)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TD",
+  "field": "points_per_common",
+  "old": "32点/公共点(2端子,内部短路)",
+  "new": "32点/公共点(2端子,内部短路)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TD",
+  "field": "response_time",
+  "old": "OFF→ON ≤150μs; ON→OFF ≤300μs",
+  "new": "OFF→ON ≤100μs; ON→OFF ≤300μs",
+  "status": "corrected",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)",
+  "note": "OFF→ON行合并单元格:'10μs/100μs'横跨B16+C32两列,'50μs/150μs'仅C64(线条边界核实)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TD",
+  "field": "output_type",
+  "old": "MOSFET(N-ch,带过电流保护)",
+  "new": "MOSFET(N-ch,有过电流保护功能)(D型)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TD",
+  "field": "rated_voltage",
+  "old": "30VDC",
+  "new": "30VDC",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TD",
+  "field": "out_current_per_point",
+  "old": "0.2A(1.6A/公共点)",
+  "new": "0.2A(1.6A/公共点)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TD",
+  "field": "points_per_common",
+  "old": "64点/公共点(4端子,内部短路)",
+  "new": "64点/公共点(4端子,内部短路)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TD",
+  "field": "response_time",
+  "old": "OFF→ON ≤150μs; ON→OFF ≤300μs",
+  "new": "OFF→ON ≤150μs; ON→OFF ≤300μs",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页48(印刷2-26)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B8XTD",
+  "field": "input_type",
+  "old": "待核实(接线图 KVSHARDX3H.pdf PDF页57)",
+  "new": "无极性(光耦内为反向并联双LED,接线图输入电源实线/虚线两种极性均画出)",
+  "status": "new",
+  "source": "KVSHARDX3H.pdf PDF页57(印刷2-35) 输入内部回路图"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B8XTD",
+  "field": "output_type",
+  "old": "MOSFET(N-ch,带过电流保护)",
+  "new": "MOSFET(N-ch,有过电流保护功能); 漏型(负载接OUT与负载电源+之间,COM1接电源-)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页56-57"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B8XTD",
+  "field": "rated_voltage",
+  "old": "IN 24VDC 5.3mA / 5VDC 1mA(开关切换,最大26.4VDC); OUT 30VDC",
+  "new": "IN 24VDC 5.3mA / 5VDC 1mA(最大26.4VDC); OUT 30VDC",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页56(印刷2-34)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B8XTD",
+  "field": "out_current_per_point",
+  "old": "0.3A(30VDC)",
+  "new": "0.3A(30VDC; 合并单元格跨B8XTD+C16XTD)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页56(印刷2-34)",
+  "note": "本页(p56)额定负载行'30VDC 0.3A'横跨B8XTD与C16XTD两列,C32XTD为0.2A"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B8XTD",
+  "field": "points_per_common",
+  "old": "IN 8点/公共点(1端子); OUT 8点/公共点(1端子); 输入输出COM独立",
+  "new": "IN 8点/公共点(1端子); OUT 8点/公共点(1端子); 输入输出COM独立",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页56(印刷2-34)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B8XTD",
+  "field": "response_time",
+  "old": "输入时间常数可设25μs/300μs/1ms/10ms(25μs档 OFF→ON TYP25/MAX65μs, ON→OFF TYP75/MAX120μs; 其余档 TYP≈设定值, MAX≈1.1~1.2倍; 表跨三款单元); OUT: OFF→ON ≤100μs, ON→OFF ≤300μs",
+  "new": "输入时间常数4级,表跨三款(TYP/MAX): 25μs: OFF→ON 25/65μs, ON→OFF 75/120μs; 300μs: 275/365μs, 275/420μs; 1ms: 1/1.2ms, 1/1.2ms; 10ms: 10/12ms, 10/12ms; OUT: OFF→ON ≤100μs, ON→OFF ≤300μs",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页56(印刷2-34)",
+  "note": "现值已正确,仅格式补全"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C16XTD",
+  "field": "out_current_per_point",
+  "old": "0.3A(30VDC; 与B8XTD同一合并单元格)",
+  "new": "0.3A(30VDC; 与B8XTD同一合并单元格)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页56(印刷2-34)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XTD",
+  "field": "input_type",
+  "old": "待核实(接线图 KVSHARDX3H.pdf PDF页59)",
+  "new": "无极性(光耦内为反向并联双LED,接线图输入电源实线/虚线两种极性均画出)",
+  "status": "new",
+  "source": "KVSHARDX3H.pdf PDF页59(印刷2-37) 输入内部回路图"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XTD",
+  "field": "output_type",
+  "old": "MOSFET(N-ch,带过电流保护)",
+  "new": "MOSFET(N-ch,有过电流保护功能); 漏型",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页56/59"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XTD",
+  "field": "rated_voltage",
+  "old": "IN 24VDC 4.1mA(仅24V模式,最大26.4VDC); OUT 30VDC",
+  "new": "IN 24VDC 4.1mA(仅24V模式,最大26.4VDC); OUT 30VDC",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页56(印刷2-34)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XTD",
+  "field": "out_current_per_point",
+  "old": "0.2A(30VDC)",
+  "new": "0.2A(30VDC)",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页56(印刷2-34)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XTD",
+  "field": "points_per_common",
+  "old": "IN 32点/公共点(2端子); OUT 32点/公共点(2端子); 输入COM0/1与输出COM2/3独立",
+  "new": "IN 32点/公共点(2端子,COM0/1内部短路); OUT 32点/公共点(2端子,COM2/3内部短路); (COM0,1)-(COM2,3)内部未短路",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页59(印刷2-37)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XTD",
+  "field": "connector",
+  "old": "MIL连接器(34针),须用OP-42224,不能用OP-23139(连接器个数未写明)",
+  "new": "MIL连接器(34针)×2(IN端1个、OUT端1个); 须用OP-42224,不能用OP-23139",
+  "status": "new",
+  "source": "KVSHARDX3H.pdf PDF页59(印刷2-37)",
+  "note": "接线图分IN端/OUT端各一个34针连接器,故共2个"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XTD",
+  "field": "response_time",
+  "old": "输入时间常数可设25μs/300μs/1ms/10ms(25μs档 OFF→ON TYP25/MAX65μs, ON→OFF TYP75/MAX120μs; 其余档 TYP≈设定值, MAX≈1.1~1.2倍; 表跨三款单元); OUT: OFF→ON ≤150μs, ON→OFF ≤300μs",
+  "new": "输入时间常数4级,表跨三款(见B8XTD); OUT: OFF→ON ≤150μs, ON→OFF ≤300μs",
+  "status": "confirmed",
+  "source": "KVSHARDX3H.pdf PDF页56(印刷2-34)",
+  "note": "OFF→ON 150μs仅C32XTD列;B8/C16为100μs"
+ }
+]

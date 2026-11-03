@@ -1,0 +1,1738 @@
+type	name	cn_name	aliases	evidence_n
+Concept	'则结束该循环控制	'则结束该循环控制		1
+Concept	'加上增量值，返回 FOR~	'加上增量值，返回 FOR~		1
+Concept	.D 数据类型转换	.D 数据类型转换		1
+Concept	.D（无符号 32 位数据型）	.D（无符号 32 位数据型）		1
+Concept	.L 数据类型转换	.L 数据类型转换		1
+Concept	.S 数据类型转换	.S 数据类型转换		1
+Concept	.U 数据类型转换	.U 数据类型转换		1
+Concept	100ms32位减定时器	100ms32位减定时器		1
+Concept	100ms32位减法定时器	100ms32位减法定时器		1
+Concept	10ms32位减定时器	10ms32位减定时器		1
+Concept	10ms32位减法定时器	10ms32位减法定时器		1
+Concept	10ms高速定时器	10ms高速定时器		1
+Concept	10µs32位减定时器	10µs32位减定时器		1
+Concept	10μs 高速定时器	10μs 高速定时器		1
+Concept	10μs32位减法定时器	10μs32位减法定时器		1
+Concept	10进制 ASCII 字符串→二进制数据	10进制 ASCII 字符串→二进制数据		1
+Concept	16进制 ASCII 字符串→二进制数据	16进制 ASCII 字符串→二进制数据		1
+Concept	1ms 高速定时器	1ms 高速定时器		1
+Concept	1ms32位减定时器	1ms32位减定时器		1
+Concept	1ms32位减法定时器	1ms32位减法定时器		1
+Concept	32位加法计数器	32位加法计数器		1
+Concept	32位加计数器	32位加计数器		1
+Concept	4 位数据的 7 段解码	4 位数据的 7 段解码		1
+Concept	4 位数据的 7 段译码	4 位数据的 7 段译码		1
+Concept	4 位数据编码	4 位数据编码		1
+Concept	4 位数据解码	4 位数据解码		1
+Concept	4位数据译码	4位数据译码		1
+Concept	8 位编码	8 位编码		1
+Concept	8 位解码	8 位解码		1
+Concept	8位编码	8位编码		1
+Concept	8位解码	8位解码		1
+Concept	A/D	A/D	模拟量 模拟量输入	1
+Concept	AnalogOut	AnalogOut	模拟量输出	1
+Concept	ArrayMax	ArrayMax	最大值	2
+Concept	ArraySearch	ArraySearch	查找	2
+Concept	ARRAYSIZE	ARRAYSIZE	元素个数 数组长度	1
+Concept	ArraySort	ArraySort	排序	2
+Concept	ASCII转	ASCII转		1
+Concept	AverageFilter	AverageFilter	平均	2
+Concept	BCD → 二进制数转换	BCD → 二进制数转换		1
+Concept	BCD 数据→二进制数据转换	BCD 数据→二进制数据转换		1
+Concept	BCD 数据类型转换（多重定义）	BCD 数据类型转换（多重定义）		1
+Concept	BCD 数据转换（数据类型指定）	BCD 数据转换（数据类型指定）		1
+Concept	BCD→BIN数据类型转换	BCD→BIN数据类型转换		1
+Concept	BIN→BCD数据类型转换	BIN→BCD数据类型转换		1
+Concept	BIN→格雷码转换	BIN→格雷码转换		1
+Concept	BIN数据→十六进制ASCII字符码转换	BIN数据→十六进制ASCII字符码转换		1
+Concept	BIN数据→十六进制字符码转换	BIN数据→十六进制字符码转换		1
+Concept	BIN数据→十进制字符串转换	BIN数据→十进制字符串转换		1
+Concept	bit是1	bit是1		1
+Concept	CIP 字符串转换	CIP 字符串转换		1
+Concept	CIP 字符串逆转换	CIP 字符串逆转换		1
+Concept	CIP 消息创建	CIP 消息创建		1
+Concept	CIP 消息获取	CIP 消息获取		1
+Concept	CIP字符串→字符串转换	CIP字符串→字符串转换		1
+Concept	CIP字符串的逆转换	CIP字符串的逆转换		1
+Concept	CIP字符串转换	CIP字符串转换		1
+Concept	CoE PDO通信停止	CoE PDO通信停止		1
+Concept	CoE PDO通信重新开始	CoE PDO通信重新开始		1
+Concept	CoE SDO写入	CoE SDO写入		1
+Concept	CoE SDO读取	CoE SDO读取		1
+Concept	CRC	CRC		1
+Concept	CRC校验值计算	CRC校验值计算		1
+Concept	D/A	D/A	模拟量 模拟量输出	1
+Concept	DINT_TO_STRING	DINT_TO_STRING	整数转字符串	1
+Concept	FIFO写入	FIFO写入		1
+Concept	FIFO删除	FIFO删除		1
+Concept	FIFO插入	FIFO插入		1
+Concept	FIFO读取	FIFO读取		1
+Concept	FPUTS	FPUTS	写字符串	1
+Concept	FREE RUN 计数器刷新	FREE RUN 计数器刷新		1
+Concept	GetSystemTime	GetSystemTime	当前时间 日期时间	2
+Concept	INT_TO_STRING	INT_TO_STRING	整数转字符串 转字符串	2
+Concept	JOG 动作	JOG 动作		1
+Concept	JOG运转	JOG运转		1
+Concept	KV-AD	KV-AD	模拟量输入	1
+Concept	KV-DA	KV-DA	模拟量输出	1
+Concept	KV-SC20V	KV-SC20V	高速计数	1
+Concept	KV-SSC02	KV-SSC02	高速计数	1
+Concept	LENGTH	LENGTH	字符串长度	1
+Concept	MC_CamIn	MC_CamIn	cam 凸轮	1
+Concept	MC_CamTableSelect	MC_CamTableSelect	cam 凸轮	1
+Concept	MC_Halt	MC_Halt	停止运动	1
+Concept	MC_ReadActualPosition	MC_ReadActualPosition	当前位置 读位置	1
+Concept	MovingAverage	MovingAverage	平均	2
+Concept	NOW	NOW	当前时间 日期时间	2
+Concept	ON/OFF 状态反转	ON/OFF 状态反转		1
+Concept	PID	PID		2
+Concept	PID_Control	PID_Control	PID	2
+Concept	ping	ping		1
+Concept	PING发送	PING发送		1
+Concept	PN_WriteRecord	PN_WriteRecord	PROFINET 写从站	1
+Concept	PWM	PWM	脉冲宽度	1
+Concept	RampGenerator	RampGenerator	斜坡	2
+Concept	SDO	SDO	从站参数 对象字典	2
+Concept	SD卡	SD卡		1
+Concept	SIZEOF	SIZEOF	数组长度	1
+Concept	SocketTCP	SocketTCP	TCP连接	1
+Concept	SocketUDP_SendTo	SocketUDP_SendTo	UDP发送	1
+Concept	Storage	Storage	SD卡 存储卡	1
+Concept	StorageWriteLine	StorageWriteLine	写入文件 写字符串	1
+Concept	STRING	STRING	转字符串	2
+Concept	STRING_COMPARE	STRING_COMPARE	字符串比较 字符串相同	2
+Concept	STRING_TO_INT	STRING_TO_INT	ASCII转 字符转数值	2
+Concept	TCP套接字主动打开	TCP套接字主动打开		1
+Concept	TCP套接字发送	TCP套接字发送		1
+Concept	TCP套接字接收(指定定界符)	TCP套接字接收(指定定界符)		1
+Concept	TCP套接字接收(指定数据长度)	TCP套接字接收(指定数据长度)		1
+Concept	TCP套接字被动打开	TCP套接字被动打开		1
+Concept	TCP连接	TCP连接		1
+Concept	TRUNC	TRUNC	取整 四舍五入 浮点转整数	1
+Concept	U_AnalogOut	U_AnalogOut	模拟量输出	1
+Concept	UDP发送	UDP发送		1
+Concept	UDP套接字发送	UDP套接字发送		1
+Concept	UDP套接字接收	UDP套接字接收		1
+Concept	UDP接收	UDP接收		1
+Concept	UTF-16数据→字符串转换	UTF-16数据→字符串转换		1
+Concept	一直转	一直转		1
+Concept	上下限	上下限		1
+Concept	上下限限制	上下限限制		1
+Concept	上升沿	上升沿		3
+Concept	上升沿差分	上升沿差分		1
+Concept	上升沿检测	上升沿检测		1
+Concept	上电	上电		1
+Concept	上限/下限值控制	上限/下限值控制		1
+Concept	下一个	下一个		1
+Concept	下降沿差分	下降沿差分		1
+Concept	与反脉冲上升沿	与反脉冲上升沿		1
+Concept	与反脉冲下降沿	与反脉冲下降沿		1
+Concept	与星期 OFF	与星期 OFF		1
+Concept	与星期 ON	与星期 ON		1
+Concept	与脉冲上升沿	与脉冲上升沿		1
+Concept	与脉冲下降沿	与脉冲下降沿		1
+Concept	中断	中断		2
+Concept	中断使能	中断使能		1
+Concept	中断允许	中断允许		1
+Concept	中断去能	中断去能		1
+Concept	中断去能范围的设置	中断去能范围的设置		1
+Concept	中断定位连续运转	中断定位连续运转		1
+Concept	中断条件设定	中断条件设定		1
+Concept	中断条件设置	中断条件设置		1
+Concept	中断禁止范围	中断禁止范围		1
+Concept	串联连接	串联连接		1
+Concept	主动连接	主动连接		1
+Concept	主控程序	主控程序		1
+Concept	主控程序复位	主控程序复位		1
+Concept	主离合器控制	主离合器控制		1
+Concept	主轴相位补偿	主轴相位补偿		1
+Concept	乘法	乘法		1
+Concept	乘法运算	乘法运算		1
+Concept	二路选择器	二路选择器		1
+Concept	二进制→BCD 数转换	二进制→BCD 数转换		1
+Concept	二进制→倍精度浮动小数点型实数转换	二进制→倍精度浮动小数点型实数转换		2
+Concept	二进制→十六进制 ASCII 代码转换	二进制→十六进制 ASCII 代码转换		1
+Concept	二进制→十六进制 ASCII 字符串转换	二进制→十六进制 ASCII 字符串转换		1
+Concept	二进制→十进制 ASCII 字符串转换	二进制→十进制 ASCII 字符串转换		1
+Concept	二进制→单精度小数点型实数数据转换	二进制→单精度小数点型实数数据转换		1
+Concept	二进制→单精度浮动小数点型实数转换	二进制→单精度浮动小数点型实数转换		2
+Concept	二进制→双精度小数点型实数数据转换	二进制→双精度小数点型实数数据转换		1
+Concept	二进制数据 → 十六进制 ASCII 字符串	二进制数据 → 十六进制 ASCII 字符串		1
+Concept	二进制数据 → 十进制 ASCII 字符串	二进制数据 → 十进制 ASCII 字符串		1
+Concept	二进制数据→ 十六进制 ASCII 代码转换	二进制数据→ 十六进制 ASCII 代码转换		1
+Concept	二进制数据→BCD 数据转换	二进制数据→BCD 数据转换		1
+Concept	二进制数据→格雷码转换	二进制数据→格雷码转换		1
+Concept	二进制数据分解排序	二进制数据分解排序		1
+Concept	二进制数据拆分排序	二进制数据拆分排序		1
+Concept	二进制数据排序	二进制数据排序		1
+Concept	二选一	二选一		2
+Concept	交变	交变		1
+Concept	交替	交替		1
+Concept	从 FIFO 表读取	从 FIFO 表读取		1
+Concept	从 LIFO 表读取	从 LIFO 表读取		1
+Concept	从存储体(存储卡/CPU存储器)的文件读取1行	从存储体(存储卡/CPU存储器)的文件读取1行		1
+Concept	从站参数	从站参数		1
+Concept	从软元件信息写入位列	从软元件信息写入位列		1
+Concept	从软元件信息读取位列	从软元件信息读取位列		1
+Concept	从软元件信息读取位列（带偏移量）	从软元件信息读取位列（带偏移量）		1
+Concept	从软元件写入位列	从软元件写入位列		1
+Concept	从软元件读取位列	从软元件读取位列		1
+Concept	以太网发送	以太网发送		1
+Concept	传感器参数写入	传感器参数写入		1
+Concept	传感器参数读取	传感器参数读取		1
+Concept	伺服ON	伺服ON		1
+Concept	伺服使能	伺服使能		2
+Concept	伺服参数	伺服参数	驱动器参数	2
+Concept	位与	位与		1
+Concept	位加载	位加载		1
+Concept	位取反	位取反		1
+Concept	位取反与	位取反与		1
+Concept	位取反或	位取反或		1
+Concept	位取反输出	位取反输出		1
+Concept	位或	位或		1
+Concept	位批量传输	位批量传输		1
+Concept	位数	位数		1
+Concept	位状态	位状态		1
+Concept	位状态取反	位状态取反		1
+Concept	位置位	位置位		1
+Concept	位计数	位计数		1
+Concept	位软元件右移	位软元件右移		1
+Concept	位软元件左移	位软元件左移		1
+Concept	位输出	位输出		1
+Concept	位连续传输	位连续传输		1
+Concept	余弦	余弦		1
+Concept	余弦值→角度弧度	余弦值→角度弧度		1
+Concept	余弦值→角度（弧度）	余弦值→角度（弧度）		1
+Concept	余数	余数		1
+Concept	使能	使能	励磁	1
+Concept	使能日志记录指定ID	使能日志记录指定ID		1
+Concept	使能记录/跟踪	使能记录/跟踪		1
+Concept	保持	保持		2
+Concept	修改目标	修改目标		2
+Concept	修改速度	修改速度		2
+Concept	倍率	倍率	速度倍率	1
+Concept	倾斜信号	倾斜信号		2
+Concept	停止传感器检测去能	停止传感器检测去能		1
+Concept	停止同步仿真机械同步	停止同步仿真机械同步		1
+Concept	停止程序	停止程序		1
+Concept	停止程序模块	停止程序模块		1
+Concept	停止运动	停止运动		1
+Concept	元素个数	元素个数		1
+Concept	全部结束	全部结束		1
+Concept	关闭套接字	关闭套接字		1
+Concept	关闭连接	关闭连接		1
+Concept	写从站	写从站		1
+Concept	写入 FIFO 表	写入 FIFO 表		1
+Concept	写入 LIFO 表	写入 LIFO 表		1
+Concept	写入KV套接字UDP通信目标	写入KV套接字UDP通信目标		1
+Concept	写入KV套接字发送数据	写入KV套接字发送数据		1
+Concept	写入SV3伺服参数	写入SV3伺服参数		1
+Concept	写入上下限报警值	写入上下限报警值		1
+Concept	写入传感器参数	写入传感器参数		1
+Concept	写入存储字符串	写入存储字符串		1
+Concept	写入存储文件(BIN数据)	写入存储文件(BIN数据)		1
+Concept	写入定位开始点编号	写入定位开始点编号		1
+Concept	写入定位目标坐标更改(坐标)	写入定位目标坐标更改(坐标)		1
+Concept	写入定位速度倍率	写入定位速度倍率		1
+Concept	写入定位速度更改	写入定位速度更改		1
+Concept	写入定标设定值	写入定标设定值		2
+Concept	写入平均常数	写入平均常数		1
+Concept	写入当前坐标更改	写入当前坐标更改		1
+Concept	写入控制模式更改	写入控制模式更改		1
+Concept	写入文件	写入文件		1
+Concept	写入显式报文通信发送数据	写入显式报文通信发送数据		1
+Concept	写入比较器设定值	写入比较器设定值		1
+Concept	写入比较器设定值0	写入比较器设定值0		1
+Concept	写入特殊功能选择	写入特殊功能选择		1
+Concept	写入缓冲存储器	写入缓冲存储器		1
+Concept	写入计数当前值	写入计数当前值		1
+Concept	写入转矩控制转矩指令	写入转矩控制转矩指令		1
+Concept	写入速度控制速度指令	写入速度控制速度指令		1
+Concept	写入预设设定值	写入预设设定值		1
+Concept	写字符串	写字符串		1
+Concept	写文件	写文件		2
+Concept	减 1	减 1		1
+Concept	减存储地址	减存储地址		1
+Concept	减法	减法		1
+Concept	减法计数器	减法计数器		1
+Concept	减法计数器（DINT）	减法计数器（DINT）		1
+Concept	减法计数器（UDINT）	减法计数器（UDINT）		1
+Concept	减法运算	减法运算		1
+Concept	减算存储地址	减算存储地址		1
+Concept	减速停止	减速停止		1
+Concept	减速停止(轴群组)	减速停止(轴群组)		1
+Concept	凸轮	凸轮	电子凸轮	2
+Concept	凸轮数据	凸轮数据	凸轮表	2
+Concept	凸轮数据写入	凸轮数据写入		1
+Concept	凸轮数据自动生成	凸轮数据自动生成		1
+Concept	凸轮数据读取	凸轮数据读取		1
+Concept	凸轮表	凸轮表		2
+Concept	创建存储文件夹	创建存储文件夹		1
+Concept	创建目录	创建目录		2
+Concept	删除字符串两端的半角空白・标号	删除字符串两端的半角空白・标号		1
+Concept	删除字符串右端的半角空白・标号	删除字符串右端的半角空白・标号		1
+Concept	删除字符串左端的半角空白・标号	删除字符串左端的半角空白・标号		1
+Concept	删除字符串指定位置的半角空白・标号	删除字符串指定位置的半角空白・标号		1
+Concept	删除存储体(存储卡/CPU存储器)文件夹	删除存储体(存储卡/CPU存储器)文件夹		1
+Concept	删除存储文件	删除存储文件		1
+Concept	删除存储文件夹	删除存储文件夹		1
+Concept	删除数据表指定位置	删除数据表指定位置		1
+Concept	刷新当前值	刷新当前值		1
+Concept	剩余容量	剩余容量		1
+Concept	功能块开始	功能块开始		1
+Concept	功能块的结束	功能块的结束		1
+Concept	功能块调用	功能块调用		1
+Concept	加 1	加 1		1
+Concept	加一	加一		1
+Concept	加减定时器	加减定时器		1
+Concept	加减计数器	加减计数器		1
+Concept	加减计数器（DINT）	加减计数器（DINT）		1
+Concept	加减计数器（UDINT）	加减计数器（UDINT）		1
+Concept	加存储地址	加存储地址		1
+Concept	加法	加法		1
+Concept	加法计数器	加法计数器		1
+Concept	加法计数器（DINT）	加法计数器（DINT）		1
+Concept	加法计数器（UDINT）	加法计数器（UDINT）		1
+Concept	加法运算	加法运算		1
+Concept	加算存储地址	加算存储地址		1
+Concept	加计数	加计数		1
+Concept	动作使能	动作使能		1
+Concept	动作允许	动作允许		1
+Concept	动作禁止	动作禁止	断电	1
+Concept	动作许可	动作许可	上电 伺服使能 使能	2
+Concept	励磁	励磁		1
+Concept	励磁断开	励磁断开		1
+Concept	区域控制	区域控制		1
+Concept	区间控制	区间控制		1
+Concept	十六进制 ASCII 代码→二进制转换	十六进制 ASCII 代码→二进制转换		1
+Concept	十六进制 ASCII 代码→字符转换	十六进制 ASCII 代码→字符转换		1
+Concept	十六进制 ASCII 字符串→二进制转换	十六进制 ASCII 字符串→二进制转换		1
+Concept	十六进制 ASCII 码 → 二进制数据转换	十六进制 ASCII 码 → 二进制数据转换		1
+Concept	十六进制 ASCII 码→字符转换	十六进制 ASCII 码→字符转换		1
+Concept	十六进制ASCII字符码→BIN数据转换	十六进制ASCII字符码→BIN数据转换		1
+Concept	十六进制ASCII字符码→字符串转换	十六进制ASCII字符码→字符串转换		1
+Concept	十六进制字符串→BIN数据转换	十六进制字符串→BIN数据转换		1
+Concept	十进制 ASCII 字符串→二进制转换	十进制 ASCII 字符串→二进制转换		1
+Concept	十进制字符串→BIN数据转换	十进制字符串→BIN数据转换		1
+Concept	半字节分离	半字节分离		1
+Concept	半字节分解	半字节分解		2
+Concept	半字节组合	半字节组合		2
+Concept	单元程序开始	单元程序开始		1
+Concept	单元程序强制结束	单元程序强制结束		2
+Concept	单元类型判定	单元类型判定		1
+Concept	单次定时器	单次定时器		1
+Concept	单次触发	单次触发		1
+Concept	单精度/倍精度浮动小数点型实数→二进制数据转换	单精度/倍精度浮动小数点型实数→二进制数据转换		1
+Concept	单精度小数点型实数→字符串转换	单精度小数点型实数→字符串转换		2
+Concept	单精度小数点型实数数据→二进制转换	单精度小数点型实数数据→二进制转换		1
+Concept	单精度小数点型实数的尾数与指数分离	单精度小数点型实数的尾数与指数分离		1
+Concept	单精度浮动小数点型实数→字符串	单精度浮动小数点型实数→字符串		1
+Concept	单精度浮动小数点型实数的尾数与指数分解	单精度浮动小数点型实数的尾数与指数分解		1
+Concept	原点回归	原点回归		1
+Concept	原点复位	原点复位		1
+Concept	原点复归	原点复归	原点回归 原点复位 回原点 回零 归零	2
+Concept	去能日志记录指定ID	去能日志记录指定ID		1
+Concept	去能记录/跟踪	去能记录/跟踪		1
+Concept	参数保存	参数保存		1
+Concept	双精度小数点型实数→字符串转换	双精度小数点型实数→字符串转换		1
+Concept	反余弦	反余弦		1
+Concept	反正切	反正切		1
+Concept	反正弦	反正弦		1
+Concept	发送数据	发送数据		2
+Concept	取余	取余		1
+Concept	取出	取出		1
+Concept	取反与	取反与		1
+Concept	取反或	取反或		1
+Concept	取反脉冲上升沿	取反脉冲上升沿		1
+Concept	取反脉冲下降沿	取反脉冲下降沿		1
+Concept	取反装入	取反装入		1
+Concept	取反输出	取反输出		1
+Concept	取整	取整		1
+Concept	取最大值	取最大值		1
+Concept	取最小值	取最小值		1
+Concept	取脉冲上升沿	取脉冲上升沿		1
+Concept	取脉冲下降沿	取脉冲下降沿		1
+Concept	变址寄存器出栈恢复	变址寄存器出栈恢复		1
+Concept	变址寄存器进栈保护	变址寄存器进栈保护		1
+Concept	变量值→字符串转换	变量值→字符串转换		1
+Concept	变量复位	变量复位		1
+Concept	右截取字符串	右截取字符串		2
+Concept	右移	右移		1
+Concept	右移（以位为单位）	右移（以位为单位）		1
+Concept	右移（位单位）	右移（位单位）		1
+Concept	合并字符串	合并字符串		1
+Concept	合并尾数和指数为单精度小数点型实数	合并尾数和指数为单精度小数点型实数		1
+Concept	合并尾数和指数为单精度浮动小数点型实数	合并尾数和指数为单精度浮动小数点型实数		1
+Concept	同时启动	同时启动		2
+Concept	同步凸轮切换	同步凸轮切换		1
+Concept	同步型跟踪控制	同步型跟踪控制		1
+Concept	同步接点输出参数更改	同步接点输出参数更改		1
+Concept	同步控制	同步控制		1
+Concept	同步转矩限制离合器控制	同步转矩限制离合器控制		1
+Concept	启动单元程序	启动单元程序		1
+Concept	启动指定的子程序	启动指定的子程序		1
+Concept	启动程序	启动程序		1
+Concept	启动程序模块	启动程序模块		1
+Concept	和校验计算	和校验计算		1
+Concept	四舍五入	四舍五入		1
+Concept	四舍五入（多重定义）	四舍五入（多重定义）		1
+Concept	四舍五入（数据类型指定）	四舍五入（数据类型指定）		1
+Concept	回原点	回原点		1
+Concept	回零	回零		1
+Concept	固定宽度	固定宽度		1
+Concept	圆弧插补	圆弧插补		2
+Concept	圆弧插补相对位置定位控制	圆弧插补相对位置定位控制		1
+Concept	圆弧插补绝对位置定位控制	圆弧插补绝对位置定位控制		1
+Concept	在字符串中代入相同的值	在字符串中代入相同的值		1
+Concept	在存储体(存储卡/CPU存储器)的文件中写入文本	在存储体(存储卡/CPU存储器)的文件中写入文本		1
+Concept	在数据列中带入相同的值	在数据列中带入相同的值		1
+Concept	在日历定时器中写入时间数据	在日历定时器中写入时间数据		1
+Concept	在缓冲存储器的数据串中插入相同的值	在缓冲存储器的数据串中插入相同的值		1
+Concept	在缓冲存储器的数据列中插入相同的值	在缓冲存储器的数据列中插入相同的值		1
+Concept	坐标→角度(弧度)	坐标→角度(弧度)		1
+Concept	坐标→角度（弧度）	坐标→角度（弧度）		1
+Concept	坐标指定反正切	坐标指定反正切		1
+Concept	坐标预置	坐标预置		1
+Concept	块与值的数据比较	块与值的数据比较		1
+Concept	块互换	块互换		1
+Concept	块数据比较	块数据比较		1
+Concept	基准位置移动	基准位置移动		1
+Concept	填充	填充		2
+Concept	增量移动	增量移动		1
+Concept	复位指定块	复位指定块		1
+Concept	复制	复制		2
+Concept	复制存储体(存储卡/CPU 存储器)的文件	复制存储体(存储卡/CPU 存储器)的文件		1
+Concept	复制存储体(存储卡/CPU存储器)的文件	复制存储体(存储卡/CPU存储器)的文件		1
+Concept	复制存储文件	复制存储文件		1
+Concept	复用器	复用器		1
+Concept	多控制段比较器	多控制段比较器		1
+Concept	多路选择器	多路选择器		1
+Concept	子串	子串		2
+Concept	子程序入口	子程序入口		1
+Concept	子程序型宏的启动	子程序型宏的启动		1
+Concept	子程序调用	子程序调用		1
+Concept	子程序返回	子程序返回		1
+Concept	字块的批量数据传输	字块的批量数据传输		1
+Concept	字大小获取	字大小获取		1
+Concept	字数据的指定位信息	字数据的指定位信息		1
+Concept	字数据的指定位反转信息	字数据的指定位反转信息		1
+Concept	字数据的指定位反转输出	字数据的指定位反转输出		1
+Concept	字数据的指定位取反信息	字数据的指定位取反信息		1
+Concept	字数据的指定位输出	字数据的指定位输出		1
+Concept	字数据的指定位输出 OFF	字数据的指定位输出 OFF		1
+Concept	字数据的指定位输出 ON	字数据的指定位输出 ON		1
+Concept	字符串→CIP字符串转换	字符串→CIP字符串转换		1
+Concept	字符串→UTF-16数据转换	字符串→UTF-16数据转换		1
+Concept	字符串→单精度小数点型实数转换	字符串→单精度小数点型实数转换		3
+Concept	字符串→单精度浮动小数点型实数转换	字符串→单精度浮动小数点型实数转换		2
+Concept	字符串→双精度小数点型实数转换	字符串→双精度小数点型实数转换		1
+Concept	字符串→变量值转换	字符串→变量值转换		1
+Concept	字符串两端的半角空格・标签删除	字符串两端的半角空格・标签删除		1
+Concept	字符串中间截取	字符串中间截取		2
+Concept	字符串传输	字符串传输		1
+Concept	字符串分割	字符串分割		2
+Concept	字符串分离	字符串分离		1
+Concept	字符串分解	字符串分解		2
+Concept	字符串切分	字符串切分		2
+Concept	字符串右截取	字符串右截取		1
+Concept	字符串右端的半角空格・标签删除	字符串右端的半角空格・标签删除		1
+Concept	字符串合并	字符串合并		1
+Concept	字符串字节分离	字符串字节分离		1
+Concept	字符串字节分解	字符串字节分解		2
+Concept	字符串字节组合	字符串字节组合		1
+Concept	字符串左截取	字符串左截取		1
+Concept	字符串左空格删除	字符串左空格删除		1
+Concept	字符串左端的半角空格・标签删除	字符串左端的半角空格・标签删除		1
+Concept	字符串截取	字符串截取		2
+Concept	字符串指定位置的半角空格・标签删除	字符串指定位置的半角空格・标签删除		1
+Concept	字符串插入	字符串插入		3
+Concept	字符串查找	字符串查找		4
+Concept	字符串检索	字符串检索		4
+Concept	字符串比较	字符串比较		2
+Concept	字符串组合	字符串组合		1
+Concept	字符串结合	字符串结合	拼接	1
+Concept	字符串转	字符串转		3
+Concept	字符串连接	字符串连接		1
+Concept	字符串部分删除	字符串部分删除		3
+Concept	字符串部分替换	字符串部分替换		1
+Concept	字符串部分置换	字符串部分置换		2
+Concept	字符串长度	字符串长度		1
+Concept	字符串长度检测	字符串长度检测		1
+Concept	字符转数值	字符转数值		2
+Concept	字节分离	字节分离		1
+Concept	字节分解	字节分解		2
+Concept	字节合计值算出	字节合计值算出		1
+Concept	字节字符串合并	字节字符串合并		1
+Concept	字节组合	字节组合		2
+Concept	字节连续传输	字节连续传输		1
+Concept	字软元件右移	字软元件右移		1
+Concept	字软元件左移	字软元件左移		1
+Concept	存储体(存储卡/CPU 存储器)写入	存储体(存储卡/CPU 存储器)写入		1
+Concept	存储体(存储卡/CPU 存储器)文件删除	存储体(存储卡/CPU 存储器)文件删除		1
+Concept	存储体(存储卡/CPU 存储器)的文件状态获取	存储体(存储卡/CPU 存储器)的文件状态获取		1
+Concept	存储体(存储卡/CPU存储器)写入	存储体(存储卡/CPU存储器)写入		1
+Concept	存储体(存储卡/CPU存储器)文件删除	存储体(存储卡/CPU存储器)文件删除		1
+Concept	存储体(存储卡/CPU存储器)读取	存储体(存储卡/CPU存储器)读取		1
+Concept	存储体（存储卡/CPU 存储器）文件夹创建	存储体（存储卡/CPU 存储器）文件夹创建		1
+Concept	存储体（存储卡/CPU 存储器）文件夹删除	存储体（存储卡/CPU 存储器）文件夹删除		1
+Concept	存储卡	存储卡	SD卡	1
+Concept	存储地址减 1	存储地址减 1		1
+Concept	存储地址加 1	存储地址加 1		1
+Concept	定位M代码OFF指令	定位M代码OFF指令		1
+Concept	定位停止传感器请求	定位停止传感器请求		1
+Concept	定位原点传感器请求	定位原点传感器请求		1
+Concept	定位指定位置停止	定位指定位置停止		1
+Concept	定位控制(点参数)	定位控制(点参数)		1
+Concept	定位目标坐标更改	定位目标坐标更改		1
+Concept	定位目标坐标更改（插补运行）	定位目标坐标更改（插补运行）		1
+Concept	定位运转	定位运转		1
+Concept	定位速度更改	定位速度更改		1
+Concept	定时器	定时器	延时 计时	2
+Concept	客户端	客户端		1
+Concept	寸动	寸动		2
+Concept	对象字典	对象字典		2
+Concept	对象的 ON 位计数	对象的 ON 位计数		1
+Concept	将指定位的输出置于 OFF	将指定位的输出置于 OFF		1
+Concept	将连续的位信息传输到指定位置	将连续的位信息传输到指定位置		1
+Concept	将连续的位信息传送到指定位置	将连续的位信息传送到指定位置		1
+Concept	将连续的字节串信息传输到指定位置（H→L）	将连续的字节串信息传输到指定位置（H→L）		1
+Concept	将连续的字节串信息传输到指定位置（L→H）	将连续的字节串信息传输到指定位置（L→H）		1
+Concept	将连续的字节串信息传送至指定位置（H→L）	将连续的字节串信息传送至指定位置（H→L）		1
+Concept	将连续的字节串信息传送至指定位置（L→H）	将连续的字节串信息传送至指定位置（L→H）		1
+Concept	小数舍去	小数舍去		1
+Concept	左截取字符串	左截取字符串		2
+Concept	左移	左移		1
+Concept	左移（以位为单位）	左移（以位为单位）		1
+Concept	左移（位单位）	左移（位单位）		1
+Concept	带自动矫正功能的 PID 控制	带自动矫正功能的 PID 控制		1
+Concept	带自动调谐的PID控制	带自动调谐的PID控制		1
+Concept	带进位循环右移	带进位循环右移		1
+Concept	带进位循环左移	带进位循环左移		1
+Concept	常用对数运算	常用对数运算		2
+Concept	幂运算	幂运算		1
+Concept	平均	平均		2
+Concept	平方根	平方根		2
+Concept	并联连接	并联连接		1
+Concept	度（°）→以弧度为单位转换	度（°）→以弧度为单位转换		1
+Concept	度（°）→弧度单位换算	度（°）→弧度单位换算		1
+Concept	延时	延时		2
+Concept	延时接通	延时接通		1
+Concept	延时断开	延时断开		1
+Concept	开平方	开平方		1
+Concept	开方	开方		1
+Concept	异或	异或		1
+Concept	异或非运算	异或非运算		1
+Concept	弧度→度（°）单位换算	弧度→度（°）单位换算		1
+Concept	弧度→度（°）单换转换	弧度→度（°）单换转换		1
+Concept	强制执行下一点定位	强制执行下一点定位		1
+Concept	归零	归零		1
+Concept	当前位置	当前位置		1
+Concept	当前位置改	当前位置改		1
+Concept	当前坐标更改	当前坐标更改	坐标预置 当前位置改	1
+Concept	当前时间	当前时间		1
+Concept	循环	循环		2
+Concept	循环右移	循环右移		1
+Concept	循环左移	循环左移		1
+Concept	循环通信输入更改	循环通信输入更改		1
+Concept	微秒→时间转换	微秒→时间转换		1
+Concept	急停	急停		2
+Concept	恒速	恒速		1
+Concept	恢复单元程序	恢复单元程序		1
+Concept	恢复流程	恢复流程		1
+Concept	成块传送	成块传送		1
+Concept	成批传送字块数据	成批传送字块数据		1
+Concept	成批读出文件寄存器	成批读出文件寄存器		1
+Concept	或反脉冲上升沿	或反脉冲上升沿		1
+Concept	或反脉冲下降沿	或反脉冲下降沿		1
+Concept	或星期 OFF	或星期 OFF		1
+Concept	或星期 ON	或星期 ON		1
+Concept	或脉冲上升沿	或脉冲上升沿		1
+Concept	或脉冲下降沿	或脉冲下降沿		1
+Concept	截取	截取		3
+Concept	截取字符串	截取字符串		2
+Concept	手动正转	手动正转		2
+Concept	打开UDP套接字	打开UDP套接字		1
+Concept	执行GetAttributeSingle	执行GetAttributeSingle		1
+Concept	执行SetAttributeSingle	执行SetAttributeSingle		1
+Concept	执行传感器服务	执行传感器服务		1
+Concept	执行显式报文通信	执行显式报文通信		1
+Concept	执行运转记录保存	执行运转记录保存		1
+Concept	扭矩上限	扭矩上限		2
+Concept	扭矩限制	扭矩限制		2
+Concept	批量传输	批量传输		1
+Concept	批量传送	批量传送		3
+Concept	找原点	找原点		1
+Concept	折线近似	折线近似		1
+Concept	折线近似（定标）	折线近似（定标）		1
+Concept	报警复位	报警复位		1
+Concept	拼接	拼接		1
+Concept	指定KV套接字以太网端口号	指定KV套接字以太网端口号		1
+Concept	指定位的上升沿微分	指定位的上升沿微分		1
+Concept	指定位的上升沿微分的反转	指定位的上升沿微分的反转		1
+Concept	指定位的下降沿微分	指定位的下降沿微分		1
+Concept	指定位的下降沿微分的反转	指定位的下降沿微分的反转		1
+Concept	指定位的输出 ON	指定位的输出 ON		1
+Concept	指定块之间的数据比较	指定块之间的数据比较		1
+Concept	指定块内的 CRC 值计算	指定块内的 CRC 值计算		1
+Concept	指定块内的数据检测	指定块内的数据检测		1
+Concept	指定块内的最大值查找	指定块内的最大值查找		1
+Concept	指定块内的最小值查找	指定块内的最小值查找		1
+Concept	指定块内的检测数据计数	指定块内的检测数据计数		1
+Concept	指定块数值总计	指定块数值总计		1
+Concept	指定块的复位（存储 0）	指定块的复位（存储 0）		1
+Concept	指定块的平均值	指定块的平均值		1
+Concept	指定子程序的启动	指定子程序的启动		1
+Concept	指定显式报文通信对象	指定显式报文通信对象		1
+Concept	指定范围内的数据查找	指定范围内的数据查找		1
+Concept	指定范围内的数据检索	指定范围内的数据检索		1
+Concept	指定隐式(I/O)报文通信停止请求对象节点	指定隐式(I/O)报文通信停止请求对象节点		1
+Concept	指定隐式(I/O)报文通信重新开始请求对象节点	指定隐式(I/O)报文通信重新开始请求对象节点		1
+Concept	指数函数运算	指数函数运算		1
+Concept	按一下	按一下		1
+Concept	按位求反	按位求反		1
+Concept	按分隔符	按分隔符		2
+Concept	按字节总计指定块	按字节总计指定块		1
+Concept	排序	排序		2
+Concept	接收数据	接收数据		2
+Concept	接收缓存	接收缓存		1
+Concept	推进迟滞滤波器	推进迟滞滤波器		1
+Concept	插入数据表指定位置	插入数据表指定位置		1
+Concept	插补	插补		2
+Concept	插补运行定位目标坐标更改	插补运行定位目标坐标更改		1
+Concept	改写数据表指定位置	改写数据表指定位置		1
+Concept	改目标	改目标		1
+Concept	故障复位	故障复位		1
+Concept	数值数据 → ASCII 码	数值数据 → ASCII 码		1
+Concept	数值数据→ASCII 字符串转换	数值数据→ASCII 字符串转换		1
+Concept	数字转	数字转		1
+Concept	数据交换	数据交换		1
+Concept	数据传送	数据传送		1
+Concept	数据存储器写入	数据存储器写入		1
+Concept	数据检索	数据检索		1
+Concept	数据类型转换	数据类型转换	类型转换	2
+Concept	数据类型转换（多重定义）	数据类型转换（多重定义）		2
+Concept	数据类型转换（数据类型指定）	数据类型转换（数据类型指定）		2
+Concept	数据表指定位置的删除	数据表指定位置的删除		1
+Concept	数据表指定位置的覆写	数据表指定位置的覆写		1
+Concept	数组复位	数组复位		1
+Concept	数组左移	数组左移		1
+Concept	数组平均值	数组平均值		1
+Concept	数组要素数取得	数组要素数取得		1
+Concept	数组长度	数组长度		1
+Concept	整数转字符串	整数转字符串		1
+Concept	文件寄存器模式的切换	文件寄存器模式的切换		1
+Concept	文件寄存器的成批保存	文件寄存器的成批保存		1
+Concept	文件寄存器的批量保存	文件寄存器的批量保存		1
+Concept	文件寄存器的批量读取	文件寄存器的批量读取		1
+Concept	文件寄存器的组切换	文件寄存器的组切换		1
+Concept	斜坡	斜坡		2
+Concept	断开连接	断开连接		1
+Concept	断电	断电		1
+Concept	断电延时	断电延时		1
+Concept	断电延时定时器	断电延时定时器	断电延时	1
+Concept	新建文件夹	新建文件夹		2
+Concept	无条件分支	无条件分支		1
+Concept	无进位循环右移	无进位循环右移		2
+Concept	无进位循环左移	无进位循环左移		2
+Concept	日历	日历	当前时间 日期时间	2
+Concept	日历定时器写入	日历定时器写入		1
+Concept	日历定时器调整	日历定时器调整		1
+Concept	日志	日志		2
+Concept	日志、跟踪使能	日志、跟踪使能		1
+Concept	日志、跟踪触发	日志、跟踪触发		1
+Concept	日志数据获取	日志数据获取		1
+Concept	日志记录数据获取	日志记录数据获取		1
+Concept	日期/时间数据→秒数据	日期/时间数据→秒数据		1
+Concept	日期和时间→秒转换	日期和时间→秒转换		1
+Concept	日期时间	日期时间		2
+Concept	日期时间数据转换为秒格式	日期时间数据转换为秒格式		1
+Concept	时刻	时刻	日期时间	2
+Concept	时间→微秒转换	时间→微秒转换		1
+Concept	时间乘法	时间乘法		1
+Concept	时间减法	时间减法		1
+Concept	时间分割比例输出	时间分割比例输出		2
+Concept	时间加法	时间加法		1
+Concept	时间比例	时间比例		1
+Concept	时间除法	时间除法		1
+Concept	星期	星期		1
+Concept	星期 OFF	星期 OFF		1
+Concept	星期 ON	星期 ON		1
+Concept	星期获取	星期获取		1
+Concept	显式报文	显式报文		1
+Concept	显示访问窗消息 1	显示访问窗消息 1		1
+Concept	显示访问窗消息 2	显示访问窗消息 2		1
+Concept	暂停单元程序	暂停单元程序		1
+Concept	暂停流程	暂停流程		1
+Concept	更改D/A转换输出数据	更改D/A转换输出数据		1
+Concept	更改存储体(存储卡/CPU 存储器)中的文件名	更改存储体(存储卡/CPU 存储器)中的文件名		1
+Concept	更改存储体(存储卡/CPU存储器)中的文件名	更改存储体(存储卡/CPU存储器)中的文件名		1
+Concept	更改当前坐标	更改当前坐标		1
+Concept	更改循环通信输出	更改循环通信输出		1
+Concept	更改特殊数据偏移值	更改特殊数据偏移值		1
+Concept	更改输出数据偏移值	更改输出数据偏移值		1
+Concept	更新运动系统变量	更新运动系统变量		1
+Concept	最大值	最大值		2
+Concept	最大值检索	最大值检索		1
+Concept	最小	最小		1
+Concept	最小值	最小值		2
+Concept	最小值检索	最小值检索		1
+Concept	有自动矫正功能的PID控制	有自动矫正功能的PID控制		1
+Concept	服务器	服务器		1
+Concept	服务端	服务端		1
+Concept	条件分支	条件分支		1
+Concept	条件判断	条件判断		1
+Concept	查找	查找		2
+Concept	查看空间	查看空间		1
+Concept	标号	标号		1
+Concept	校验	校验		1
+Concept	根据软元件信息写入位列（带偏移量）	根据软元件信息写入位列（带偏移量）		1
+Concept	格雷码→二进制数据转换	格雷码→二进制数据转换		1
+Concept	检测指定块内的数据	检测指定块内的数据		1
+Concept	检索指定块内的最大值	检索指定块内的最大值		1
+Concept	检索指定块内的最小值	检索指定块内的最小值		1
+Concept	模块执行停止	模块执行停止		1
+Concept	模块执行开始	模块执行开始		1
+Concept	模块缓存	模块缓存		1
+Concept	模块间子例行程序命令	模块间子例行程序命令		1
+Concept	模块间子程序调用	模块间子程序调用		1
+Concept	模拟量输入	模拟量输入		1
+Concept	模拟量输出	模拟量输出		1
+Concept	正切	正切		1
+Concept	正切值→角度（弧度）	正切值→角度（弧度）		1
+Concept	正弦	正弦		1
+Concept	正弦值→角度（弧度）	正弦值→角度（弧度）		1
+Concept	死区控制	死区控制		1
+Concept	求余	求余		1
+Concept	求和	求和		1
+Concept	流程暂停	流程暂停		1
+Concept	流程重新开始	流程重新开始		1
+Concept	浮动小数点型实数有效确认	浮动小数点型实数有效确认		1
+Concept	清空缓冲区	清空缓冲区		1
+Concept	清除处理时间最大值	清除处理时间最大值		1
+Concept	清除套接字接收缓存	清除套接字接收缓存		1
+Concept	清除报警	清除报警		1
+Concept	清除缓存	清除缓存		1
+Concept	清除轴错误/驱动器报警	清除轴错误/驱动器报警		1
+Concept	清除轴错误／驱动器报警	清除轴错误／驱动器报警		1
+Concept	清零	清零		4
+Concept	点动	点动		2
+Concept	点运转	点运转		1
+Concept	生成 CIP 消息	生成 CIP 消息		1
+Concept	生成存储体（存储卡/CPU存储器）文件夹	生成存储体（存储卡/CPU存储器）文件夹		1
+Concept	用户信息显示	用户信息显示		1
+Concept	用户信息显示解除	用户信息显示解除		1
+Concept	用户消息显示	用户消息显示		1
+Concept	用户消息显示解除	用户消息显示解除		1
+Concept	电子凸轮	电子凸轮		2
+Concept	电机断电	电机断电		1
+Concept	目标坐标更改	目标坐标更改		1
+Concept	直线插补	直线插补		2
+Concept	直线插补相对位置定位控制	直线插补相对位置定位控制		1
+Concept	直线插补绝对位置定位控制	直线插补绝对位置定位控制		1
+Concept	相对位置定位控制	相对位置定位控制		1
+Concept	相对定位	相对定位	增量移动 相对移动	1
+Concept	相对移动	相对移动		1
+Concept	确保缓冲存储器	确保缓冲存储器		1
+Concept	示教	示教		2
+Concept	禁止记录指定ID	禁止记录指定ID		1
+Concept	秒数据→日期/时间数据	秒数据→日期/时间数据		1
+Concept	秒转换为日期时间数据格式	秒转换为日期时间数据格式		1
+Concept	移位	移位		2
+Concept	移位寄存器	移位寄存器		1
+Concept	移动到起始位置	移动到起始位置		1
+Concept	移动存储体(存储卡/CPU存储器)的文件	移动存储体(存储卡/CPU存储器)的文件		1
+Concept	移动存储文件	移动存储文件		1
+Concept	立即停止	立即停止	急停 紧急停止	2
+Concept	立即停止所有轴	立即停止所有轴		1
+Concept	符号求反	符号求反		1
+Concept	等待连接	等待连接		1
+Concept	算术右移（以位为单位）	算术右移（以位为单位）		1
+Concept	算术右移（位单位）	算术右移（位单位）		1
+Concept	算术左移（以位为单位）	算术左移（以位为单位）		1
+Concept	算术左移（位单位）	算术左移（位单位）		1
+Concept	类型转换	类型转换		1
+Concept	紧急停止	紧急停止		2
+Concept	结构体复位	结构体复位		1
+Concept	结构体排序	结构体排序		1
+Concept	绝对位置	绝对位置		1
+Concept	绝对位置定位控制	绝对位置定位控制		1
+Concept	绝对位置跟踪控制	绝对位置跟踪控制		1
+Concept	绝对值	绝对值		1
+Concept	绝对值编码器	绝对值编码器		1
+Concept	绝对定位	绝对定位	绝对位置	1
+Concept	绝对移动	绝对移动		1
+Concept	统计bit	统计bit		1
+Concept	缓冲存储器	缓冲存储器	模块缓存	2
+Concept	缓冲存储器值写入	缓冲存储器值写入		1
+Concept	缓冲存储器值读取	缓冲存储器值读取		1
+Concept	缓冲存储器写入	缓冲存储器写入		1
+Concept	缓冲存储器批量写入	缓冲存储器批量写入		1
+Concept	缓冲存储器确保	缓冲存储器确保		1
+Concept	缓冲存储器读取	缓冲存储器读取		1
+Concept	缓冲存储器连续写入	缓冲存储器连续写入		1
+Concept	缓冲存储器连续读取	缓冲存储器连续读取		1
+Concept	网络通不通	网络通不通		1
+Concept	置位	置位		2
+Concept	置位优先保持	置位优先保持		1
+Concept	翻转	翻转		1
+Concept	脉冲	脉冲		1
+Concept	脉冲定时器	脉冲定时器	固定宽度 脉冲	1
+Concept	脉冲宽度	脉冲宽度		1
+Concept	自保型宏的启动	自保型宏的启动		1
+Concept	自保型宏的结束	自保型宏的结束		1
+Concept	自保持	自保持		2
+Concept	自然对数运算	自然对数运算		2
+Concept	自然指数运算	自然指数运算		1
+Concept	自由运行计数器刷新	自由运行计数器刷新		2
+Concept	范围指定字符串检索	范围指定字符串检索		1
+Concept	范围比较	范围比较		1
+Concept	获取 CIP 消息	获取 CIP 消息		1
+Concept	获取位大小	获取位大小		1
+Concept	获取字大小	获取字大小		2
+Concept	获取字节大小	获取字节大小		1
+Concept	获取存储体(存储卡/CPU存储器)的文件状态	获取存储体(存储卡/CPU存储器)的文件状态		1
+Concept	获取存储可用空间	获取存储可用空间		1
+Concept	获取存储文件列表	获取存储文件列表		1
+Concept	获取存储文件状态	获取存储文件状态		1
+Concept	获取数组要素数	获取数组要素数		1
+Concept	获取数组起始编号	获取数组起始编号		1
+Concept	获取记录数据	获取记录数据		1
+Concept	获取软元件/变量数据	获取软元件/变量数据		1
+Concept	获取软元件信息	获取软元件信息		1
+Concept	获取软元件地址	获取软元件地址		1
+Concept	获取运转记录数据	获取运转记录数据		1
+Concept	获取邮件发送结果	获取邮件发送结果		1
+Concept	获取阵列要素数	获取阵列要素数		1
+Concept	被动连接	被动连接		1
+Concept	角度→弧度转换	角度→弧度转换		1
+Concept	角度（弧度）→余弦值	角度（弧度）→余弦值		1
+Concept	角度（弧度）→正切值	角度（弧度）→正切值		1
+Concept	角度（弧度）→正弦值	角度（弧度）→正弦值		1
+Concept	解除定位待机	解除定位待机		1
+Concept	计数	计数		1
+Concept	计数器	计数器	计数	1
+Concept	计时	计时		1
+Concept	计算指定块的 CRC 值	计算指定块的 CRC 值		1
+Concept	设定KV套接字TCP(无协议)接收	设定KV套接字TCP(无协议)接收		1
+Concept	设定KV套接字打开	设定KV套接字打开		1
+Concept	设定中断去能范围	设定中断去能范围		1
+Concept	设定同步控制外部参照指令值	设定同步控制外部参照指令值		1
+Concept	设定输入中断检测条件	设定输入中断检测条件		1
+Concept	设定输入过电压保护功能	设定输入过电压保护功能		1
+Concept	设定输出过电流保护功能	设定输出过电流保护功能		1
+Concept	设定邮件主题	设定邮件主题		1
+Concept	设定邮件收件人地址	设定邮件收件人地址		1
+Concept	设定邮件收件人组	设定邮件收件人组		1
+Concept	设定邮件正文	设定邮件正文		1
+Concept	设定邮件附加文件名	设定邮件附加文件名		1
+Concept	读出 FIFO 表	读出 FIFO 表		1
+Concept	读出 LIFO 表	读出 LIFO 表		1
+Concept	读取A/D转换特殊数据	读取A/D转换特殊数据		1
+Concept	读取FTP文件传输状态	读取FTP文件传输状态		1
+Concept	读取KV套接字处理状态	读取KV套接字处理状态		1
+Concept	读取KV套接字接收数据	读取KV套接字接收数据		1
+Concept	读取SV3伺服参数	读取SV3伺服参数		1
+Concept	读取传感器参数	读取传感器参数		1
+Concept	读取全部类型的A/D转换数据	读取全部类型的A/D转换数据		1
+Concept	读取反馈转矩监控器	读取反馈转矩监控器		1
+Concept	读取存储文件(BIN数据)	读取存储文件(BIN数据)		1
+Concept	读取存储文件(多行字符串)	读取存储文件(多行字符串)		1
+Concept	读取定位当前点编号	读取定位当前点编号		1
+Concept	读取定时器/计数器的当前值	读取定时器/计数器的当前值		1
+Concept	读取属性	读取属性		1
+Concept	读取当前坐标	读取当前坐标		1
+Concept	读取当前控制模式	读取当前控制模式		1
+Concept	读取指令坐标	读取指令坐标		1
+Concept	读取显式报文通信完成代码	读取显式报文通信完成代码		1
+Concept	读取显式报文通信接收数据	读取显式报文通信接收数据		1
+Concept	读取缓冲存储器	读取缓冲存储器		1
+Concept	读取缓冲数据	读取缓冲数据		1
+Concept	读取计数当前值	读取计数当前值		1
+Concept	读取转速	读取转速		1
+Concept	读取轴错误代码	读取轴错误代码		1
+Concept	读取输入捕获0	读取输入捕获0		1
+Concept	读取隐式(I/O)报文通信登录节点表	读取隐式(I/O)报文通信登录节点表		1
+Concept	读取隐式(I/O)报文通信错误中节点表	读取隐式(I/O)报文通信错误中节点表		1
+Concept	读取频率	读取频率		1
+Concept	读文件	读文件		2
+Concept	超前滞后滤波器	超前滞后滤波器		1
+Concept	超前滞后过滤	超前滞后过滤		1
+Concept	转INT	转INT		1
+Concept	转REAL	转REAL		1
+Concept	转字符串	转字符串		2
+Concept	转成字符串	转成字符串		3
+Concept	转数值	转数值		2
+Concept	转矩前馈值更改	转矩前馈值更改		1
+Concept	转矩控制	转矩控制	转矩模式	1
+Concept	转矩模式	转矩模式		1
+Concept	转矩限制值更改	转矩限制值更改		1
+Concept	软元件/变量数据获取	软元件/变量数据获取		1
+Concept	软元件地址加一	软元件地址加一		1
+Concept	软元件地址加法	软元件地址加法		1
+Concept	软元件记录数据获取	软元件记录数据获取		1
+Concept	辅助离合器控制	辅助离合器控制		1
+Concept	辅助轴相位补偿	辅助轴相位补偿		1
+Concept	输入刷新	输入刷新		1
+Concept	输入继电器状态刷新	输入继电器状态刷新		1
+Concept	输出刷新	输出刷新		1
+Concept	输出计数器	输出计数器		1
+Concept	运行中修改	运行中修改		1
+Concept	连接字符串	连接字符串		1
+Concept	连续传输	连续传输		1
+Concept	连续高低字节互换	连续高低字节互换		1
+Concept	选一个	选一个		2
+Concept	通电延时	通电延时		1
+Concept	通电延时定时器	通电延时定时器	延时	2
+Concept	速度倍率	速度倍率		1
+Concept	速度前馈值更改	速度前馈值更改		1
+Concept	速度控制	速度控制	一直转 恒速 速度模式	2
+Concept	速度控制（CSP）	速度控制（CSP）		1
+Concept	速度控制（CSV）	速度控制（CSV）		1
+Concept	速度更改	速度更改		1
+Concept	速度模式	速度模式		2
+Concept	逻辑“与”运算	逻辑“与”运算		1
+Concept	逻辑“异或”运算	逻辑“异或”运算		1
+Concept	逻辑“或”	逻辑“或”		1
+Concept	逻辑“或”运算	逻辑“或”运算		1
+Concept	逻辑与	逻辑与		1
+Concept	逻辑或	逻辑或		1
+Concept	重写	重写		1
+Concept	重命名存储文件	重命名存储文件		1
+Concept	重新开始定位运转	重新开始定位运转		1
+Concept	错误复位	错误复位	报警复位 故障复位 清除报警	1
+Concept	闪变	闪变		1
+Concept	间接指定对象的地址存储	间接指定对象的地址存储		1
+Concept	限幅	限幅		1
+Concept	除法	除法		1
+Concept	除法余数	除法余数		1
+Concept	随机数发生	随机数发生		1
+Concept	隐式(I/O)报文通信输入数据刷新	隐式(I/O)报文通信输入数据刷新		1
+Concept	隐式报文通信输入刷新	隐式报文通信输入刷新		1
+Concept	隐式报文通信输出刷新	隐式报文通信输出刷新		1
+Concept	驱动器参数	驱动器参数		2
+Concept	高低字节替换	高低字节替换		1
+Concept	高低字节转换	高低字节转换		1
+Concept	高速原点移动	高速原点移动		1
+Concept	高速计数	高速计数		1
+Concept	高速计数器更改	高速计数器更改		1
+ErrorCode	1232	ST 里发现非法的字符串	错误1232	0
+ErrorCode	214	梯形图中存在未注册变量	错误214 未注册变量	0
+ErrorCode	33	可以省略 ENDH 命令	错误33	0
+ErrorCode	602	Pos 不在范围内	错误602	0
+ErrorCode	61	同一定时器编号在多个 TMR/TMH/TMS/TMU 指令中使用	错误61 定时器编号重复	0
+ErrorCode	709	变量编辑窗口中存在不正确的变量定义	错误709	0
+FieldFinding	MNM 首行 DEVICE 码与编码按目标 CPU 取证	MNM 首行 DEVICE 码与编码按目标 CPU 取证	DEVICE码 MNM编码 UTF-16LE DEVICE:60	0
+FieldFinding	ST 保留字与软元件名冲突	ST 保留字与软元件名冲突	保留字 变量名冲突 C0	0
+FieldFinding	写入依赖顺序：结构体→轴→全局变量→逐模块(MNM→自变量→局部变量)→编译	写入依赖顺序：结构体→轴→全局变量→逐模块(MNM→自变量→局部变量)→编译	写入顺序 依赖顺序 无效数据类型	0
+FieldFinding	只有 2 步的“转换结果 OK”是空工程	只有 2 步的“转换结果 OK”是空工程	编译OK 转换结果OK 总步数	0
+FieldFinding	导出体中的 ??? 未指定实参可以原样导入	导出体中的 ??? 未指定实参可以原样导入	??? 未指定实参	0
+FieldFinding	比较触点不能用 32 位字作操作数（读取助记符列表失败）	比较触点不能用 32 位字作操作数（读取助记符列表失败）	读取助记符列表失败 AND= DM.L	0
+FieldFinding	编译要求目标工程已打开且只有一个同名 Kvs 进程	编译要求目标工程已打开且只有一个同名 Kvs 进程	KV_COMPILE_PROJECT_PROCESS_AMBIGUOUS 多个KVS实例	0
+FieldFinding	轴变量名不能靠变量粘贴创建，要改轴名	轴变量名不能靠变量粘贴创建，要改轴名	轴改名 Axis_1 _MC_Axis 批量登录轴	0
+FunctionBlock	*_BCD_TO_**			1
+FunctionBlock	*_TO_**	数据类型转换		1
+FunctionBlock	*_TO_**			1
+FunctionBlock	*_TO_BCD_**			1
+FunctionBlock	*_TRUNC_**			1
+FunctionBlock	ABS	绝对值		1
+FunctionBlock	ACOS	余弦值→角度（弧度）		3
+FunctionBlock	ADD	加法		1
+FunctionBlock	ADD		SUB MUL DIV	3
+FunctionBlock	ADD.F			1
+FunctionBlock	ADD_TIME	时间加法		1
+FunctionBlock	ADRADD	加存储地址		2
+FunctionBlock	ADRDEC	存储地址减 1		2
+FunctionBlock	ADRINC	存储地址加 1		2
+FunctionBlock	ADRSUB	减存储地址		2
+FunctionBlock	AND	逻辑与		1
+FunctionBlock	AND		ANB	2
+FunctionBlock	ANL		ORL	1
+FunctionBlock	ANL			1
+FunctionBlock	ApproxCal	折线近似		1
+FunctionBlock	AryCRC	CRC校验值计算		1
+FunctionBlock	AryMax	最大值检索		1
+FunctionBlock	AryMean	数组平均值		1
+FunctionBlock	AryMin	最小值检索		1
+FunctionBlock	AryReset	数组复位		1
+FunctionBlock	AryShiftL	数组左移		1
+FunctionBlock	ArySum	和校验计算		1
+FunctionBlock	ASC		RASC	1
+FunctionBlock	AsciiToBinary	十六进制ASCII字符码→BIN数据转换		1
+FunctionBlock	AsciiToString	十六进制ASCII字符码→字符串转换		1
+FunctionBlock	ASIN	反正弦		1
+FunctionBlock	ASIN	正弦值→角度（弧度）		3
+FunctionBlock	Assignment			1
+FunctionBlock	ATAN	正切值→角度（弧度）		3
+FunctionBlock	ATAN2	坐标指定反正切		1
+FunctionBlock	BCD_TO_**	BCD→BIN数据类型转换		1
+FunctionBlock	BCD_TO_**			1
+FunctionBlock	BinaryToAscii	BIN数据→十六进制ASCII字符码转换		1
+FunctionBlock	BinToGrayCode	BIN→格雷码转换		1
+FunctionBlock	BitBlockMove	位连续传输		1
+FunctionBlock	BitCount	位计数		1
+FunctionBlock	BitFillMove	位批量传输		1
+FunctionBlock	BitLoad	位加载		1
+FunctionBlock	BitSet	位置位		1
+FunctionBlock	BLD		BAND BOR	1
+FunctionBlock	BLD	字数据的指定位信息		2
+FunctionBlock	BLDB	字数据的指定位取反信息		2
+FunctionBlock	BlockMove	连续传输		1
+FunctionBlock	BlockSwap	连续高低字节互换		1
+FunctionBlock	BOUB	字数据的指定位反转输出		2
+FunctionBlock	BOUT		BOUB	1
+FunctionBlock	BOUT	字数据的指定位输出		2
+FunctionBlock	BREAK	强制结束该循环处理。		1
+FunctionBlock	BRES	字数据的指定位输出 OFF		2
+FunctionBlock	BSET		BRES	1
+FunctionBlock	BSET	字数据的指定位输出 ON		2
+FunctionBlock	ByteBlockMove	字节连续传输		1
+FunctionBlock	ByteSum	字节合计值算出		1
+FunctionBlock	C_SCMP	字符串比较		1
+FunctionBlock	C_SDEL	字符串部分删除		1
+FunctionBlock	C_SINS	字符串插入		1
+FunctionBlock	C_SMID	字符串中间截取		1
+FunctionBlock	CALL		SBN RET	2
+FunctionBlock	CALL	启动指定的子程序		2
+FunctionBlock	CHR	十六进制 ASCII 码→字符转换		2
+FunctionBlock	CipGetAttributeSingle	执行GetAttributeSingle		2
+FunctionBlock	CipMsgService	执行显式报文通信		1
+FunctionBlock	CipSetAttributeSingle	执行SetAttributeSingle		2
+FunctionBlock	CipStringToString	CIP字符串→字符串转换		1
+FunctionBlock	Clear	变量复位		1
+FunctionBlock	CMP.F			1
+FunctionBlock	CNT	32位加计数器		2
+FunctionBlock	CONCAT	字符串组合		1
+FunctionBlock	CONCAT	字符串连接		1
+FunctionBlock	Control			1
+FunctionBlock	COS	角度（弧度）→余弦值		3
+FunctionBlock	CTD	减法计数器		1
+FunctionBlock	CTD_DINT	减法计数器（DINT）		1
+FunctionBlock	CTD_UDINT	减法计数器（UDINT）		1
+FunctionBlock	CTH		CTC	1
+FunctionBlock	CTH0		CTH1 CTC	1
+FunctionBlock	CTU	加法计数器		1
+FunctionBlock	CTU_DINT	加法计数器（DINT）		1
+FunctionBlock	CTU_UDINT	加法计数器（UDINT）		1
+FunctionBlock	CTUD	加减计数器		1
+FunctionBlock	CTUD_DINT	加减计数器（DINT）		1
+FunctionBlock	CTUD_UDINT	加减计数器（UDINT）		1
+FunctionBlock	CURVAL	读取定时器/计数器的当前值		1
+FunctionBlock	DataSearch	数据检索		1
+FunctionBlock	Decode	8位解码		1
+FunctionBlock	DecStringToNum	十进制字符串→BIN数据转换		1
+FunctionBlock	DEG	弧度→度（°）单位换算		3
+FunctionBlock	DegToRad	角度→弧度转换		1
+FunctionBlock	DELETE	字符串部分删除		1
+FunctionBlock	DELETE	字符串部分删除		2
+FunctionBlock	DevAddressAdd	软元件地址加法		1
+FunctionBlock	DevAddressGet	获取软元件地址		1
+FunctionBlock	DevAddressInc	软元件地址加一		1
+FunctionBlock	DevInfoGet	获取软元件信息		1
+FunctionBlock	DevInfoOffsetRead	从软元件信息读取位列（带偏移量）		1
+FunctionBlock	DevInfoOffsetWrite	根据软元件信息写入位列（带偏移量）		1
+FunctionBlock	DevInfoRead	从软元件信息读取位列		1
+FunctionBlock	DevInfoWrite	从软元件信息写入位列		1
+FunctionBlock	DI		EI	2
+FunctionBlock	DIFU		DIFD	2
+FunctionBlock	DisableInterruptRange	中断禁止范围		1
+FunctionBlock	DisperseByte	字节分解		1
+FunctionBlock	DisperseNibble	半字节分解		1
+FunctionBlock	DisperseString	字符串字节分解		1
+FunctionBlock	DIV	除法		1
+FunctionBlock	DIV.F			1
+FunctionBlock	DIV_TIME	时间除法		1
+FunctionBlock	DMX	4 位数据编码		2
+FunctionBlock	DtToSec	日期和时间→秒转换		1
+FunctionBlock	DW.F			1
+FunctionBlock	EC_CoE_PDORestart	CoE PDO通信重新开始		1
+FunctionBlock	EC_CoE_PDOStop	CoE PDO通信停止		1
+FunctionBlock	EC_CoE_SDORead	CoE SDO读取		1
+FunctionBlock	EC_CoE_SDOWrite	CoE SDO写入		1
+FunctionBlock	EnableInterrupt	中断允许		1
+FunctionBlock	Encode	8位编码		1
+FunctionBlock	END		ENDH	2
+FunctionBlock	EQ			1
+FunctionBlock	Exchange	数据交换		1
+FunctionBlock	EXP	自然指数运算		1
+FunctionBlock	EXP	指数函数运算		3
+FunctionBlock	EXPT	幂运算		1
+FunctionBlock	EXPT	幂运算		1
+FunctionBlock	FB	功能块的启动		1
+FunctionBlock	FBCALL	功能块调用		1
+FunctionBlock	FBSTRT	功能块开始		2
+FunctionBlock	FC37_Script_unitfunction			1
+FunctionBlock	FEND	功能块的结束		2
+FunctionBlock	FIFODelete	FIFO删除		1
+FunctionBlock	FIFOInsert	FIFO插入		1
+FunctionBlock	FIFORead	FIFO读取		1
+FunctionBlock	FIFOWrite	FIFO写入		1
+FunctionBlock	FillMove	批量传输		1
+FunctionBlock	FIND	字符串查找		1
+FunctionBlock	FIND	字符串检索		2
+FunctionBlock	FMOV.F			1
+FunctionBlock	FOR		NEXT BREAK	1
+FunctionBlock	FOR		NEXT	1
+FunctionBlock	FUN	功能的启动		1
+FunctionBlock	GetAryCount	获取数组要素数		1
+FunctionBlock	GetBitSize	获取位大小		1
+FunctionBlock	GetByteSize	获取字节大小		1
+FunctionBlock	GetDayOfWeek	星期获取		1
+FunctionBlock	GetWordSize	获取字大小		1
+FunctionBlock	GRY	二进制数据→格雷码转换		3
+FunctionBlock	HexStringToNum	十六进制字符串→BIN数据转换		1
+FunctionBlock	IF			2
+FunctionBlock	Inc	加一		1
+FunctionBlock	INC		DEC	1
+FunctionBlock	INSERT	字符串插入		1
+FunctionBlock	INSERT	字符串插入		1
+FunctionBlock	INSTR	字符串检索		2
+FunctionBlock	INT		RETI	2
+FunctionBlock	INT	单精度浮动小数点型实数→二进制数据转换		2
+FunctionBlock	IS_***	单元类型判定		1
+FunctionBlock	IS_VALID	浮动小数点型实数有效确认		1
+FunctionBlock	JOGX		JOGY	1
+FunctionBlock	LD		LDB	2
+FunctionBlock	LDA		STA	1
+FunctionBlock	LDA.F			1
+FunctionBlock	LDF	指定位的下降沿微分		2
+FunctionBlock	LDFB	指定位的下降沿微分的反转		2
+FunctionBlock	LDP		ANP ODP LDF ANF ORF	1
+FunctionBlock	LDP	指定位的上升沿微分		2
+FunctionBlock	LDPB	指定位的上升沿微分的反转		2
+FunctionBlock	LeadLagFilter	超前滞后过滤		1
+FunctionBlock	LEFT	字符串左截取		1
+FunctionBlock	LEFT	左截取字符串		2
+FunctionBlock	LEN	字符串长度检测		1
+FunctionBlock	LIMIT	上下限限制		1
+FunctionBlock	LN	自然对数运算		1
+FunctionBlock	LN	自然对数运算		1
+FunctionBlock	lNSERT			1
+FunctionBlock	LOG	自然对数运算		3
+FunctionBlock	LoggingEnable	日志、跟踪使能		1
+FunctionBlock	LoggingTrigger	日志、跟踪触发		1
+FunctionBlock	LOWER_BOUND	获取数组起始编号		1
+FunctionBlock	LrealToString	双精度小数点型实数→字符串转换		1
+FunctionBlock	LT			1
+FunctionBlock	LTRIM	删除字符串左端的半角空白・标号		2
+FunctionBlock	MAX	取最大值		1
+FunctionBlock	MAX	检索指定块内的最大值		3
+FunctionBlock	MAX_RANGE			1
+FunctionBlock	MC		MCR	2
+FunctionBlock	MC_AbsolutePosFollowUpControl	绝对位置跟踪控制		1
+FunctionBlock	MC_AuxAxisPhasing	辅助轴相位补偿		1
+FunctionBlock	MC_AuxClutch	辅助离合器控制		1
+FunctionBlock	MC_CamGenerate	凸轮数据自动生成		1
+FunctionBlock	MC_CamRead	凸轮数据读取		1
+FunctionBlock	MC_CamWrite	凸轮数据写入		1
+FunctionBlock	MC_ChangeTargetGroupPositions	定位目标坐标更改（插补运行）		1
+FunctionBlock	MC_ChangeTargetPosition	定位目标坐标更改		1
+FunctionBlock	MC_ChangeTargetVelocity	定位速度更改		1
+FunctionBlock	MC_ClearMaxCycleTime	清除处理时间最大值		1
+FunctionBlock	MC_FastMoveToHome	高速原点移动		1
+FunctionBlock	MC_GroupStop	减速停止(轴群组)		1
+FunctionBlock	MC_Home	原点复归		1
+FunctionBlock	MC_ImmediateStop	立即停止		1
+FunctionBlock	MC_ImmediateStopAll	立即停止所有轴		1
+FunctionBlock	MC_InternalHomeSensor	定位原点传感器请求		1
+FunctionBlock	MC_InternalStopSensor	定位停止传感器请求		1
+FunctionBlock	MC_Jog			1
+FunctionBlock	MC_MainAxisPhasing	主轴相位补偿		1
+FunctionBlock	MC_MainClutch	主离合器控制		1
+FunctionBlock	MC_MaskStopSensor	停止传感器检测去能		1
+FunctionBlock	MC_MCodeOff	定位M代码OFF指令		1
+FunctionBlock	MC_MoveAbsolute	绝对位置定位控制		1
+FunctionBlock	MC_MoveCircularAbsolute	圆弧插补绝对位置定位控制		1
+FunctionBlock	MC_MoveCircularRelative	圆弧插补相对位置定位控制		6
+FunctionBlock	MC_MoveLinearAbsolute	直线插补绝对位置定位控制		1
+FunctionBlock	MC_MoveLinearRelative	直线插补相对位置定位控制		1
+FunctionBlock	MC_MoveRelative	相对位置定位控制		1
+FunctionBlock	MC_MoveToBasePosition	基准位置移动		1
+FunctionBlock	MC_MoveToNextPoint	强制执行下一点定位		1
+FunctionBlock	MC_MoveToPoint	定位控制(点参数)		1
+FunctionBlock	MC_MoveVelocity	速度控制（CSP）		1
+FunctionBlock	MC_OperationEnable	动作允许		1
+FunctionBlock	MC_Power	伺服ON		1
+FunctionBlock	MC_RefreshMotionVariable	更新运动系统变量		1
+FunctionBlock	MC_ReleaseStandby	解除定位待机		1
+FunctionBlock	MC_Reset	清除轴错误／驱动器报警		1
+FunctionBlock	MC_ResumePositioning	重新开始定位运转		1
+FunctionBlock	MC_SaveParameter	参数保存		1
+FunctionBlock	MC_SetOverride	重写		1
+FunctionBlock	MC_SetPosition	更改当前坐标		1
+FunctionBlock	MC_SetSyncExternalReference	设定同步控制外部参照指令值		1
+FunctionBlock	MC_SetTorqueFeedforward	转矩前馈值更改		1
+FunctionBlock	MC_SetTorqueLimit	转矩限制值更改		1
+FunctionBlock	MC_SetVelocityFeedforward	速度前馈值更改		1
+FunctionBlock	MC_Stop	减速停止		1
+FunctionBlock	MC_StopAtTargetPosition	定位指定位置停止		1
+FunctionBlock	MC_StopSimMechanicalSync	停止同步仿真机械同步		1
+FunctionBlock	MC_SuspendNextPositioning	中断定位连续运转		1
+FunctionBlock	MC_SV3_ReadServoParameter	读取SV3伺服参数		1
+FunctionBlock	MC_SV3_WriteServoParameter	写入SV3伺服参数		1
+FunctionBlock	MC_SwitchCam	同步凸轮切换		1
+FunctionBlock	MC_SyncControl	同步控制		1
+FunctionBlock	MC_SyncTypeFollowUpControl	同步型跟踪控制		1
+FunctionBlock	MC_Teach	示教		1
+FunctionBlock	MC_TorqueControl	转矩控制		1
+FunctionBlock	MC_TorqueLimitClutch	同步转矩限制离合器控制		1
+FunctionBlock	MC_UpdateSyncContactParameter	同步接点输出参数更改		1
+FunctionBlock	MC_VelocityControl	速度控制（CSV）		1
+FunctionBlock	MCALL	子程序型宏的启动		1
+FunctionBlock	MDSTOP	模块执行停止		2
+FunctionBlock	MDSTRT	模块执行开始		2
+FunctionBlock	MEND	自保型宏的结束		1
+FunctionBlock	MicroSecToTime	微秒→时间转换		1
+FunctionBlock	MID	字符串中间截取		1
+FunctionBlock	MID	截取字符串		2
+FunctionBlock	MIN	取最小值		1
+FunctionBlock	MIN	检索指定块内的最小值		3
+FunctionBlock	MIN_RANGE			1
+FunctionBlock	MOD	取余		1
+FunctionBlock	ModuleStart	启动程序模块		1
+FunctionBlock	ModuleStop	停止程序模块		1
+FunctionBlock	MOV.F			1
+FunctionBlock	MOVE	传输		1
+FunctionBlock	MPS		MRD MPP	2
+FunctionBlock	MPX		DMX	2
+FunctionBlock	MPX	4位数据译码		2
+FunctionBlock	MSTRT	自保型宏的启动		1
+FunctionBlock	MUL	乘法		1
+FunctionBlock	MUL.F			1
+FunctionBlock	MUL_TIME	时间乘法		1
+FunctionBlock	MUX	多路选择器		1
+FunctionBlock	MUX	复用器		1
+FunctionBlock	NE			1
+FunctionBlock	NOP			1
+FunctionBlock	NOT	位取反		1
+FunctionBlock	NumToDecString	BIN数据→十进制字符串转换		1
+FunctionBlock	NumToHexString	BIN数据→十六进制字符码转换		1
+FunctionBlock	ONDL		OFDL	1
+FunctionBlock	Operation			1
+FunctionBlock	OperationRecordCapture	获取运转记录数据		1
+FunctionBlock	OperationRecordSave	执行运转记录保存		1
+FunctionBlock	Operator			1
+FunctionBlock	OR	逻辑或		1
+FunctionBlock	OR		ORB	2
+FunctionBlock	ORGX		ORGY	1
+FunctionBlock	ORL			1
+FunctionBlock	OUT		OUB	2
+FunctionBlock	PID	带自动调谐的PID控制		4
+FunctionBlock	Ping	PING发送		1
+FunctionBlock	PLSX		PLSY	1
+FunctionBlock	PRAGMA			1
+FunctionBlock	R_TRIG	上升沿检测		1
+FunctionBlock	RAD	度（°）→弧度单位换算		3
+FunctionBlock	Ramp	倾斜信号		1
+FunctionBlock	RealToString	单精度小数点型实数→字符串转换		1
+FunctionBlock	RefreshCyclicInput	隐式(I/O)报文通信输入数据刷新		1
+FunctionBlock	RefreshFreerunCounter	自由运行计数器刷新		1
+FunctionBlock	RefreshX	输入继电器状态刷新		1
+FunctionBlock	REPLACE	字符串部分替换		1
+FunctionBlock	REPLACE	字符串部分置换		2
+FunctionBlock	RES	将指定位的输出置于 OFF		2
+FunctionBlock	RFSX	输入刷新		2
+FunctionBlock	RFSY	输出刷新		2
+FunctionBlock	RGRY	格雷码→二进制数据转换		3
+FunctionBlock	RIGHT	字符串右截取		1
+FunctionBlock	RIGHT	右截取字符串		2
+FunctionBlock	ROL	循环左移		1
+FunctionBlock	ROL	无进位循环左移		1
+FunctionBlock	ROOT.F			1
+FunctionBlock	ROR	无进位循环右移		1
+FunctionBlock	RRA		RLA	1
+FunctionBlock	RSEC	秒数据→日期/时间数据		3
+FunctionBlock	RTRIM	删除字符串右端的半角空白・标号		2
+FunctionBlock	SEC	日期/时间数据→秒数据		3
+FunctionBlock	SEL	二路选择器		1
+FunctionBlock	SEL	选择		1
+FunctionBlock	SELECT_CASE			1
+FunctionBlock	SET		RES	2
+FunctionBlock	SET	指定位的输出 ON		2
+FunctionBlock	SetInputInterruptCondition	设定输入中断检测条件		1
+FunctionBlock	ShiftRegister	移位寄存器		1
+FunctionBlock	SHL	左移		1
+FunctionBlock	SHL	左移（以位为单位）		1
+FunctionBlock	SHR	右移（以位为单位）		1
+FunctionBlock	SIN	正弦		1
+FunctionBlock	SIN	角度（弧度）→正弦值		3
+FunctionBlock	SocketClearRecvBuf	清除套接字接收缓存		1
+FunctionBlock	SocketClose	关闭套接字		1
+FunctionBlock	SocketTCP_ActiveOpen	TCP套接字主动打开		1
+FunctionBlock	SocketTCP_PassiveOpen	TCP套接字被动打开		1
+FunctionBlock	SocketTCP_Recv	TCP套接字接收(指定数据长度)		1
+FunctionBlock	SocketTCP_RecvDelimiter	TCP套接字接收(指定定界符)		1
+FunctionBlock	SocketTCP_Send	TCP套接字发送		1
+FunctionBlock	SocketUDP_Open	打开UDP套接字		1
+FunctionBlock	SocketUDP_Recv	UDP套接字接收		1
+FunctionBlock	SocketUDP_Send	UDP套接字发送		1
+FunctionBlock	SPLIT	字符串分解		2
+FunctionBlock	SplitN	字符串分解		1
+FunctionBlock	SQRT	平方根		1
+FunctionBlock	SQRT	平方根		2
+FunctionBlock	SR	置位优先保持		1
+FunctionBlock	SRA		SLA	1
+FunctionBlock	STA.F			1
+FunctionBlock	STG		JMP ENDS	3
+FunctionBlock	StorageCopy	复制存储文件		1
+FunctionBlock	StorageDeleteFile	删除存储文件		1
+FunctionBlock	StorageGetCapacity	获取存储可用空间		1
+FunctionBlock	StorageGetFileList	获取存储文件列表		1
+FunctionBlock	StorageGetStatus	获取存储文件状态		1
+FunctionBlock	StorageMakeDir	创建存储文件夹		1
+FunctionBlock	StorageMove	移动存储文件		1
+FunctionBlock	StoragePrint	写入存储字符串		1
+FunctionBlock	StorageReadBin	读取存储文件(BIN数据)		1
+FunctionBlock	StorageReadLine	读取存储文件(多行字符串)		1
+FunctionBlock	StorageRemoveDir	删除存储文件夹		1
+FunctionBlock	StorageRename	重命名存储文件		1
+FunctionBlock	StorageWriteBin	写入存储文件(BIN数据)		1
+FunctionBlock	STP		STE	2
+FunctionBlock	STR	数值数据 → ASCII 码		2
+FunctionBlock	StringCmp	字符串比较		1
+FunctionBlock	StringMove	字符串传输		1
+FunctionBlock	StringSearch	范围指定字符串检索		1
+FunctionBlock	StringToCipString	字符串→CIP字符串转换		1
+FunctionBlock	StringToLreal	字符串→双精度小数点型实数转换		1
+FunctionBlock	StringToReal	字符串→单精度小数点型实数转换		1
+FunctionBlock	StringToUTF16Code	字符串→UTF-16数据转换		1
+FunctionBlock	StringToVariable	字符串→变量值转换		1
+FunctionBlock	StructReset	结构体复位		1
+FunctionBlock	StructSort	结构体排序		1
+FunctionBlock	SUB	减法		1
+FunctionBlock	SUB.F			1
+FunctionBlock	SUB_TIME	时间减法		1
+FunctionBlock	suffix			3
+FunctionBlock	TAN	角度（弧度）→正切值		3
+FunctionBlock	TBCD		TBIN	1
+FunctionBlock	TCHX		TCHY	1
+FunctionBlock	TimeProportionalOut	时间分割比例输出		1
+FunctionBlock	TimeToMicroSec	时间→微秒转换		1
+FunctionBlock	TMH	10ms32位减定时器		4
+FunctionBlock	TMR	100ms32位减定时器		4
+FunctionBlock	TMS	1ms32位减定时器		4
+FunctionBlock	TO_**	数据类型转换		1
+FunctionBlock	TO_**			1
+FunctionBlock	TO_BCD_**	BIN→BCD数据类型转换		1
+FunctionBlock	TO_BCD_**			1
+FunctionBlock	TODF	二进制→倍精度浮动小数点型实数转换		1
+FunctionBlock	TOF	断电延时定时器		1
+FunctionBlock	TOF	二进制→单精度浮动小数点型实数转换		1
+FunctionBlock	TON	通电延时定时器		1
+FunctionBlock	TOU	.U 数据类型转换	TOS TOD TOL	1
+FunctionBlock	TP	单次定时器		1
+FunctionBlock	TRIM	删除字符串两端的半角空白・标号		2
+FunctionBlock	TrimL	字符串左空格删除		1
+FunctionBlock	TRUNC_**	小数舍去		1
+FunctionBlock	TRUNC_**			1
+FunctionBlock	TYPE			1
+FunctionBlock	U_ADRead	读取A/D转换特殊数据		1
+FunctionBlock	U_ADReadBlock	读取全部类型的A/D转换数据		1
+FunctionBlock	U_ADWriteAverage	写入平均常数		1
+FunctionBlock	U_ADWriteCmpLimit	写入比较器设定值		1
+FunctionBlock	U_ADWriteOffset	更改特殊数据偏移值		1
+FunctionBlock	U_ADWriteScaling	写入定标设定值		1
+FunctionBlock	U_CntReadCounter	读取计数当前值		1
+FunctionBlock	U_CntReadHz	读取频率		1
+FunctionBlock	U_CntReadInputCapture0	读取输入捕获0		1
+FunctionBlock	U_CntReadRPM	读取转速		1
+FunctionBlock	U_CntWriteCounter	写入计数当前值		1
+FunctionBlock	U_CntWriteCTC0	写入比较器设定值0		1
+FunctionBlock	U_CntWritePreset	写入预设设定值		1
+FunctionBlock	U_CyclicReadErr	读取隐式(I/O)报文通信错误中节点表		1
+FunctionBlock	U_CyclicReadRegister	读取隐式(I/O)报文通信登录节点表		1
+FunctionBlock	U_CyclicStart	指定隐式(I/O)报文通信重新开始请求对象节点		1
+FunctionBlock	U_CyclicStop	指定隐式(I/O)报文通信停止请求对象节点		1
+FunctionBlock	U_DAWrite	更改D/A转换输出数据		1
+FunctionBlock	U_DAWriteOffset	更改输出数据偏移值		1
+FunctionBlock	U_DAWriteScaling	写入定标设定值		1
+FunctionBlock	U_DAWriteUpperLowerLimit	写入上下限报警值		1
+FunctionBlock	U_DisableOverCP	设定输出过电流保护功能		1
+FunctionBlock	U_DisableOverVP	设定输入过电压保护功能		1
+FunctionBlock	U_FTPClientStatus	读取FTP文件传输状态		1
+FunctionBlock	U_MailAttach	设定邮件附加文件名		1
+FunctionBlock	U_MailStatus	获取邮件发送结果		1
+FunctionBlock	U_MailSubject	设定邮件主题		1
+FunctionBlock	U_MailText	设定邮件正文		1
+FunctionBlock	U_MailTo	设定邮件收件人地址		1
+FunctionBlock	U_MailToGroup	设定邮件收件人组		1
+FunctionBlock	U_MsgRecv	读取显式报文通信接收数据		1
+FunctionBlock	U_MsgSend	写入显式报文通信发送数据		1
+FunctionBlock	U_MsgStatus	读取显式报文通信完成代码		1
+FunctionBlock	U_MsgTo	指定显式报文通信对象		1
+FunctionBlock	U_PosReadActPos	读取当前坐标		1
+FunctionBlock	U_PosReadAxisErrCode	读取轴错误代码		1
+FunctionBlock	U_PosReadCmdPos	读取指令坐标		1
+FunctionBlock	U_PosReadCtrlMode	读取当前控制模式		1
+FunctionBlock	U_PosReadCurrentPointNo	读取定位当前点编号		1
+FunctionBlock	U_PosReadFeedbackTrq	读取反馈转矩监控器		1
+FunctionBlock	U_PosWriteChgPos	写入当前坐标更改		1
+FunctionBlock	U_PosWriteChgTargetPos	写入定位目标坐标更改(坐标)		1
+FunctionBlock	U_PosWriteChgVel	写入定位速度更改		1
+FunctionBlock	U_PosWriteCtrlMode	写入控制模式更改		1
+FunctionBlock	U_PosWriteOverride	写入定位速度倍率		1
+FunctionBlock	U_PosWritePointNo	写入定位开始点编号		1
+FunctionBlock	U_PosWriteSelectSpecialFunc	写入特殊功能选择		1
+FunctionBlock	U_PosWriteTrqCtrlCmdTrq	写入转矩控制转矩指令		1
+FunctionBlock	U_PosWriteVelCtrlCmdVel	写入速度控制速度指令		1
+FunctionBlock	U_PSReadBuf	读取PROTOCOL STUDIO事件通信指令接收缓存		1
+FunctionBlock	U_ReadBuf	读取缓冲数据		1
+FunctionBlock	U_SockNonProcRecvSetting	设定KV套接字TCP(无协议)接收		1
+FunctionBlock	U_SockOpen	设定KV套接字打开		1
+FunctionBlock	U_SockReadBuf	读取KV套接字接收数据		1
+FunctionBlock	U_SockSelectPort	指定KV套接字以太网端口号		1
+FunctionBlock	U_SockStatus	读取KV套接字处理状态		1
+FunctionBlock	U_SockUDPTo	写入KV套接字UDP通信目标		1
+FunctionBlock	U_SockWriteBuf	写入KV套接字发送数据		1
+FunctionBlock	UFResume	恢复流程		1
+FunctionBlock	UFRSM	恢复单元程序		2
+FunctionBlock	UFSUS	暂停单元程序		2
+FunctionBlock	UFSuspend	暂停流程		1
+FunctionBlock	UnitBufMemBlockRead	缓冲存储器连续读取		1
+FunctionBlock	UnitBufMemBlockWrite	缓冲存储器连续写入		1
+FunctionBlock	UnitBufMemFill	缓冲存储器批量写入		1
+FunctionBlock	UnitBufMemRead	缓冲存储器值读取		1
+FunctionBlock	UnitBufMemWrite	缓冲存储器值写入		1
+FunctionBlock	UniteByte	字节组合		1
+FunctionBlock	UniteNibble	半字节组合		1
+FunctionBlock	UniteString	字符串字节组合		1
+FunctionBlock	UpDownTimer	加减定时器		1
+FunctionBlock	UPStart	单元程序开始		1
+FunctionBlock	UPStop	单元程序强制结束		1
+FunctionBlock	UTF16CodeToString	UTF-16数据→字符串转换		1
+FunctionBlock	VAL	字符串→单精度浮动小数点型实数转换		2
+FunctionBlock	VariableToString	变量值→字符串转换		1
+FunctionBlock	W-ON		W-OFF	2
+FunctionBlock	W-UE		W-DE	2
+FunctionBlock	WHILE			1
+FunctionBlock	WriteCalendarTime	日历定时器写入		1
+FunctionBlock	XOR	异或		1
+FunctionBlock	ZCMP.F			1
+FunctionBlock	ZoneCmp	范围比较		1
+FunctionBlock	ZPOP	变址寄存器出栈恢复		2
+FunctionBlock	ZPUSH	变址寄存器进栈保护		2
+Instruction	ABS	绝对值		4
+Instruction	ABSENC	绝对值编码器		2
+Instruction	ACNT	获取阵列要素数		5
+Instruction	ADD			4
+Instruction	ADRADD		ADRSUB	3
+Instruction	ADRINC		ADRDEC	3
+Instruction	ADRSET	间接指定对象的地址存储		5
+Instruction	AJST	日历定时器调整		5
+Instruction	ALT			3
+Instruction	ANDA	逻辑“与”运算		7
+Instruction	ANL		ORL	3
+Instruction	APR	折线近似（定标）		5
+Instruction	ARES			3
+Instruction	ASC	二进制数据→ 十六进制 ASCII 代码转换		5
+Instruction	ASIN		ACOS ATAN	3
+Instruction	ASLA	算术左移（位单位）		5
+Instruction	ASRA	算术右移（位单位）		4
+Instruction	ATAN2	坐标→角度(弧度)		5
+Instruction	AVG	指定块的平均值		7
+Instruction	AWHIDE	用户信息显示解除		5
+Instruction	AWMSG	显示访问窗消息 2		4
+Instruction	AWNUM	显示访问窗消息 1		4
+Instruction	AWSHOW	用户信息显示		4
+Instruction	BANDC	死区控制		5
+Instruction	BBCMP			3
+Instruction	BBMOV			2
+Instruction	BCMP	指定块之间的数据比较		5
+Instruction	BCMPI	块数据比较		4
+Instruction	BCNT	对象的 ON 位计数		6
+Instruction	BLD		BAND BOR BLDB BANB BORB	3
+Instruction	BMOV	成批传送字块数据		5
+Instruction	BOUT		BOUB	3
+Instruction	BSET		BRES	2
+Instruction	BSIZE			3
+Instruction	BSL	位软元件左移		5
+Instruction	BSR	位软元件右移		4
+Instruction	BSUM	按字节总计指定块		5
+Instruction	BSWAP	块互换		5
+Instruction	BYBMOV	将连续的字节串信息传送至指定位置（H→L）		5
+Instruction	BYLMOV	将连续的字节串信息传送至指定位置（L→H）		4
+Instruction	C			5
+Instruction	CAL			3
+Instruction	CAL*			2
+Instruction	CAL+			3
+Instruction	CAL-			3
+Instruction	CALL		SBN RET	1
+Instruction	CHGSP	速度更改		2
+Instruction	CHGSPX		CHGSPY	1
+Instruction	CHGTGT	目标坐标更改		2
+Instruction	CJ		NCJ GOTO LABEL	2
+Instruction	CMP			5
+Instruction	COM	按位求反		7
+Instruction	CON			3
+Instruction	CPMGET	获取 CIP 消息		5
+Instruction	CPMSET	生成 CIP 消息		5
+Instruction	CPSASC	CIP字符串转换		5
+Instruction	CRC	计算指定块的 CRC 值		5
+Instruction	CTH		CTC	1
+Instruction	DASC	二进制数据 → 十进制 ASCII 字符串		8
+Instruction	DCNT	指定块内的检测数据计数		6
+Instruction	DEC	减 1		6
+Instruction	DECO	8 位解码		5
+Instruction	DFLOAT	二进制→倍精度浮动小数点型实数转换		4
+Instruction	DFTOF			3
+Instruction	DI	中断去能	EI	4
+Instruction	DIC	设定中断去能范围		5
+Instruction	DIFU		DIFD	3
+Instruction	DINTG			3
+Instruction	DISB	字节分解		6
+Instruction	DISF	单精度浮动小数点型实数的尾数与指数分解		6
+Instruction	DISN	半字节分解		5
+Instruction	DISS	字符串字节分解		6
+Instruction	DIV			6
+Instruction	DROUND			2
+Instruction	DSER	指定范围内的数据检索		5
+Instruction	DW			5
+Instruction	ECALL	模块间子例行程序命令		5
+Instruction	ENCO	8 位编码		5
+Instruction	END		ENDH	2
+Instruction	ENRA	异或非运算		4
+Instruction	EORA	逻辑“异或”运算		6
+Instruction	EXP		LOG	3
+Instruction	EXT			3
+Instruction	FASC	单精度浮动小数点型实数→字符串		5
+Instruction	FB		FEND FUN	3
+Instruction	FBCALL		FBSTRT	3
+Instruction	FCNT			1
+Instruction	FDEL	删除数据表指定位置		5
+Instruction	FIFOR	读出 FIFO 表		6
+Instruction	FIFOW	写入 FIFO 表		6
+Instruction	FINS	插入数据表指定位置		5
+Instruction	FLIK			4
+Instruction	FLOAT	二进制→单精度浮动小数点型实数转换		5
+Instruction	FMOV	在字符串中代入相同的值		6
+Instruction	FOR		NEXT BREAK	3
+Instruction	FRLDM	成批读出文件寄存器		5
+Instruction	FRSET	文件寄存器模式的切换		5
+Instruction	FRSTM	文件寄存器的成批保存		4
+Instruction	FTODF			3
+Instruction	FWRIT	改写数据表指定位置		5
+Instruction	GRY		RGRY	2
+Instruction	HASC	二进制数据 → 十六进制 ASCII 字符串		5
+Instruction	HKEY			3
+Instruction	HOME	移动到起始位置		2
+Instruction	HOMEX		HOMEY	1
+Instruction	HSP			4
+Instruction	IEDGE	中断条件设定		6
+Instruction	INC	加 1		5
+Instruction	INCENC			1
+Instruction	INT		RETI	3
+Instruction	INTG	单精度/倍精度浮动小数点型实数→二进制数据转换		6
+Instruction	INV			3
+Instruction	ITVL			5
+Instruction	JOG	JOG 动作		1
+Instruction	JOGX		JOGY	1
+Instruction	KEEP			5
+Instruction	KV1000_ABSENC			1
+Instruction	KV1000_CHGSPX			1
+Instruction	KV1000_FCNT			1
+Instruction	KV1000_HOMEX			1
+Instruction	KV1000_INCENC			1
+Instruction	KV1000_JOGX			1
+Instruction	KV1000_LOGE			1
+Instruction	KV1000_MCMP			1
+Instruction	KV1000_ORGX			2
+Instruction	KV1000_PLSOUT			1
+Instruction	KV1000_PLSX			1
+Instruction	KV1000_RCNT			1
+Instruction	KV1000_TCHX			1
+Instruction	KVnano_ABSENC			1
+Instruction	KVnano_FCNT			1
+Instruction	KVnano_INCENC			1
+Instruction	KVnano_LOGE		LOGD	1
+Instruction	KVnano_MCMP			1
+Instruction	KVnano_PLSOUT			1
+Instruction	KVnano_RCNT			1
+Instruction	KVnano_TRGD			2
+Instruction	LD		LDB AND ANB OR ORB	3
+Instruction	LDA			3
+Instruction	LDCAL		ANDCAL ORCAL LDCALB ANDCALB ORCALB	4
+Instruction	LDP	作为常开接点，与左母线连接。此接点在检测到的上升沿后，仅1次扫描为 ON。	ANP ORP LDF ANF ORF	2
+Instruction	LDPB	作为常开接点，与左母线连接。此接点在检测到的上升沿后，仅1次扫描为 OFF。	ANPB ORPB LDFB ANFB ORFB	3
+Instruction	LDWK		ANDWK ORWK LDWKB ANDWKB ORWKB	4
+Instruction	LEN	字符串长度检测		6
+Instruction	LIFOR	读出 LIFO 表		4
+Instruction	LIFOW	写入 LIFO 表		4
+Instruction	LIMIT	上限/下限值控制		4
+Instruction	LLFLT	推进迟滞滤波器		5
+Instruction	LOG10	常用对数运算		4
+Instruction	LOGE	使能记录/跟踪	LOGD	4
+Instruction	MAX		MIN	3
+Instruction	MC		MCR	2
+Instruction	MCALL		MSTRT MEND	3
+Instruction	MCMP	多控制段比较器		2
+Instruction	MCOPY	复制存储体(存储卡/CPU存储器)的文件		6
+Instruction	MDEL	存储体(存储卡/CPU存储器)文件删除		5
+Instruction	MDSTRT		MDSTOP	2
+Instruction	MEMSW			4
+Instruction	MEP		MEF	2
+Instruction	MFREE	以字节为单位获取存储体(存储卡/CPU存储器)可用空间		6
+Instruction	MFREEK	以千字节为单位获取存储体（存储卡/CPU存储器）可用空间		6
+Instruction	MMKDIR	生成存储体（存储卡/CPU存储器）文件夹		6
+Instruction	MMOV	移动存储体(存储卡/CPU存储器)的文件		5
+Instruction	MOV			4
+Instruction	MPRINT	在存储体(存储卡/CPU存储器)的文件中写入文本		7
+Instruction	MPS		MRD MPP	1
+Instruction	MPX		DMX	3
+Instruction	MREAD	存储体(存储卡/CPU存储器)读取		8
+Instruction	MREADL	从存储体(存储卡/CPU存储器)的文件读取1行		8
+Instruction	MREN	更改存储体(存储卡/CPU存储器)中的文件名		5
+Instruction	MRMDIR	删除存储体(存储卡/CPU存储器)文件夹		4
+Instruction	MSTAT	获取存储体(存储卡/CPU存储器)的文件状态		7
+Instruction	MUL			4
+Instruction	MWRIT	存储体(存储卡/CPU存储器)写入		8
+Instruction	NEG	符号求反		5
+Instruction	ONDL		OFDL	3
+Instruction	ORA	逻辑“或”运算		6
+Instruction	ORG	原点复归		2
+Instruction	ORGX		ORGY	1
+Instruction	OUT		OUB	3
+Instruction	OUTC			3
+Instruction	PID			5
+Instruction	PIDAT	有自动矫正功能的PID控制		8
+Instruction	PLDA			3
+Instruction	PLSOUT			1
+Instruction	PLSX		PLSY	1
+Instruction	PMOV	将连续的位信息传送到指定位置		5
+Instruction	POW			3
+Instruction	PSTA			3
+Instruction	PSTRT	定位运转		2
+Instruction	RAD		DEG	3
+Instruction	RAMP	倾斜信号		5
+Instruction	RASC	十六进制 ASCII 码 → 二进制数据转换		6
+Instruction	RCNT			1
+Instruction	RCOM			4
+Instruction	RCPSASC	CIP字符串的逆转换		5
+Instruction	RDASC	10进制 ASCII 字符串→二进制数据		8
+Instruction	RETURN			2
+Instruction	RFASC	字符串→单精度浮动小数点型实数转换		5
+Instruction	RFSCI	循环通信输入更改		4
+Instruction	RFSCO	更改循环通信输出		4
+Instruction	RFSCTH	高速计数器更改		2
+Instruction	RFSFRC	FREE RUN 计数器刷新		4
+Instruction	RFSPS	刷新当前值		2
+Instruction	RFSPSX		RFSPSY	1
+Instruction	RFSX		RFSY	3
+Instruction	RHASC	16进制 ASCII 字符串→二进制数据		5
+Instruction	RLA	带进位循环左移		5
+Instruction	RLNCA	无进位循环左移		3
+Instruction	RND	随机数发生		5
+Instruction	ROOT	平方根		7
+Instruction	ROUND			2
+Instruction	RRA	带进位循环右移		5
+Instruction	RRNCA	无进位循环右移		3
+Instruction	SADD			4
+Instruction	SCJ			3
+Instruction	SCMP			4
+Instruction	SDEL	字符串部分删除		5
+Instruction	SEC		RSEC	3
+Instruction	SEG	4 位数据的 7 段译码		4
+Instruction	SER	检测指定块内的数据		6
+Instruction	SET		RES	3
+Instruction	SFIND	字符串检索		5
+Instruction	SFINDN	字符串检索		5
+Instruction	SFT			5
+Instruction	SHOT			4
+Instruction	SIN		COS TAN	3
+Instruction	SINS	字符串插入		5
+Instruction	SLA	左移（位单位）		4
+Instruction	SLEFT	左截取字符串		5
+Instruction	SMID	截取字符串		5
+Instruction	SMOV			4
+Instruction	SORT	二进制数据排序		5
+Instruction	SORTN	二进制数据分解排序		4
+Instruction	SPRD	读取传感器参数		7
+Instruction	SPWR	传感器参数写入		5
+Instruction	SRA	右移（位单位）		4
+Instruction	SRGHT	右截取字符串		5
+Instruction	SRPLC	字符串部分置换		5
+Instruction	SSVC	执行传感器服务		5
+Instruction	STA			5
+Instruction	STG		JMP ENDS	3
+Instruction	STP		STE	3
+Instruction	STRIM	删除字符串指定位置的半角空白・标号		5
+Instruction	SUB			4
+Instruction	SWAP	高低字节转换		5
+Instruction	TBCD	二进制→BCD 数转换		6
+Instruction	TBIN	BCD → 二进制数转换		6
+Instruction	TCH	示教		2
+Instruction	TCHX		TCHY	1
+Instruction	TMIN			5
+Instruction	TMR		TMH TMS	3
+Instruction	TMU	10µs32位减定时器		4
+Instruction	TPOUT	时间分割比例输出		5
+Instruction	TRGD	日志数据获取		4
+Instruction	TRGR	软元件记录数据获取		3
+Instruction	UDC			5
+Instruction	UDT			4
+Instruction	UFILL	在缓冲存储器的数据串中插入相同的值		5
+Instruction	UFSUS		UFRSM	5
+Instruction	UMALLOC	确保缓冲存储器		6
+Instruction	UNIB	字节组合		5
+Instruction	UNIF	合并尾数和指数为单精度浮动小数点型实数		6
+Instruction	UNIN	半字节组合		5
+Instruction	UNIS	字符串合并		6
+Instruction	UPSTOP	单元程序强制结束		5
+Instruction	UPSTRT	启动单元程序		8
+Instruction	UREAD	读取缓冲存储器		5
+Instruction	UWRIT	写入缓冲存储器		4
+Instruction	W-ON		W-OFF	3
+Instruction	W-UE		W-DE	2
+Instruction	WSIZE	获取字大小		4
+Instruction	WSL	字软元件左移		6
+Instruction	WSR	字软元件右移		5
+Instruction	WSUM	指定块数值总计		5
+Instruction	WTIME	在日历定时器中写入时间数据		6
+Instruction	XCH			3
+Instruction	ZCMP			4
+Instruction	ZONE	区间控制		4
+Instruction	ZPUSH		ZPOP	3
+Instruction	ZRES	复位指定块		6
+Unit	KV-AD_DA		KV-AD_DA.pdf	4
+Unit	KV-AD_DAN		KV-AD_DANano.pdf	4
+Unit	KV-APP_T		KV-APP_Traj.pdf	4
+Unit	KV-CA		KV-CA.pdf	4
+Unit	KV-CL20_RC		KV-CL20_RC.pdf	4
+Unit	KV-DN20		KV-DN20.pdf	4
+Unit	KV-EC01		KV-EC01.pdf	4
+Unit	KV-EP02		KV-EP02.pdf	4
+Unit	KV-FL20V		KV-FL20V.pdf	4
+Unit	KV-L20V		KV-L20V.pdf	4
+Unit	KV-L21V		KV-L21V.pdf	4
+Unit	KV-LE20V		KV-LE20V.pdf	4
+Unit	KV-LE21V		KV-LE21V.pdf	4
+Unit	KV-LH20V		KV-LH20V.pdf	4
+Unit	KV-LH_E		KV-LH_Error.pdf	1
+Unit	KV-LH_IAI		KV-LH_IAI.pdf	1
+Unit	KV-LH_K		KV-LH_Keyence_QS.pdf	2
+Unit	KV-LH_K		KV-LH_Keyence_QS_Error.pdf	2
+Unit	KV-LH_O		KV-LH_Orientalmotor.pdf	1
+Unit	KV-LH_SMC		KV-LH_SMC.pdf	1
+Unit	KV-LM21V		KV-LM21V.pdf	4
+Unit	KV-ML_MC		KV-ML_MC.pdf	4
+Unit	KV-SAD_SDA		KV-SAD_SDA.pdf	4
+Unit	KV-SC20V		KV-SC20V.pdf	4
+Unit	KV-SH04PL		KV-SH04PL.pdf	4
+Unit	KV-SH04PL_D		KV-SH04PL_DeviceMap.xls	4
+Unit	KV-SSC02		KV-SSC02.pdf	4
+Unit	KV-TF40		KV-TF40.pdf	4
+Unit	KV-TP40		KV-TP40.pdf	4
+Unit	KV-X_D		KV-X_DeviceMap.xlsx	4
+Unit	KV-XCM		KV-XCM.pdf	4
+Unit	KV-XD		KV-XD.pdf	4
+Unit	KV-XD02_APP_ALM		KV-XD02_APP_ALM.pdf	4
+Unit	KV-XD02_APP_OPM		KV-XD02_APP_OPM.pdf	4
+Unit	KV-XH		KV-XH.pdf	4
+Unit	KV-XH_C		KV-XH_ControlCycle.pdf	1
+Unit	KV-XH_D		KV-XH_DeviceMap.xls	4
+Unit	KV-XHEC		KV-XHEC.pdf	4
+Unit	KV-XHEC_C		KV-XHEC_ControlCycle.pdf	1
+Unit	KV-XHEC_D		KV-XHEC_DeviceMap.xls	4
+Unit	KV-XHECL		KV-XHECL.pdf	4
+Unit	KV-XHECL_C		KV-XHECL_ControlCycle.pdf	1
+Unit	KV-XL		KV-XL.pdf	4
+Unit	KV-XLE		KV-XLE.pdf	4

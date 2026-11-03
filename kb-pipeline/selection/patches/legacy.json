@@ -1,0 +1,602 @@
+[
+ {
+  "file": "cpu.csv",
+  "model": "KV-8000",
+  "field": "max_io_points",
+  "old": "扩展时最大3072点（不含基本单元；KV-EB1S/EB1R 2台、64点单元）",
+  "new": "扩展时最大3072点（不含基本单元；KV-EB1S/EB1R 2台、64点单元）",
+  "status": "confirmed",
+  "source": "KvsHARD8000.pdf PDF页29(印刷2-3)",
+  "note": "原文: 最大I/O点数(基本单元部分除外)=扩展时最大3072点(KV-EB1S/KV-EB1R 2台使用、64点单元使用时); 即3072点不含CPU基本单元自身"
+ },
+ {
+  "file": "cpu.csv",
+  "model": "KV-8000",
+  "field": "max_expansion_units",
+  "old": "",
+  "new": "16台（仅KV-8000/7000系列扩展单元）/48台（含KV-5000/3000系列，用KV-EB1时）",
+  "status": "confirmed",
+  "source": "KvsHARD8000.pdf PDF页29(印刷2-3)",
+  "note": ""
+ },
+ {
+  "file": "cpu.csv",
+  "model": "KV-7500",
+  "field": "max_io_points",
+  "old": "",
+  "new": "扩展时最大3072点（不含基本单元）",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页29(印刷2-3)",
+  "note": "原文同KV-8000: 扩展时最大3072点(KV-EB1S/EB1R 2台、64点单元使用时)"
+ },
+ {
+  "file": "cpu.csv",
+  "model": "KV-7300",
+  "field": "max_io_points",
+  "old": "",
+  "new": "扩展时最大3072点（不含基本单元）",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页29(印刷2-3)",
+  "note": "原文同KV-8000: 扩展时最大3072点(KV-EB1S/EB1R 2台、64点单元使用时)"
+ },
+ {
+  "file": "cpu.csv",
+  "model": "KV-7300",
+  "field": "program_capacity",
+  "old": "约160K步；CPU存储21MB",
+  "new": "约160K步；CPU存储21MB",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页29(印刷2-3)",
+  "note": ""
+ },
+ {
+  "file": "cpu.csv",
+  "model": "KV-7500",
+  "field": "program_capacity",
+  "old": "约1500K步；CPU存储64MB",
+  "new": "约1500K步；CPU存储64MB",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页29(印刷2-3)",
+  "note": ""
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-ML16V",
+  "field": "compatible_cpus",
+  "old": "",
+  "new": "KV-8000、KV-7500/7300适用设备一览为○",
+  "status": "confirmed",
+  "source": "KvsHARD8000.pdf PDF页649(印刷附-43); KVSHARDG4.pdf PDF页562(印刷附-38)",
+  "note": "两本手册的适用设备一览中'定位运动单元 KV-ML16V/KV-MC20V/KV-MC40V/KV-MX1'均为○(KV-7000手册该章标题为针对KV-5000/3000系列扩展单元的对应情况)。KV-X500/X300的'－'不在本批页内,未核"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-ML16V",
+  "field": "compatible_cpus",
+  "old": "",
+  "new": "KV-5500/5000/3000（本单元手册）",
+  "status": "confirmed",
+  "source": "KV-ML_MC.pdf PDF页39(印刷1-19)",
+  "note": "可连接CPU单元=KV-5500/5000/3000"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-MC20V",
+  "field": "compatible_cpus",
+  "old": "",
+  "new": "KV-8000、KV-7500/7300适用设备一览为○",
+  "status": "confirmed",
+  "source": "KvsHARD8000.pdf PDF页649(印刷附-43); KVSHARDG4.pdf PDF页562(印刷附-38)",
+  "note": "两本手册的适用设备一览中'定位运动单元 KV-ML16V/KV-MC20V/KV-MC40V/KV-MX1'均为○(KV-7000手册该章标题为针对KV-5000/3000系列扩展单元的对应情况)。KV-X500/X300的'－'不在本批页内,未核"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-MC20V",
+  "field": "compatible_cpus",
+  "old": "",
+  "new": "KV-5500/5000/3000（本单元手册）",
+  "status": "confirmed",
+  "source": "KV-ML_MC.pdf PDF页39(印刷1-19)",
+  "note": "可连接CPU单元=KV-5500/5000/3000"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-MC40V",
+  "field": "compatible_cpus",
+  "old": "",
+  "new": "KV-8000、KV-7500/7300适用设备一览为○",
+  "status": "confirmed",
+  "source": "KvsHARD8000.pdf PDF页649(印刷附-43); KVSHARDG4.pdf PDF页562(印刷附-38)",
+  "note": "两本手册的适用设备一览中'定位运动单元 KV-ML16V/KV-MC20V/KV-MC40V/KV-MX1'均为○(KV-7000手册该章标题为针对KV-5000/3000系列扩展单元的对应情况)。KV-X500/X300的'－'不在本批页内,未核"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-MC40V",
+  "field": "compatible_cpus",
+  "old": "",
+  "new": "KV-5500/5000/3000（本单元手册）",
+  "status": "confirmed",
+  "source": "KV-ML_MC.pdf PDF页39(印刷1-19)",
+  "note": "可连接CPU单元=KV-5500/5000/3000"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-MC20V",
+  "field": "max_pulse_rate",
+  "old": "4MHz",
+  "new": "4MHz",
+  "status": "confirmed",
+  "source": "KV-ML_MC.pdf PDF页39(印刷1-19)",
+  "note": "'最大输出脉冲'行=4MHz,即差动线驱动脉冲输出最高频率(ML16V该行为'-')"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-MC40V",
+  "field": "max_pulse_rate",
+  "old": "4MHz",
+  "new": "4MHz",
+  "status": "confirmed",
+  "source": "KV-ML_MC.pdf PDF页39(印刷1-19)",
+  "note": "'最大输出脉冲'行=4MHz,即差动线驱动脉冲输出最高频率(ML16V该行为'-')"
+ },
+ {
+  "file": "motion_units.csv",
+  "model": "KV-ML16V",
+  "field": "axes",
+  "old": "16（含虚拟轴）",
+  "new": "16（含虚拟轴）",
+  "status": "confirmed",
+  "source": "KV-ML_MC.pdf PDF页39",
+  "note": "控制轴数: 16轴(包括虚拟轴); MC40V=4轴+1轴(虚拟轴); MC20V=2轴"
+ },
+ {
+  "file": "special_units.csv",
+  "model": "KV-DA40V",
+  "field": "compatible_series",
+  "old": "KV-8000适用表写作“KV-DA40/KV-DA40”未明列DA40V（待核实）",
+  "new": "KV-8000适用表写作“KV-DA40/KV-DA40”未明列DA40V（待核实）",
+  "status": "confirmed",
+  "source": "KvsHARD8000.pdf PDF页649(印刷附-43); KVSHARDG4.pdf PDF页562(印刷附-38)",
+  "note": "放大后确认两本手册均印作'KV-DA40/KV-DA40/'(重复,显然笔误应为DA40V),DA40V字样确实未出现; AD40V/AD40G/AM40V均列出。字面上未列入,按笔误推断为可用,属推断"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16XA",
+  "field": "connector",
+  "old": "待核实(规格表外部连接方式首列缺失)",
+  "new": "端子排",
+  "status": "corrected",
+  "source": "KVSHARD.pdf PDF页43(印刷1-25)",
+  "note": "外部连接方式: B16XA=端子排(跨24V/5V两列); 接线图PDF页45为端子排0~15+C0/C1(COM0/COM1)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16XA",
+  "field": "points_per_common",
+  "old": "16点/1公共点(COM 2点内部共通)",
+  "new": "16点/1公共点(COM 2点内部共通)",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页43,45",
+  "note": "脚注*2: C32XA和B16XA的COM有2点,内部共通"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XA",
+  "field": "points_per_common",
+  "old": "32点/1公共点(COM 2点内部共通)",
+  "new": "32点/1公共点(COM 2点内部共通)",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页43,46",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16XA",
+  "field": "response_time",
+  "old": "输入时间常数3级切换: OFF→ON 25μs/1ms/10ms, ON→OFF 75μs/1ms/10ms (均±20%)",
+  "new": "输入时间常数3级切换: OFF→ON 25μs/1ms/10ms, ON→OFF 75μs/1ms/10ms (均±20%)",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页43(印刷1-25)",
+  "note": "μ在图上可见(25μs/75μs)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XA",
+  "field": "response_time",
+  "old": "输入时间常数3级切换: OFF→ON 25μs/1ms/10ms, ON→OFF 75μs/1ms/10ms (均±20%)",
+  "new": "输入时间常数3级切换: OFF→ON 25μs/1ms/10ms, ON→OFF 75μs/1ms/10ms (均±20%)",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页43(印刷1-25)",
+  "note": "μ在图上可见(25μs/75μs)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64XA",
+  "field": "response_time",
+  "old": "输入时间常数3级切换: OFF→ON 25μs/1ms/10ms, ON→OFF 75μs/1ms/10ms (均±20%)",
+  "new": "输入时间常数3级切换: OFF→ON 25μs/1ms/10ms, ON→OFF 75μs/1ms/10ms (均±20%)",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页43(印刷1-25)",
+  "note": "μ在图上可见(25μs/75μs)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64XB",
+  "field": "response_time",
+  "old": "输入时间常数3级切换: OFF→ON 25μs/1ms/10ms, ON→OFF 75μs/1ms/10ms (均±20%)",
+  "new": "输入时间常数3级切换: OFF→ON 25μs/1ms/10ms, ON→OFF 75μs/1ms/10ms (均±20%)",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页43(印刷1-25)",
+  "note": "μ在图上可见(25μs/75μs)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64XA",
+  "field": "rated_voltage",
+  "old": "24VDC(仅24V模式); 额定电流按端子组为5.3mA或1.5mA(列对应待核实); 最大26.4VDC",
+  "new": "24VDC(仅24V模式); 继电器号108~115/308~315(16点,2线制): 5.3mA,最小ON 19V,最大OFF电流1.5mA,输入阻抗4.3kΩ; 其余继电器号000~015/100~107/200~215/300~307(48点): 1.5mA,最小ON 19V,最大OFF电流0.5mA,输入阻抗15kΩ; 最大26.4VDC",
+  "status": "corrected",
+  "source": "KVSHARD.pdf PDF页43(印刷1-25)、PDF页48(印刷1-30内部电路图)",
+  "note": "C64XA两个24VDC模式列分别对应脚注*4(108~115,308~315)与*5; 内部电路图佐证: 108~115/308~315为4.3kΩ+330Ω,其余为15kΩ+2.7kΩ。注意脚注*4/*5原文两者都带'(2线制)'字样,第二张内部电路图的列表还漏写000~015,疑手册笔误; 以上按图上所印"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64XA",
+  "field": "points_per_common",
+  "old": "64点/1公共点(COM 4点:H侧2点/L侧2点)",
+  "new": "64点/1公共点(COM 4点:H侧COM2/3、L侧COM0/1;各侧内部短路,两侧之间不短接)",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页43(脚注*3)、PDF页47(接线图)",
+  "note": "接线图注: COM0,COM1内部短路; COM2,COM3内部短路; (COM0,1)-(COM2,3)内部不短接"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64XB",
+  "field": "points_per_common",
+  "old": "待核实(公共点方式仅3个值对应4个型号,推断同KV-C64XA为64点/1公共点)",
+  "new": "64点/1公共点(COM 4点:COM0/1与COM2/3两组,各组内部短路,两组之间不短接)",
+  "status": "corrected",
+  "source": "KVSHARD.pdf PDF页43、PDF页47",
+  "note": "规格表'公共点方式'行'64点/1公共点'的合并单元格线条边界覆盖C64XA两列与C64XB,故XB同样为64点/1公共点,不再是推断; 接线图PDF页47标题为'KV-C64XA/C64XB接线图'"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64XB",
+  "field": "rated_voltage",
+  "old": "24VDC 4.1mA(仅24V模式); 最大26.4VDC",
+  "new": "24VDC 4.1mA(仅24V模式); 最小ON 19V; 最大OFF电流1.5mA; 输入阻抗5.6kΩ; 最大26.4VDC",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页43",
+  "note": "数值与现有一致,补充细节; 内部电路图PDF页48: 5.6kΩ+470Ω"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B8RC",
+  "field": "response_time",
+  "old": "OFF→ON ≤10ms; ON→OFF 未找到",
+  "new": "OFF→ON ≤10ms; ON→OFF ≤10ms",
+  "status": "corrected",
+  "source": "KVSHARDG4.pdf PDF页53(印刷2-27)",
+  "note": "'10ms以下'为跨OFF->ON与ON->OFF两行的合并单元格(B8RC/B16RC两列共用),故ON→OFF也是≤10ms"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16RC",
+  "field": "response_time",
+  "old": "OFF→ON ≤10ms; ON→OFF 未找到",
+  "new": "OFF→ON ≤10ms; ON→OFF ≤10ms",
+  "status": "corrected",
+  "source": "KVSHARDG4.pdf PDF页53(印刷2-27)",
+  "note": "'10ms以下'为跨OFF->ON与ON->OFF两行的合并单元格(B8RC/B16RC两列共用),故ON→OFF也是≤10ms"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16RA",
+  "field": "response_time",
+  "old": "OFF→ON ≤10ms; ON→OFF 未找到",
+  "new": "OFF→ON ≤10ms; ON→OFF ≤10ms",
+  "status": "corrected",
+  "source": "KVSHARD.pdf PDF页50(印刷1-32)",
+  "note": "'10ms以下'跨OFF->ON/ON->OFF两行"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16RA",
+  "field": "out_current_per_point",
+  "old": "2A(原文为22A,疑排版错误,待核实)(8A/1公共点)",
+  "new": "2A(8A/1公共点)",
+  "status": "corrected",
+  "source": "KVSHARD.pdf PDF页50(印刷1-32)",
+  "note": "放大图上字面确实印作'AC 250V/DC 30V 22A(8A/1公共点)'(无上标),属手册印刷错误; 同一继电器规格在KV-7000手册PDF页53(B8RC/B16RC列)印作'AC 250V/DC 30V 2A (KV-B16RC为8A/公共点)',且8A/公共点的单元不可能每点22A,故取2A。属依据交叉印证的推断,非图上直读"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TA",
+  "field": "response_time",
+  "old": "OFF→ON ≤10μs; ON→OFF ≤100μs",
+  "new": "OFF→ON ≤10μs; ON→OFF ≤100μs",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页50",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TAP",
+  "field": "response_time",
+  "old": "OFF→ON ≤10μs; ON→OFF ≤150μs",
+  "new": "OFF→ON ≤10μs; ON→OFF ≤150μs",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页50",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TA",
+  "field": "response_time",
+  "old": "OFF→ON ≤50μs; ON→OFF ≤100μs",
+  "new": "OFF→ON ≤10μs; ON→OFF ≤100μs",
+  "status": "corrected",
+  "source": "KVSHARD.pdf PDF页50(印刷1-32)",
+  "note": "'10μs以下'合并单元格线条边界覆盖B16TA/B16TAP/C32TA/C32TAP四列,只有C64TA/C64TAP两列是'50μs以下'; 旧值把C32TA错按列位置归入50μs"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TAP",
+  "field": "response_time",
+  "old": "OFF→ON ≤50μs; ON→OFF ≤150μs",
+  "new": "OFF→ON ≤10μs; ON→OFF ≤150μs",
+  "status": "corrected",
+  "source": "KVSHARD.pdf PDF页50(印刷1-32)",
+  "note": "同上,合并单元格覆盖四列"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TA",
+  "field": "response_time",
+  "old": "OFF→ON ≤50μs; ON→OFF ≤140μs",
+  "new": "OFF→ON ≤50μs; ON→OFF ≤140μs",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页50",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TAP",
+  "field": "response_time",
+  "old": "OFF→ON ≤50μs; ON→OFF ≤200μs",
+  "new": "OFF→ON ≤50μs; ON→OFF ≤200μs",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页50",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TA",
+  "field": "points_per_common",
+  "old": "64点/1公共点(表中写2端子,脚注写4点COM内部短接,待核实)",
+  "new": "64点/1公共点(表中写2端子,脚注*3写4点COM内部短接,手册自相矛盾)",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页50(印刷1-32)",
+  "note": "图上确为表内'64点/1公共点(2端子)*3'而脚注*3'KV-C64TA、C64TAP的4点COM在内部短接'; 手册本身矛盾,本页无法裁决; KV-7000手册C64TC/C64TCP写4个端子,倾向4端子,但属推断"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TAP",
+  "field": "points_per_common",
+  "old": "64点/1公共点(表中写2端子,脚注写4点COM内部短接,待核实)",
+  "new": "64点/1公共点(表中写2端子,脚注*3写4点COM内部短接,手册自相矛盾)",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页50(印刷1-32)",
+  "note": "图上确为表内'64点/1公共点(2端子)*3'而脚注*3'KV-C64TA、C64TAP的4点COM在内部短接'; 手册本身矛盾,本页无法裁决; KV-7000手册C64TC/C64TCP写4个端子,倾向4端子,但属推断"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TA",
+  "field": "notes",
+  "old": "内部消耗规格表≤30mA,规格一览≤35mA(不一致,待核实)",
+  "new": "KVSHARD.pdf规格表内部消耗电流≤30mA(35mA出处未在本批页核)",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页50",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TA",
+  "field": "notes",
+  "old": "内部消耗规格表≤45mA,规格一览≤55mA(不一致,待核实)",
+  "new": "KVSHARD.pdf规格表内部消耗电流≤45mA(55mA出处未在本批页核)",
+  "status": "confirmed",
+  "source": "KVSHARD.pdf PDF页50",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TCP",
+  "field": "response_time",
+  "old": "OFF→ON ≤50μs; ON→OFF ≤200μs",
+  "new": "OFF→ON ≤10μs; ON→OFF ≤200μs",
+  "status": "corrected",
+  "source": "KVSHARDG4.pdf PDF页53(印刷2-27)",
+  "note": "'10μs以下'合并单元格覆盖B16TCP与C32TCP两列,仅C64TCP为'50μs以下'; ON→OFF 200μs跨三列"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TCP",
+  "field": "response_time",
+  "old": "OFF→ON ≤10μs; ON→OFF ≤200μs",
+  "new": "OFF→ON ≤10μs; ON→OFF ≤200μs",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页53",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TCP",
+  "field": "response_time",
+  "old": "OFF→ON ≤50μs; ON→OFF ≤200μs",
+  "new": "OFF→ON ≤50μs; ON→OFF ≤200μs",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页53",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TCP",
+  "field": "notes",
+  "old": "OFF泄漏电流原文100mA以下,疑为100μA",
+  "new": "OFF泄漏电流:KV-7000手册PDF页53图上印作'100mA以下'(单位疑印刷错误,同手册TC/TD页印作100μA)",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页53(印刷2-27)、PDF页54",
+  "note": "放大后确认TCP页确为'100mA以下'; 同手册TC/TD页为'100μA以下',TCP应为排版错误,推断100μA"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TC",
+  "field": "response_time",
+  "old": "OFF→ON ≤50μs; ON→OFF ≤200μs",
+  "new": "OFF→ON ≤10μs; ON→OFF ≤200μs",
+  "status": "corrected",
+  "source": "KVSHARDG4.pdf PDF页54(印刷2-28)",
+  "note": "'10μs以下(C型)/100μs以下(D型)'合并单元格覆盖16点与32点两列,仅64点列为50μs/150μs"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TD",
+  "field": "response_time",
+  "old": "OFF→ON ≤150μs; ON→OFF ≤300μs",
+  "new": "OFF→ON ≤100μs; ON→OFF ≤300μs",
+  "status": "corrected",
+  "source": "KVSHARDG4.pdf PDF页54(印刷2-28)",
+  "note": "同上; D型32点OFF→ON=100μs,150μs是64点列"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TC",
+  "field": "response_time",
+  "old": "OFF→ON ≤10μs; ON→OFF ≤200μs",
+  "new": "OFF→ON ≤10μs; ON→OFF ≤200μs",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页54(印刷2-28)",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TC",
+  "field": "response_time",
+  "old": "OFF→ON ≤50μs; ON→OFF ≤200μs",
+  "new": "OFF→ON ≤50μs; ON→OFF ≤200μs",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页54(印刷2-28)",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TD",
+  "field": "response_time",
+  "old": "OFF→ON ≤100μs; ON→OFF ≤300μs",
+  "new": "OFF→ON ≤100μs; ON→OFF ≤300μs",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页54(印刷2-28)",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TD",
+  "field": "response_time",
+  "old": "OFF→ON ≤150μs; ON→OFF ≤300μs",
+  "new": "OFF→ON ≤150μs; ON→OFF ≤300μs",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页54(印刷2-28)",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B16TD",
+  "field": "out_current_per_point",
+  "old": "0.3A",
+  "new": "0.3A",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页54",
+  "note": "D型16点列=0.3A; 32点与64点列合并=0.2A(脚注*4: 各公共点额定1.6A)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32TD",
+  "field": "out_current_per_point",
+  "old": "0.2A(1.6A/公共点)",
+  "new": "0.2A(1.6A/公共点)",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页54",
+  "note": "D型16点列=0.3A; 32点与64点列合并=0.2A(脚注*4: 各公共点额定1.6A)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C64TD",
+  "field": "out_current_per_point",
+  "old": "0.2A(1.6A/公共点)",
+  "new": "0.2A(1.6A/公共点)",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页54",
+  "note": "D型16点列=0.3A; 32点与64点列合并=0.2A(脚注*4: 各公共点额定1.6A)"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B8XTD",
+  "field": "out_current_per_point",
+  "old": "0.3A(30VDC)",
+  "new": "0.3A(30VDC)",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页62(印刷2-36)",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C16XTD",
+  "field": "out_current_per_point_kv7000_manual",
+  "old": "",
+  "new": "0.2A(30VDC)",
+  "status": "new",
+  "source": "KVSHARDG4.pdf PDF页62(印刷2-36)",
+  "note": "冲突提示,请勿自动覆盖out_current_per_point: KV-7000手册规格表'额定负载'行放大后,'DC30V 0.3A'单元格只覆盖KV-B8XTD一列,'DC30V 0.2A'覆盖C16XTD+C32XTD两列; 与已人工在X3H手册核实的'C16XTD=0.3A(与B8XTD合并)'不一致。两本手册印法不同,建议保留X3H结论,本条仅记录KV-7000手册印法。"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XTD",
+  "field": "out_current_per_point",
+  "old": "0.2A(30VDC)",
+  "new": "0.2A(30VDC)",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页62",
+  "note": ""
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-B8XTD",
+  "field": "response_time(OUT部分)",
+  "old": "OFF→ON ≤100μs, ON→OFF ≤300μs",
+  "new": "OFF→ON ≤100μs, ON→OFF ≤300μs",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页62(印刷2-36)",
+  "note": "μ清晰可见; 输入时间常数表(25μs档 OFF→ON TYP25/MAX65μs, ON→OFF TYP75/MAX120μs)亦与现有一致"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C16XTD",
+  "field": "response_time(OUT部分)",
+  "old": "OFF→ON ≤100μs, ON→OFF ≤300μs",
+  "new": "OFF→ON ≤100μs, ON→OFF ≤300μs",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页62(印刷2-36)",
+  "note": "μ清晰可见; 输入时间常数表(25μs档 OFF→ON TYP25/MAX65μs, ON→OFF TYP75/MAX120μs)亦与现有一致"
+ },
+ {
+  "file": "io_units.csv",
+  "model": "KV-C32XTD",
+  "field": "response_time(OUT部分)",
+  "old": "OFF→ON ≤150μs, ON→OFF ≤300μs",
+  "new": "OFF→ON ≤150μs, ON→OFF ≤300μs",
+  "status": "confirmed",
+  "source": "KVSHARDG4.pdf PDF页62(印刷2-36)",
+  "note": "μ清晰可见; 输入时间常数表(25μs档 OFF→ON TYP25/MAX65μs, ON→OFF TYP75/MAX120μs)亦与现有一致"
+ }
+]

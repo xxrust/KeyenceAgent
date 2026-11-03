@@ -1,0 +1,50 @@
+{"id": "h_home_sensor", "cat": "cn_colloquial", "q": "找零点 原点传感器", "expect": ["MC_Home", "MC_InternalHomeSensor", "原点复归"]}
+{"id": "h_servo_off", "cat": "cn_colloquial", "q": "电机励磁断开", "expect": ["MC_Power", "MC_OperationEnable"]}
+{"id": "h_move_point", "cat": "cn_colloquial", "q": "按点位表定位", "expect": ["MC_MoveToPoint", "U_PosWritePointNo", "点"]}
+{"id": "h_change_target", "cat": "cn_colloquial", "q": "运动中途改目标位置", "expect": ["MC_ChangeTargetPosition", "U_PosWriteChgTargetPos"]}
+{"id": "h_torque_limit", "cat": "cn_colloquial", "q": "限制电机输出扭矩", "expect": ["MC_SetTorqueLimit", "MC_TorqueLimitClutch"]}
+{"id": "h_sync", "cat": "cn_colloquial", "q": "主从轴同步跟随", "expect": ["MC_SyncControl", "MC_SyncTypeFollowUpControl", "同步"]}
+{"id": "h_group_stop", "cat": "cn_colloquial", "q": "轴组停止", "expect": ["MC_GroupStop"]}
+{"id": "h_teach", "cat": "cn_colloquial", "q": "示教当前位置", "expect": ["MC_Teach"]}
+{"id": "h_timer_acc", "cat": "cn_colloquial", "q": "累计计时 断电保持", "expect": ["UpDownTimer", "TMR", "TMU", "累计"]}
+{"id": "h_falling", "cat": "cn_colloquial", "q": "下降沿触发", "expect": ["F_TRIG", "LDF", "DIFD"]}
+{"id": "h_count_down", "cat": "cn_colloquial", "q": "倒计数", "expect": ["CTD", "CTUD"]}
+{"id": "h_str_replace", "cat": "cn_colloquial", "q": "替换字符串中的字符", "expect": ["REPLACE", "SRPLC"]}
+{"id": "h_str_left", "cat": "cn_colloquial", "q": "取字符串左边几个字符", "expect": ["LEFT", "SLEFT"]}
+{"id": "h_str_compare", "cat": "cn_colloquial", "q": "比较两个字符串是否相同", "expect": ["StringCmp", "EQ", "C_SCMP"]}
+{"id": "h_str_split", "cat": "cn_colloquial", "q": "按分隔符分割字符串", "expect": ["SplitN", "DisperseString"]}
+{"id": "h_trim", "cat": "cn_colloquial", "q": "去掉字符串空格", "expect": ["TrimL", "STRIM"]}
+{"id": "h_hex_str", "cat": "cn_colloquial", "q": "十六进制字符串转数值", "expect": ["HexStringToNum", "HASC", "RHASC"]}
+{"id": "h_bcd", "cat": "cn_colloquial", "q": "BCD码转换", "expect": ["TO_BCD_**", "BCD_TO_**", "TBCD", "TBIN"]}
+{"id": "h_abs", "cat": "cn_colloquial", "q": "取绝对值", "expect": ["ABS"]}
+{"id": "h_trig", "cat": "cn_colloquial", "q": "计算正弦值", "expect": ["SIN"]}
+{"id": "h_rad", "cat": "cn_colloquial", "q": "角度转弧度", "expect": ["DegToRad"]}
+{"id": "h_select", "cat": "cn_colloquial", "q": "二选一输出", "expect": ["SEL", "MUX"]}
+{"id": "h_bitcount", "cat": "cn_colloquial", "q": "统计ON的位数", "expect": ["BitCount"]}
+{"id": "h_search", "cat": "cn_colloquial", "q": "在数组里查找某个值", "expect": ["DataSearch"]}
+{"id": "h_swap", "cat": "cn_colloquial", "q": "高低字节交换", "expect": ["SWAP", "Exchange", "BlockSwap"]}
+{"id": "h_fifo", "cat": "cn_colloquial", "q": "先进先出队列", "expect": ["FIFOWrite", "FIFORead", "FIFO", "FIFOR", "FIFOW"]}
+{"id": "h_gray", "cat": "cn_colloquial", "q": "格雷码", "expect": ["BinToGrayCode", "GRY"]}
+{"id": "h_tcp_recv", "cat": "cn_colloquial", "q": "以太网接收数据直到结束符", "expect": ["SocketTCP_RecvDelimiter"]}
+{"id": "h_close", "cat": "cn_colloquial", "q": "断开socket连接", "expect": ["SocketClose"]}
+{"id": "h_clear_buf", "cat": "cn_colloquial", "q": "清空接收缓冲区", "expect": ["SocketClearRecvBuf"]}
+{"id": "h_pdo_stop", "cat": "cn_colloquial", "q": "暂停EtherCAT过程数据通信", "expect": ["EC_CoE_PDOStop"]}
+{"id": "h_cip_set", "cat": "cn_colloquial", "q": "EtherNet/IP 写入属性值", "expect": ["CipSetAttributeSingle"]}
+{"id": "h_mail", "cat": "cn_colloquial", "q": "PLC发送邮件", "expect": ["U_MailTo", "U_MailSend", "邮件"]}
+{"id": "h_time_add", "cat": "cn_colloquial", "q": "时间相加", "expect": ["ADD_TIME"]}
+{"id": "h_sec", "cat": "cn_colloquial", "q": "日期时间转成秒", "expect": ["DtToSec"]}
+{"id": "h_capacity", "cat": "cn_colloquial", "q": "SD卡剩余容量", "expect": ["StorageGetCapacity"]}
+{"id": "h_mkdir", "cat": "cn_colloquial", "q": "在存储卡上新建文件夹", "expect": ["StorageMakeDir", "MMKDIR"]}
+{"id": "h_disable_int", "cat": "cn_colloquial", "q": "禁止中断", "expect": ["DisableInterruptRange", "DI", "EnableInterrupt"]}
+{"id": "h_ad_read", "cat": "cn_colloquial", "q": "读取模拟量输入值", "expect": ["U_ADRead", "KV-AD", "模拟"]}
+{"id": "h_da_write", "cat": "cn_colloquial", "q": "模拟量输出写入", "expect": ["U_DAWrite", "KV-DA", "模拟"]}
+{"id": "h_counter_read", "cat": "cn_colloquial", "q": "读高速计数器当前值", "expect": ["U_CntReadCounter", "高速计数"]}
+{"id": "h_freq", "cat": "cn_colloquial", "q": "测量脉冲频率", "expect": ["U_CntReadHz", "频率"]}
+{"id": "h_var_size", "cat": "cn_colloquial", "q": "获取数组元素个数", "expect": ["GetAryCount"]}
+{"id": "h_dev_addr", "cat": "cn_colloquial", "q": "获取变量的软元件地址", "expect": ["DevAddressGet", "DevInfoGet"]}
+{"id": "h_filter", "cat": "cn_colloquial", "q": "一阶滤波 超前滞后", "expect": ["LeadLagFilter"]}
+{"id": "h_pwm", "cat": "cn_colloquial", "q": "时间比例输出 PWM", "expect": ["TimeProportionalOut"]}
+{"id": "h_round", "cat": "cn_colloquial", "q": "实数取整", "expect": ["TRUNC_**", "TRUNC"]}
+{"id": "h_mod", "cat": "cn_colloquial", "q": "求余数", "expect": ["MOD"]}
+{"id": "h_exp", "cat": "cn_colloquial", "q": "乘方运算", "expect": ["EXPT", "EXP", "POW"]}
+{"id": "h_wait_scan", "cat": "cn_colloquial", "q": "只在第一个扫描周期执行一次", "expect": ["CR2008", "初始化", "首次扫描", "上升沿"]}
