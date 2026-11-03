@@ -227,13 +227,13 @@ absolute numbers are optimistic; sealed_a (checked with `--fast` only) is the ha
 
 ## 2026-11-03 reranker: tried, measured, left off
 
-Model: BAAI/bge-reranker-v2-m3 (XLM-R large, 2.27 GB) pulled from ModelScope to
-H:\models\models\BAAI--bge-reranker-v2-m3\snapshots\master (516 s). Loads in 5.7 s on the A4000 and scores
+Model: `BAAI/bge-reranker-v2-m3` (XLM-R large, 2.27 GB) pulled from ModelScope to
+`H:\models\models\BAAI--bge-reranker-v2-m3\snapshots\master` (516 s). Loads in 5.7 s on the A4000 and scores
 24 pairs in 45 ms, so a query costs +~300 ms end to end (127 ms -> 425 ms).
-Code: kv-studio-kb-programming/scripts/kb_rerank.py + Searcher._rerank; off by default, KB_RERANK=1 or
---rerank turns it on; KB_RERANK_N (candidates), KB_RERANK_A (blend), KB_RERANK_CARD (passage shape).
+Code: `kv-studio-kb-programming/scripts/kb_rerank.py` + `Searcher._rerank`; off by default, `KB_RERANK=1` or
+`--rerank` turns it on; `KB_RERANK_N` (candidates), `KB_RERANK_A` (blend), `KB_RERANK_CARD` (passage shape).
 
-Passage shapes tried: (1) title | section | text[:900]; (2) card summary + title/section/text;
+Passage shapes tried: (1) `title | section | text[:900]`; (2) card summary + title/section/text;
 (3) card summary alone. Blends 1.0 / 0.7 / 0.5 / 0.4; candidate depth 24 and 3.
 
 | set | baseline hit@5 / hit@1 / MRR | best rerank config | result |
@@ -249,13 +249,13 @@ hit@5 on sealed_60 and -10 pp hit@1 on holdout 50. Pure rerank (A=1.0) is far wo
 
 Why: the cross-encoder judges "which passage explains this topic", and our labels (and an agent's need) are
 "which page documents this instruction". A raw FB page chunk is a parameter table, so the model prefers any
-prose page that mentions the same words — e.g. for "找零点 原点传感器" it scores 定位控制的步骤(p322-325) 0.84
-and MC_Home 0.31, while the fusion (correctly, for this library) puts MC_Home #2 and MC_InternalHomeSensor #1.
-Sanity check of the model itself: 原点复归 vs MC_Home page = 0.995, vs a PID page = 0.002, so the loader and the
-scoring are not the problem.
+prose page that mentions the same words — e.g. for "找零点 原点传感器" it scores `定位控制的步骤(p322-325)` 0.84
+and `MC_Home` 0.31, while the fusion (correctly, for this library) puts `MC_Home` #2 and
+`MC_InternalHomeSensor` #1. Sanity check of the model itself: 原点复归 vs the MC_Home page = 0.995, vs a PID
+page = 0.002, so the loader and the scoring are not the problem.
 
 To make a reranker useful here it would need one of: labels expressed as "any correct answer page"
-(expect_any, so a procedure page also counts), a reranker fine-tuned on the "API page" preference, or
+(`expect_any`, so a procedure page also counts), a reranker fine-tuned on the "API page" preference, or
 reranking at card level with a card-specific objective. Until then it stays off and the fusion order wins.
 
 Side result worth keeping: with content-level hits (answer string allowed to appear in the returned text),
@@ -264,49 +264,50 @@ doc-level misses on that set are mostly "the same fact on a different page".
 
 ## 2026-11-03 扩展资料入库：教材 / 官方示例程序 / 标准化工程
 
-用户提供 H:\KeyenceAgent\其他文件（7 本 PDF + official-examples.zip）与 KVX样例程序_v100 工程快照。按用户要求
+用户提供 `H:\KeyenceAgent\其他文件`（7 本 PDF + `official-examples.zip`）与 `KVX样例程序_v100` 工程快照。按用户要求
 **PDF 一律用 MinerU 重新识别，不用 Python 直接抽文本**（旧库 22% 的 PDF 页文字层是乱码，同样的坑不想再踩）。
 
-### 入库了什么（ingest_extra.py，x: 前缀，幂等可重跑）
+### 入库了什么（`ingest_extra.py`，`x:` 前缀，幂等可重跑）
 | 类型 | 来源 | 块数 | 说明 |
 |---|---|---|---|
-| 	extbook | AS_155351 使用实例 ST 语言（140p）、AS_147562 程序标准化（92p）、AS_143610 运动控制篇（92p） | 160 | MinerU standard 档，630s / 339s / 300s，产物在 extra_docs/mineru/<key>/ |
-| program_example | SH04PL轴控程序示例（20 个 .mnm）、常用主模块程序（44 个 .mnm） | 122 | 官方示例梯形图/ST 原码 |
-| project_snapshot | KVX样例程序_v100（H:\kvOp\regression13_real_20260923_final） | 72 | 40 个 FB（自变量/局部变量/ST 体）、24 个程序模块、全局变量表、结构体、总览 |
-| kb_note | 手写 | 2 | 命名规范对照（教材 vs 样例程序）、资料构成说明 |
+| `textbook` | AS_155351 使用实例 ST 语言（140p）、AS_147562 程序标准化（92p）、AS_143610 运动控制篇（92p） | 160 | MinerU standard 档，630 s / 339 s / 300 s，产物在 `extra_docs/mineru/<key>/` |
+| `program_example` | SH04PL轴控程序示例（20 个 .mnm）、常用主模块程序（44 个 .mnm） | 119 | 官方示例梯形图/ST 原码 |
+| `project_snapshot` | KVX样例程序_v100（`H:\kvOp\regression13_real_20260923_final`） | 72 | 40 个 FB（自变量/局部变量/ST 体）、24 个程序模块、全局变量表、结构体、总览 |
+| `kb_note` | 手写 | 3 | 命名规范对照、资料构成、程序分层结构 |
 
 ### 为什么是 stage1 之后、stage2 之前
-stage1 会重建 chunks 表，所以扩展资料不能进 stage1 的输入；ingest_extra.py 在 stage1 之后追加，
-再由 stage2 重建 FTS/lexicon/term_df、stage4 重建卡片、stage5 重建向量。重跑 stage1 后必须重新执行一次。
+`stage1` 会重建 `chunks` 表，所以扩展资料不能进 stage1 的输入；`ingest_extra.py` 在 stage1 之后追加，
+再由 stage2 重建 FTS/lexicon/term_df、stage4 重建卡片、stage5 重建向量。重跑 `stage1` 后必须重新执行一次。
+`--only <type>` 只重写该类型的父块（`write(reset_all=False)`），不会误删其他扩展资料。
 
-### 先验权重（PRIOR）
-	extbook 0.8 / program_example 0.75 / project_snapshot 0.8 / kb_note 1.0 —— 故意低于手册（pdf 0.85、
-chm 0.95、htmlhelp 1.0）：教材覆盖同一主题时不能顶掉工程师要引用的手册页；kb_note 是手写规范，
+### 先验权重（`PRIOR`）
+`textbook 0.8 / program_example 0.75 / project_snapshot 0.8 / kb_note 1.0` —— 故意低于手册（`pdf 0.85`、
+`chm 0.95`、`htmlhelp 1.0`）：教材覆盖同一主题时不能顶掉工程师要引用的手册页；`kb_note` 是手写规范，
 可以排在最前。
 
 ### 被排除的资料及理由
-- AS_108654 设备数据的 PLC 管理（7p）：营销页（用户判断，完全没必要）
-- AS_143609 基础编程篇（90p）：与 KVSPRG/KVSINTRO/KVSUSE 高度重复
-- AS_151508 实时时序图监控器（16p）：库里已有 156 块涉及该工具，且属 operator 技能域
-- AS_167121 运转记录活用指南（28p）：库里已有 297 块涉及运转记录
-- T语言示例.md：与库里 57 条 	_language_example 逐编号对应，重复
+- `AS_108654` 设备数据的 PLC 管理（7p）：营销页（用户判断，完全没必要）
+- `AS_143609` 基础编程篇（90p）：与 `KVSPRG` / `KVSINTRO` / `KVSUSE` 高度重复
+- `AS_151508` 实时时序图监控器（16p）：库里已有 156 块涉及该工具，且属 operator 技能域
+- `AS_167121` 运转记录活用指南（28p）：库里已有 297 块涉及运转记录
+- `T语言示例.md`：与库里 57 条 `t_language_example` 逐编号对应，重复
 
-### 教材与样例程序的“配对”实情（查过了，不是配套）
-- 名字零交集：教材全文对 FB_Cylinder/FB_Motion/KVX样例程序 等 0 命中，全文“下载”0 次；教材里的示例
+### 教材与样例程序的"配对"实情（查过了，不是配套）
+- 名字零交集：教材全文对 `FB_Cylinder` / `FB_Motion` / `KVX样例程序` 等 0 命中，全文"下载"0 次；教材里的示例
   都是书内代码片段。
-- **命名规范两套**：教材 p12 教 x/ui/i/udi/di/r/lr/str/tim/a/st/un/fb + 作用域 g/l；KVX样例程序实际用
-  （BOOL）、inst（FB 实例）、str（结构体），全局变量 135/145 直接中文命名。两者不可混用，
-  这一点写进了 kb_note，并在每块的 keywords 里标 convention=textbook|sample。
+- **命名规范两套**：教材 p12 教 `x/ui/i/udi/di/r/lr/str/tim/a/st/un/fb` + 作用域 `g/l`；KVX样例程序实际用
+  `b`（BOOL）、`inst`（FB 实例）、`str`（结构体），全局变量 135/145 直接中文命名。两者不可混用，
+  这一点写进了 `kb_note`，并在每块的 `keywords` 里标 `convention=textbook|sample`。
 
 ### 入库结果与复测（同日 15:00 完成）
 
-MinerU standard 档解析三本教材（**不用 Python 直接抽文本**，旧库 22% 的 PDF 页是乱码文字层）：
-ST 语言实例 140 页/630 s、程序标准化 92 页/339 s、运动控制篇 92 页/300 s，产物在 extra_docs/mineru/<key>/。
-mineru-kit 的 markdown 输出里 3.8–6.7 MB 大部分是 base64 图片，去掉后正文约 113 k / 43 k / 29 k 字符。
+MinerU standard 档解析三本教材（**不用 Python 直接抽文本**）：
+ST 语言实例 140 页 / 630 s、程序标准化 92 页 / 339 s、运动控制篇 92 页 / 300 s，产物在 `extra_docs/mineru/<key>/`。
+`mineru-kit` 的 markdown 输出里 3.8–6.7 MB 大部分是 base64 图片，去掉后正文约 113 k / 43 k / 29 k 字符。
 
-最终入库 354 块（x: 前缀，ingest_extra.py 幂等）：
-	extbook 160（按标题合并到 ~1600 字/块）、program_example 119（每个 .mnm 一块，标题带上代码里的中文注释）、
-project_snapshot 72（40 FB + 24 程序 + 全局变量表 + 结构体 + 总览）、kb_note 3。
+最终入库 **354 块**（`x:` 前缀，`ingest_extra.py` 幂等）：
+`textbook 160`（按标题合并到约 1600 字/块）、`program_example 119`（每个 .mnm 一块，标题带上代码里的中文注释）、
+`project_snapshot 72`（40 FB + 24 程序 + 全局变量表 + 结构体 + 总览）、`kb_note 3`。
 
 复测（同代码、同评测集，仅把新资料放进库里）：
 
@@ -321,18 +322,32 @@ holdout 50 的 hit@1 掉了 4 个百分点，逐条查过：全是手册之间�
 （这条坑之前记过）。hit@5 反而从 0.96 升到 0.98。
 
 ### 检索验证（人工 QA）
-- "程序标准化 变量命名前缀怎么定" → #1 kb_note 变量命名规范，#2-3 	extbook 1 面向程序的标准化
-- "变量命名规范 教材还是样例" → 两条 kb_note 包揽前二
-- "ST语言 四则运算 示例" → #1-3 全是 	extbook 1章 四则运算
-- "轴1原点回归 示例程序" → #4 program_example OriginReturn.mnm（轴1原点回归，示例程序）（前三名是手册 MC_Home/ORG）
-- "标准程序 功能块分层怎么分" → #5 kb_note 标准化程序的分层结构
-- "绝对位置跟随控制 示例程序" → 前八名仍是手册（MC_MoveAbsolute 等）：手册确实更贴题，按设计 PRIOR 让教材/示例低于手册
+- "程序标准化 变量命名前缀怎么定" → #1 `kb_note 变量命名规范`，#2-3 `textbook 1 面向程序的标准化`
+- "变量命名规范 教材还是样例" → 两条 `kb_note` 包揽前二
+- "ST语言 四则运算 示例" → #1-3 全是 `textbook 1章 四则运算`
+- "轴1原点回归 示例程序" → #4 `program_example OriginReturn.mnm（轴1原点回归，示例程序）`（前三名是手册 MC_Home/ORG）
+- "标准程序 功能块分层怎么分" → #5 `kb_note 标准化程序的分层结构`
+- "绝对位置跟随控制 示例程序" → 前八名仍是手册（MC_MoveAbsolute 等）：手册确实更贴题，按设计 `PRIOR` 让教材/示例低于手册
 
-### 顺带修掉的两个问题
-1. SH04PL轴控程序示例.md 里混着"📈 转换总结"这种生成器小标题，被当成程序块且能排第一；现在只接收标题里含
-   .mnm 的段。
-2. 示例程序的标题原本是英文文件名（OriginReturn.mnm），中文问句命中率低；现在从代码里的中文注释提取
-   描述，变成 OriginReturn.mnm（轴1原点回归，示例程序）。
+### 顺带修掉的问题
+1. `SH04PL轴控程序示例.md` 里混着"📈 转换总结"这种生成器小标题，被当成程序块且能排第一；现在只接收标题里含
+   `.mnm` 的段。
+2. 示例程序的标题原本是英文文件名（`OriginReturn.mnm`），中文问句命中率低；现在从代码里的中文注释提取
+   描述，变成 `OriginReturn.mnm（轴1原点回归，示例程序）`。
 
-SKILL.md 的证据优先级已补上 	extbook / program_example / project_snapshot / kb_note 四类，并写明
+`SKILL.md` 的证据优先级已补上 `textbook` / `program_example` / `project_snapshot` / `kb_note` 四类，并写明
 "手册讲语法与约束、教材讲方法与步骤、示例/快照是参考实现，三者不能互相替代"。
+
+### 手册到底有多少本（2026-11-03 更正）
+之前写"155 本参考手册"是错的，实际：
+
+- `C:\Users\Public\Documents\KEYENCE\KVS12\ManualHelp\2052` 里有 **162 个文件**：144 PDF + 10 CHM + 6 XLS + 2 XLSX
+- 进库的 PDF 是 **137 本**：6 本因内容与别的书完全相同被去重合并（原名记在 `also_in`：
+  `KV-LH_OrientalmotorAZ.pdf`→`KV-LH_Orientalmotor.pdf`、`KvsPtcNanoHardDiff.pdf`→`KvsPtcDevDiff.pdf`、
+  `KvsPtcParamCpupos.pdf`→`KvsPtcInstCpumb.pdf`、`SV2_GainSearchPro2_without_command.pdf`→`_with_command`、
+  `SV3_GainSearchPro_without_order.pdf`→`_with_order`、`UnitTrace_KVS11.pdf`→`UnitTrace.pdf`），
+  `CPUErrorList.pdf`（51 页 CPU 错误代码表）在旧库构建时就没被导入 —— **已知缺口，未入库**
+- 137 本的块数分布：≥200 块 30 本、50–199 块 25 本、10–49 块 28 本、**1–9 块 54 本**（单页速查/便签，
+  如 `KV-XH_ControlCycle.pdf`、`EpGraph.pdf`、各伺服调谐速查）。所以"137 本"按文件算，不等于 137 本大部头
+- 另外 8 个 Excel 设备映射表（`DeviceMap(KV-X/XH/XHEC/ML_MC/SH04PL)`、`DeviceMap(MV-L40)`、CR/CM 转换表）
+  逐地址展开后占 **33,167 块 = 全库 62%**；CHM/HTML 帮助（598 + 70 + 11 + 51 个页面）合计约 5,940 块

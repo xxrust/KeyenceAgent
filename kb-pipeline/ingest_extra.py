@@ -375,7 +375,15 @@ def note_chunks() -> list[dict]:
 - 两者都基于同一套方法（变量分组、ST 写 FB 体、FB 分层复用），差异只在命名风格。"""
     assets = """# 知识库资料构成（2026-11-03 起）
 
-除 155 本随 KV STUDIO 安装的参考手册（`source_type=pdf` 等）外，本库还收录了三类非手册资料：
+除随 KV STUDIO 安装的参考手册（`source_type=pdf` 等）外，本库还收录了三类非手册资料。
+先把手册那部分说清楚，因为"多少本"容易说错：
+- `ManualHelp\\2052` 目录里是 **144 个 PDF**，进库的是 **137 本**（6 本因内容与别的书完全相同被去重合并，
+  原名记在 `also_in`；`CPUErrorList.pdf`（51 页 CPU 错误代码表）在旧库构建时就没导入，是已知缺口）。
+- 137 本里块数 ≥200 的只有 30 本、50–199 的 25 本，另有 **54 本只有 1–9 块**（单页速查/便签，
+  如 `KV-XH_ControlCycle.pdf`、`EpGraph.pdf`）——所以"137 本"按文件算，不等于 137 本大部头。
+- 另有 **8 个 Excel 设备映射表**（`DeviceMap(KV-X/XH/XHEC/ML_MC/SH04PL)`、`DeviceMap(MV-L40)`、
+  CR/CM 转换表），逐地址展开，占全库 **62% 的块数**（33,167 块）。
+- 还有 10 个 CHM、70 个 htmlhelp 页、11 个 dockinghelp 包、51 个导航页，合计约 5,900 块。
 
 ## 教材（source_type=textbook，MinerU 识别）
 - `AS_147562_程序标准化_变量ST_FB.pdf`：程序标准化的方法论——变量（全局/局部、数据类型、分组、
@@ -411,9 +419,15 @@ def note_chunks() -> list[dict]:
 
 
 # ---------------------------------------------------------------- writer
-def write(rows: list[dict], db: Path) -> dict:
+def write(rows: list[dict], db: Path, reset_all: bool = True) -> dict:
+    """Insert the generated chunks. reset_all wipes every x: row (full run); a partial run only
+    clears the parents it is about to rewrite, so `--only note` cannot delete the textbooks."""
     conn = sqlite3.connect(db)
-    conn.execute("delete from chunks where chunk_id like 'x:%'")
+    if reset_all:
+        conn.execute("delete from chunks where chunk_id like 'x:%'")
+    else:
+        for p in {r["parent_id"] for r in rows}:
+            conn.execute("delete from chunks where parent_id = ? or chunk_id = ?", (p, p))
     stats = {}
     for r in rows:
         stats[r["source_type"]] = stats.get(r["source_type"], 0) + 1
@@ -456,7 +470,7 @@ def main():
             print(f"   {r['chunk_id']} | {r['title'][:60]} | {len(r['text'])} chars | {r['source'][:70]}")
     if a.dry_run:
         return
-    print("\nwritten:", write(rows, a.db))
+    print("\nwritten:", write(rows, a.db, reset_all=(a.only is None)))
 
 
 if __name__ == "__main__":
