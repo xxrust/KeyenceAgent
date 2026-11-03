@@ -86,7 +86,27 @@ KeyenceAgent 把问题分成三层，每层一个技能：
 ## 知识库（Wiki V3m）：里面有什么
 
 知识库是一个本地 SQLite（`wiki.v3m.db`，约 450 MB）+ 一份 bge-m3 向量矩阵，由 [`kb-pipeline/`](kb-pipeline/) 从下列资料编译而来。
-**数据库不进 git**（体积太大），通过项目网盘分发，放到配置里的 `wiki_root` 即可。
+**数据库不进 git**（体积太大），通过网盘分发，放到配置里的 `wiki_root` 即可。
+
+### 获取
+
+| | |
+|---|---|
+| 百度网盘 | https://pan.baidu.com/s/1pmwVMdOXGB6pkAp0kGuCIQ?pwd=gx7d |
+| 提取码 | `gx7d` |
+| 文件 | `kb-v3m-2026-11-03.zip`（141 MB，解压后约 494 MB） |
+
+解压后按包内 `README-知识库.md` 把 4 个文件放到 `<wiki_root>\v3\`：
+
+```
+<wiki_root>\v3\wiki.v3m.db
+<wiki_root>\v3\vectors.wiki.v3m.bge-m3.npy
+<wiki_root>\v3\vectors.wiki.v3m.bge-m3.ids.json
+<wiki_root>\v3\jieba_userdict.txt
+```
+
+包内 `MANIFEST.json` 记录了每个文件的 SHA-256、块数/卡片数/向量行数、构建时间与对应的 git commit，可用来校验完整性。
+注意这是**公开分享链接**，拿到链接的人都能下载；如需更换，重新打包上传后更新本节即可。
 
 ### 资料构成
 
@@ -236,7 +256,7 @@ AI Agent 自动完成：
 - Windows PowerShell 5.1
 - KEYENCE KV STUDIO KVS12（已安装 `Kvs.exe`）
 - Codex AI Agent 运行时
-- 基恩士知识库 `wiki.v3m.db`（约 450 MB）+ 向量矩阵（约 40 MB），从项目网盘获取后放到 `wiki_root`，见上文「知识库（Wiki V3m）」
+- 基恩士知识库 `wiki.v3m.db`（约 450 MB）+ 向量矩阵（约 40 MB）：从[下方网盘链接](#获取)下载后放到 `wiki_root`，见「知识库（Wiki V3m）」一节
 
 ### 安装
 
