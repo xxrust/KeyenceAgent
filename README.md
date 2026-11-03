@@ -95,6 +95,10 @@ KeyenceAgent 把问题分成三层，每层一个技能：
 | 百度网盘 | https://pan.baidu.com/s/1pmwVMdOXGB6pkAp0kGuCIQ?pwd=gx7d |
 | 提取码 | `gx7d` |
 | 文件 | `kb-v3m-2026-11-03.zip`（141 MB，解压后约 494 MB） |
+| SHA-256 | `ddf7466fff2c2c8e96d93e189ec3e931764338ac398a6d8808ff007d83d8c12e` |
+
+`wiki.v3m.db` 的 SHA-256 是 `930bbfc51787359fcf699c102871f1c26d39c4e42be95fd33025df8d140d408a`
+（对应 git commit `d24163c`，构建于 2026-11-03 15:37）。
 
 解压后按包内 `README-知识库.md` 把 4 个文件放到 `<wiki_root>\v3\`：
 
