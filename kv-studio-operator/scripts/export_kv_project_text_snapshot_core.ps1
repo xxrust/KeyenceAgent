@@ -1,4 +1,4 @@
-﻿<#!
+<#!
 .SYNOPSIS
   Export a KV STUDIO project into a version-control friendly, text-first snapshot.
 .DESCRIPTION
@@ -214,7 +214,12 @@ $mnmOut=Join-Path $rawRoot 'mnm'; $mnmExportDir=Join-Path $rawRoot 'mnm_export';
 $mnmWorkflow=Join-Path $scriptRoot 'workflows\export_mnm_project_copy_default_folder.ps1'
 $mnmResult=Join-Path $mnmOut 'export_mnm_project_copy_result.json'
 $mnmWorkRoot=Join-Path ([IO.Path]::GetTempPath()) ('kv_mnm_snapshot_'+[guid]::NewGuid().ToString('N').Substring(0,8))
-$mnmArgs=@('-ProjectPath',$ProjectPath,'-ExportDir',$mnmExportDir,'-OutDir',$mnmOut,'-WorkRoot',$mnmWorkRoot,'-AllowWorkRootOutsideExportDir','-AllowOverwrite','-TimeoutSeconds',[string]$TimeoutSeconds)
+# The snapshot always works on a throw-away isolated copy, so there is never a
+# KV STUDIO session bound to that copy path that a "restart" could reuse. The
+# export child must launch its own process: pass -NoRestartKvs explicitly,
+# otherwise export_mnm_browse_default_folder_guarded.ps1 raises
+# KV_EXPORT_RESTART_REFUSED on a cold start (no path-bound process, count 0).
+$mnmArgs=@('-ProjectPath',$ProjectPath,'-ExportDir',$mnmExportDir,'-OutDir',$mnmOut,'-WorkRoot',$mnmWorkRoot,'-AllowWorkRootOutsideExportDir','-AllowOverwrite','-NoRestartKvs','-TimeoutSeconds',[string]$TimeoutSeconds)
 $mnmStep=Invoke-Child $mnmWorkflow $mnmArgs $mnmResult 'mnm_export' -ResetPaths @($mnmExportDir)
 $mnmWorkspacePlanPath=Join-Path $mnmOut 'artifacts\export_workspace\export_workspace_plan.json'
 if(Test-Path -LiteralPath $mnmWorkspacePlanPath -PathType Leaf){
