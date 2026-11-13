@@ -22,6 +22,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\workflo
 - 需要复现 UI 状态时，对**同一个已打开工程**重跑该 runner，不要新建工程。
 - 全流程一次 20 分钟以上，单步通常 20 秒–2 分钟；改一步验证一步。
 
+## 先读：别人踩过的坑（照做能一次做对）
+
+详细症状/根因/自检见 [references/agent-mistakes.md](references/agent-mistakes.md)。高频 6 条：
+
+1. **没实跑不许说"验证过"**：涉及"KV STUDIO 里成立"的结论，必须有 live 回执或编译输出，否则只写"计划层已验证"。
+2. **不要手搓 plan JSON 喂执行器**：会被 `KV_PLAN_REQUIRED_GATE_ORDER` / `KV_PLAN_STEP_OUT_DIR_MISMATCH` 拦；用 planner 产出，或按顺序直调 `runner_children/*.ps1`。
+3. **不要用字符串替换盲改"一名多用"的标识符**：`import_mnm_$($i+1)` 同时是步骤名/`-OutDir` 子目录/artifact 路径；改完必须 Parser 0 错 + 跑对应套件。
+4. **写回含非 ASCII 的 .ps1 必须保留 UTF-8 BOM**，否则 `script-hygiene` 报 `non_ascii_without_utf8_bom`。
+5. **提交只显式列文件**，别 `git add -A -- <dir>`（会带进无关 untracked 产物）。
+6. **变量名别像软元件**（`MR9000` 会被拒），用 `bR10Probe` 这类语义名；调 runner 前核对它的 `param()`，别猜参数。
 ## 写入依赖顺序（自底向上）
 
 KV STUDIO 的编译是全局的，但 UI 写入必须按依赖顺序，**块里引用的变量必须在其它地方先定义**：
