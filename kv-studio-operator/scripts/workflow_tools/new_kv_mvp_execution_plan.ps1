@@ -184,7 +184,12 @@ try {
     if (-not (Test-Path -LiteralPath $mnmPath -PathType Leaf)) { throw "MNM file not found: $mnmPath" }
     $moduleName = [string]$entry.module_name
     if (-not $moduleName) { $moduleName = [IO.Path]::GetFileNameWithoutExtension($mnmPath) }
-    $moduleType = if ($null -ne $entry.module_type -and [string]$entry.module_type -ne '') { [int]$entry.module_type } else { 0 }
+      $entryEmptyBodyMnm = ''
+  if ($entry.empty_body_mnm) {
+    $entryEmptyBodyMnm = Resolve-ScaffoldPath ([string]$entry.empty_body_mnm)
+    if (-not (Test-Path -LiteralPath $entryEmptyBodyMnm -PathType Leaf)) { throw "Empty-body MNM not found for ${moduleName}: $entryEmptyBodyMnm" }
+  }
+$moduleType = if ($null -ne $entry.module_type -and [string]$entry.module_type -ne '') { [int]$entry.module_type } else { 0 }
     $category = if ($entry.category) { [string]$entry.category } elseif ($moduleType -eq 2) { 'function_block' } else { 'scan' }
     $entryGlobalTsv = Resolve-ScaffoldPath ([string]$entry.variables.global_tsv)
     $entryLocalTsv = Resolve-ScaffoldPath ([string]$entry.variables.local_tsv)
@@ -205,6 +210,7 @@ try {
     }
     $resolvedMnmFiles += [pscustomobject]@{
       path = $mnmPath
+  empty_body_path = $entryEmptyBodyMnm
       module_name = $moduleName
       module_type = $moduleType
       category = $category
@@ -343,7 +349,13 @@ try {
   for ($i = 0; $i -lt $resolvedMnmFiles.Count; $i++) {
     $entry = $resolvedMnmFiles[$i]
     $importArgs = [System.Collections.Generic.List[string]]::new()
-    Add-Arg -List $importArgs -Name '-MnmPath' -Value $entry.path
+    $importMnmPath = $entry.path
+  $importStepName = "import_mnm_$($i + 1)"
+  if ($entry.empty_body_path) {
+    $importMnmPath = $entry.empty_body_path
+    $importStepName = "import_mnm_empty_$($i + 1)"
+  }
+  Add-Arg -List $importArgs -Name '-MnmPath' -Value $importMnmPath
     Add-Arg -List $importArgs -Name '-ProjectPath' -Value $projectPathForRun
     Add-Arg -List $importArgs -Name '-OutDir' -Value (Join-Path $artifactRoot ("import_mnm_$($i + 1)"))
     Add-Arg -List $importArgs -Name '-ExpectedModuleName' -Value $entry.module_name
@@ -359,7 +371,7 @@ try {
     if ($Mode -eq 'new_project' -or $DeleteExistingModulesBeforeImport) { Add-SwitchArg -List $importArgs -Name '-DeleteExistingModuleBeforeImport' -Enabled $true }
     Add-Arg -List $importArgs -Name '-RestartKvs' -Value $(if ($Mode -eq 'repair_existing_project' -and $i -eq 0) { 'true' } else { 'false' })
     Add-Arg -List $importArgs -Name '-KvsExe' -Value $KvsExe
-    $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })import_mnm_$($i + 1)" 'import_mnm_guarded.ps1' @('runner_child_approved') $importArgs.ToArray() (Join-Path $artifactRoot ("import_mnm_$($i + 1)")) 'runner_child' 240))
+    $steps.Add((New-Step "$(if ($Mode -eq 'repair_existing_project') { 'repair_' } else { '' })$importStepName" 'import_mnm_guarded.ps1' @('runner_child_approved') $importArgs.ToArray() (Join-Path $artifactRoot ("import_mnm_$($i + 1)")) 'runner_child' 240))
 
     if ($Mode -eq 'new_project') {
       $placementDir = Join-Path (Join-Path $artifactRoot 'module_placement') $entry.module_name
@@ -433,6 +445,14 @@ try {
     }
   }
 
+for ($i = 0; $i -lt $resolvedMnmFiles.Count; $i++) {
+  $entry = $resolvedMnmFiles[$i]
+  if (-not $entry.empty_body_path) { continue }
+  $safeModule = ($entry.module_name -replace '[^A-Za-z0-9_.-]+', '_')
+  $bodyOutDir = Join-Path $artifactRoot ('set_fb_program_body\' + ('module_{0:D2}_{1}' -f ($i + 1), $safeModule))
+  $bodyArgs = @('-ProjectPath',$projectPathForRun,'-FbModuleName',$entry.module_name,'-MnmPath',$entry.path,'-OutDir',$bodyOutDir)
+  $steps.Add((New-Step "set_fb_program_body_$($entry.module_name)" 'set_fb_program_body_guarded.ps1' @('runner_child_approved') $bodyArgs $bodyOutDir))
+}
   $compileOutDir = Join-Path $artifactRoot 'compile_convert'
   $compileStepArgs = @('-ProjectPath',$projectPathForRun,'-OutDir',$compileOutDir,'-WaitSeconds','40','-ChecklistPath',$ChecklistPath,'-ConvertAction','CtrlF9')
   if ($createdProjectResultPath) { $compileStepArgs += @('-CreatedProjectResultPath',$createdProjectResultPath) }
