@@ -1,8 +1,11 @@
 """Quick state dump of the wiki.v3m.db after an ingest or rebuild (diagnostic)."""
+from pathlib import Path
+import os, sys, sqlite3
 import sqlite3
 import sys
 
-db = sys.argv[1] if len(sys.argv) > 1 else r"H:\llm-wiki-v2-keyence\v3\wiki.v3m.db"
+DB_DEFAULT = os.environ.get("KB_DB") or str((Path(__file__).resolve().parent.parent / "dist" / "kb-v3m-2026-11-03" / "wiki.v3m.db"))
+db = sys.argv[1] if len(sys.argv) > 1 else DB_DEFAULT
 c = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
 print("chunks total:", c.execute("select count(*) from chunks").fetchone()[0])
 print("x: rows:", dict(c.execute(

@@ -3,10 +3,10 @@
 Goal: 清洗和切块 → trigram + jieba 混合检索 + 同义词 → 定本体 → 抽取卡片并挂证据 → 向量检索，每步用 benchmark 测。
 Status: **all stages done (2026-11-02)**.
 
-Source DB (read-only): `H:\llm-wiki-v2-keyence\wiki.v2.cleaned.db`
-Output: `H:\llm-wiki-v2-keyence\v3\` — `wiki.v3m.db` (the only runtime library), `jieba_userdict.txt`,
-`vectors.wiki.v3m.bge-m3.npy/.ids.json` (not in git). The old `wiki.v3.db` is archived under
-`H:\llm-wiki-v2-keyence\_archive_v3\` (rebuildable from stage1 in ~10 min) and is no longer maintained.
+**2026-11-14 起只有一本库**：`dist/kb-v3m-2026-11-03/wiki.v3m.db`（仓库内，451.9 MB，运行时唯一来源）。
+旧的 `wiki.v2.cleaned.db`、`wiki.v3.db`、以及 `H:\llm-wiki-v2-keyence\v3\wiki.v3m.db` 副本已删除，
+stage1 的 V2 源不再随仓库提供；需要重建时请先重新取得原始 V2 库。
+各 stage 脚本的默认库路径已改为仓库内 `dist/kb-v3m-2026-11-03/wiki.v3m.db`，可用环境变量 `KB_DB` 覆盖。
 Runtime entry (in the skill): `kv-studio-kb-programming/scripts/kb_search.py` (+ `kb_vectors.py`, `kb_rerank.py`);
 `search_v3.py` here is a shim.
 Model: bge-m3 from ModelScope at `H:\models\models\BAAI--bge-m3\snapshots\master` (huggingface.co and hf-mirror unreachable from Python);

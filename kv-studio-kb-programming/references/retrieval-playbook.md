@@ -45,12 +45,15 @@ records the actual tested version/encoding and desktop acceptance.
 Examples:
 
 ```powershell
-python .\llm-wiki-v2-keyence\scripts\wiki_query.py "KV-XH DeviceMap" --db .\llm-wiki-v2-keyence\wiki.v2.cleaned.db --limit 5 --evidence
-python .\llm-wiki-v2-keyence\scripts\wiki_query.py "KV-XLE buffer memory" --db .\llm-wiki-v2-keyence\wiki.v2.cleaned.db --limit 5 --evidence
-python .\llm-wiki-v2-keyence\scripts\wiki_query.py "register map" --db .\llm-wiki-v2-keyence\wiki.v2.cleaned.db --limit 5 --evidence
+python .\kv-studio-kb-programming\scripts\kb_search.py "KV-XH DeviceMap" -k 5
+python .\kv-studio-kb-programming\scripts\kb_search.py "KV-XLE buffer memory" -k 5
+python .\kv-studio-kb-programming\scripts\kb_search.py "register map" -k 5
 ```
 
-If `wiki.v2.cleaned.db` has weak recall, do not switch databases by default. Rewrite the query as exact identifiers plus short semantic phrases, then compare evidence by source type. Use `--db` only when the user provides another verified Wiki V2 database for the current machine.
+There is exactly one runtime library (`dist/kb-v3m-*/wiki.v3m.db`); `kb_search.py` resolves it
+without `--db`. If recall is weak, rewrite the query as exact identifiers plus short semantic
+phrases and compare evidence by source type. Switching databases is no longer an option: the
+Wiki V2 cleaned DB and `wiki.v3.db` were deleted on 2026-11-14.
 
 ### Motion and positioning
 

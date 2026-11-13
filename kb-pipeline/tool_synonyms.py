@@ -8,6 +8,7 @@ Usage:
   python tool_synonyms.py                 # report
   python tool_synonyms.py --df-term 定点 # show df for arbitrary terms
 """
+import os
 from __future__ import annotations
 
 import argparse
@@ -17,7 +18,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SYN = HERE / "synonyms.tsv"
-DB = Path(r"H:\llm-wiki-v2-keyence\v3\wiki.v3m.db")
+DB = Path(os.environ.get("KB_DB") or (Path(__file__).resolve().parent.parent / "dist" / "kb-v3m-2026-11-03" / "wiki.v3m.db"))
 
 
 def load(path: Path) -> list[tuple[int, str, str]]:

@@ -376,6 +376,14 @@ while ((Get-Date) -lt $deadline) {
       $handled = $true
       continue
     }
+    # Only dialogs we have seen before may be confirmed automatically. Anything else
+    # stops the step with a screenshot instead of clicking a default button
+    # (issue #3 R05).
+    $dialogTitle = [string]$parts[2]
+    if ($dialogTitle -notmatch '(?i)EtherNet/IP|保存|变更|変更|确认|確認|警告|情報|信息|KV STUDIO') {
+      $shot = Save-Shot 'unknown_dialog.png'
+      Fail 'KV_UI_UNKNOWN_DIALOG' ("unexpected dialog '{0}'; refusing to confirm it. screenshot={1}" -f $dialogTitle, $shot)
+    }
     if (Find-Button $el '是(Y)') { [void](Press-Button $el '是(Y)'); $handled = $true; continue }
     if (Find-Button $el '确定') { [void](Press-Button $el '确定'); $handled = $true; continue }
   }
@@ -403,6 +411,14 @@ do {
       [void][EipEdit.EipEditWin]::SendMessage([IntPtr][long]$parts[0], 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
       $handled = $true
       continue
+    }
+    # Only dialogs we have seen before may be confirmed automatically. Anything else
+    # stops the step with a screenshot instead of clicking a default button
+    # (issue #3 R05).
+    $dialogTitle = [string]$parts[2]
+    if ($dialogTitle -notmatch '(?i)EtherNet/IP|保存|变更|変更|确认|確認|警告|情報|信息|KV STUDIO') {
+      $shot = Save-Shot 'unknown_dialog.png'
+      Fail 'KV_UI_UNKNOWN_DIALOG' ("unexpected dialog '{0}'; refusing to confirm it. screenshot={1}" -f $dialogTitle, $shot)
     }
     if (Find-Button $el '是(Y)') { [void](Press-Button $el '是(Y)'); $handled = $true; continue }
     if (Find-Button $el '确定') { [void](Press-Button $el '确定'); $handled = $true; continue }
@@ -472,8 +488,29 @@ if ($Action -eq 'Delete') {
   $ok = ($persistedIps.Count -lt $preIps.Count)
   $detail = "persisted before=$($preIps.Count) after=$($persistedIps.Count)"
 } else {
-  $ok = ($persistedIps -contains $newIp)
-  $detail = "persisted target=$newIp after=$($persistedIps -join ',')"
+  # A flat "the IP exists somewhere" check cannot prove the target node owns it
+  # (issue #3 R04). Bind node -> IP by row when both column copies are coherent,
+  # and refuse to claim success when they are not.
+  $bindingVerified = $false
+  if ($persistedIps.Count -eq $postNodeLabels.Count -and $preIps.Count -eq $preNodeLabels.Count) {
+    $targetRowIp = $null
+    for ($rowIndex = 0; $rowIndex -lt $postNodeLabels.Count; $rowIndex++) {
+      if ([string]$postNodeLabels[$rowIndex] -match $targetPattern) { $targetRowIp = [string]$persistedIps[$rowIndex]; break }
+    }
+    if ($targetRowIp) {
+      $bindingVerified = ($targetRowIp -eq $newIp)
+      $detail = "node=$node bound_ip=$targetRowIp expected=$newIp"
+    } else {
+      $detail = "node=$node not found in reopened node column"
+    }
+  } else {
+    $detail = "ip/node column counts differ (ip={0} node={1}); node-ip binding unverifiable" -f $persistedIps.Count, $postNodeLabels.Count
+  }
+  if (-not $bindingVerified -and ($persistedIps -contains $newIp) -and ($persistedIps.Count -eq $postNodeLabels.Count)) {
+    Fail 'KV_EIP_MODIFY_NODE_BINDING_MISMATCH' $detail
+  }
+  if (-not $bindingVerified -and -not ($persistedIps -contains $newIp)) { $detail = $detail + '; target ip absent from reopened list' }
+  $ok = $bindingVerified
 }
 if (-not $ok) {
   $shot = Save-Shot 'readback.png'
@@ -487,6 +524,7 @@ $shotOk = Save-Shot 'success.png'
 $result = [ordered]@{
   ok = $true
   verified = $true
+  binding_verified = if ($Action -eq 'Modify') { $bindingVerified } else { $true }
   action = $Action
   project = $ProjectName
   node_address = $node

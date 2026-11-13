@@ -20,6 +20,7 @@ Usage:
   python ingest_extra.py --dry-run            # counts and samples, no DB write
   python ingest_extra.py                      # write into the DB + report
 """
+import os
 from __future__ import annotations
 
 import argparse
@@ -31,7 +32,7 @@ import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DB = Path(r"H:\llm-wiki-v2-keyence\v3\wiki.v3m.db")
+DB = Path(os.environ.get("KB_DB") or (Path(__file__).resolve().parent.parent / "dist" / "kb-v3m-2026-11-03" / "wiki.v3m.db"))
 MINERU = HERE / "extra_docs" / "mineru"
 ZIP_SRC = Path(r"H:\KeyenceAgent\其他文件\official-examples.zip")
 SNAP = Path(r"H:\kvOp\regression13_real_20260923_final\13_project_text_snapshot_20260923_130026_242_32dd2104"

@@ -3,12 +3,13 @@
 Output: inventory.tsv  (kind, name, cn_name, aliases, evidence_n)
         pairs.tsv      (cn desc, identifier, df)   manual name<->desc pairs that survived pruning
 """
+import os
 import re
 import sqlite3
 from collections import Counter
 from pathlib import Path
 
-DB = r"H:\llm-wiki-v2-keyence\v3\wiki.v3m.db"
+DB = os.environ.get("KB_DB") or str(Path(__file__).resolve().parent.parent / "dist" / "kb-v3m-2026-11-03" / "wiki.v3m.db")
 OUT = Path(r"H:\KeyenceAgent\kb-pipeline\vocab")
 OUT.mkdir(exist_ok=True)
 c = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
