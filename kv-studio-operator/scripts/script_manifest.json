@@ -252,7 +252,7 @@
                                                                                         "project_inventory.json"
                                                                                     ]
                                                                       },
-                                  "workflow_tools/new_kv_mvp_execution_plan.ps1":  {
+                                  "workflow_tools/new_kv_module_execution_plan.ps1":  {
                                                                                        "files":  [
                                                                                                      "execution_plan_result.json"
                                                                                                  ]
@@ -1151,7 +1151,7 @@
                                               "customer_callable":  false
                                           },
                                           {
-                                              "path":  "workflow_tools/new_kv_mvp_execution_plan.ps1",
+                                              "path":  "workflow_tools/new_kv_module_execution_plan.ps1",
                                               "status":  "approved",
                                               "customer_callable":  false
                                           },

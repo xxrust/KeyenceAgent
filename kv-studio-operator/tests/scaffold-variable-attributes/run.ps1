@@ -11,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $renderer = Join-Path $repo 'scripts\render_kv_mvp_scaffold_model.ps1'
 $validator = Join-Path $repo 'scripts\scaffold_tools\validate_kv_mvp_scaffold.ps1'
-$planner = Join-Path $repo 'scripts\workflow_tools\new_kv_mvp_execution_plan.ps1'
+$planner = Join-Path $repo 'scripts\workflow_tools\new_kv_module_execution_plan.ps1'
 foreach ($path in @($renderer, $validator, $planner)) {
   if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "script not found: $path" }
 }

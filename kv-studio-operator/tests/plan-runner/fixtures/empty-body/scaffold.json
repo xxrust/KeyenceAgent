@@ -1,0 +1,24 @@
+﻿{
+    "schema_version":  2,
+    "project":  {
+                    "cpu_model":  "KV-X310",
+                    "name":  "EmptyBodyFixture"
+                },
+    "variables":  {
+                      "schema":  "per_mnm",
+                      "attributes":  "name_type"
+                  },
+    "mnm_files":  [
+                      {
+                          "module_name":  "ST01",
+                          "empty_body_mnm":  "mnm\\ST01_empty.mnm",
+                          "path":  "mnm\\ST01.mnm",
+                          "variables":  {
+                                            "local_tsv":  "locals.tsv",
+                                            "global_tsv":  "globals.tsv"
+                                        },
+                          "category":  "scan",
+                          "module_type":  0
+                      }
+                  ]
+}

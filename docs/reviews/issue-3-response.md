@@ -159,7 +159,7 @@ KB_MODEL_DIR 指向空目录 → kb_search.py --db ... 'MC_Jog 寸动' -k 2
 
 ## R10｜写入顺序 / 原子性不一致 —— **部分成立**
 
-planner 的实际步骤顺序（`new_kv_mvp_execution_plan.ps1:266-455`）：
+planner 的实际步骤顺序（`new_kv_module_execution_plan.ps1:266-455`）：
 
 ```
 assert_ui_guard_usage → assert_agent_boundary → validate_scaffold → assert_existing_project_source_snapshot

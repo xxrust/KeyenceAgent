@@ -23,7 +23,7 @@
 
 - 生成脚本：`C:\kvrun\sample_model\build_structures.ps1`
 - 产物：`C:\kvrun\sample_model\structure_plan.json`（26 个 create 操作，按依赖排序）
-- 计划集成：`new_kv_mvp_execution_plan.ps1 -StructurePlanPath <plan>` 增加
+- 计划集成：`new_kv_module_execution_plan.ps1 -StructurePlanPath <plan>` 增加
   `import_structures` 步骤（create_project 之后、模块导入之前）
 
 实跑证据：

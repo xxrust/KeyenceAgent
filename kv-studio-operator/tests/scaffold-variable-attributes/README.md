@@ -6,7 +6,7 @@ global variable attributes:
 ```
 scaffold.model.json -> renderer -> scaffold.json variables.attributes
                     -> validator -> variable_write_verified_fields
-                    -> new_kv_mvp_execution_plan -> set_variables -FullGlobalAttributes
+                    -> new_kv_module_execution_plan -> set_variables -FullGlobalAttributes
 ```
 
 Run:

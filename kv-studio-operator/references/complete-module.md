@@ -161,7 +161,7 @@ FB 的 `argument_reopen_verified=true` 只在这条保存、局部编辑器重�
 ## 正文引用新局部实例时的顺序（issue #3 R10）
 
 planner 默认把 `import_mnm_N` 放在 `set_fb_arguments_*` / `set_variables_*` **之前**（见
-`new_kv_mvp_execution_plan.ps1` 的步骤生成顺序）。这对"正文不引用新声明"的模块成立；一旦模块正文里
+`new_kv_module_execution_plan.ps1` 的步骤生成顺序）。这对"正文不引用新声明"的模块成立；一旦模块正文里
 出现本次才声明的局部实例（FB 实例、局部变量），KV 在导入时会报 `读取助记符列表失败`。
 
 这种情况必须拆成三步提供（本项目 2026-11 在 v9/v10 上实测）：

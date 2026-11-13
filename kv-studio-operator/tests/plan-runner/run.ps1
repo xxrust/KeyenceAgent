@@ -6,6 +6,7 @@ $ErrorActionPreference = 'Stop'
 # Proves the plan parser, stage ordering, argument reconstruction and result
 # schema without touching KV STUDIO.
 
+$env:KVS_OPERATOR_PLANNER = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\..\scripts\workflow_tools\new_kv_module_execution_plan.ps1"))
 $tool = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\scripts\workflow_tools\run_kv_execution_plan.ps1'))
 if (-not (Test-Path -LiteralPath $tool -PathType Leaf)) { throw "tool not found: $tool" }
 
@@ -99,6 +100,26 @@ $bindExit = $LASTEXITCODE
 $bindLog = if (Test-Path (Join-Path $bindRoot 'plan_run.log')) { Get-Content -LiteralPath (Join-Path $bindRoot 'plan_run.log') -Raw -Encoding UTF8 } else { '' }
 Add-Case 'CreatedProjectResultPath forwarded only to declaring runner' ($bindExit -eq 0 -and $bindLog -match 'import_mnm_guarded\.ps1.*CreatedProjectResultPath' -and $bindLog -match 'set_fb_arguments.*CreatedProjectResultPath skipped') "exit=$bindExit"
 
+# R10: a scaffold entry with empty_body_mnm must emit placeholder import -> locals ->
+# body override, in that order; the plain fixture must keep import_mnm_1.
+$fixtureRoot = Join-Path $PSScriptRoot 'fixtures\empty-body'
+$r10Out = Join-Path $WorkRoot 'r10_plan'
+New-Item -ItemType Directory -Force -Path $r10Out | Out-Null
+& $env:KVS_OPERATOR_PLANNER -Mode new_project -ScaffoldRoot $fixtureRoot -OutRoot $r10Out -OutDir $r10Out 2>&1 | Out-Null
+$r10Exit = $LASTEXITCODE
+$r10PlanPath = Join-Path $r10Out 'execution_plan.json'
+$r10Names = @()
+if (Test-Path -LiteralPath $r10PlanPath) {
+  $r10Plan = Get-Content -LiteralPath $r10PlanPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  $r10Names = @($r10Plan.steps | ForEach-Object { [string]$_.name })
+}
+$iEmpty = [array]::IndexOf($r10Names, 'import_mnm_empty_1')
+$iVars = [array]::IndexOf($r10Names, 'set_variables_ST01')
+$iBody = [array]::IndexOf($r10Names, 'set_fb_program_body_ST01')
+Add-Case 'R10 planner exits 0' ($r10Exit -eq 0) "exit=$r10Exit"
+Add-Case 'R10 emits placeholder import' ($iEmpty -ge 0) ($r10Names -join ',')
+Add-Case 'R10 order empty -> locals -> body' (($iEmpty -ge 0) -and ($iVars -gt $iEmpty) -and ($iBody -gt $iVars)) "empty=$iEmpty vars=$iVars body=$iBody"
+Add-Case 'R10 does not double-import the body' (-not ($r10Names -contains 'import_mnm_1')) ($r10Names -join ',')
 $failed = @($cases | Where-Object { -not $_.ok })
 $result = [ordered]@{ test = 'plan-runner'; passed = @($cases | Where-Object { $_.ok }).Count; failed = $failed.Count; cases = $cases.ToArray(); work_root = $WorkRoot }
 $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $WorkRoot 'test_result.json') -Encoding UTF8

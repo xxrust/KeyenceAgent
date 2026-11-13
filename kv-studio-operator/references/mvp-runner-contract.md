@@ -20,7 +20,7 @@ Read this file when diagnosing `run_kv_mvp_scaffold.ps1`, `run_kv_mvp_repair_exi
 - `OutRoot`: parent directory for runner output.
 - `RunRoot`: current run directory, currently `<OutRoot>\<ProjectName>`.
 - `Same-run artifact`: a file written under the current `RunRoot` during the current runner invocation.
-- `ExecutionPlan`: `workflow_tools/new_kv_mvp_execution_plan.ps1` 生成的步骤清单。
+- `ExecutionPlan`: `workflow_tools/new_kv_module_execution_plan.ps1` 生成的步骤清单。
 - `FlatExecutionRunner`: `workflow_tools/invoke_kv_flat_execution_plan.ps1`，执行 `ExecutionPlan.steps[]`、控制超时、收集失败、写出最终 result JSON。
 
 Do not use artifacts from a previous `RunRoot` as proof for the current run.
@@ -140,7 +140,7 @@ configuration objects, not code references.
 
 ### Structure (Data Type) Import
 
-`new_kv_mvp_execution_plan.ps1 -StructurePlanPath <mutation plan>` adds an
+`new_kv_module_execution_plan.ps1 -StructurePlanPath <mutation plan>` adds an
 `import_structures` step immediately after `create_project`. The plan uses the
 `mutate_structure_definitions_guarded.ps1` schema: `structure_operations[]` with
 `action=create`, `parent_path=["数据类型"]`, and `members[]`. Generate it from a
@@ -171,7 +171,7 @@ The scaffold carries the same contract in `scaffold.json`:
 global model row has a non-empty `device`, `initial_value` or `comment`, and
 `name_type` otherwise. The validator then permits those fields only for the
 `full` mode (`variable_write_verified_fields` mirrors the mode), and
-`new_kv_mvp_execution_plan.ps1` adds `-FullGlobalAttributes` to every
+`new_kv_module_execution_plan.ps1` adds `-FullGlobalAttributes` to every
 `set_variables` step. A scaffold without the declaration keeps the fail-closed
 name/type behavior, and an unknown value fails with
 `KV_SCAFFOLD_VARIABLE_SCHEMA_INVALID`. `tests\scaffold-variable-attributes\run.bat`

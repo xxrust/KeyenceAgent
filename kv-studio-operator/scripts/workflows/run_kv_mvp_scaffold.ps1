@@ -41,7 +41,7 @@ if ([string]::IsNullOrWhiteSpace($OutRoot)) {
   $OutRoot = Join-Path (Join-Path ([IO.Path]::GetTempPath()) 'kv-studio-operator') 'mvp_runs'
 }
 
-$planTool = Resolve-KvStudioOperatorScriptPath -ScriptRoot $scriptRoot -Name 'new_kv_mvp_execution_plan.ps1' -Classes @('workflow_tool')
+$planTool = Resolve-KvStudioOperatorScriptPath -ScriptRoot $scriptRoot -Name 'new_kv_module_execution_plan.ps1' -Classes @('workflow_tool')
 $runnerTool = Resolve-KvStudioOperatorScriptPath -ScriptRoot $scriptRoot -Name 'invoke_kv_flat_execution_plan.ps1' -Classes @('workflow_tool')
 $planOutDir = Join-Path ([IO.Path]::GetFullPath($OutRoot)) ('_execution_plans\new_project_' + (Get-Date -Format 'yyyyMMdd_HHmmss_ffff'))
 New-Item -ItemType Directory -Force -Path $planOutDir | Out-Null
