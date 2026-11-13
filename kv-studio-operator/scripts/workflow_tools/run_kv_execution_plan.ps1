@@ -70,7 +70,11 @@ function Get-StepSpec([string]$name) {
   if ($name -match '^(set|repair)_variables_') {
     return [pscustomobject]@{ runner = 'set_variables_guarded.ps1'; stage = 'variables' }
   }
-  throw "KV_PLAN_STEP_UNSUPPORTED: $name"
+  # This legacy executor only knows four scaffold step families. A plan produced by
+  # new_kv_mvp_execution_plan.ps1 also carries gates, placement checks, compile and
+  # export steps, so it must run through the flat executor (issue #3 R03).
+  throw ("KV_PLAN_STEP_UNSUPPORTED: {0}. This plan belongs to the official flat executor: " +
+         "use scripts/workflow_tools/invoke_kv_flat_execution_plan.ps1 -PlanPath <plan> instead of run_kv_execution_plan.ps1" -f $name)
 }
 
 function Get-RunnerParameterNames([string]$path) {

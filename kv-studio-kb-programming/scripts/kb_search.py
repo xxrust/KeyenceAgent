@@ -36,17 +36,29 @@ def resolve_db(explicit: Path | None = None) -> Path:
         return explicit
     env = os.environ.get("KEYENCE_WIKI_V3_DB")
     if env:
-        return Path(os.path.expandvars(env))
+        candidate = Path(os.path.expandvars(env))
+        if candidate.exists():
+            return candidate
+        print(f"WARNING: KEYENCE_WIKI_V3_DB points at a missing file ({candidate}); "
+              f"using the repository library", file=sys.stderr)
     cfgs = [os.environ.get("KEYENCE_AGENT_CONFIG"), os.environ.get("KV_STUDIO_OPERATOR_CONFIG")]
     if os.environ.get("APPDATA"):
         cfgs.append(str(Path(os.environ["APPDATA"]) / "Codex" / "kv-studio-operator" / "config.json"))
     for c in cfgs:
         if c and Path(c).exists():
             data = json.loads(Path(c).read_text(encoding="utf-8-sig"))
+            configured = None
             if data.get("wiki_db"):
-                return Path(os.path.expandvars(data["wiki_db"]))
-            if data.get("wiki_root"):
-                return Path(os.path.expandvars(data["wiki_root"])) / "v3" / "wiki.v3m.db"
+                configured = Path(os.path.expandvars(data["wiki_db"]))
+            elif data.get("wiki_root"):
+                configured = Path(os.path.expandvars(data["wiki_root"])) / "v3" / "wiki.v3m.db"
+            # A stale config that points at a deleted library must not win over the
+            # single shipped one (issue #3 R07/R09).
+            if configured and configured.exists():
+                return configured
+            if configured:
+                print(f"WARNING: configured knowledge base is missing ({configured}); "
+                      f"using the repository library", file=sys.stderr)
             break
     return repo_default_db()
 
@@ -335,11 +347,18 @@ class Searcher:
 
     def _vec_channel(self, q: str) -> list[int]:
         if not self.has_vec:
+            self.degraded = "no_vectors_table"
             return []
         if self._vec is None:
-            from kb_vectors import VectorIndex  # same directory
-            import os
-            self._vec = VectorIndex(self.db, os.environ.get("KB_VEC_MODEL") or None)
+            try:
+                from kb_vectors import VectorIndex  # same directory
+                import os
+                self._vec = VectorIndex(self.db, os.environ.get("KB_VEC_MODEL") or None)
+            except Exception as exc:  # a missing model must degrade loudly, not silently
+                self.degraded = "vectors_unavailable:%s" % type(exc).__name__
+                print("WARNING: vector channel unavailable (%s); answering with lexical+cards only"
+                      % self.degraded, file=sys.stderr)
+                return []
         return self._vec.search(q, CAND)
 
     def _card_channel(self, a: dict, strong: bool = True) -> list[int]:
@@ -573,7 +592,9 @@ def main():
     cards = [] if a.no_cards else s.related_cards(a.query)
     res = s.search(a.query, a.k, mode, a.explain)
     if a.json:
-        print(json.dumps({"query": a.query, "mode": mode, "cards": cards, "results": res},
+        degraded = getattr(s, "degraded", "")
+        print(json.dumps({"query": a.query, "mode": mode, "cards": cards, "results": res,
+                          "degraded": bool(degraded), "degraded_reason": degraded},
                          ensure_ascii=False, indent=1))
         return 0 if res else 2
     if a.explain and res:

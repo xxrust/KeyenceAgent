@@ -157,3 +157,18 @@ FB 的 `argument_reopen_verified=true` 只在这条保存、局部编辑器重�
 `planned`、单项导入成功、表格粘贴成功或静态门禁通过都不满足真实桌面验收。
 失败则保留本次现场与错误并停止后续 UI 输入，不用既有发布证据覆盖本次失败。
 需要 PLC 行为证明时，编译和保存读回之后仍须进行用户要求的行为检查。
+
+## 正文引用新局部实例时的顺序（issue #3 R10）
+
+planner 默认把 `import_mnm_N` 放在 `set_fb_arguments_*` / `set_variables_*` **之前**（见
+`new_kv_mvp_execution_plan.ps1` 的步骤生成顺序）。这对"正文不引用新声明"的模块成立；一旦模块正文里
+出现本次才声明的局部实例（FB 实例、局部变量），KV 在导入时会报 `读取助记符列表失败`。
+
+这种情况必须拆成三步提供（本项目 2026-11 在 v9/v10 上实测）：
+
+1. `body_path` 指向**空体** MNM（只有 `END/ENDH` 或占位 ST 盒），先建出模块；
+2. `locals_path` / `arguments_path` 声明全部新实例；
+3. 再用正文 MNM 覆盖程序体（`set_fb_program_body`）。
+
+也就是说：**正文引用新局部实例的模块不能一次导入**。planner 尚未自动拆分，交付时要在计划里显式写成
+上表三步；否则会得到 `KV_MNM_SYMBOL_UNRESOLVED` / `读取助记符列表失败`。
