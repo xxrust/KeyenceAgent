@@ -22,16 +22,24 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\workflo
 - 需要复现 UI 状态时，对**同一个已打开工程**重跑该 runner，不要新建工程。
 - 全流程一次 20 分钟以上，单步通常 20 秒–2 分钟；改一步验证一步。
 
-## 先读：别人踩过的坑（照做能一次做对）
+## 行为标准（硬性，做之前先对照这一节）
 
-详细症状/根因/自检见 [references/agent-mistakes.md](references/agent-mistakes.md)。高频 6 条：
+下面是可检查的**行为契约**，不是建议。每条都写了"怎么证明做到了"。
 
-1. **没实跑不许说"验证过"**：涉及"KV STUDIO 里成立"的结论，必须有 live 回执或编译输出，否则只写"计划层已验证"。
-2. **不要手搓 plan JSON 喂执行器**：会被 `KV_PLAN_REQUIRED_GATE_ORDER` / `KV_PLAN_STEP_OUT_DIR_MISMATCH` 拦；用 planner 产出，或按顺序直调 `runner_children/*.ps1`。
-3. **不要用字符串替换盲改"一名多用"的标识符**：`import_mnm_$($i+1)` 同时是步骤名/`-OutDir` 子目录/artifact 路径；改完必须 Parser 0 错 + 跑对应套件。
-4. **写回含非 ASCII 的 .ps1 必须保留 UTF-8 BOM**，否则 `script-hygiene` 报 `non_ascii_without_utf8_bom`。
-5. **提交只显式列文件**，别 `git add -A -- <dir>`（会带进无关 untracked 产物）。
-6. **变量名别像软元件**（`MR9000` 会被拒），用 `bR10Probe` 这类语义名；调 runner 前核对它的 `param()`，别猜参数。
+| # | 标准 | 怎么证明（必须能贴出来） |
+|---|---|---|
+| B1 | **没有实跑不许写"已验证"**。结论若涉及"在 KV STUDIO 里成立"，必须有一次真实执行 | live 步骤回执（`ok/exit_code`）、编译输出行（`转换成功。` + 步数）、或 `run_all.ps1` 汇总；三者都没有就只能写"计划层已验证，执行层未验证" |
+| B2 | **执行只走两条路**：planner 产出计划 → flat executor；或按顺序直调 `runner_children/*.ps1`。禁止手拼 plan JSON | 计划 JSON 由 `new_kv_module_execution_plan.ps1` / `new_kv_existing_project_update_workspace.ps1` 生成；手写的文件不得喂执行器 |
+| B3 | **改既有脚本前先定位耦合**：grep 目标标识符的出现次数与用途，把"命名"和"路径"分开改；优先纯增量（新名字 + 新分支） | 改动前贴 grep 结果；改后 `[Parser]::ParseFile` = 0 错，且对应套件绿 |
+| B4 | **每次提交只含本次声明的文件**；改名时行为零变化 | `git status --porcelain` 核过；`git show --stat` 只含目标文件；改名后全仓 grep 旧名 = 0 |
+| B5 | **含非 ASCII 的 `.ps1` 必须 UTF-8 BOM** | `scripts/gates/assert_kv_script_syntax.ps1` 的 `encoding_failure_count=0` |
+| B6 | **live 前四件套齐备**：合规 `CHECKLIST.md`（`# Checklist`/`## KV STUDIO`/`## Steps`）、runner 参数逐字取自其 `param()`、变量名为语义名（非 `MR9000` 这类软元件样式）、夹具模块名不与目标工程冲突 | checklist 文件路径 + `param()` 片段 + TSV 首行 |
+| B7 | **失败必须报可复现三件套**：`error_code` + 触发命令 + 已排除项；不许用"可能是…"代替 | 报错原文 + 你实际跑的命令行 |
+| B8 | **live 只动副本**：任何写操作先复制工程（`references/KVX样例程序_v100` → 临时目录），验收后核对原工程未被改动 | 副本路径 + 原工程 `git status` 干净 |
+
+交付前自查顺序：B3 → B5 → B2 → B1 → B4。任一条给不出证明，就不要说"完成/验证通过"。
+
+细节症状与自检项见 [references/agent-mistakes.md](references/agent-mistakes.md)（12 条真机踩坑记录）。
 ## 写入依赖顺序（自底向上）
 
 KV STUDIO 的编译是全局的，但 UI 写入必须按依赖顺序，**块里引用的变量必须在其它地方先定义**：
