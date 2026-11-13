@@ -1,4 +1,4 @@
-﻿{
+{
     "schema_version":  2,
     "layout_policy":  "role_directories",
     "notes":  [
@@ -63,8 +63,17 @@
                                           ]
                           },
     "step_result_contracts":  {
-                                  "runner_children/set_axis_pitch_guarded.ps1":  {
-                                                                                     "files":  [
+                                  "runner_children/import_device_comments_guarded.ps1":  {
+                                                                                             "files":  [
+                                                                                                           "device_comments_import_result.json"
+                                                                                                       ]
+                                                                                         },
+                                  "workflow_tools/verify_kv_device_comments_import.ps1":  {
+                                                                                              "files":  [
+                                                                                                            "comment_import_verification.json"
+                                                                                                        ]
+                                                                                          },
+                                  "runner_children/set_axis_pitch_guarded.ps1":  {                                                                                     "files":  [
                                                                                                    "axis_pitch_result.json"
                                                                                                ]
                                                                                  },
@@ -828,6 +837,24 @@
                                                                    }
                                               },
                                               {
+                                                  "path":  "workflows/import_kv_device_comments.ps1",
+                                                  "status":  "pending_validation",
+                                                  "customer_callable":  false,
+                                                  "capabilities":  [
+                                                                       "import_kv_device_comments",
+                                                                       "verify_kv_device_comments_import"
+                                                                   ],
+                                                  "runner_children":  [
+                                                                          "runner_children/import_device_comments_guarded.ps1",
+                                                                          "runner_children/export_device_comments_guarded.ps1"
+                                                                      ],
+                                                  "execution":  "flat_manifest_steps",
+                                                  "verification":  {
+                                                                       "scope":  "device comment table import through the File menu read dialog plus Ctrl+S, then an export-based round-trip diff; promoted to published only after the shared regression suite covers it",
+                                                                       "reference":  "workflow_tools/verify_kv_device_comments_import.ps1"
+                                                                   }
+                                              },
+                                              {
                                                   "path":  "workflows/annotate_kv_program_with_comments.ps1",
                                                   "status":  "published",
                                                   "customer_callable":  true,
@@ -997,6 +1024,12 @@
                                                       "ui_guard_required":  true
                                                   },
                                                   {
+                                                      "path":  "runner_children/import_device_comments_guarded.ps1",
+                                                      "status":  "approved",
+                                                      "customer_callable":  false,
+                                                      "ui_guard_required":  true
+                                                  },
+                                                  {
                                                       "path":  "runner_children/set_fb_arguments_guarded.ps1",
                                                       "status":  "approved",
                                                       "customer_callable":  false,
@@ -1094,6 +1127,11 @@
                     "workflow_tool":  [
                                           {
                                               "path":  "workflow_tools/generate_kv_capability_report.ps1",
+                                              "status":  "approved",
+                                              "customer_callable":  false
+                                          },
+                                          {
+                                              "path":  "workflow_tools/verify_kv_device_comments_import.ps1",
                                               "status":  "approved",
                                               "customer_callable":  false
                                           },
