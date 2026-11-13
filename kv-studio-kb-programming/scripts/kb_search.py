@@ -43,12 +43,29 @@ def resolve_db(explicit: Path | None = None) -> Path:
     for c in cfgs:
         if c and Path(c).exists():
             data = json.loads(Path(c).read_text(encoding="utf-8-sig"))
-            if data.get("wiki_v3_db"):
-                return Path(os.path.expandvars(data["wiki_v3_db"]))
+            if data.get("wiki_db"):
+                return Path(os.path.expandvars(data["wiki_db"]))
             if data.get("wiki_root"):
                 return Path(os.path.expandvars(data["wiki_root"])) / "v3" / "wiki.v3m.db"
             break
-    return Path(r"H:\llm-wiki-v2-keyence\v3\wiki.v3m.db")
+    return repo_default_db()
+
+
+def repo_default_db():
+    """The single shipped runtime library: <repo>/dist/kb-v3m-*/wiki.v3m.db.
+
+    There is exactly one knowledge base (wiki.v3m.db). No absolute drive letter and
+    no machine-specific configuration is required: a clean clone resolves it from
+    the repository itself (issue #3 R07/R09).
+    """
+    here = Path(__file__).resolve()
+    for parent in [here.parent, *here.parents]:
+        dist = parent / "dist"
+        if dist.is_dir():
+            candidates = sorted(dist.glob("kb-v3m-*/wiki.v3m.db"))
+            if candidates:
+                return candidates[-1]
+    return here.parent / "wiki.v3m.db"
 
 
 DB = resolve_db()

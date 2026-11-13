@@ -158,7 +158,7 @@
                                                           "remediation":  "extract to 功能块/FB_*, one instance per axis/station, and let the site programs keep device mapping and sequencing"
                                                       }
                                                   ],
-                            "instance_rule":  "the reusable unit is the axis or station, so one FB instance per axis or station; sharing a single instance across axes (for example one MC_Power instance driving three axes, or MC_Home2 used for axes 2 and 3) is a defect, not a style question, consistent with the vendor rule that each axis needs its own MC_Power",
+                            "instance_rule":  "every official FB (MC_Power/MC_Home/MC_Stop/...) also needs its own instance per axis, and a user FB (only when class B applies) is likewise one instance per axis or station; sharing a single instance across axes (for example one MC_Power instance driving three axes, or MC_Home2 used for axes 2 and 3) is a defect, not a style question, consistent with the vendor rule that each axis needs its own MC_Power",
                             "anti_patterns":  [
                                                   "wrapping an official FB in a user FB to give it a name (adds a private interface, adds no capability)",
                                                   "moving duplicated hand-written ladder into a user FB and calling that an optimisation (the duplication survives, only the file changes)",

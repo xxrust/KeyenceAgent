@@ -1,8 +1,15 @@
-﻿param(
+param(
   [Parameter(Mandatory=$true)][string]$PlanPath,
   [string]$ArtifactsRoot = '',
   [string]$OutDir = '',
-  [switch]$AllowIncomplete
+  [switch]$AllowIncomplete,
+  # Bind every receipt to this run. Defaults to the plan's run_id. A receipt from an
+  # earlier run (different or missing run_id) is stale and cannot prove anything
+  # (issue #3 R06).
+  [string]$RunId = '',
+  # A plan with zero modules has nothing to prove; without this switch that is an
+  # error instead of a silent success (issue #3 R06).
+  [switch]$AllowEmptyPlan
 )
 # Module completeness gate: a module is complete only when its MNM import, its
 # local variables (and FB arguments for function blocks) have succeeded in this
@@ -19,8 +26,20 @@ function Read-JsonOrNull([string]$Path) {
   try { return (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json) } catch { return $null }
 }
 function Get-SafeModule([string]$Name) { return ($Name -replace '[^A-Za-z0-9_.-]+', '_') }
+# A receipt proves this run only when it carries the expected run id. Receipts from
+# an older run (or without any run id when one is expected) are stale.
+function Test-ReceiptStale([object]$Receipt) {
+  if (-not $Receipt) { return $false }
+  if (-not $expectedRunId) { return $false }
+  $receiptRunId = ([string]$Receipt.run_id)
+  return (-not $receiptRunId) -or ($receiptRunId -ne $expectedRunId)
+}
 
-$sets = @($plan.variable_sets)
+$planPropertyNames = @($plan.PSObject.Properties.Name)
+$expectedRunId = if ($RunId) { [string]$RunId } else { [string]$plan.run_id }
+$sawVariableSets = $planPropertyNames -contains 'variable_sets'
+$sets = @($plan.variable_sets | Where-Object { $null -ne $_ })
+$sawVariableSetsProperty = $sawVariableSets
 $stepNames = @($plan.steps | ForEach-Object { [string]$_.name } | Where-Object { $_ })
 $hasPlanSteps = ($stepNames.Count -gt 0)
 $modules = New-Object System.Collections.Generic.List[object]
@@ -39,11 +58,20 @@ for ($i = 0; $i -lt $sets.Count; $i++) {
   } else { [string]$set.category -match 'fb' }
   $placementExpected = if ($hasPlanSteps) { $stepNames -contains "verify_module_placement_$module" } else { $false }
 
-  $importOk = [bool]($importReceipt -and $importReceipt.ok)
-  $placementOk = if ($placementReceipt) { [bool]$placementReceipt.ok } else { -not $placementExpected }
-  $argsOk = if ($argsReceipt) { [bool]$argsReceipt.ok } else { -not $argsExpected }
-  $varsOk = [bool]($varResult -and $varResult.ok)
+  $staleReceipts = @()
+  foreach ($pair in @(
+      @{ name = 'import'; receipt = $importReceipt },
+      @{ name = 'module_placement'; receipt = $placementReceipt },
+      @{ name = 'set_fb_arguments'; receipt = $argsReceipt },
+      @{ name = 'set_variables'; receipt = $varResult })) {
+    if (Test-ReceiptStale $pair.receipt) { $staleReceipts += ('stale_receipt:{0}' -f $pair.name) }
+  }
+  $importOk = [bool]($importReceipt -and $importReceipt.ok) -and -not ($staleReceipts -contains 'stale_receipt:import')
+  $placementOk = if ($placementReceipt) { [bool]$placementReceipt.ok -and -not ($staleReceipts -contains 'stale_receipt:module_placement') } else { -not $placementExpected }
+  $argsOk = if ($argsReceipt) { [bool]$argsReceipt.ok -and -not ($staleReceipts -contains 'stale_receipt:set_fb_arguments') } else { -not $argsExpected }
+  $varsOk = [bool]($varResult -and $varResult.ok) -and -not ($staleReceipts -contains 'stale_receipt:set_variables')
   $reason = @()
+  foreach ($stale in $staleReceipts) { $reason += $stale }
   if (-not $importOk) { $reason += 'import_missing_or_failed' }
   if (-not $placementReceipt -and $placementExpected) { $reason += 'placement_receipt_missing' }
   if (-not $argsReceipt -and $argsExpected) { $reason += 'fb_arguments_receipt_missing' }
@@ -67,8 +95,15 @@ for ($i = 0; $i -lt $sets.Count; $i++) {
 }
 
 $incomplete = @($modules | Where-Object { -not $_.complete })
+$emptyPlan = ($modules.Count -eq 0)
+$errorCode = ''
+if (-not $sawVariableSetsProperty) { $errorCode = 'KV_MODULE_COMPLETION_VARIABLE_SETS_MISSING' }
+elseif ($emptyPlan -and -not $AllowEmptyPlan) { $errorCode = 'KV_MODULE_COMPLETION_EMPTY_PLAN' }
 $report = [ordered]@{
-  ok = ($incomplete.Count -eq 0)
+  ok = (($incomplete.Count -eq 0) -and -not $errorCode)
+  error_code = $errorCode
+  expected_run_id = $expectedRunId
+  empty_plan = $emptyPlan
   plan_path = $PlanPath
   artifacts_root = $ArtifactsRoot
   total_modules = $modules.Count
@@ -83,5 +118,5 @@ $report | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $reportPath -Encodi
 $report | ConvertTo-Json -Depth 4
 
 Write-Host ("KV_MODULE_COMPLETION: complete={0}/{1} incomplete={2} report={3}" -f $report.complete_modules, $report.total_modules, $report.incomplete_count, $reportPath)
-if ($report.incomplete_count -gt 0 -and -not $AllowIncomplete) { exit 41 }
+if ((-not $report.ok) -and -not $AllowIncomplete) { exit 41 }
 exit 0

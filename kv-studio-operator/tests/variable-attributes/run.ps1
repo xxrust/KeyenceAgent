@@ -1,5 +1,9 @@
 param(
-  [string]$RepoRoot = ''
+  [string]$RepoRoot = '',
+  # run_all.ps1 passes -WorkRoot to every suite; accept it and drop the machine
+  # summary there so the aggregator reads JSON instead of scraping stdout
+  # (issue #3 R13).
+  [string]$WorkRoot = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -83,6 +87,16 @@ $failed = @($results | Where-Object { -not $_.pass })
 $results | Format-Table -AutoSize | Out-String -Width 140 | Write-Output
 Write-Output ''
 Write-Output ("Cases: {0}  Passed: {1}  Failed: {2}" -f $results.Count, ($results.Count - $failed.Count), $failed.Count)
+if ($WorkRoot) {
+  New-Item -ItemType Directory -Force -Path $WorkRoot | Out-Null
+  [ordered]@{
+    test = 'variable-attributes'
+    passed = ($results.Count - $failed.Count)
+    failed = $failed.Count
+    cases = @($results | ForEach-Object { [ordered]@{ name = $_.case; ok = [bool]$_.pass; detail = [string]$_.detail } })
+    work_root = $WorkRoot
+  } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $WorkRoot 'test_result.json') -Encoding UTF8
+}
 if ($failed.Count -gt 0) {
   foreach ($f in $failed) { Write-Output ("FAIL {0}: {1}" -f $f.case, $f.detail) }
   exit 1

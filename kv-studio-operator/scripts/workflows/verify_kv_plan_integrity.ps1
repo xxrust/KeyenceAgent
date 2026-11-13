@@ -1,6 +1,9 @@
-﻿param(
+param(
   [Parameter(Mandatory=$true)][string]$PlanPath,
-  [string]$OutDir = ''
+  [string]$OutDir = '',
+  # Treat a check that never ran (skipped) as a failure. Use it when the caller
+  # knows the plan must carry that evidence (issue #3 R01).
+  [switch]$RequireAllChecks
 )
 # Offline integrity gate for an execution plan. Wires the three preflight tools
 # that used to have no caller:
@@ -39,17 +42,41 @@ function Invoke-OfflineTool([string]$ScriptName, [string[]]$Arguments, [string]$
 }
 
 $moduleOut = Join-Path $OutDir 'module_completion'
-$module = Invoke-OfflineTool 'get_kv_module_completion.ps1' @('-PlanPath', $PlanPath, '-OutDir', $moduleOut) 'module_completion.json'
+# -AllowEmptyPlan turns "plan with no modules" into a skipped check below instead of
+# a hard error; a real module list must still prove itself (issue #3 R06).
+$module = Invoke-OfflineTool 'get_kv_module_completion.ps1' @('-PlanPath', $PlanPath, '-OutDir', $moduleOut, '-AllowEmptyPlan') 'module_completion.json'
 $moduleResultPath = Join-Path $moduleOut 'module_completion.json'
-Add-Check 'module_completion' $(if ($module.exit -eq 0) { 'pass' } else { 'fail' }) $module.exit $moduleResultPath $module.detail
+# A tool that exits 0 without writing its report proves nothing (issue #3 R01).
+$moduleStatus = if ($module.exit -ne 0 -or -not (Test-Path -LiteralPath $moduleResultPath -PathType Leaf)) { 'fail' } else { 'pass' }
+if ($moduleStatus -eq 'pass') {
+  $moduleReport = Get-Content -LiteralPath $moduleResultPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  if ($moduleReport.empty_plan) {
+    $moduleStatus = 'skipped'
+    $module.detail = 'plan has no variable_sets: nothing to prove'
+  }
+}
+Add-Check 'module_completion' $moduleStatus $module.exit $moduleResultPath $module.detail
 
 $globalTsv = [string]$plan.merged_global_variables_tsv
 if (-not $globalTsv) { $globalTsv = [string]$plan.runtime_global_variables_tsv }
 if ($globalTsv -and (Test-Path -LiteralPath $globalTsv -PathType Leaf)) {
   $depOut = Join-Path $OutDir 'variable_dependencies'
-  $dep = Invoke-OfflineTool 'plan_kv_variable_dependencies.ps1' @('-VariablesTsv', $globalTsv, '-OutDir', $depOut) 'variable_dependencies.json'
+  $depArgs = @('-VariablesTsv', $globalTsv, '-OutDir', $depOut, '-RequireReady')
+  # Forward the structure/axis/FB context when the plan carries it, so custom types
+  # are resolved instead of being reported as missing_type:* (issue #3 R01).
+  $structureDefs = [string]$plan.structure_definitions_path
+  if ($structureDefs -and (Test-Path -LiteralPath $structureDefs -PathType Leaf)) { $depArgs += @('-StructureDefinitionsPath', $structureDefs) }
+  foreach ($axisIndex in @($plan.axis_indexes)) { if ($null -ne $axisIndex -and [string]$axisIndex -ne '') { $depArgs += @('-AxisIndexes', [string]$axisIndex) } }
+  if ($plan.fb_types) { $depArgs += @('-FbTypes', (@($plan.fb_types) -join ',')) }
+  $dep = Invoke-OfflineTool 'plan_kv_variable_dependencies.ps1' $depArgs 'variable_dependencies.json'
   $depResultPath = Join-Path $depOut 'variable_dependency_report.json'
-  Add-Check 'variable_dependencies' $(if ($dep.exit -eq 0) { 'pass' } else { 'fail' }) $dep.exit $depResultPath $dep.detail
+  $depStatus = 'fail'
+  if ($dep.exit -eq 0 -and (Test-Path -LiteralPath $depResultPath -PathType Leaf)) {
+    $depReport = Get-Content -LiteralPath $depResultPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $depStatus = if ($depReport.ok) { 'pass' } else { 'fail' }
+    if (-not $depReport.ok) { $dep.detail = ("blocked_count={0}" -f $depReport.blocked_count) }
+  }
+  Add-Check 'variable_dependencies' $depStatus $dep.exit $depResultPath $dep.detail
 } else {
   Add-Check 'variable_dependencies' 'skipped' 0 '' 'plan has no merged_global_variables_tsv'
 }
@@ -65,16 +92,23 @@ if ($scaffoldRoot -and (Test-Path -LiteralPath $scaffoldRoot -PathType Container
 }
 
 $failed = @($checks | Where-Object { $_.status -eq 'fail' })
+$skipped = @($checks | Where-Object { $_.status -eq 'skipped' })
+# A check that never ran is not a pass: with -RequireAllChecks a skipped check fails
+# the gate (issue #3 R01).
+$blocking = @($failed)
+if ($RequireAllChecks) { $blocking = @($failed) + @($skipped | ForEach-Object { [pscustomobject]@{ name = $_.name; status = 'fail'; exit_code = 41; result_path = $_.result_path; detail = 'check did not run: ' + $_.detail } }) }
 $report = [ordered]@{
-  ok = ($failed.Count -eq 0)
+  ok = ($blocking.Count -eq 0)
   plan_path = $PlanPath
+  require_all_checks = [bool]$RequireAllChecks
   checks = $checks.ToArray()
   failed_count = $failed.Count
+  skipped_count = $skipped.Count
   generated_at = (Get-Date).ToString('o')
 }
 $reportPath = Join-Path $OutDir 'plan_integrity_result.json'
 $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $reportPath -Encoding UTF8
 $report | ConvertTo-Json -Depth 4
-Write-Host ("KV_PLAN_INTEGRITY: ok={0} checks={1} failed={2} report={3}" -f $report.ok, $checks.Count, $failed.Count, $reportPath)
-if ($failed.Count -gt 0) { exit 41 }
+Write-Host ("KV_PLAN_INTEGRITY: ok={0} checks={1} failed={2} skipped={3} report={4}" -f $report.ok, $checks.Count, $failed.Count, $skipped.Count, $reportPath)
+if ($blocking.Count -gt 0) { exit 41 }
 exit 0

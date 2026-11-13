@@ -1,6 +1,8 @@
 ﻿param(
   [string]$OutDir = '',
-  [int]$TimeoutSeconds = 600
+  [int]$TimeoutSeconds = 600,
+  # Accepted for run_all.ps1 parity (issue #3 R13). Live output still goes to OutDir.
+  [string]$WorkRoot = ''
 )
 # Self-contained live test for the EtherNet/IP CRUD capability:
 #   1. copy references\KVX样例程序_v100 to a temp project

@@ -9,9 +9,10 @@ description: 当 Codex 需要基于本机 KEYENCE 知识库（Wiki v3：手册 +
 
 ```yaml
 source_of_truth:
-  primary: <wiki_root>/v3/wiki.v3.db        # 清洗切块 + 混合索引 + 本体卡片（kb-pipeline 构建）
+  # 唯一运行时知识库（2026-11-14 起）：仓库内 dist/kb-v3m-*/wiki.v3m.db
+  # 只有这一个库；V2 cleaned DB 与 wiki.v3.db 已删除，不再提供回退。
+  primary: dist/kb-v3m-*/wiki.v3m.db        # 清洗切块 + 混合索引 + 本体卡片（kb-pipeline 构建）
   query_script: scripts/kb_search.py
-  fallback: scripts/query_keyence_kb.py     # 仅当 v3 库不存在时使用（旧 Wiki V2 cleaned DB）
   legacy_forbidden:
     - knowledge-base/knowledge.db
     - kb_tools/query_kb.py
@@ -24,8 +25,8 @@ must_query_before:
   - module_manual_claim
 ```
 
-使用本 skill 时，先查知识库，再写结论或代码。v3 库路径按 `--db` > `KEYENCE_WIKI_V3_DB` >
-operator 配置 `wiki_v3_db` > 配置 `wiki_root`\v3\wiki.v3.db 解析。库由仓库内 `kb-pipeline/`
+使用本 skill 时，先查知识库，再写结论或代码。唯一库路径按 `--db` > `KEYENCE_WIKI_V3_DB` >
+operator 配置 `wiki_db` > 配置 `wiki_root`\v3\wiki.v3m.db > 仓库内 `dist/kb-v3m-*/wiki.v3m.db` 解析。库由仓库内 `kb-pipeline/`
 构建并用 benchmark 验收（见 `kb-pipeline/PROGRESS.md`），不要自行重建检索引擎。
 
 当前项目的语义快照可作为“这个项目实际包含什么”的证据，例如程序树归属、变量类型、
@@ -84,13 +85,13 @@ python <skill-root>\scripts\kb_search.py "KV-XH 软元件分配" --json
   `origin` 指向记录它的 skill 文档；优先于手册泛述，但只在相同 KVS 版本/CPU 前提下成立。
 - `[card:Concept]`（confidence=extracted）只是“口语 → 指令名”的导航，不是证据。
 - 每条结果带 `chunk_id`、`source`、`series`。series 为空表示文档未标明系列，跨系列使用前要确认。
-- 退出码：0 有结果，2 无结果，4 库不存在（此时改用 `query_keyence_kb.py` 并在回答中注明）。
+- 退出码：0 有结果，2 无结果，4 库不存在（此时直接报缺库，不要退回旧库或凭记忆作答）。
 - 向量通道需要 torch + sentence-transformers 和本地 bge-m3（`KB_MODEL_DIR` 或 `H:\models`）；
   不可用时自动退回不含向量的混合检索。带向量冷启动约 8 秒，`--fast` 跳过向量约 1 秒，
   但口语化问题召回明显下降（120 条手册盲测 hit@5 0.89 → 0.68，50 条旧 holdout 0.96 → 0.94）。
   先用默认模式问口语问题，已知精确名称时用 `--card` 或 `--fast`。
-- 检索库已固定为 `wiki.v3m.db`（PDF 乱码页用 MinerU 文本替换，且补齐了 card 与向量）；
-  `wiki.v3.db` 只作对照，不要切回去。
+- 检索库只有 `dist/kb-v3m-*/wiki.v3m.db` 一个（PDF 乱码页用 MinerU 文本替换，且补齐了 card 与向量）；
+  `wiki.v3.db` 已删除；不要再引用它，也不要用 `--db` 指向旧库。
 
 为完整模块准备依据时，将本次查询的 `--json` 输出保存在任务目录的证据文件中，记录查询词、
 `chunk_id`、`source` 和适用 CPU/上下文。阅读返回的正文，确认所用指令、BOOL 操作数和
@@ -98,7 +99,7 @@ FB IN/OUT/局部变量语义；标题相似或系统局部变量条目不能代�
 提供给 operator 完整模块契约的 `evidence_paths` 应引用这些非空文件；文件存在仅证明依据可追溯，
 不证明 MNM 可编译或运行行为正确。查询失败时保留错误并修复查询入口，不用空文件冒充证据。
 
-旧入口 `query_keyence_kb.py`（Wiki V2）保留为回退，用法见其 `--help`；它对中文口语召回很差
+旧入口 `query_keyence_kb.py`（Wiki V2）已随 V2 库删除而失效，仅作历史参考，不要作为回退
 （benchmark holdout hit@5 = 0.14），只在 v3 库不可用时使用。
 
 弱召回时：
@@ -118,14 +119,14 @@ weak_recall:
 ## 编程规则
 
 - 不要用通用 IEC 61131-3 经验冒充 KEYENCE 已确认语法。
-- ST 程序体中不要输出 `VAR ... END_VAR` 这类 IEC 声明块，除非 Wiki V2 明确证明 KV STUDIO 在该上下文接受。
+- ST 程序体中不要输出 `VAR ... END_VAR` 这类 IEC 声明块，除非手册明确证明 KV STUDIO 在该上下文接受。
 - 默认把变量当作 KV STUDIO 工程/变量编辑器对象：先在全局/局部变量表中登记，再在 ST 程序体里只写可执行语句。
 - 写 ST 时分开输出：
   - `需要在 KV STUDIO 登记的变量/设备`
   - `ST 程序体`
 - 不要凭空发明模块地址、继电器号、缓冲地址、轴号或信号名。没有证据时用占位名，并说明必须按实际设备分配映射。
 - 运动/JOG 程序必须说明正/负方向、请求、完成、错误等信号需要来自实际单元设备分配。
-- 如果 Wiki V2 结果跨模块系列含义不同，明确标出每条证据对应的系列。
+- 如果检索结果跨模块系列含义不同，明确标出每条证据对应的系列。
 
 ## 回答形状
 

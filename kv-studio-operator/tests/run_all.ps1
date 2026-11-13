@@ -1,4 +1,4 @@
-﻿param(
+param(
   [string]$WorkRoot = '',
   [switch]$IncludeLive,
   [string[]]$Only = @()
@@ -85,14 +85,20 @@ foreach ($suite in $suites) {
       $passed = [int]$report.passed
       $failed = [int]$report.failed
       $skipped = ($report.PSObject.Properties.Name -contains 'skipped') -and [bool]$report.skipped
-      if ($skipped) {
-        $status = 'skip'
-        $passed = 0
-        $detail = 'skipped'
-      } elseif ($exitCode -eq 0 -and $failed -eq 0) {
-        $status = 'pass'
+      # A skip is only trustworthy when the suite also reports zero failures and a
+      # clean exit. Failures win: a suite cannot hide them by setting skipped=true
+      # (issue #3 R02). $failed is kept as reported so the summary stays honest.
+      if ($exitCode -eq 0 -and $failed -eq 0) {
+        if ($skipped) {
+          $status = 'skip'
+          $passed = 0
+          $detail = 'skipped'
+        } else {
+          $status = 'pass'
+        }
       } else {
         $status = 'fail'
+        if ($skipped) { $detail = 'skipped-but-failed' }
       }
     }
   } else {

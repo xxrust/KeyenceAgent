@@ -184,7 +184,18 @@ function Copy-SkillDirectory([string]$SourceDir, [string]$TargetRoot) {
 
   New-Item -ItemType Directory -Force -Path $target | Out-Null
   Copy-Item -Path (Join-Path $SourceDir '*') -Destination $target -Recurse -Force
-  return [pscustomobject]@{ name = $name; target = $targetFull; action = 'copied_or_updated' }
+  # Mirror, not merge: files removed upstream must disappear here too, otherwise an
+  # upgrade keeps executing stale scripts (issue #3 R12).
+  $sourceFiles = @(Get-ChildItem -LiteralPath $sourceFull -Recurse -File | ForEach-Object { $_.FullName.Substring($sourceFull.Length).TrimStart('\') })
+  $removed = @()
+  foreach ($targetFile in @(Get-ChildItem -LiteralPath $targetFull -Recurse -File)) {
+    $relative = $targetFile.FullName.Substring($targetFull.Length).TrimStart('\')
+    if ($sourceFiles -notcontains $relative) {
+      Remove-Item -LiteralPath $targetFile.FullName -Force
+      $removed += $relative
+    }
+  }
+  return [pscustomobject]@{ name = $name; target = $targetFull; action = 'copied_or_updated'; removed = $removed.Count }
 }
 
 function Get-KeyenceSkillDirectories([string]$RepoRoot) {
@@ -427,12 +438,21 @@ if ((Test-Selected 'skills') -and -not $SkipSkillInstall) {
   $installedSkillsUnblocked = Unblock-KeyencePowerShellFiles $CodexSkillsRoot
 }
 
-$configObject = [ordered]@{
-  kvs_exe = $kvsExe
-  work_root = $workRoot
-  admin_credential_path = $credentialPath
-  admin_user_default = $adminUserDefault
-  wiki_root = $wikiRoot
+# Start from the config already on disk and overwrite only the keys this run owns.
+# Rebuilding the object from scratch dropped every key the user added by hand
+# (issue #3 R12).
+$configObject = [ordered]@{}
+if ($existingConfig) {
+  foreach ($prop in $existingConfig.PSObject.Properties) { $configObject[$prop.Name] = $prop.Value }
+}
+if ((Test-Selected 'config') -or (Test-Selected 'kvs_exe') -or (Test-Selected 'work_root') -or (Test-Selected 'admin_user') -or (Test-Selected 'credential') -or ($Configure -contains 'all')) {
+  if ($kvsExe) { $configObject['kvs_exe'] = $kvsExe }
+  if ($workRoot) { $configObject['work_root'] = $workRoot }
+  $configObject['admin_credential_path'] = $credentialPath
+  if ($adminUserDefault) { $configObject['admin_user_default'] = $adminUserDefault }
+}
+if ((Test-Selected 'config') -or (Test-Selected 'wiki_root') -or ($Configure -contains 'all')) {
+  if ($wikiRoot) { $configObject['wiki_root'] = $wikiRoot }
 }
 if ((Test-Selected 'advanced') -or ($Configure -contains 'all')) {
   $configObject['timeout_seconds'] = [int]$timeoutSecondsText
