@@ -156,6 +156,20 @@ BOOL 梯形图按 [complete-module.md](references/complete-module.md) 使用 ope
 - TSV 的实际粘贴列和读回边界以 operator 的 variable-editor.md 及校验脚本为准；
   不在两个 skill 中分别维护 UI schema。
 
+## 重构的判定顺序：先官方 FB，后自建 FB（必读）
+
+优化任何既有程序前，先读 `references/fb-first-refactor.md`。三条硬规则：
+
+1. **先查官方**：官方/单元库 FB 已经提供的能力（轴的运动控制、通信的连接与收发、报警清除），
+   一律直接用官方 FB，把现场信号当输入参数喂进去；**不要**用手写梯形图重建它的上升沿、自保持、
+   方向互斥、忙/完成标志。
+2. **再谈提炼**：只有"官方没有该能力"且"同一逻辑在 ≥2 处重复、只依赖自变量"时，才提炼用户 FB；
+   **不要**把重复的手写逻辑搬进一个自研 FB 当作优化，也**不要**给官方 FB 再包一层用户 FB。
+3. **不认识的信号不许猜**：含义不明确的软元件条件原样保留为输入条件，单列"待确认信号"清单，
+   不得为结构好看而删除、取反或旁路。
+
+判定的证据要求、反模式与交付清单见 `references/fb-first-refactor.md`。
+房规侧对应 `kv-studio-operator/references/project-standard.json` 的 `reuse_principle`（类 A 先于类 B）。
 ## 可复用 FB
 
 调用方拥有真实设备映射、全局集成变量、轴/模块绑定和 FB 实例。

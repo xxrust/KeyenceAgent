@@ -1,74 +1,229 @@
 {
-  "schema_version": 1,
-  "name": "house-kv-project-standard",
-  "status": "advisory",
-  "disclaimer": "本文件是仓库从范例程序归纳出的内部约定，不是 KEYENCE 的产品要求。KV STUDIO 不强制任何命名或分区，因此检查结果只能作为建议：必须先向用户展示结论并询问是否按范例调整，不得据此判定项目“错误”或擅自改工程。",
-  "derived_from": {
-    "project": "references/KVX样例程序_v100",
-    "cpu": "KV-X520",
-    "structure_evidence": "references/sample-project-structure.json",
-    "patterns": "references/project-standard.patterns.json",
-    "extracted_with": "scripts/workflow_tools/extract_kv_project_structure.ps1",
-    "observed": {
-      "program_count": 24,
-      "buckets": { "platform": 8, "station": 7, "axis_or_device": 5, "caller": 3, "other": 1 },
-      "function_blocks": 36,
-      "user_data_types": 26
-    }
-  },
-  "layers": [
-    { "layer": "功能块", "expects": "可复用逻辑的 FB 本体（;MODULE_TYPE:2），命名 ^FB_", "required": "when_reusable_logic_exists" },
-    { "layer": "程序/每次扫描执行型模块", "expects": "工站程序 ST##_*、设备或轴控制 A#_*、平台功能（初始化/设备状态/Alarm/HMI/IO*）、调用层 调用*FB", "required": "true" },
-    { "layer": "程序/后备模块", "expects": "版本管理、上电或收尾只执行一次的逻辑", "required": "optional" },
-    { "layer": "单元配置/EtherCAT/EtherNet-IP/运动设定", "expects": "与实际硬件一致，有单元就要在树里可见", "required": "when_hardware_present" },
-    { "layer": "变量/数据类型", "expects": "用户变量用业务命名；自定义类型按 str<域> + Ctrl/Param/Status/IO 分层", "required": "true" }
-  ],
-  "naming": [
-    { "bucket": "station", "pattern": "^ST\\d{2}_", "kind": "station_program", "category": "每次扫描执行型模块", "observed": 7 },
-    { "bucket": "axis_or_device", "pattern": "^A\\d_", "kind": "device_control_program", "category": "每次扫描执行型模块", "observed": 5 },
-    { "bucket": "caller", "pattern": "^调用.*FB$", "kind": "fb_caller_program", "category": "每次扫描执行型模块", "observed": 3 },
-    { "bucket": "platform", "pattern": "^(IO输入|IO输出|高速计数器输入|模拟量输入|初始化|设备状态|Alarm|报警|HMI|版本管理|安全|配方)$", "kind": "platform_program", "category": "每次扫描执行型模块", "observed": 8 },
-    { "bucket": "fb_prefixed", "pattern": "^FB_", "kind": "function_block", "category": "功能块", "observed": 36 }
-  ],
-  "data_type_conventions": {
-    "domain_prefix": "str",
-    "suffixes": [ "Ctrl", "Param", "Status", "IO", "SysInfo" ],
-    "conversion_prefix": "uni_",
-    "observed_examples": [ "strAxis", "strAxisCtrl", "strAxisParam", "strAxisStatus", "strStation", "strMachine", "uni_UDINT_BOOL" ]
-  },
-  "station_model": {
-    "pattern": "^ST\\d{2}_",
-    "expects": "每个工站一段独立程序（不互相跳转），工站之间由主流程或上位机编排；工站相关的数据结构沿用 str<域>* 分层",
-    "note": "范例用 ST00..ST06 表示工位/工序；项目确实没有工位概念时可以不用，但要在项目总结里写明"
-  },
-  "fb_model": {
-    "body_pattern": "^FB_",
-    "caller_pattern": "^调用.*FB$",
-    "expects": "FB 只依赖自变量与局部状态；真实设备映射、轴/单元绑定、全局实例留在调用方"
-  },
-  "reuse_principle": {
-    "decision": "owner decision 2026-10: reusable logic, and any standard program that must be ported to other machines, belongs in a function block (功能块/FB_*); scan programs keep only site mapping, sequencing and the call layer",
-    "basis": "house convention recorded by the project owner, not a KEYENCE requirement",
-    "candidate_classes": [
-      { "class": "A", "name": "official_fb_available_but_unused", "evidence_requirement": "Wiki or manual evidence required; without it the candidate must be reported as unverified", "checks": [ "STD-07" ] },
-      { "class": "B", "name": "portable_logic_should_become_user_fb", "evidence_requirement": "house standard plus reuse evidence (the same logic repeated per axis or per station, or needing migration to another machine); no KEYENCE document is required", "checks": [ "STD-01" ] }
-    ],
-    "instance_rule": "the reusable unit is the axis or station, so one FB instance per axis or station; sharing a single instance across axes (for example one MC_Power instance driving three axes, or MC_Home2 used for axes 2 and 3) is a defect, not a style question, consistent with the vendor rule that each axis needs its own MC_Power",
-    "example": "Axis_FB in the Taizhou machine: three axes repeat the same enable/home/jog/reset/stop and signal-mapping logic inside one scan program, so it is class B"
-  },
-  "advisory_checks": [
-    { "id": "STD-01", "severity": "warn", "check": "program_named_like_fb", "meaning": "模块名看起来是 FB，但类别是程序（;MODULE_TYPE:0）", "suggest": "把可复用逻辑移到 功能块/FB_*，调用方放在 程序/.../调用*FB；按房规，可复用或需移植的标准程序都必须做成 FB（见 reuse_principle）" },
-    { "id": "STD-02", "severity": "info", "check": "no_station_partition", "meaning": "没有任何 ST##_* 工站程序", "suggest": "按工序拆分，或确认本项目确实无工位概念" },
-    { "id": "STD-03", "severity": "info", "check": "missing_platform_programs", "meaning": "缺少 初始化/设备状态/Alarm/HMI/IO 等平台功能分区", "suggest": "按需补齐，或在总结里说明由上位机/HMI 承担" },
-    { "id": "STD-04", "severity": "warn", "check": "flat_data_types", "meaning": "自定义类型没有按 str<域>+Ctrl/Param/Status 分层", "suggest": "整理类型，便于复用与跨项目迁移" },
-    { "id": "STD-05", "severity": "info", "check": "uncommented_used_devices", "meaning": "被引用但没有注释的软元件（见 text/comments/coverage.json 的 used_unannotated）", "suggest": "至少给判定、参数、状态区补注释" },
-    { "id": "STD-06", "severity": "warn", "check": "shared_fb_instance", "meaning": "同一个 FB 实例在一个扫描周期被调用多次（或跨轴复用同一实例）", "suggest": "每个轴/工位一个独立实例" }
-  ],
-  "flow": [
-    "read_only_project_text_snapshot（只读，产出完整映射）",
-    "summarize_kv_project（非 UI，产出项目总结：功能/工站/接口/数据地图/缺口）",
-    "extract_kv_project_structure + assert_kv_project_standard（非 UI，产出标准报告）",
-    "向用户展示总结与不合规项，询问是否按范例调整（必须询问，不擅自改）",
-    "用户同意后：生成迁移计划 → 在工程副本上执行 → 编译验证"
-  ]
+    "schema_version":  1,
+    "name":  "house-kv-project-standard",
+    "status":  "advisory",
+    "disclaimer":  "本文件是仓库从范例程序归纳出的内部约定，不是 KEYENCE 的产品要求。KV STUDIO 不强制任何命名或分区，因此检查结果只能作为建议：必须先向用户展示结论并询问是否按范例调整，不得据此判定项目“错误”或擅自改工程。",
+    "derived_from":  {
+                         "project":  "references/KVX样例程序_v100",
+                         "cpu":  "KV-X520",
+                         "structure_evidence":  "references/sample-project-structure.json",
+                         "patterns":  "references/project-standard.patterns.json",
+                         "extracted_with":  "scripts/workflow_tools/extract_kv_project_structure.ps1",
+                         "observed":  {
+                                          "program_count":  24,
+                                          "buckets":  {
+                                                          "platform":  8,
+                                                          "station":  7,
+                                                          "axis_or_device":  5,
+                                                          "caller":  3,
+                                                          "other":  1
+                                                      },
+                                          "function_blocks":  36,
+                                          "user_data_types":  26
+                                      }
+                     },
+    "layers":  [
+                   {
+                       "layer":  "功能块",
+                       "expects":  "可复用逻辑的 FB 本体（;MODULE_TYPE:2），命名 ^FB_",
+                       "required":  "when_reusable_logic_exists"
+                   },
+                   {
+                       "layer":  "程序/每次扫描执行型模块",
+                       "expects":  "工站程序 ST##_*、设备或轴控制 A#_*、平台功能（初始化/设备状态/Alarm/HMI/IO*）、调用层 调用*FB",
+                       "required":  "true"
+                   },
+                   {
+                       "layer":  "程序/后备模块",
+                       "expects":  "版本管理、上电或收尾只执行一次的逻辑",
+                       "required":  "optional"
+                   },
+                   {
+                       "layer":  "单元配置/EtherCAT/EtherNet-IP/运动设定",
+                       "expects":  "与实际硬件一致，有单元就要在树里可见",
+                       "required":  "when_hardware_present"
+                   },
+                   {
+                       "layer":  "变量/数据类型",
+                       "expects":  "用户变量用业务命名；自定义类型按 str\u003c域\u003e + Ctrl/Param/Status/IO 分层",
+                       "required":  "true"
+                   }
+               ],
+    "naming":  [
+                   {
+                       "bucket":  "station",
+                       "pattern":  "^ST\\d{2}_",
+                       "kind":  "station_program",
+                       "category":  "每次扫描执行型模块",
+                       "observed":  7
+                   },
+                   {
+                       "bucket":  "axis_or_device",
+                       "pattern":  "^A\\d_",
+                       "kind":  "device_control_program",
+                       "category":  "每次扫描执行型模块",
+                       "observed":  5
+                   },
+                   {
+                       "bucket":  "caller",
+                       "pattern":  "^调用.*FB$",
+                       "kind":  "fb_caller_program",
+                       "category":  "每次扫描执行型模块",
+                       "observed":  3
+                   },
+                   {
+                       "bucket":  "platform",
+                       "pattern":  "^(IO输入|IO输出|高速计数器输入|模拟量输入|初始化|设备状态|Alarm|报警|HMI|版本管理|安全|配方)$",
+                       "kind":  "platform_program",
+                       "category":  "每次扫描执行型模块",
+                       "observed":  8
+                   },
+                   {
+                       "bucket":  "fb_prefixed",
+                       "pattern":  "^FB_",
+                       "kind":  "function_block",
+                       "category":  "功能块",
+                       "observed":  36
+                   }
+               ],
+    "data_type_conventions":  {
+                                  "domain_prefix":  "str",
+                                  "suffixes":  [
+                                                   "Ctrl",
+                                                   "Param",
+                                                   "Status",
+                                                   "IO",
+                                                   "SysInfo"
+                                               ],
+                                  "conversion_prefix":  "uni_",
+                                  "observed_examples":  [
+                                                            "strAxis",
+                                                            "strAxisCtrl",
+                                                            "strAxisParam",
+                                                            "strAxisStatus",
+                                                            "strStation",
+                                                            "strMachine",
+                                                            "uni_UDINT_BOOL"
+                                                        ]
+                              },
+    "station_model":  {
+                          "pattern":  "^ST\\d{2}_",
+                          "expects":  "每个工站一段独立程序（不互相跳转），工站之间由主流程或上位机编排；工站相关的数据结构沿用 str\u003c域\u003e* 分层",
+                          "note":  "范例用 ST00..ST06 表示工位/工序；项目确实没有工位概念时可以不用，但要在项目总结里写明"
+                      },
+    "fb_model":  {
+                     "body_pattern":  "^FB_",
+                     "caller_pattern":  "^调用.*FB$",
+                     "expects":  "FB 只依赖自变量与局部状态；真实设备映射、轴/单元绑定、全局实例留在调用方"
+                 },
+    "reuse_principle":  {
+                            "decision":  "owner decision 2026-11 (revised): official/unit-library function blocks come FIRST. If the vendor already provides the capability (axis motion control, communication connect/send/receive, alarm reset), call it directly with site signals as arguments; never rebuild its edge/latch/interlock/busy logic in ladder, and never wrap an official FB in a user FB just to give it a name. Extract a user FB only when no official FB covers the capability AND the same logic repeats in two or more places and depends only on its arguments.",
+                            "basis":  "house convention recorded by the project owner, not a KEYENCE requirement",
+                            "ordering":  [
+                                             "1. use the official/unit-library FB directly when it covers the capability",
+                                             "2. only when no official FB covers it, check whether the same logic repeats in two or more places",
+                                             "3. extract to 功能块/FB_* and call it from every site program",
+                                             "4. conditions whose meaning is unknown stay as inputs and are reported, never bypassed"
+                                         ],
+                            "candidate_classes":  [
+                                                      {
+                                                          "class":  "A",
+                                                          "name":  "official_fb_available_but_reimplemented_in_ladder",
+                                                          "priority":  1,
+                                                          "evidence_requirement":  "KEYENCE manual/wiki card for the official FB (its Execute/Busy/Done/Error semantics) plus the hand-written ladder that duplicates them; without the card the finding is only a candidate",
+                                                          "checks":  [
+                                                                         "STD-07"
+                                                                     ],
+                                                          "detection":  [
+                                                                            "hand-built edge + self-hold + done-reset wrapped around an MC_* / communication FB call",
+                                                                            "the FB instance is called with ??? for Execute/Busy/Done/Error and the program invents its own status bits with SET/RES/SHOT",
+                                                                            "direction mutual exclusion or busy flags written by hand while the FB already exposes them",
+                                                                            "the same mechanism hand-written once per axis or per device"
+                                                                        ],
+                                                          "remediation":  "delete the hand-written state machine, pass the real site conditions into the official FB arguments, and take status from its Done/Busy/Error outputs"
+                                                      },
+                                                      {
+                                                          "class":  "B",
+                                                          "name":  "portable_logic_should_become_user_fb",
+                                                          "priority":  2,
+                                                          "applies_only_when":  "no official FB covers the capability",
+                                                          "evidence_requirement":  "house standard plus reuse evidence (same logic repeated per axis or station, or needing migration to another machine); no KEYENCE document required",
+                                                          "checks":  [
+                                                                         "STD-01"
+                                                                     ],
+                                                          "detection":  [
+                                                                            "identical logic repeated in two or more programs with only variable/constant differences",
+                                                                            "the logic depends only on its own arguments and local state (no global soft-device access)"
+                                                                        ],
+                                                          "remediation":  "extract to 功能块/FB_*, one instance per axis/station, and let the site programs keep device mapping and sequencing"
+                                                      }
+                                                  ],
+                            "instance_rule":  "the reusable unit is the axis or station, so one FB instance per axis or station; sharing a single instance across axes (for example one MC_Power instance driving three axes, or MC_Home2 used for axes 2 and 3) is a defect, not a style question, consistent with the vendor rule that each axis needs its own MC_Power",
+                            "anti_patterns":  [
+                                                  "wrapping an official FB in a user FB to give it a name (adds a private interface, adds no capability)",
+                                                  "moving duplicated hand-written ladder into a user FB and calling that an optimisation (the duplication survives, only the file changes)",
+                                                  "renaming or relocating a scan program that contains hand-written state machines (the name changes, the defect does not)",
+                                                  "deleting, inverting or bypassing a condition whose meaning nobody can explain, just to make the structure look clean"
+                                              ],
+                            "unknown_signal_rule":  "If the meaning of a condition cannot be established (no comment, no owner answer), keep it as an input member of the official FB call and list it in the delivery report as meaning-to-be-confirmed. Never bypass it for structural tidiness.",
+                            "delivery_requirements":  [
+                                                          "count of hand-written lines deleted, per module, and which official FB now owns that capability",
+                                                          "the site conditions that were kept, with device, current comment and where they now appear",
+                                                          "a behaviour-difference list (before -\u003e after) that the owner must review before downloading",
+                                                          "items that could not be replaced, with the evidence for why",
+                                                          "the unknown-signal list"
+                                                      ],
+                            "example":  "Taizhou machine (2026-11): the program already called MC_Home/MC_Jog/MC_Reset/MC_Stop yet also hand-built their rising edges, holds, direction interlocks and busy/done flags in ladder (~190 of 214 lines). The correct fix is to delete that ladder and feed the site conditions into the official FB arguments; moving it into a user FB, or wrapping the official FBs in one, is the anti-pattern."
+                        },
+    "advisory_checks":  [
+                            {
+                                "id":  "STD-01",
+                                "severity":  "warn",
+                                "check":  "program_named_like_fb",
+                                "meaning":  "模块名看起来是 FB，但类别是程序（;MODULE_TYPE:0）",
+                                "suggest":  "把可复用逻辑移到 功能块/FB_*，调用方放在 程序/.../调用*FB；按房规，可复用或需移植的标准程序都必须做成 FB（见 reuse_principle）"
+                            },
+                            {
+                                "id":  "STD-02",
+                                "severity":  "info",
+                                "check":  "no_station_partition",
+                                "meaning":  "没有任何 ST##_* 工站程序",
+                                "suggest":  "按工序拆分，或确认本项目确实无工位概念"
+                            },
+                            {
+                                "id":  "STD-03",
+                                "severity":  "info",
+                                "check":  "missing_platform_programs",
+                                "meaning":  "缺少 初始化/设备状态/Alarm/HMI/IO 等平台功能分区",
+                                "suggest":  "按需补齐，或在总结里说明由上位机/HMI 承担"
+                            },
+                            {
+                                "id":  "STD-04",
+                                "severity":  "warn",
+                                "check":  "flat_data_types",
+                                "meaning":  "自定义类型没有按 str\u003c域\u003e+Ctrl/Param/Status 分层",
+                                "suggest":  "整理类型，便于复用与跨项目迁移"
+                            },
+                            {
+                                "id":  "STD-05",
+                                "severity":  "info",
+                                "check":  "uncommented_used_devices",
+                                "meaning":  "被引用但没有注释的软元件（见 text/comments/coverage.json 的 used_unannotated）",
+                                "suggest":  "至少给判定、参数、状态区补注释"
+                            },
+                            {
+                                "id":  "STD-06",
+                                "severity":  "warn",
+                                "check":  "shared_fb_instance",
+                                "meaning":  "同一个 FB 实例在一个扫描周期被调用多次（或跨轴复用同一实例）",
+                                "suggest":  "每个轴/工位一个独立实例"
+                            }
+                        ],
+    "flow":  [
+                 "read_only_project_text_snapshot（只读，产出完整映射）",
+                 "summarize_kv_project（非 UI，产出项目总结：功能/工站/接口/数据地图/缺口）",
+                 "extract_kv_project_structure + assert_kv_project_standard（非 UI，产出标准报告）",
+                 "向用户展示总结与不合规项，询问是否按范例调整（必须询问，不擅自改）",
+                 "用户同意后：生成迁移计划 → 在工程副本上执行 → 编译验证"
+             ]
 }
