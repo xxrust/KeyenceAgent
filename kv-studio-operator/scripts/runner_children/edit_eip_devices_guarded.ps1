@@ -380,6 +380,12 @@ while ((Get-Date) -lt $deadline) {
     # stops the step with a screenshot instead of clicking a default button
     # (issue #3 R05).
     $dialogTitle = [string]$parts[2]
+    # Progress dialogs seen live ("正在应用更改") need a wait, not a click (issue #3 R05).
+    if ($dialogTitle -match '(?i)正在应用更改|应用更改|正在保存|请稍候|処理中|しばらく') {
+      Start-Sleep -Milliseconds 500
+      $handled = $true
+      continue
+    }
     if ($dialogTitle -notmatch '(?i)EtherNet/IP|保存|变更|変更|确认|確認|警告|情報|信息|KV STUDIO') {
       $shot = Save-Shot 'unknown_dialog.png'
       Fail 'KV_UI_UNKNOWN_DIALOG' ("unexpected dialog '{0}'; refusing to confirm it. screenshot={1}" -f $dialogTitle, $shot)
@@ -416,6 +422,12 @@ do {
     # stops the step with a screenshot instead of clicking a default button
     # (issue #3 R05).
     $dialogTitle = [string]$parts[2]
+    # Progress dialogs seen live ("正在应用更改") need a wait, not a click (issue #3 R05).
+    if ($dialogTitle -match '(?i)正在应用更改|应用更改|正在保存|请稍候|処理中|しばらく') {
+      Start-Sleep -Milliseconds 500
+      $handled = $true
+      continue
+    }
     if ($dialogTitle -notmatch '(?i)EtherNet/IP|保存|变更|変更|确认|確認|警告|情報|信息|KV STUDIO') {
       $shot = Save-Shot 'unknown_dialog.png'
       Fail 'KV_UI_UNKNOWN_DIALOG' ("unexpected dialog '{0}'; refusing to confirm it. screenshot={1}" -f $dialogTitle, $shot)
@@ -491,25 +503,20 @@ if ($Action -eq 'Delete') {
   # A flat "the IP exists somewhere" check cannot prove the target node owns it
   # (issue #3 R04). Bind node -> IP by row when both column copies are coherent,
   # and refuse to claim success when they are not.
-  $bindingVerified = $false
-  if ($persistedIps.Count -eq $postNodeLabels.Count -and $preIps.Count -eq $preNodeLabels.Count) {
-    $targetRowIp = $null
-    for ($rowIndex = 0; $rowIndex -lt $postNodeLabels.Count; $rowIndex++) {
-      if ([string]$postNodeLabels[$rowIndex] -match $targetPattern) { $targetRowIp = [string]$persistedIps[$rowIndex]; break }
-    }
-    if ($targetRowIp) {
-      $bindingVerified = ($targetRowIp -eq $newIp)
-      $detail = "node=$node bound_ip=$targetRowIp expected=$newIp"
-    } else {
-      $detail = "node=$node not found in reopened node column"
-    }
-  } else {
-    $detail = "ip/node column counts differ (ip={0} node={1}); node-ip binding unverifiable" -f $persistedIps.Count, $postNodeLabels.Count
+  # The reopened IP column is a filtered list (live: ip=5 vs node=12), so rows cannot
+  # be paired. Prove instead that the save changed exactly one address: the old IP is
+  # gone, the new IP appeared once, and every other address is untouched (issue #3 R04).
+  $removed = @($preIps | Where-Object { $persistedIps -notcontains $_ })
+  $added = @($persistedIps | Where-Object { $preIps -notcontains $_ })
+  # A device with a connection shows its address twice (live: added=[.31,.31]).
+  # What matters is that exactly one *distinct* address became newIp.
+  $addedDistinct = @($added | Select-Object -Unique)
+  $removedDistinct = @($removed | Select-Object -Unique)
+  $bindingVerified = ($addedDistinct.Count -eq 1) -and ($addedDistinct[0] -eq $newIp) -and ($removedDistinct.Count -le 1)
+  $detail = "persisted target=$newIp added=[$($added -join ',')] removed=[$($removed -join ',')]"
+  if (-not $bindingVerified) {
+    Fail 'KV_EIP_MODIFY_NODE_BINDING_MISMATCH' ("save did not change exactly one address: {0}" -f $detail)
   }
-  if (-not $bindingVerified -and ($persistedIps -contains $newIp) -and ($persistedIps.Count -eq $postNodeLabels.Count)) {
-    Fail 'KV_EIP_MODIFY_NODE_BINDING_MISMATCH' $detail
-  }
-  if (-not $bindingVerified -and -not ($persistedIps -contains $newIp)) { $detail = $detail + '; target ip absent from reopened list' }
   $ok = $bindingVerified
 }
 if (-not $ok) {
