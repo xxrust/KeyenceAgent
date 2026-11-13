@@ -1182,7 +1182,12 @@ function Convert-LocalRows([string]$Path) {
 
 function Get-DefinedVariableRows([string]$Path, [string]$Scope) {
   if (-not $Path) { return @() }
-  $text = [IO.File]::ReadAllText($Path, [Text.Encoding]::Default)
+  # Use the shared BOM-aware reader. Reading with [Text.Encoding]::Default made a
+  # UTF-8 TSV unusable as soon as one cell held non-ASCII text: the ANSI decode
+  # merges the trailing byte of a multi-byte character with the following 0x09 tab,
+  # so the name cell swallowed the type cell and the row failed as
+  # KV_VARIABLE_DATA_TYPE_UNSUPPORTED with a name such as "鍔熻兘鐮?UINT".
+  $text = Read-KvDelimitedText $Path
   @(Get-KvExecutableVariableRows -Rows @($text | ConvertFrom-Csv -Delimiter "`t") -Scope $Scope)
 }
 

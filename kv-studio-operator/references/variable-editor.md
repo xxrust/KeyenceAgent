@@ -23,7 +23,14 @@ MNM before and after and compare byte by byte — `.cm1` changes, program bodies
 
 ## Input TSV Schema
 
-Use UTF-8 files with a header and literal tabs. Name/type writes use these columns:
+Use a header and literal tabs. Accepted encodings, decoded in this order: UTF-16LE with
+BOM, UTF-8 with BOM, UTF-8 without BOM, then the system ANSI code page as a legacy
+fallback. Prefer UTF-8. A cell may contain non-ASCII text (Chinese variable names are
+common) — if a row is rejected with `KV_VARIABLE_DATA_TYPE_UNSUPPORTED` and the reported
+name looks like `鍔熻兘鐮?UINT` (the name cell holding the type), the file was decoded with
+the wrong code page: rewrite it as UTF-8 and retry.
+
+Name/type writes use these columns:
 
 ```tsv
 scope	owner_program	name	data_type	status	evidence
