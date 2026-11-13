@@ -2,6 +2,25 @@
 
 Use this reference when MNM import causes missing variables or when reproducing a reference program.
 
+## First decide: variable table or device comments?
+
+"Making a program readable" has three separate mechanisms — device-bound variables (the
+ladder shows the variable name), the device comment bank (`.cm1`, a comment beside the
+device), and the variable-table comment column. They do not substitute for each other.
+
+| Project state | Default |
+| --- | --- |
+| New project / new modules for this machine | Use the **variable table**: one device-bound variable per point (`name` / `data_type` / `device` / `comment`), code uses variable names |
+| Existing project full of bare `MR`/`DM` plus a comment table | **Add device comments** (`workflows/import_kv_device_comments.ps1`); do not rewrite the program into variable names |
+| Existing project already largely named | Keep using the **variable table** for new points; write the variable `comment` |
+
+Measure before choosing: `text/comments/usage.tsv` (references per device) against the user
+variables in `text/variables/*`. Advisory threshold: user-variable references ≥50% means a
+variable-oriented project. The project owner makes the final call after reviewing the numbers.
+
+When you take the comment route, "comments only, logic untouched" is verifiable: export the
+MNM before and after and compare byte by byte — `.cm1` changes, program bodies must not.
+
 ## Input TSV Schema
 
 Use UTF-8 files with a header and literal tabs. Name/type writes use these columns:

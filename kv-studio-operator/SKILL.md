@@ -536,7 +536,9 @@ workflow 的已验证执行计划就是前置操作清单；不必另写只含�
 
 ## 按任务阅读
 
+- **第一次接触一台机器/一个工程**：先读 [keyence-basics-and-pitfalls.md](../keyence-plc-programmer/references/keyence-basics-and-pitfalls.md)。它写的是最容易按其它品牌习惯搞错的事（KV 没有 X/Y、单元 I/O 在 R 区、MNM 里 `;` 开头是 ST 代码、`.kpr` 不能离线解析、注释/变量/变量注释是三套机制）。读代码前的三十秒投资，省掉后面几十分钟返工。
 - 编写 PLC 逻辑、MNM 和 FB 接口：使用 `keyence-plc-programmer`；KEYENCE 专有语法依据 Wiki 或导出证据。
+- 决定"补注释还是建变量"：按 `keyence-plc-programmer` 里的「变量表 vs 软元件注释」策略——新项目默认变量表；既有项目先量 `usage.tsv` 与用户变量数，裸地址为主就补软元件注释，已变量化就沿用变量表。
 - 新增完整扫描程序/FB 的契约、BOOL 范围及整套预检：[complete-module.md](references/complete-module.md)；只改已有单项仍走窄接口。
 - 变量/结构体 schema、FB 表格状态及持久化范围：[variable-editor.md](references/variable-editor.md)。
 - 硬件、EtherCAT、EtherNet/IP 和 ESI 边界：[project-configuration.md](references/project-configuration.md)。
