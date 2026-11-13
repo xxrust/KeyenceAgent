@@ -42,6 +42,7 @@ examples\axis-registration\run.bat   插 2 个从站 + 登录 2 个轴 + 填螺�
 examples\axis-table-edit\run.bat     改轴控制大表的某个单元格（对象级选中）
 tests\axis-pitch\run.bat             改轴参数 + 断言 + 重开回读
 tests\table-cell\run.bat             改大表单元格 + 整表 diff 断言
+import_kv_device_comments.bat        软元件注释表写回工程（导入 → 保存 → 回读 diff）
 ```
 
 > ⚠️ **bat 必须纯 ASCII**：中文参数不要写进 `.bat`（cmd 会把它变成 `?`）；

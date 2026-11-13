@@ -342,8 +342,25 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\get_kv_
 MNM 中以 `;` 开头的 ST 行算使用、`BOOKMARK` 标签不算。`coverage.json` 记录注释表与每个程序体的 sha256，
 可据此判断报告是否已陈旧。数字含义：`used_unannotated` 是真正的文档缺口，`annotated_unused` 多为 HMI/上位机专用位。
 
-要"一条命令拿到完整项目映射"用 `-Capability read_only_project_text_snapshot`（场景 13）：它在同一次隔离 UI 会话里
-一并导出注释表并与程序体 join，产物落在 `text/comments/`，`architecture/project_map.json` 的
+注释表**写回**用 `-Capability import_kv_device_comments`
+（入口 `import_kv_device_comments.bat` → `scripts/workflows/import_kv_device_comments.ps1` →
+`runner_children/import_device_comments_guarded.ps1` + `workflow_tools/verify_kv_device_comments_import.ps1`）：
+
+```powershell
+.\import_kv_device_comments.bat -ProjectPath <project.kpr> -CommentsPath <comments.csv> -OutDir <dir>
+```
+
+走「文件(F) → 读取 CSV/TXT 格式的软元件注释(Q)...」+ `Ctrl+S`，因此写的是 `.cm1` 注释库而不是变量表；
+程序体不变（12 个 MNM 导出后逐字节相同）。三步收尾：导入 → 保存 → **导出回读并逐条 diff**，
+`comment_import_verification.json` 的 `required`/`verified`/`mismatch_count` 才是验收口径，
+导入框自己弹的「读取了 N 个软元件注释」只作旁证。已验证的 KV 行为（改之前先看）：
+文件名框是 `ComboBoxEx32 > ComboBox > Edit` 共享 id 1148 且 `WM_GETTEXT` 读回空（要用 UIA 读）；
+完成提示框是 DirectUI（UIA 里全是 `ControlType.Pane`，没有 Button，按文本白名单 + Enter + `AllowTargetClose`）；
+`InterpreterC` 是不可见常驻窗口，必须用 `IsWindowVisible` 过滤；对话框会延时出现，沉降窗口 3 s；
+设备名会被归一化（`MR0001→MR001`、`DM0001→DM1`、`B0B` 是十六进制），比对前要做 key 归一。
+状态：`pending_validation` —— 缺 `tests/kv-interface-regression/23_*`。
+
+要"一条命令拿到完整项目映射"用 `-Capability read_only_project_text_snapshot`（场景 13）：它在同一次隔离 UI 会话里一并导出注释表并与程序体 join，产物落在 `text/comments/`，`architecture/project_map.json` 的
 `extension_points.comments` 直接给出作用域、统计和未注释软元件清单；`status=ready` 且
 `missing_capabilities` 为空才代表这份映射完整（缺注释层会如实报 `partial`）。
 
