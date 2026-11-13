@@ -1,4 +1,4 @@
-<#!
+﻿<#!
 .SYNOPSIS
   Export a KV STUDIO project into a version-control friendly, text-first snapshot.
 .DESCRIPTION

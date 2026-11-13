@@ -1,0 +1,8 @@
+{
+  "name": "23_import_device_comments",
+  "enabled": true,
+  "workflow": "scripts/workflows/import_kv_device_comments.ps1",
+  "result_file": "workflow\\workflow_result.json",
+  "open_project": false,
+  "arguments": ["-ProjectPath", "${project}", "-CommentsPath", "${fixture_dir}\\comments_regression.csv", "-OutDir", "${out}\\workflow", "-TimeoutSeconds", "600"]
+}

@@ -1,4 +1,4 @@
-﻿{
+{
   "schema_version": 1,
   "generated_from": "manual v2; read and write routes cross-checked with script_manifest.json",
   "assets": {
@@ -73,6 +73,7 @@
     "create_st_module": { "script": "workflows/create_kv_st_module.ps1", "assets": ["program"], "inputs": ["st_module_contract", "st_source", "local_variable_rows"], "outputs": ["saved_project", "module_readback", "compile_result"], "depends_on": ["write_data_types", "configure_expansion_units", "set_variables"], "evidence": ["tests/kv-interface-regression/17_st_numeric_scan", "tests/kv-interface-regression/18_st_numeric_fb"] },
     "compile_project": { "script": "workflows/compile_kv_project.ps1", "assets": ["program", "fb", "global_variables"], "inputs": ["saved_project"], "outputs": ["compile_result", "compile_diagnostics"], "depends_on": ["create_complete_module"], "evidence": ["tests/kv-interface-regression/05_compile"] },
     "rename_motion_axes": { "script": "workflow_tools/rename_kv_axes.ps1", "assets": ["motion_axis"], "inputs": ["axis_index_to_name_mapping"], "outputs": ["axis_rename_result.json", "saved_project", "tree_text_readback"], "depends_on": [], "evidence": ["tests/axis-rename-live"], "validation_status": "approved", "validation_scope": "Live regression uses a configured scratch project and skips when that project is unavailable or unsaved; this status follows manifest approval and is not a claim that this environment ran the test." },
+    "import_device_comments": { "script": "workflows/import_kv_device_comments.ps1", "assets": ["comments"], "inputs": ["project_path", "comments_csv"], "outputs": ["saved_project", "device_comments_import_result.json", "comment_import_verification.json"], "depends_on": [], "evidence": ["tests/kv-interface-regression/23_import_device_comments"], "validation_status": "published", "validation_scope": "Reads a CSV/TXT device comment table through the File menu read dialog, saves the project, then re-exports and diffs every entry; comment bank only, program bodies unchanged." },
     "annotate_exported_programs": { "script": "workflows/annotate_kv_program_with_comments.ps1", "assets": ["comments", "program"], "inputs": ["comments.csv", "exported_mnm_directory"], "outputs": ["comments.tsv", "usage.tsv", "coverage.json", "program_annotations.md"], "depends_on": [], "evidence": ["tests/kv-interface-regression/22_annotate_program_comments"], "target_kind": "derived_artifacts", "limitation": "Read-only join; source comment table and MNM bodies are not modified and no KV STUDIO project write occurs." }
   },
   "write_acceptance_recipes": {

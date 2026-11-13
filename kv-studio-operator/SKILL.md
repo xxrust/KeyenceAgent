@@ -208,9 +208,10 @@ powershell -File <skill-root>\tests\run_all.ps1 -WorkRoot <out>              # �
 powershell -File <skill-root>\tests\run_all.ps1 -WorkRoot <out> -IncludeLive # 含真实桌面
 ```
 
-- 离线套件（13）：`compile-triage`、`module-completion`、`variable-dependencies`、`plan-runner`、
-  `inventory-expansion`、`ethercat-guard-contract`、`script-hygiene`、`eip-snapshot`、
-  `variable-usage`，以及既有 `scan-order`、`variable-attributes`、`scaffold-variable-attributes`、
+- 离线套件（18）：`compile-triage`、`module-completion`、`variable-dependencies`、`plan-runner`、
+  `inventory-expansion`、`clone-readiness`、`capability-report`、`ethercat-guard-contract`、
+  `script-hygiene`、`eip-snapshot`、`eip-write-contract`、`variable-usage`、`write-ontology`、
+  `system-layout`，以及既有 `scan-order`、`variable-attributes`、`scaffold-variable-attributes`、
   `library-dependencies`（后四者输出 `Cases/Passed/Failed` 文本，run_all 会解析）；
 - 真实桌面套件（3）：`axis-rename-live`（改临时名→校验→改回→保存）、
   `ethercat-node-live`（选下一个空闲节点地址→加节点+批量轴→回读 WsTreeEnv）、
@@ -221,8 +222,9 @@ powershell -File <skill-root>\tests\run_all.ps1 -WorkRoot <out> -IncludeLive # �
   `axis-rename-live` 结束后会保存；
 - 验收口径：`suites_failed = 0` 且 `cases_failed = 0`，并以同次运行的 JSON 为准。
 
-最近一次全量结果（2026-10-26，`C:\kvrun\tests_final4`）：16 个套件、160 个用例全部通过
-（离线 13 套 124 例；真实桌面 3 套 36 例）。EIP 连接快照成功路径由
+最近一次离线全量结果（2026-11-13，`C:\kvrun\taizhou_20260805\suite_after_s23b`）：18 个套件、
+186 个用例全部通过（本轮未跑真实桌面套件）。此前 2026-10-26 的全量结果为 16 套 160 例。
+EIP 连接快照成功路径由
 `eip-snapshot-live` 自动化：真实打开样例工程的 `连接设定 - 1:NU-EP1`，断言 `IN_100`、
 64 字、199 行分配、`B00`/`B01` 与 raw TSV 落盘，再关闭对话框并恢复 scratch 工程。
 
@@ -358,7 +360,9 @@ MNM 中以 `;` 开头的 ST 行算使用、`BOOKMARK` 标签不算。`coverage.j
 完成提示框是 DirectUI（UIA 里全是 `ControlType.Pane`，没有 Button，按文本白名单 + Enter + `AllowTargetClose`）；
 `InterpreterC` 是不可见常驻窗口，必须用 `IsWindowVisible` 过滤；对话框会延时出现，沉降窗口 3 s；
 设备名会被归一化（`MR0001→MR001`、`DM0001→DM1`、`B0B` 是十六进制），比对前要做 key 归一。
-状态：`pending_validation` —— 缺 `tests/kv-interface-regression/23_*`。
+状态：`published` —— 回归场景 `tests/kv-interface-regression/23_import_device_comments`
+（`sample_copy` + `open_project:false`，覆盖冷启动；`run.ps1` 另断言 `saved=true` 与 `*.cm1` 落盘）。
+2026-11-13 实机通过：3 条注释、`mismatch_count=0`、`cm1` 205,820 字节。
 
 要"一条命令拿到完整项目映射"用 `-Capability read_only_project_text_snapshot`（场景 13）：它在同一次隔离 UI 会话里一并导出注释表并与程序体 join，产物落在 `text/comments/`，`architecture/project_map.json` 的
 `extension_points.comments` 直接给出作用域、统计和未注释软元件清单；`status=ready` 且

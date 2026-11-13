@@ -838,8 +838,8 @@
                                               },
                                               {
                                                   "path":  "workflows/import_kv_device_comments.ps1",
-                                                  "status":  "pending_validation",
-                                                  "customer_callable":  false,
+                                                  "status":  "published",
+                                                  "customer_callable":  true,
                                                   "capabilities":  [
                                                                        "import_kv_device_comments",
                                                                        "verify_kv_device_comments_import"
@@ -850,8 +850,8 @@
                                                                       ],
                                                   "execution":  "flat_manifest_steps",
                                                   "verification":  {
-                                                                       "scope":  "device comment table import through the File menu read dialog plus Ctrl+S, then an export-based round-trip diff; promoted to published only after the shared regression suite covers it",
-                                                                       "reference":  "workflow_tools/verify_kv_device_comments_import.ps1"
+                                                                       "scope":  "device comment table import through the File menu read dialog plus Ctrl+S, then an export-based round-trip diff with mismatch_count=0; scenario 23 passed live 2026-11-13 (cold start, 3 entries, cm1 rewritten)",
+                                                                       "reference":  "tests/kv-interface-regression/23_import_device_comments/README.md"
                                                                    }
                                               },
                                               {
