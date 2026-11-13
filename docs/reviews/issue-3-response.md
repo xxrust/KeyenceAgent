@@ -17,11 +17,11 @@
 | R05 | P1 | **成立** | 静态 | 无 |
 | R06 | P1 | **成立** | 实跑复现 | 评审表述不精确：只有 `variable_sets: []` 才 0/0，属性缺失反而报错 |
 | R07 | P2 | 部分成立 | 静态 | 运行期只有 v3m 一套，V2 只是回退；问题是**文档三处口径不一** |
-| R08 | P2 | **需复核** | 未核 | 未逐行核对向量降级路径，不表态 |
+| R08 | P2 | **部分成立（降级可用但无提示）** | 实跑 | 模型目录清空后检索仍正常返回，属静默降级 |
 | R09 | P2 | 部分成立 | 静态 | `H:/models` 是候选之一，可用 `KB_MODEL_DIR` 覆盖；构建源确有硬编码 |
-| R10 | P2 | **需复核** | 未核 | 需比对 planner 实际写序与文档，本轮未做完 |
+| R10 | P2 | **部分成立** | 静态 + 本会话实证 | planner 是「先导入完整 MNM，再写 locals/arguments」，与「先声明再引用」的实测顺序冲突 |
 | R11 | P2 | 部分成立 | 静态 | 我的新规则确实"过于绝对"（丢了整机单元例外）；"互相抵觸"更多是**歧义** |
-| R12 | P2 | **需复核** | 未核 | setup 脚本本轮未细读 |
+| R12 | P2 | **成立** | 静态 | config 整体重写丢未知键；skill 安装是覆盖复制、不清理上游已删文件 |
 | R13 | P2 | 部分成立 | 实跑 | 参数不统一成立；但 aggregator 有 legacy 分支，不会因此误判失败 |
 | R14 | P2 | 成立（有保留） | 度量 | operator SKILL.md 576 行/47 KB，确属案例堆积 |
 
@@ -135,9 +135,19 @@ artifacts/set_variables/module_01_MyMod/set_variables_result.json = {"ok":true}
 
 ---
 
-## R08｜向量降级与依赖安装 —— **需复核（我不下结论）**
+## R08｜向量降级与依赖安装 —— **部分成立（降级可用，但无提示）**
 
-本轮只确认 `kb_vectors.py:3` 有模型查找顺序注释，未逐行核"模型缺失时的降级是否真的回退到关键词检索"。评审也承认未跑 benchmark。**这条需要一次实跑（拔掉模型目录）才能定论**，我不在没有证据时附和。
+实跑对照（同一 DB、同一 query）：
+
+```
+KB_MODEL_DIR 指向空目录 → kb_search.py --db ... 'MC_Jog 寸动' -k 2
+→ 与有模型时输出一致，exit=0，没有报错
+```
+
+即模型不可用时**不会崩**，会退回关键词检索继续工作（降级是"静默"的）。所以"降级保证不完整"这条要分开说：
+
+- **不成立**的部分：降级本身可用，不是"缺模型就不可用"；
+- **成立**的部分：没有任何输出提示"现在是降级模式"，上层无法知道自己拿到的是语义排序还是关键词排序；`--mode/--explain` 也没标出来。依赖安装契约（谁装 sentence-transformers / 模型放哪）仍只在注释里，没有正式入口。
 
 ---
 
@@ -147,9 +157,23 @@ artifacts/set_variables/module_01_MyMod/set_variables_result.json = {"ok":true}
 
 ---
 
-## R10｜写入顺序 / 原子性不一致 —— **需复核**
+## R10｜写入顺序 / 原子性不一致 —— **部分成立**
 
-需要把 `new_kv_mvp_execution_plan.ps1` 的步骤生成顺序与 `references/*.md` 里写的"先变量后 FB 自变量"等规则逐条对照。本轮时间不够，不做结论。
+planner 的实际步骤顺序（`new_kv_mvp_execution_plan.ps1:266-455`）：
+
+```
+assert_ui_guard_usage → assert_agent_boundary → validate_scaffold → assert_existing_project_source_snapshot
+→ assert_mnm_import_plan → create_project → import_structures → stage_default_program
+→ import_mnm_N → verify_module_placement_<module> → delete_staged_program
+→ set_fb_arguments_* → set_variables_* → compile_convert → copy_convert_result
+→ export_project_inventory → verify_saved_scan_order
+```
+
+而 `references/complete-module.md:124-126` 写的是"先导入 MNM → 移动到父节点 → `locals` 写入局部变量"。
+
+冲突点不在文档之间，而在**实现与 KV 的实际约束**：本会话在 v9/v10 上实际遇到的是——**程序体里引用了尚未声明的局部实例时，导入直接失败**（`读取助记符列表失败`），必须先建空体、再 `set_variables`、再覆盖正文。也就是说 planner 把"导入完整 MNM"放在 `set_variables_*` **之前**，只对"正文引用不到新局部变量"的工程成立；一旦模块正文引用了新局部实例，这个顺序就会失败。
+
+→ 评审说"写入顺序、模块原子性与实际 planner 不一致"成立，但**证据不是文档互斥，而是 planner 顺序与 KV 导入约束冲突**；修法是 planner 对"正文引用新局部"的模块生成 empty→locals→body 三步，或在文档里明确禁止这种模块一次导入。
 
 ---
 
@@ -161,9 +185,12 @@ artifacts/set_variables/module_01_MyMod/set_variables_result.json = {"ok":true}
 
 ---
 
-## R12｜局部配置更新丢键、升级留旧脚本 —— **需复核**
+## R12｜局部配置更新丢键、升级留旧脚本 —— **成立（两半都成立）**
 
-本轮只确认仓库根有 `setup_keyence_agent.ps1`，未核它写 config 是"读-改-写"还是整体覆盖，也未核升级时是否清理已删除的脚本。评审给的定位（`kv-studio-operator/setup*`）在我这里不存在同名文件，说明**他的路径引用可能也对不上**，这条需要先定位再判定。
+- **配置丢键**：`setup_keyence_agent.ps1:430-446` 每次用**新建的** `$configObject`（只有 `kvs_exe / work_root / admin_credential_path / admin_user_default / wiki_root`，高级项再多两键）整体 `Set-Content` 覆盖 config.json。用户在配置里加的任何其他键（例如 `wiki_v3_db`、自定义 runner 默认值）在跑 `-Configure kvs_exe` 这类局部更新后会**消失**。
+- **升级留旧脚本**：`Copy-SkillDirectory`（`:176-188`）只做 `Copy-Item -Recurse -Force`，不删除目标目录里上游已移除的文件 → 旧脚本会一直留到用户手工清理。
+
+**评审定位不准处**：他引用 `kv-studio-operator/setup*`，仓库里实际的安装器是**根目录** `setup_keyence_agent.ps1`（另有 `scripts/install_keyence_dev_links.ps1`）；结论对，路径错。
 
 ---
 
@@ -205,7 +232,7 @@ live 侧 `eip-live-cycle/run.ps1` 同样没有 `-WorkRoot`。
 2. **再统一入口**（R03 第二套 executor 要么删、要么改成调用 flat executor；R13 给 `variable-attributes` 补 `-WorkRoot` 并输出 `test_result.json`）；
 3. **EIP 两处**（R04 回读改 (node,ip) 对、R05 未知弹窗改停止）；
 4. **文档收敛**（R11 补回整机单元例外并同步 `instance_rule`、R07 三处口径统一、R14 拆案例到 references）；
-5. R08/R09/R10/R12 先补证据再改。
+5. R09/R12 可按上面结论直接改；R08 只需补"降级要显式上报"；R10 需改 planner 的模块级步骤序列（空体→locals→body）。
 
 ---
 
