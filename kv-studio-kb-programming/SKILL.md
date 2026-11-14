@@ -86,7 +86,7 @@ python <skill-root>\scripts\kb_search.py "KV-XH 软元件分配" --json
 - `[card:Concept]`（confidence=extracted）只是“口语 → 指令名”的导航，不是证据。
 - 每条结果带 `chunk_id`、`source`、`series`。series 为空表示文档未标明系列，跨系列使用前要确认。
 - 退出码：0 有结果，2 无结果，4 库不存在（此时直接报缺库，不要退回旧库或凭记忆作答）。
-- 向量通道需要 torch + sentence-transformers 和本地 bge-m3（`KB_MODEL_DIR` 或 `H:\models`）；
+- 向量通道需要 torch + sentence-transformers 和本地 bge-m3；模型目录通过 `KB_MODEL_DIR` 显式配置，未配置时只使用模型 ID 的客户端解析，不依赖固定盘符；
   不可用时自动退回不含向量的混合检索。带向量冷启动约 8 秒，`--fast` 跳过向量约 1 秒，
   但口语化问题召回明显下降（120 条手册盲测 hit@5 0.89 → 0.68，50 条旧 holdout 0.96 → 0.94）。
   先用默认模式问口语问题，已知精确名称时用 `--card` 或 `--fast`。
@@ -105,6 +105,8 @@ FB IN/OUT/局部变量语义；标题相似或系统局部变量条目不能代�
 弱召回时：
 
 ```yaml
+Legacy note: `query_keyence_kb.py` is an explicit V2 compatibility tool only when a V2 database path is supplied; it is never an automatic fallback for the v3m runtime.
+
 weak_recall:
   actions:
     - split_query_into_exact_identifier_and_semantic_terms

@@ -67,33 +67,69 @@ Add-Case 'complete modules 2/2' (([int]$completeReport.complete_modules -eq 2) -
 # Steps-bearing plan: a planned FB-arguments step or placement check without its
 # receipt must make the module incomplete (no more "missing receipt = true").
 $stepsPlan = Join-Path $WorkRoot 'execution_plan_steps.json'
+$stepsArtifacts = Join-Path $WorkRoot 'steps_artifacts'
+New-Item -ItemType Directory -Force -Path $stepsArtifacts | Out-Null
 [ordered]@{
   plan_id = 'module-completion-steps'
-  artifact_root = $artifacts
+  run_id = 'steps-binding'
+  artifact_root = $stepsArtifacts
   variable_sets = @([ordered]@{ module_name = 'ST03'; category = 'fb' })
   steps = @(
-    [ordered]@{ name = 'import_mnm_3' },
+    [ordered]@{ name = 'import_mnm_1' },
     [ordered]@{ name = 'verify_module_placement_ST03' },
     [ordered]@{ name = 'set_fb_arguments_ST03' },
     [ordered]@{ name = 'set_variables_ST03' }
   )
 } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $stepsPlan -Encoding UTF8
-Write-Json (Join-Path $artifacts 'import_mnm_3\step_receipt.json') ([ordered]@{ ok = $true; step = 'import_mnm_3' })
-Write-Json (Join-Path $artifacts 'set_variables\module_01_ST03\set_variables_result.json') ([ordered]@{ ok = $true; module = 'ST03' })
+$stepsHash = (Get-FileHash -LiteralPath $stepsPlan -Algorithm SHA256).Hash
+$stepsReceipt = [ordered]@{ ok = $true; run_id = 'steps-binding'; execution_plan_sha256 = $stepsHash }
+Write-Json (Join-Path $stepsArtifacts 'import_mnm_1\step_receipt.json') $stepsReceipt
+Write-Json (Join-Path $stepsArtifacts 'set_variables\module_01_ST03\set_variables_result.json') $stepsReceipt
 $outStepsMissing = Join-Path $WorkRoot 'out_steps_missing'
-& $tool -PlanPath $stepsPlan -ArtifactsRoot $artifacts -OutDir $outStepsMissing -AllowIncomplete | Out-Null
+& $tool -PlanPath $stepsPlan -ArtifactsRoot $stepsArtifacts -OutDir $outStepsMissing -AllowIncomplete | Out-Null
 $stepsMissingReport = Get-Content -LiteralPath (Join-Path $outStepsMissing 'module_completion.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $stepsReasons = @($stepsMissingReport.incomplete[0].reasons)
 Add-Case 'missing fb arguments receipt is incomplete' ($stepsReasons -contains 'fb_arguments_receipt_missing') ($stepsReasons -join ',')
 Add-Case 'missing placement receipt is incomplete' ($stepsReasons -contains 'placement_receipt_missing') ($stepsReasons -join ',')
 
-Write-Json (Join-Path $artifacts 'module_placement\ST03\step_receipt.json') ([ordered]@{ ok = $true; step = 'placement' })
-Write-Json (Join-Path $artifacts 'set_fb_arguments\module_01_ST03\step_receipt.json') ([ordered]@{ ok = $true; step = 'fbargs' })
+Write-Json (Join-Path $stepsArtifacts 'module_placement\ST03\step_receipt.json') $stepsReceipt
+Write-Json (Join-Path $stepsArtifacts 'set_fb_arguments\module_01_ST03\step_receipt.json') $stepsReceipt
 $outStepsComplete = Join-Path $WorkRoot 'out_steps_complete'
-& $tool -PlanPath $stepsPlan -ArtifactsRoot $artifacts -OutDir $outStepsComplete | Out-Null
+& $tool -PlanPath $stepsPlan -ArtifactsRoot $stepsArtifacts -OutDir $outStepsComplete | Out-Null
 $stepsCompleteExit = $LASTEXITCODE
 $stepsCompleteReport = Get-Content -LiteralPath (Join-Path $outStepsComplete 'module_completion.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 Add-Case 'complete once planned receipts exist' ($stepsCompleteExit -eq 0 -and [bool]$stepsCompleteReport.ok) "exit=$stepsCompleteExit ok=$($stepsCompleteReport.ok)"
+
+# A formal plan must reject receipts that merely say ok=true when their run,
+# project, or plan binding is stale. Then prove the same artifacts are accepted
+# once all bindings match the plan.
+$bindingPlan = Join-Path $WorkRoot 'execution_plan_binding.json'
+$bindingProject = Join-Path $WorkRoot 'binding_project.kpr'
+'fixture' | Set-Content -LiteralPath $bindingProject -Encoding UTF8
+[ordered]@{
+  run_id = 'r06-binding'
+  project_path = $bindingProject
+  artifact_root = $artifacts
+  variable_sets = @([ordered]@{ module_name = 'BOUND'; category = 'scan' })
+  steps = @([ordered]@{ name = 'import_mnm_1' }, [ordered]@{ name = 'set_variables_BOUND' })
+} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $bindingPlan -Encoding UTF8
+$badBinding = [ordered]@{ ok = $true; run_id = 'old-run'; project_path = $bindingProject; execution_plan_sha256 = ('0' * 64) }
+Write-Json (Join-Path $artifacts 'import_mnm_1\step_receipt.json') $badBinding
+Write-Json (Join-Path $artifacts 'set_variables\module_01_BOUND\step_receipt.json') $badBinding
+Write-Json (Join-Path $artifacts 'set_variables\module_01_BOUND\set_variables_result.json') $badBinding
+$outBindingBad = Join-Path $WorkRoot 'out_binding_bad'
+& $tool -PlanPath $bindingPlan -ArtifactsRoot $artifacts -OutDir $outBindingBad -AllowIncomplete | Out-Null
+$bindingBadReport = Get-Content -LiteralPath (Join-Path $outBindingBad 'module_completion.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+Add-Case 'stale run/hash receipts are rejected' (([int]$bindingBadReport.incomplete_count -eq 1) -and (@($bindingBadReport.incomplete[0].reasons) -contains 'stale_receipt:import')) (@($bindingBadReport.incomplete[0].reasons) -join ',')
+$bindingHash = (Get-FileHash -LiteralPath $bindingPlan -Algorithm SHA256).Hash
+$goodBinding = [ordered]@{ ok = $true; run_id = 'r06-binding'; project_path = $bindingProject; execution_plan_sha256 = $bindingHash }
+Write-Json (Join-Path $artifacts 'import_mnm_1\step_receipt.json') $goodBinding
+Write-Json (Join-Path $artifacts 'set_variables\module_01_BOUND\step_receipt.json') $goodBinding
+Write-Json (Join-Path $artifacts 'set_variables\module_01_BOUND\set_variables_result.json') $goodBinding
+$outBindingGood = Join-Path $WorkRoot 'out_binding_good'
+& $tool -PlanPath $bindingPlan -ArtifactsRoot $artifacts -OutDir $outBindingGood | Out-Null
+$bindingGoodReport = Get-Content -LiteralPath (Join-Path $outBindingGood 'module_completion.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+Add-Case 'matching run/hash receipts are accepted' ($LASTEXITCODE -eq 0 -and [bool]$bindingGoodReport.ok) "exit=$LASTEXITCODE ok=$($bindingGoodReport.ok)"
 
 $failed = @($cases | Where-Object { -not $_.ok })
 $result = [ordered]@{ test = 'module-completion'; passed = @($cases | Where-Object { $_.ok }).Count; failed = $failed.Count; cases = $cases.ToArray(); work_root = $WorkRoot }

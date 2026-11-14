@@ -17,14 +17,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import sqlite3
 import sys
 import time
 from pathlib import Path
 
-SRC = Path(r"H:\llm-wiki-v2-keyence\wiki.v2.cleaned.db")
-DST = Path(r"H:\llm-wiki-v2-keyence\v3\wiki.v3.db")
+HERE = Path(__file__).resolve().parent
+SRC = Path(os.environ.get("KB_SOURCE_DB") or (HERE.parent / "dist" / "kb-v2.cleaned.db"))
+DST = Path(os.environ.get("KB_DB") or (HERE.parent / "dist" / "kb-v3m-2026-11-03" / "wiki.v3m.db"))
 
 TARGET = 1600       # preferred piece size (chars)
 HARD_MAX = 2600     # pieces never exceed this unless a single line does

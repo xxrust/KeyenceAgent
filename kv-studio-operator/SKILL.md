@@ -28,8 +28,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\workflo
 
 | # | 标准 | 怎么证明（必须能贴出来） |
 |---|---|---|
+| Policy note | The public operator boundary is documented in [operator-policy.md](references/operator-policy.md): callers use manifest capabilities and workflows; direct `runner_children` calls are internal and bypass the receipt contract. | See the reference for the stable policy. |
 | B1 | **没有实跑不许写"已验证"**。结论若涉及"在 KV STUDIO 里成立"，必须有一次真实执行 | live 步骤回执（`ok/exit_code`）、编译输出行（`转换成功。` + 步数）、或 `run_all.ps1` 汇总；三者都没有就只能写"计划层已验证，执行层未验证" |
-| B2 | **执行只走两条路**：planner 产出计划 → flat executor；或按顺序直调 `runner_children/*.ps1`。禁止手拼 plan JSON | 计划 JSON 由 `new_kv_module_execution_plan.ps1` / `new_kv_existing_project_update_workspace.ps1` 生成；手写的文件不得喂执行器 |
+| B2 | **执行只走两条公开路径**：planner 产出计划 → flat executor；或用 `rerun_kv_plan_step.ps1` 对既有计划做受控单步复跑。`runner_children/*.ps1` 只属于内部实现，Agent 不得直接调用；禁止手拼 plan JSON | 计划 JSON 由 `new_kv_module_execution_plan.ps1` / `new_kv_existing_project_update_workspace.ps1` 生成；单步复跑必须保留计划的 `run_id`、工程路径和步骤参数，并写入独立回执 |
 | B3 | **改既有脚本前先定位耦合**：grep 目标标识符的出现次数与用途，把"命名"和"路径"分开改；优先纯增量（新名字 + 新分支） | 改动前贴 grep 结果；改后 `[Parser]::ParseFile` = 0 错，且对应套件绿 |
 | B4 | **每次提交只含本次声明的文件**；改名时行为零变化 | `git status --porcelain` 核过；`git show --stat` 只含目标文件；改名后全仓 grep 旧名 = 0 |
 | B5 | **含非 ASCII 的 `.ps1` 必须 UTF-8 BOM** | `scripts/gates/assert_kv_script_syntax.ps1` 的 `encoding_failure_count=0` |
@@ -46,8 +47,9 @@ KV STUDIO 的编译是全局的，但 UI 写入必须按依赖顺序，**块里�
 
 1. **数据类型（结构体/用户 DUT）**：先建；嵌套类型按成员依赖排序（标量成员在前）。
 2. **FB 模块**：先导入 FB 的 MNM，再写它的自变量表和局部变量；FB 自变量用到的结构体已存在。
+   若正文引用本次才声明的局部实例，必须使用 planner 生成的 `empty_body_path` → 声明 → `set_fb_program_body` 三步计划。
 3. **变量定义**：程序引用的全局/局部变量所在表必须先存在；`_MC_AXIS_REF` /
-   `_MC_AXIS_GROUP_REF` 等轴引用按目标工程实际配置（没有轴时 device 可先为空）。
+   `_MC_AXIS_GROUP_REF` 等轴引用按目标工程实际配置（没有轴时 device 可先为空）。计划门禁只接受来自 EtherCAT/轴快照的 `-VerifiedAxisIndexes`，不会把变量 TSV 中的 `_MC_Axis[n]` 当作轴存在证据。
 4. **程序模块**：最后导入/写入引用这些变量和 FB 的扫描程序。MNM 导入本身不解析变量，
    但**编译前**所有被引用的变量必须已定义，否则编译报“未注册变量”。
 5. **编译与扫描顺序**：全部落盘后再编译，扫描顺序用 `assert_kv_scan_order.ps1` 单独验证。
@@ -394,6 +396,10 @@ MNM 中以 `;` 开头的 ST 行算使用、`BOOKMARK` 标签不算。`coverage.j
   都 0 命中；Python 默认 `open()` 直接 `UnicodeDecodeError`（gbk）。这类工具请显式指定编码，或读快照提供的
   `text\mnm_utf8\`（UTF-8 无 BOM，仅供阅读；权威、可导入的副本始终是 `text\mnm\`）。
 ### FB 复用口径（项目所有者裁决）
+
+The stable official-FB versus user-FB boundary, including the whole-machine
+unit exception and its required reuse evidence, is maintained in
+`kv-studio-operator/references/operator-policy.md` and the programmer reference.
 
 - **可复用、或需要经常移植到其他机器的标准程序，一律做成功能块**（`功能块\FB_*`）；扫描程序只保留现场映射、
   时序与调用层。依据是**本仓库房规**（`project-standard.json` 的 `reuse_principle`），不是 KEYENCE 的硬性要求。

@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-DB = Path(r"H:\llm-wiki-v2-keyence\v3\wiki.v3.db")
+DB = Path(os.environ.get("KB_DB") or (Path(__file__).resolve().parent.parent / "dist" / "kb-v3m-2026-11-03" / "wiki.v3m.db"))
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "kv-studio-kb-programming" / "scripts"))
 from kb_vectors import MODELS, VectorIndex, load_model  # noqa: E402,F401

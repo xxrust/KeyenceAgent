@@ -10,9 +10,9 @@
                   },
     "mnm_files":  [
                       {
-                          "module_name":  "ST01",
-                          "empty_body_mnm":  "mnm\\ST01_empty.mnm",
-                          "path":  "mnm\\ST01.mnm",
+                          "module_name":  "R10_Test",
+                          "empty_body_mnm":  "mnm\\R10_Test_empty.mnm",
+                          "path":  "mnm\\R10_Test.mnm",
                           "variables":  {
                                             "local_tsv":  "locals.tsv",
                                             "global_tsv":  "globals.tsv"

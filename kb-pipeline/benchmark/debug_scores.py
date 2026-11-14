@@ -3,9 +3,10 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import search_v3
+from kb_paths import control_db, runtime_db
 
-s3 = search_v3.Searcher(Path('H:/llm-wiki-v2-keyence/v3/wiki.v3.db'))
-s3m = search_v3.Searcher(Path('H:/llm-wiki-v2-keyence/v3/wiki.v3m.db'))
+s3 = search_v3.Searcher(control_db())
+s3m = search_v3.Searcher(runtime_db())
 
 # Test the failing query
 q = "运动中途改目标位置"

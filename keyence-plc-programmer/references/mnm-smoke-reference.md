@@ -1,7 +1,7 @@
 # MNM Smoke Programming Reference
 
 Use this for minimal KEYENCE KV STUDIO smoke programs when a fast independent VM test is needed.
-Production project work still uses Wiki V2 evidence and KV STUDIO conversion as the acceptance basis.
+Production project work uses Wiki v3m evidence and KV STUDIO conversion as the acceptance basis.
 
 ## Validated Minimal Shape
 

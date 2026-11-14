@@ -172,3 +172,4 @@ planner 默认把 `import_mnm_N` 放在 `set_fb_arguments_*` / `set_variables_*`
 
 也就是说：**正文引用新局部实例的模块不能一次导入**。planner 尚未自动拆分，交付时要在计划里显式写成
 上表三步；否则会得到 `KV_MNM_SYMBOL_UNRESOLVED` / `读取助记符列表失败`。
+Current generated-plan contract (superseding the historical manual-plan note above): when a module body references a local instance introduced by this run, the scaffold manifest must provide `empty_body_path`; the planner then emits empty import, declaration writes, and `set_fb_program_body` in order. A complete MNM import without that three-step evidence is not accepted as proof of completion.

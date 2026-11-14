@@ -5,8 +5,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import search_v3
+from kb_paths import runtime_db
 
-s = search_v3.Searcher(Path('H:/llm-wiki-v2-keyence/v3/wiki.v3m.db'))
+s = search_v3.Searcher(runtime_db())
 cases = [json.loads(l) for l in open('cases_holdout.jsonl', encoding='utf-8')]
 
 misses = []

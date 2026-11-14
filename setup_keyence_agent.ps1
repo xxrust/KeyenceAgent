@@ -29,7 +29,7 @@ function New-HelpText {
     '  config       Configure normal machine paths.',
     '  kvs_exe      Configure KV STUDIO Kvs.exe path.',
     '  work_root    Configure disposable work root.',
-    '  wiki_root    Configure KEYENCE Wiki V2 root.',
+    '  wiki_root    Configure the KEYENCE knowledge-base root (v3m preferred; v2 is explicit legacy fallback).',
     '  admin_user   Configure default KV STUDIO administrator user name.',
     '  credential   Store KV STUDIO administrator credential.',
     '  advanced     Configure advanced runner defaults.',
@@ -62,7 +62,7 @@ $CommonText = @{
   prompt_config = 'Local config file path or directory'
   prompt_kvs = 'KV STUDIO Kvs.exe path'
   prompt_work = 'Disposable work root'
-  prompt_wiki = 'KEYENCE Wiki V2 root'
+  prompt_wiki = 'KEYENCE Wiki v3m root'
   prompt_admin_user = 'KV STUDIO administrator user name'
   prompt_advanced = 'Configure advanced runner defaults'
   prompt_timeout = 'Runner timeout seconds'
@@ -183,18 +183,23 @@ function Copy-SkillDirectory([string]$SourceDir, [string]$TargetRoot) {
   }
 
   New-Item -ItemType Directory -Force -Path $target | Out-Null
+  $manifestPath = Join-Path $target '.keyence-managed-files.json'
+  $previousFiles = @()
+  if (Test-Path -LiteralPath $manifestPath -PathType Leaf) {
+    try { $previousFiles = @((Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json).files) } catch { $previousFiles = @() }
+  }
   Copy-Item -Path (Join-Path $SourceDir '*') -Destination $target -Recurse -Force
-  # Mirror, not merge: files removed upstream must disappear here too, otherwise an
-  # upgrade keeps executing stale scripts (issue #3 R12).
+  # Remove only files recorded as managed by a previous installation. User-created
+  # files in the skill directory are outside the managed set and survive upgrades.
   $sourceFiles = @(Get-ChildItem -LiteralPath $sourceFull -Recurse -File | ForEach-Object { $_.FullName.Substring($sourceFull.Length).TrimStart('\') })
   $removed = @()
-  foreach ($targetFile in @(Get-ChildItem -LiteralPath $targetFull -Recurse -File)) {
-    $relative = $targetFile.FullName.Substring($targetFull.Length).TrimStart('\')
-    if ($sourceFiles -notcontains $relative) {
-      Remove-Item -LiteralPath $targetFile.FullName -Force
-      $removed += $relative
+  foreach ($relative in $previousFiles) {
+    if ($sourceFiles -notcontains [string]$relative) {
+      $targetFile = Join-Path $targetFull ([string]$relative)
+      if (Test-Path -LiteralPath $targetFile -PathType Leaf) { Remove-Item -LiteralPath $targetFile -Force; $removed += [string]$relative }
     }
   }
+  [ordered]@{ schema_version = 1; files = $sourceFiles } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
   return [pscustomobject]@{ name = $name; target = $targetFull; action = 'copied_or_updated'; removed = $removed.Count }
 }
 
@@ -297,11 +302,13 @@ function Get-SetupStatus([string]$RepoRoot, [string]$SkillsRoot, [string]$Config
   $items.Add((New-StatusItem 'work_root' (-not [string]::IsNullOrWhiteSpace($workRoot)) $workRoot))
 
   $wikiRoot = if ($Config -and $Config.wiki_root) { [string]$Config.wiki_root } else { '' }
-  $wikiOk = ((-not [string]::IsNullOrWhiteSpace($wikiRoot)) -and
-    (Test-Path -LiteralPath $wikiRoot -PathType Container) -and
-    (Test-Path -LiteralPath (Join-Path $wikiRoot 'wiki.v2.cleaned.db') -PathType Leaf) -and
-    (Test-Path -LiteralPath (Join-Path $wikiRoot 'scripts\wiki_query.py') -PathType Leaf))
-  $items.Add((New-StatusItem 'wiki_root' $wikiOk $wikiRoot))
+  $wikiDb = if ($Config -and $Config.wiki_db) { [string]$Config.wiki_db } elseif ($Config -and $Config.wiki_v3_db) { [string]$Config.wiki_v3_db } else { '' }
+  $wikiCandidates = @()
+  if ($wikiDb) { $wikiCandidates += $wikiDb }
+  if ($wikiRoot) { $wikiCandidates += (Join-Path $wikiRoot 'v3\wiki.v3m.db'); $wikiCandidates += (Join-Path $wikiRoot 'wiki.v3m.db') }
+  $wikiResolved = @($wikiCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1)
+  $wikiStatusPath = if ($wikiResolved.Count -gt 0) { [string]$wikiResolved[0] } elseif ($wikiDb) { $wikiDb } else { $wikiRoot }
+  $items.Add((New-StatusItem 'wiki_root' ($wikiResolved.Count -gt 0) $wikiStatusPath))
 
   $adminUser = if ($Config -and $Config.admin_user_default) { [string]$Config.admin_user_default } else { '' }
   $items.Add((New-StatusItem 'admin_user_default' (-not [string]::IsNullOrWhiteSpace($adminUser)) $adminUser))
@@ -380,15 +387,12 @@ $htmlhelpCandidates = @(
   'C:\Users\Public\Documents\KEYENCE\KVS12\ManualHelp\2052\htmlhelp',
   (Join-Path $repoRoot 'htmlhelp')
 )
-if (Test-Path -LiteralPath (Join-Path $repoRoot 'llm-wiki-v2-keyence')) {
-  $htmlhelpCandidates += $repoRoot
-}
 $htmlhelpDefault = First-ExistingPath $htmlhelpCandidates 'C:\Users\Public\Documents\KEYENCE\KVS12\ManualHelp\2052\htmlhelp'
 
 $wikiRootDefault = First-ExistingPath @(
-  (Join-Path $htmlhelpDefault 'llm-wiki-v2-keyence'),
-  (Join-Path $repoRoot 'llm-wiki-v2-keyence')
-) (Join-Path $htmlhelpDefault 'llm-wiki-v2-keyence')
+  (Join-Path $repoRoot 'dist\kb-v3m-2026-11-03'),
+  (Join-Path $htmlhelpDefault 'llm-wiki-v3m')
+) (Join-Path $repoRoot 'dist\kb-v3m-2026-11-03')
 if ($existingConfig -and $existingConfig.wiki_root) { $wikiRootDefault = [string]$existingConfig.wiki_root }
 
 $defaultLocalAppData = if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) { Join-Path $env:USERPROFILE 'AppData\Local' } else { $env:LOCALAPPDATA }
@@ -463,7 +467,9 @@ if ((Test-Selected 'config') -or (Test-Selected 'kvs_exe') -or (Test-Selected 'w
   Assert-KvStudioExecutable $kvsExe
   $configParent = Split-Path -Parent $ConfigPath
   New-Item -ItemType Directory -Force -Path $configParent | Out-Null
-  $configObject | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ConfigPath -Encoding UTF8
+  $tmpConfigPath = "$ConfigPath.tmp.$PID"
+  $configObject | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $tmpConfigPath -Encoding UTF8
+  Move-Item -LiteralPath $tmpConfigPath -Destination $ConfigPath -Force
   [Environment]::SetEnvironmentVariable('KEYENCE_AGENT_CONFIG', $ConfigPath, 'User')
   [Environment]::SetEnvironmentVariable('KV_STUDIO_OPERATOR_CONFIG', $ConfigPath, 'User')
   $env:KEYENCE_AGENT_CONFIG = $ConfigPath

@@ -1,7 +1,7 @@
 """Dense-vector channel for kb_search.py (optional; needs torch + sentence-transformers).
 
-Model lookup order: KB_MODEL_DIR/<org>/<name> > H:/models/<org>/<name> (ModelScope layout)
-> Hugging Face id (through HF_ENDPOINT). Vectors live next to the DB as
+Model lookup order: explicit KB_MODEL_DIR layouts > the model ID
+(through the configured Hugging Face/ModelScope client). Vectors live next to the DB as
 vectors.<db-stem>.<model>.npy (+ .ids.json), falling back to the legacy vectors.<model>.npy;
 table `vectors` in the DB records which models exist.
 """
@@ -21,7 +21,7 @@ QUERY_PREFIX = {"bge-small": "为这个句子生成表示以用于检索相关�
 
 def model_path(name: str) -> str:
     repo = MODELS[name]
-    roots = [os.environ.get("KB_MODEL_DIR"), r"H:\models"]
+    roots = [os.environ.get("KB_MODEL_DIR")]
     for root in roots:
         if not root:
             continue

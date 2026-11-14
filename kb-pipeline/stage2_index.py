@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sqlite3
 import time
@@ -21,7 +22,7 @@ from pathlib import Path
 import jieba
 
 HERE = Path(__file__).resolve().parent
-DB = Path(r"H:\llm-wiki-v2-keyence\v3\wiki.v3.db")
+DB = Path(os.environ.get("KB_DB") or (Path(__file__).resolve().parent.parent / "dist" / "kb-v3m-2026-11-03" / "wiki.v3m.db"))
 SYN = HERE / "synonyms.tsv"
 
 IDENT = r"[A-Za-z_*][A-Za-z0-9_.*+\-/&|^<>˜]*"

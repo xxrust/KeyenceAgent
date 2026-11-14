@@ -38,7 +38,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 在 Codex 中提出：
 
 ```text
-根据本机 KEYENCE Wiki V2，查询 KV STUDIO 中 ST 赋值语句和 BOOL 变量的官方语法。
+根据本机 KEYENCE Wiki v3m，查询 KV STUDIO 中 ST 赋值语句和 BOOL 变量的官方语法。
 ```
 
 查询结果应包含来源类型和可打开的证据路径。

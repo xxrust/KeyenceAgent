@@ -16,10 +16,11 @@ import argparse
 import json
 import os
 import re
+from kb_paths import runtime_db
 import sqlite3
 from pathlib import Path
 
-DB = Path(r"H:\llm-wiki-v2-keyence\v3\wiki.v3m.db")
+DB = runtime_db()
 
 
 def cjk_runs(s: str) -> set[str]:

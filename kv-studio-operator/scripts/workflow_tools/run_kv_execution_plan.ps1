@@ -27,7 +27,6 @@ if (-not (Test-Path -LiteralPath $PlanPath -PathType Leaf)) { throw "KV_PLAN_MIS
 if (-not (Test-Path -LiteralPath $ProjectPath -PathType Leaf)) { throw "KV_PROJECT_MISSING: $ProjectPath" }
 if (-not $RunRoot) { $RunRoot = Join-Path (Split-Path -Parent $PlanPath) ('run_' + (Get-Date -Format 'yyyyMMdd_HHmmss')) }
 if (-not $LogPath) { $LogPath = Join-Path $RunRoot 'plan_run.log' }
-New-Item -ItemType Directory -Force -Path $RunRoot | Out-Null
 
 $runnerRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'runner_children'
 if (-not (Test-Path -LiteralPath $runnerRoot)) { throw "KV_RUNNER_ROOT_MISSING: $runnerRoot" }
@@ -39,6 +38,21 @@ if ($plan.PSObject.Properties.Name -contains 'schema_version') {
 }
 $steps = @($plan.steps)
 if ($steps.Count -eq 0) { throw 'KV_PLAN_EMPTY' }
+
+# Official module plans have gates, placement checks, receipts and compile
+# evidence that this compatibility runner cannot reproduce. Route them through
+# the one executor that owns that contract; the legacy runner remains limited to
+# the small hand-authored stage fixtures used by older callers.
+$isOfficialPlan = $plan.operation -in @('new_project','repair_existing_project')
+if ($isOfficialPlan) {
+  if ($DryRun) { throw 'KV_PLAN_OFFICIAL_REQUIRES_FLAT_EXECUTOR: use invoke_kv_flat_execution_plan.ps1 -PlanPath for a read-only preflight' }
+  if (($Stages -join '|') -ne 'structures|imports|fb_arguments|variables') { throw 'KV_PLAN_STAGE_FILTER_UNSUPPORTED_FOR_OFFICIAL_PLAN: use the flat executor contract' }
+  $flat = Join-Path $PSScriptRoot 'invoke_kv_flat_execution_plan.ps1'
+  if (-not (Test-Path -LiteralPath $flat -PathType Leaf)) { throw "KV_FLAT_EXECUTOR_MISSING: $flat" }
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $flat -PlanPath $PlanPath
+  exit ([int]$LASTEXITCODE)
+}
+New-Item -ItemType Directory -Force -Path $RunRoot | Out-Null
 
 function ConvertTo-Arguments([object]$arguments) {
   $map = @{}
@@ -145,6 +159,17 @@ function Invoke-PreparedStep($step, [int]$timeoutSeconds) {
   }
   if (-not $map.ContainsKey('OutDir')) { $map['OutDir'] = Join-Path $RunRoot $step.name }
   $outDir = [string]$map['OutDir']
+  # DryRun is read-only: do not create step directories or remove prior evidence.
+  if ($DryRun) {
+    $argumentList = @()
+    foreach ($key in $map.Keys) {
+      $value = $map[$key]
+      if ($value -is [bool]) { if ($value) { $argumentList += "-$key" } }
+      else { $argumentList += @("-$key", [string]$value) }
+    }
+    Write-StepLog $step.name ("dry-run {0} {1}" -f $step.runner, ($argumentList -join ' '))
+    return 0
+  }
   New-Item -ItemType Directory -Force -Path $outDir | Out-Null
   $exitCodeFile = Join-Path $outDir 'exit_code.txt'
   if (Test-Path -LiteralPath $exitCodeFile) { Remove-Item -LiteralPath $exitCodeFile -Force }
@@ -153,10 +178,6 @@ function Invoke-PreparedStep($step, [int]$timeoutSeconds) {
     $value = $map[$key]
     if ($value -is [bool]) { if ($value) { $argumentList += "-$key" } }
     else { $argumentList += @("-$key", [string]$value) }
-  }
-  if ($DryRun) {
-    Write-StepLog $step.name ("dry-run {0} {1}" -f $step.runner, ($argumentList -join ' '))
-    return 0
   }
   $started = Get-Date
   $stdout = Join-Path $outDir 'step_stdout.txt'

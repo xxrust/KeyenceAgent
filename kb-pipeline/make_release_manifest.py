@@ -2,11 +2,13 @@
 import datetime
 import hashlib
 import json
+import os
 import sqlite3
 import subprocess
 from pathlib import Path
 
-D = Path(r"H:\KeyenceAgent\dist\kb-v3m-2026-11-03")
+REPO = Path(__file__).resolve().parent.parent
+D = Path(os.environ.get("KB_RELEASE_DIR") or (REPO / "dist" / "kb-v3m-2026-11-03"))
 
 files = []
 for p in sorted(D.iterdir()):
@@ -22,7 +24,7 @@ conn = sqlite3.connect(f"file:{D / 'wiki.v3m.db'}?mode=ro", uri=True)
 by_type = dict(conn.execute("select source_type, count(*) from chunks group by 1 order by 2 desc"))
 cards = dict(conn.execute("select type, count(*) from cards group by 1 order by 2 desc"))
 vec = conn.execute("select model, n, dim from vectors").fetchall()
-commit = subprocess.run(["git", "-C", r"H:\KeyenceAgent", "rev-parse", "HEAD"],
+commit = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"],
                         capture_output=True, text=True).stdout.strip()
 man = {
     "name": "KEYENCE KV STUDIO 知识库 Wiki V3m",

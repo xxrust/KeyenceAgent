@@ -8,10 +8,10 @@ Usage:
   python tool_synonyms.py                 # report
   python tool_synonyms.py --df-term 定点 # show df for arbitrary terms
 """
-import os
 from __future__ import annotations
 
 import argparse
+import os
 import sqlite3
 from collections import Counter
 from pathlib import Path

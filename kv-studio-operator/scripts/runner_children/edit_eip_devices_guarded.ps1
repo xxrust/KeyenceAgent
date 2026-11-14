@@ -155,6 +155,14 @@ function Find-Button($rootElement, [string]$name) {
   }
   return $null
 }
+function Get-DialogText($rootElement) {
+  $parts = New-Object System.Collections.Generic.List[string]
+  foreach ($node in @($rootElement.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition))) {
+    $name = [string]$node.Current.Name
+    if ($name) { $parts.Add($name) }
+  }
+  return ($parts -join ' ')
+}
 function Press-Button($rootElement, [string]$name) {
   $b = Find-Button $rootElement $name
   if (-not $b) { return $false }
@@ -200,6 +208,14 @@ function Get-NodeLabels([long]$hwnd) {
     if ($cand.Count -gt 0) { $labels = $cand; break }
   }
   return @($labels)
+}
+
+# The 节点 column also copies connection children such as 1-1, 1-2, ... .
+# The IP column contains one row per device connection, represented by the
+# plain numeric device label. Keep that projection explicit so binding checks
+# compare like-for-like rows instead of the full hierarchical label column.
+function Get-DeviceNodeLabels([object[]]$labels) {
+  return @($labels | Where-Object { [string]$_ -match '^\d+$' } | ForEach-Object { [string]$_ })
 }
 
 Expand-Item (Get-TreeItem '^单元配置$')
@@ -281,9 +297,31 @@ if (-not $selected) { Fail 'KV_EIP_DEVICE_ROW_NOT_FOUND' "node $node not found i
 # label. It is compared again after the reopen so a delete/modify of the wrong
 # device is detected instead of only counting rows.
 $preNodeLabels = @(Get-NodeLabels $eipWindow.hwnd)
+$preDeviceNodeLabels = @(Get-DeviceNodeLabels $preNodeLabels)
 Log 'pre_node_column' @{ count = $preNodeLabels.Count; labels = ($preNodeLabels -join ',') }
+Log 'pre_device_node_rows' @{ count = $preDeviceNodeLabels.Count; labels = ($preDeviceNodeLabels -join ',') }
 if ($preNodeLabels.Count -eq 0) {
   Fail 'KV_EIP_NODE_IDENTITY_UNAVAILABLE' 'node column copy returned no labels before the edit'
+}
+
+if ($Action -eq 'Modify') {
+  if ($preDeviceNodeLabels.Count -ne $preIps.Count) {
+    Fail 'KV_EIP_NODE_IP_BINDING_UNAVAILABLE' ("device-node/IP row counts differ before edit: nodes=$($preDeviceNodeLabels.Count), ips=$($preIps.Count)")
+  }
+  $targetIndexes = @(0..($preDeviceNodeLabels.Count - 1) | Where-Object { $preDeviceNodeLabels[$_] -eq [string]$node })
+  if ($targetIndexes.Count -eq 0) {
+    Fail 'KV_EIP_NODE_IP_BINDING_UNAVAILABLE' "target node $node does not identify a device row"
+  }
+  $targetOldIps = @($targetIndexes | ForEach-Object { [string]$preIps[[int]$_] })
+  if ($targetOldIps -contains $newIp) {
+    Fail 'KV_EIP_MODIFY_NOOP' "target node $node already has IP $newIp; no change was performed"
+  }
+  $duplicateIndexes = @(0..($preIps.Count - 1) | Where-Object {
+      ($targetIndexes -notcontains $_) -and ([string]$preIps[$_] -eq $newIp)
+    })
+  if ($duplicateIndexes.Count -gt 0) {
+    Fail 'KV_EIP_MODIFY_TARGET_IP_IN_USE' "IP $newIp is already assigned to non-target device row(s): $($duplicateIndexes -join ',')"
+  }
 }
 
 if ($Action -eq 'Delete') {
@@ -386,7 +424,15 @@ while ((Get-Date) -lt $deadline) {
       $handled = $true
       continue
     }
-    if ($dialogTitle -notmatch '(?i)EtherNet/IP|保存|变更|変更|确认|確認|警告|情報|信息|KV STUDIO') {
+    $dialogText = Get-DialogText $el
+    $knownEipDialog = ($dialogTitle -match '(?i)^EtherNet/IP 设定$') -and
+      ($parts[1] -eq '#32770') -and
+      ($dialogText -match '(?i)EtherNet/IP|设备设定|连接设定|手动') -and
+      ((Find-Button $el '确定') -or (Find-Button $el '取消') -or (Find-Button $el '手动(M)'))
+    $knownDialog = $knownEipDialog -or
+      (($dialogTitle -match '(?i)KV STUDIO|保存|变更|変更|确认|確認|警告|情報|信息') -and
+       ($dialogText -match '(?i)更新单元编辑器|为了继续|项目.*保存|保存.*项目|变更.*保存|変更.*保存|是否保存'))
+    if (-not $knownDialog) {
       $shot = Save-Shot 'unknown_dialog.png'
       Fail 'KV_UI_UNKNOWN_DIALOG' ("unexpected dialog '{0}'; refusing to confirm it. screenshot={1}" -f $dialogTitle, $shot)
     }
@@ -428,7 +474,15 @@ do {
       $handled = $true
       continue
     }
-    if ($dialogTitle -notmatch '(?i)EtherNet/IP|保存|变更|変更|确认|確認|警告|情報|信息|KV STUDIO') {
+    $dialogText = Get-DialogText $el
+    $knownEipDialog = ($dialogTitle -match '(?i)^EtherNet/IP 设定$') -and
+      ($parts[1] -eq '#32770') -and
+      ($dialogText -match '(?i)EtherNet/IP|设备设定|连接设定|手动') -and
+      ((Find-Button $el '确定') -or (Find-Button $el '取消') -or (Find-Button $el '手动(M)'))
+    $knownDialog = $knownEipDialog -or
+      (($dialogTitle -match '(?i)KV STUDIO|保存|变更|変更|确认|確認|警告|情報|信息') -and
+       ($dialogText -match '(?i)更新单元编辑器|为了继续|项目.*保存|保存.*项目|变更.*保存|変更.*保存|是否保存'))
+    if (-not $knownDialog) {
       $shot = Save-Shot 'unknown_dialog.png'
       Fail 'KV_UI_UNKNOWN_DIALOG' ("unexpected dialog '{0}'; refusing to confirm it. screenshot={1}" -f $dialogTitle, $shot)
     }
@@ -466,6 +520,7 @@ for ($attempt = 1; $attempt -le 2 -and ($persistedIps.Count -eq 0 -or $postNodeL
     Start-Sleep -Seconds 1
   }
 }
+$postDeviceNodeLabels = @(Get-DeviceNodeLabels $postNodeLabels)
 if ($persistedIps.Count -eq 0 -and $preIps.Count -gt 0) {
   Fail 'KV_EIP_PERSISTED_READBACK_MISSING' 'reopened EIP readback is empty; cannot prove the change was saved'
 }
@@ -500,23 +555,27 @@ if ($Action -eq 'Delete') {
   $ok = ($persistedIps.Count -lt $preIps.Count)
   $detail = "persisted before=$($preIps.Count) after=$($persistedIps.Count)"
 } else {
-  # A flat "the IP exists somewhere" check cannot prove the target node owns it
-  # (issue #3 R04). Bind node -> IP by row when both column copies are coherent,
-  # and refuse to claim success when they are not.
-  # The reopened IP column is a filtered list (live: ip=5 vs node=12), so rows cannot
-  # be paired. Prove instead that the save changed exactly one address: the old IP is
-  # gone, the new IP appeared once, and every other address is untouched (issue #3 R04).
-  $removed = @($preIps | Where-Object { $persistedIps -notcontains $_ })
-  $added = @($persistedIps | Where-Object { $preIps -notcontains $_ })
-  # A device with a connection shows its address twice (live: added=[.31,.31]).
-  # What matters is that exactly one *distinct* address became newIp.
-  $addedDistinct = @($added | Select-Object -Unique)
-  $removedDistinct = @($removed | Select-Object -Unique)
-  $bindingVerified = ($addedDistinct.Count -eq 1) -and ($addedDistinct[0] -eq $newIp) -and ($removedDistinct.Count -le 1)
-  $detail = "persisted target=$newIp added=[$($added -join ',')] removed=[$($removed -join ',')]"
-  if (-not $bindingVerified) {
-    Fail 'KV_EIP_MODIFY_NODE_BINDING_MISMATCH' ("save did not change exactly one address: {0}" -f $detail)
+  # Never infer node ownership from an IP set difference. Compare the numeric
+  # device rows (one per connection) with the IP column; hierarchical child
+  # labels such as 1-1 are intentionally excluded from this projection.
+  if ($preDeviceNodeLabels.Count -ne $preIps.Count -or $postDeviceNodeLabels.Count -ne $persistedIps.Count) {
+    Fail 'KV_EIP_NODE_IP_BINDING_UNAVAILABLE' ("device-node/IP row counts differ before/after: pre=$($preDeviceNodeLabels.Count)/$($preIps.Count), post=$($postDeviceNodeLabels.Count)/$($persistedIps.Count); raw_nodes_before=$($preNodeLabels.Count), raw_nodes_after=$($postNodeLabels.Count)")
   }
+  $targetIndexes = @(0..($preDeviceNodeLabels.Count - 1) | Where-Object { $preDeviceNodeLabels[$_] -eq [string]$node })
+  if ($targetIndexes.Count -eq 0) {
+    Fail 'KV_EIP_NODE_IP_BINDING_UNAVAILABLE' "target node $node does not identify a device row"
+  }
+  $bindingVerified = $true
+  for ($j = 0; $j -lt $preIps.Count; $j++) {
+    if ($preDeviceNodeLabels[$j] -eq [string]$node) {
+      if ($persistedIps[$j] -ne $newIp) { $bindingVerified = $false }
+    } elseif ($persistedIps[$j] -ne $preIps[$j]) {
+      $bindingVerified = $false
+    }
+  }
+  $actualTargetIps = @($targetIndexes | ForEach-Object { $persistedIps[[int]$_] })
+  $detail = "persisted target=$newIp rows=$($targetIndexes -join ',') actual=$($actualTargetIps -join ',')"
+  if (-not $bindingVerified) { Fail 'KV_EIP_MODIFY_NODE_BINDING_MISMATCH' $detail }
   $ok = $bindingVerified
 }
 if (-not $ok) {

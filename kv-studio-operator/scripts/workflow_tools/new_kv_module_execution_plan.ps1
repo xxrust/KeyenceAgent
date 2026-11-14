@@ -28,6 +28,9 @@
   # Optional mutation-plan JSON for user data types (structures). When present,
   # the plan imports them after project creation and before module imports.
   [string]$StructurePlanPath = '',
+  # Axis indexes must come from a verified EtherCAT/axis snapshot, never from
+  # the variable TSV alone. The caller owns that verification boundary.
+  [int[]]$VerifiedAxisIndexes = @(),
 
   [Parameter(Mandatory=$true)]
   [string]$OutDir
@@ -169,6 +172,7 @@ try {
   }
 
   $runRoot = Join-Path $OutRoot $ProjectName
+  $runId = [guid]::NewGuid().ToString('N')
   $artifactRoot = Join-Path $runRoot 'artifacts'
   $projectRoot = Join-Path $runRoot 'Projects'
   $scaffoldArtifactRoot = Join-Path $artifactRoot 'scaffold'
@@ -240,6 +244,10 @@ $moduleType = if ($null -ne $entry.module_type -and [string]$entry.module_type -
   # motion configuration; keep them out of the runtime global set, record them
   # as deferred, and let the global layer complete and compile.
   $deferredAxisVariables = @()
+  # Variable devices tell us which axis indexes are required, but they do not
+  # prove that those axes exist in the target project. Keep this as diagnostic
+  # context; the integrity gate only forwards a verified axis inventory.
+  $axisIndexes = New-Object System.Collections.Generic.HashSet[int]
   $runtimeGlobalPath = $mergedGlobal.path
   if ($mergedGlobal.path -and (Test-Path -LiteralPath $mergedGlobal.path)) {
     $globalLines = @(Get-Content -LiteralPath $mergedGlobal.path -Encoding Default)
@@ -250,6 +258,8 @@ $moduleType = if ($null -ne $entry.module_type -and [string]$entry.module_type -
         if (-not $line) { continue }
         $parts = @($line -split "`t", -1)
         $type = if ($parts.Count -gt 3) { $parts[3].Trim() } else { '' }
+        $device = if ($parts.Count -gt 4) { $parts[4].Trim() } else { '' }
+        if ($device -match '^_MC_Axis(?:Group)?\[(\d+)\]$') { [void]$axisIndexes.Add([int]$matches[1]) }
         if ($type -eq '_MC_AXIS_REF' -or $type -eq '_MC_AXIS_GROUP_REF') {
           $deferredAxisVariables += (if ($parts.Count -gt 2) { $parts[2].Trim() } else { '' })
           continue
@@ -301,9 +311,14 @@ $moduleType = if ($null -ne $entry.module_type -and [string]$entry.module_type -
   # command-line matching.
   $createdProjectResultPath = if ($Mode -eq 'new_project') { Join-Path (Join-Path $artifactRoot 'create_project') 'create_project_result.json' } else { '' }
 
+  $structureDefinitionsForDependency = ''
   if ($StructurePlanPath) {
     $structurePlanFull = [IO.Path]::GetFullPath($StructurePlanPath)
     if (-not (Test-Path -LiteralPath $structurePlanFull -PathType Leaf)) { throw "KV_STRUCTURE_PLAN_MISSING: $structurePlanFull" }
+    try {
+      $structureDoc = Get-Content -LiteralPath $structurePlanFull -Raw -Encoding UTF8 | ConvertFrom-Json
+      if ($structureDoc.PSObject.Properties.Name -contains 'structures') { $structureDefinitionsForDependency = $structurePlanFull }
+    } catch { }
     $structuresOut = Join-Path $artifactRoot 'structures'
     $steps.Add((New-Step 'import_structures' 'mutate_structure_definitions_guarded.ps1' @('runner_child_approved') @('-ProjectPath',$projectPathForRun,'-PlanPath',$structurePlanFull,'-OutDir',$structuresOut) $structuresOut 'runner_child' 1800))
   }
@@ -482,6 +497,7 @@ for ($i = 0; $i -lt $resolvedMnmFiles.Count; $i++) {
   $importSteps = New-Object System.Collections.Generic.List[object]
   $fbArgSteps = New-Object System.Collections.Generic.List[object]
   $variableSteps = New-Object System.Collections.Generic.List[object]
+  $bodySteps = New-Object System.Collections.Generic.List[object]
   $restSteps = New-Object System.Collections.Generic.List[object]
   $seenImport = $false
   foreach ($step in $steps) {
@@ -494,13 +510,21 @@ for ($i = 0; $i -lt $resolvedMnmFiles.Count; $i++) {
     if ($isImport -or $isPlacement) { $seenImport = $true; $importSteps.Add($step); continue }
     if ($isFbArgs) { $fbArgSteps.Add($step); continue }
     if ($isVariables) { $variableSteps.Add($step); continue }
+    if ($n -match '^set_fb_program_body_') { $bodySteps.Add($step); continue }
     $restSteps.Add($step)
   }
   $orderedSteps = New-Object System.Collections.Generic.List[object]
   foreach ($s in $preSteps) { $orderedSteps.Add($s) }
   foreach ($s in $importSteps) { $orderedSteps.Add($s) }
-  foreach ($s in $fbArgSteps) { $orderedSteps.Add($s) }
-  foreach ($s in $variableSteps) { $orderedSteps.Add($s) }
+  # A module whose body references newly declared locals must be written in the
+  # KV-safe order: import an empty body, declare locals/arguments, then paste the
+  # final body. Keep each module's declaration and body steps adjacent.
+  foreach ($entry in $resolvedMnmFiles) {
+    $moduleName = [string]$entry.module_name
+    foreach ($s in @($fbArgSteps | Where-Object { [string]$_.name -match [regex]::Escape($moduleName) })) { $orderedSteps.Add($s) }
+    foreach ($s in @($variableSteps | Where-Object { [string]$_.name -match [regex]::Escape($moduleName) })) { $orderedSteps.Add($s) }
+    foreach ($s in @($bodySteps | Where-Object { [string]$_.name -eq "set_fb_program_body_$moduleName" })) { $orderedSteps.Add($s) }
+  }
   foreach ($s in $restSteps) { $orderedSteps.Add($s) }
   $steps = $orderedSteps
 
@@ -515,6 +539,7 @@ for ($i = 0; $i -lt $resolvedMnmFiles.Count; $i++) {
     project_path = $projectPathForRun
     project_needle = $projectNeedle
     run_root = $runRoot
+    run_id = $runId
     artifact_root = $artifactRoot
     result_path = $resultPath
     checklist_path = $ChecklistPath
@@ -522,6 +547,14 @@ for ($i = 0; $i -lt $resolvedMnmFiles.Count; $i++) {
     source_snapshot_manifest = $SourceSnapshotManifestPath
     delete_existing_modules_before_import = [bool]($DeleteExistingModulesBeforeImport -or $Mode -eq 'new_project')
     structure_plan_path = $(if ($StructurePlanPath) { [IO.Path]::GetFullPath($StructurePlanPath) } else { '' })
+    # The dependency gate consumes this same exported definition artifact when
+    # available; keeping the fields in the plan makes the context explicit.
+    structure_definitions_path = $structureDefinitionsForDependency
+    axis_indexes = @($VerifiedAxisIndexes | Sort-Object -Unique)
+    required_axis_indexes = @($axisIndexes | Sort-Object)
+    axis_context_verified = ($VerifiedAxisIndexes.Count -gt 0)
+    axis_context_source = if ($VerifiedAxisIndexes.Count -gt 0) { 'caller_verified_axis_inventory' } else { 'variable_references_only' }
+    fb_types = @($fbTypeNames)
     default_program_staging = [ordered]@{
       scaffold_contains_default_program = $scaffoldHasDefaultProgram
       stage_module_name = $stageModuleName

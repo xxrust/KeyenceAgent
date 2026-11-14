@@ -101,6 +101,9 @@ Add-Case 'modify bat routes Action Modify' ($modifyBatText -match '-Action Modif
 $editText = if (Test-Path $editRunner) { Get-Content -LiteralPath $editRunner -Raw -Encoding UTF8 } else { '' }
 Add-Case 'edit runner proves readback' ($editText -match 'KV_EIP_EDIT_READBACK_FAILED') 'runner'
 Add-Case 'edit runner marks verified flag' ($editText -match 'verified = \$false') 'runner'
+Add-Case 'modify rejects no-op IP' ($editText -match 'KV_EIP_MODIFY_NOOP') 'runner'
+Add-Case 'modify rejects duplicate target IP' ($editText -match 'KV_EIP_MODIFY_TARGET_IP_IN_USE') 'runner'
+Add-Case 'unknown EIP dialogs require fingerprint' ($editText -match '\$parts\[1\] -eq ''#32770''' -and $editText -match 'Find-Button \$el ''确定''') 'runner'
 Add-Case 'workflow validates Action set' ((Get-Content -LiteralPath $workflow -Raw -Encoding UTF8) -match "ValidateSet\('Add','Modify','Delete'\)") 'workflow'
 
 $delConfig = Join-Path $WorkRoot 'devices_delete.json'

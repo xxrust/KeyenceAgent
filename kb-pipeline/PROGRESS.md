@@ -16,14 +16,14 @@ Python deps: jieba; optional torch 2.5.1+cu118 (driver is CUDA 11.2), transforme
 Rebuild all (**wiki.v3m.db is the only runtime library**; the v3 control library is archived, see above):
 ```
 # v3m (runtime): MinerU text for the PDF pages whose text layer is garbled
-python stage1_clean_chunk.py --mineru --dst H:\llm-wiki-v2-keyence\v3\wiki.v3m.db
-python stage2_index.py   --db H:\llm-wiki-v2-keyence\v3\wiki.v3m.db
-python stage4_cards.py   --db H:\llm-wiki-v2-keyence\v3\wiki.v3m.db
-python stage5_vectors.py --db H:\llm-wiki-v2-keyence\v3\wiki.v3m.db --model bge-m3
+KB_SOURCE_DB=<path-to-v2-cleaned.db> KB_DB=dist/kb-v3m-2026-11-03/wiki.v3m.db python stage1_clean_chunk.py --mineru
+KB_DB=dist/kb-v3m-2026-11-03/wiki.v3m.db python stage2_index.py
+KB_DB=dist/kb-v3m-2026-11-03/wiki.v3m.db python stage4_cards.py
+KB_DB=dist/kb-v3m-2026-11-03/wiki.v3m.db python stage5_vectors.py --model bge-m3
 # optional control build (not needed for the runtime; stage4/stage5 default to this DB name)
 python stage1_clean_chunk.py && python stage2_index.py && python stage4_cards.py && python stage5_vectors.py --model bge-m3
 # measure
-python benchmark/run_benchmark.py --retriever v3 --db H:\llm-wiki-v2-keyence\v3\wiki.v3m.db --mode hybrid \
+KB_DB=dist/kb-v3m-2026-11-03/wiki.v3m.db python benchmark/run_benchmark.py --retriever v3 --mode hybrid \
        --cases benchmark/cases_holdout.jsonl        # add --rerank / --hit content as needed
 ```
 `stage2` now takes ~4-5 min (it scans title/section/text once to fill `term_df`) and reports dead synonym

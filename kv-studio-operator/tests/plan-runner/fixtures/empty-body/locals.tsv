@@ -1,1 +1,2 @@
-scope	owner_program	name	data_type	status	device	group	comment
+﻿scope	owner_program	name	data_type	status	device	group	comment
+local	R10_Test	bR10Probe	BOOL	declared			R10 live probe

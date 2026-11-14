@@ -252,6 +252,7 @@ function Invoke-FlatWorkflowStep([object]$Step) {
   $elapsed = [math]::Round(((Get-Date) - $stepStart).TotalSeconds, 3)
   [ordered]@{
     run_id=$script:runId;step=$Step.name;ok=($exit -eq 0);exit_code=$exit;started_utc=$stepStart.ToUniversalTime().ToString('o')
+    project_path=[string]$plan.project_path;execution_plan_sha256=$script:validatedPlanHash
     script=$scriptPath;arguments=$arguments;parameters=$Step.parameters;inputs=$inputs;code_sha256=$script:codeFingerprint.sha256
     artifacts=$evidence;evidence_error=$evidenceError;elapsed_seconds=$elapsed
   } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $outDir 'step_receipt.json') -Encoding UTF8
@@ -347,6 +348,7 @@ try {
   $initialPlanHash=(Get-FileHash -LiteralPath $PlanPath -Algorithm SHA256).Hash
   $plan = Get-Content -Raw -LiteralPath $PlanPath -Encoding UTF8 | ConvertFrom-Json
   if ($plan.ok -isnot [bool] -or -not $plan.ok) { throw "Execution plan is not ok: $PlanPath" }
+  if ($plan.run_id) { $script:runId = [string]$plan.run_id }
   if (-not $plan.run_root) { throw 'KV_PLAN_RUN_ROOT_REQUIRED' }
   New-Item -ItemType Directory -Force -Path ([string]$plan.run_root) | Out-Null
   $script:unifiedRunLog = Join-Path ([string]$plan.run_root) 'run.log'

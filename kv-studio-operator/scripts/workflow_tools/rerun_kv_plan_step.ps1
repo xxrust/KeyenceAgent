@@ -14,6 +14,8 @@ $plan = Get-Content -LiteralPath $PlanPath -Raw -Encoding UTF8 | ConvertFrom-Jso
 $step = @($plan.steps | Where-Object { [string]$_.name -eq $StepName })
 if ($step.Count -ne 1) { throw "KV_RERUN_STEP_NOT_FOUND: $StepName (matches=$($step.Count))" }
 $step = $step[0]
+$expectedRunId = [string]$plan.run_id
+$planHash = (Get-FileHash -LiteralPath $PlanPath -Algorithm SHA256).Hash
 $classes = @($step.classes | ForEach-Object { [string]$_ })
 $scriptPath = Resolve-KvStudioOperatorScriptPath -ScriptRoot $root -Name ([string]$step.script_name) -Classes $classes
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
@@ -23,9 +25,22 @@ $argsList = @($step.arguments | ForEach-Object { [string]$_ })
 # overwrites the original run's evidence.
 $outIndex = [Array]::IndexOf($argsList, '-OutDir')
 if ($outIndex -ge 0 -and ($outIndex + 1) -lt $argsList.Count) { $argsList[$outIndex + 1] = $OutDir }
+$projectPath = ''
+for ($i = 0; $i -lt $argsList.Count - 1; $i++) {
+  if ($argsList[$i] -eq '-ProjectPath') { $projectPath = [string]$argsList[$i + 1]; break }
+}
+$inputFingerprints = @()
+foreach ($arg in $argsList) {
+  if ($arg -and (Test-Path -LiteralPath $arg -PathType Leaf)) {
+    $inputFingerprints += [ordered]@{ path = [IO.Path]::GetFullPath($arg); sha256 = (Get-FileHash -LiteralPath $arg -Algorithm SHA256).Hash }
+  }
+}
+$mutex = New-Object System.Threading.Mutex($false, 'Local\KeyenceAgent.KvStudio.UI')
+if (-not $mutex.WaitOne(0)) { throw 'KV_UI_MUTEX_BUSY: another KV STUDIO workflow is running' }
 $stdoutPath = Join-Path $OutDir 'step_stdout.txt'
 $stderrPath = Join-Path $OutDir 'step_stderr.txt'
 $watch = [Diagnostics.Stopwatch]::StartNew()
+try {
 $proc = Start-Process -FilePath 'powershell' -ArgumentList (@('-NoProfile','-ExecutionPolicy','Bypass','-File',$scriptPath) + $argsList) -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru -WindowStyle Hidden
 $timedOut = $false
 if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
@@ -35,6 +50,9 @@ if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
 $proc.Refresh()
 $exitCode = if ($timedOut) { -2 } else { [int]$proc.ExitCode }
 $watch.Stop()
+} finally {
+  if ($mutex) { try { $mutex.ReleaseMutex() } catch {} ; $mutex.Dispose() }
+}
 
 # Collect the contract files declared for this script, plus a failure screenshot.
 $contractFiles = @()
@@ -62,6 +80,7 @@ if (-not (Test-Path -LiteralPath $screenshot -PathType Leaf)) { $screenshot = ''
 
 $result = [ordered]@{
   ok = ($exitCode -eq 0)
+  run_id = $expectedRunId
   step = [string]$step.name
   script = $scriptPath
   classes = $classes
@@ -73,7 +92,11 @@ $result = [ordered]@{
   stderr_path = $stderrPath
   contract_files = $present
   failure_screenshot_path = $screenshot
+  project_path = $projectPath
+  execution_plan_sha256 = $planHash
+  input_fingerprints = $inputFingerprints
 }
 $result | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $OutDir 'rerun_result.json') -Encoding UTF8
+$result | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $OutDir 'step_receipt.json') -Encoding UTF8
 $result | ConvertTo-Json -Depth 4
 exit $exitCode

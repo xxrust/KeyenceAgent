@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import search_v3
 import kb_search
+from kb_paths import runtime_db
 
 # Load test cases
 dev_cases = [json.loads(l) for l in open('cases.jsonl', encoding='utf-8')]
@@ -53,7 +54,7 @@ def evaluate_with_length_penalty(searcher, cases, min_len, best_rrf_k=45):
 print("Testing length penalty on v3m with best RRF_K=45...")
 print()
 
-s = search_v3.Searcher(Path('H:/llm-wiki-v2-keyence/v3/wiki.v3m.db'))
+s = search_v3.Searcher(runtime_db())
 
 # Test different MIN_LEN thresholds
 min_len_values = [0, 300, 400, 500, 600, 800, 1000]

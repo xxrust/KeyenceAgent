@@ -18,6 +18,7 @@ $workflow = Join-Path $repo 'scripts\workflows\configure_kv_eip_devices.ps1'
 $fixture = Join-Path $repo 'references\KVX样例程序_v100'
 $fixtureKpr = Join-Path $fixture 'KVX样例程序_v100.kpr'
 
+if (-not $OutDir -and $WorkRoot) { $OutDir = $WorkRoot }
 if (-not $OutDir) { $OutDir = Join-Path $env:TEMP ('kv-eip-live-' + [guid]::NewGuid().ToString('N').Substring(0, 8)) }
 $OutDir = [IO.Path]::GetFullPath($OutDir)
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
@@ -66,9 +67,13 @@ if (-not $ready) {
 Log 'kvs_ready'
 
 $addCfg = Join-Path $OutDir 'add.json'
+$noOpCfg = Join-Path $OutDir 'modify_noop.json'
+$duplicateCfg = Join-Path $OutDir 'modify_duplicate.json'
 $modCfg = Join-Path $OutDir 'modify.json'
 $delCfg = Join-Path $OutDir 'delete.json'
 [IO.File]::WriteAllText($addCfg, '{"schema_version":1,"devices":[{"model":"NU-EP1","node_address":3,"ip_address":"192.168.0.3"}]}', (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText($noOpCfg, '{"schema_version":1,"devices":[{"node_address":3,"ip_address":"192.168.0.2"}]}', (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText($duplicateCfg, '{"schema_version":1,"devices":[{"node_address":3,"ip_address":"192.168.0.1"}]}', (New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText($modCfg, '{"schema_version":1,"devices":[{"node_address":3,"ip_address":"192.168.0.31"}]}', (New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText($delCfg, '{"schema_version":1,"devices":[{"node_address":3}]}', (New-Object Text.UTF8Encoding($false)))
 
@@ -102,12 +107,27 @@ function Invoke-Step([string]$action, [string]$configPath, [string]$stepName) {
 }
 
 $steps = New-Object System.Collections.Generic.List[object]
+$negativeChecks = New-Object System.Collections.Generic.List[object]
 $failures = New-Object System.Collections.Generic.List[string]
 
 Log 'step 1/3 add'
 $add = Invoke-Step 'Add' $addCfg 'add'
 $steps.Add($add)
 if (-not $add.ok) { $failures.Add('add: ' + $add.detail) }
+
+Log 'negative check 1/2 modify no-op'
+$noOp = Invoke-Step 'Modify' $noOpCfg 'modify_noop'
+$noOpCode = if ($noOp.result) { [string]$noOp.result.error_code } else { '' }
+$noOpOk = (-not $noOp.ok) -and ($noOpCode -eq 'KV_EIP_MODIFY_NOOP')
+$negativeChecks.Add([ordered]@{ name = 'modify_noop_rejected'; ok = $noOpOk; error_code = $noOpCode; out_dir = $noOp.out_dir })
+if (-not $noOpOk) { $failures.Add("modify_noop: expected KV_EIP_MODIFY_NOOP, got '$noOpCode'") }
+
+Log 'negative check 2/2 modify duplicate IP'
+$duplicate = Invoke-Step 'Modify' $duplicateCfg 'modify_duplicate'
+$duplicateCode = if ($duplicate.result) { [string]$duplicate.result.error_code } else { '' }
+$duplicateOk = (-not $duplicate.ok) -and ($duplicateCode -eq 'KV_EIP_MODIFY_TARGET_IP_IN_USE')
+$negativeChecks.Add([ordered]@{ name = 'modify_duplicate_ip_rejected'; ok = $duplicateOk; error_code = $duplicateCode; out_dir = $duplicate.out_dir })
+if (-not $duplicateOk) { $failures.Add("modify_duplicate: expected KV_EIP_MODIFY_TARGET_IP_IN_USE, got '$duplicateCode'") }
 
 Log 'step 2/3 modify'
 $mod = Invoke-Step 'Modify' $modCfg 'modify'
@@ -137,7 +157,10 @@ $result = [ordered]@{
       pre_ips = $_.result.pre_ips; post_ips = $_.result.post_ips; readback = $_.result.readback
     }
   })
+  negative_checks = $negativeChecks.ToArray()
   failures = @($failures)
+  passed = @($steps | Where-Object { $_.ok }).Count
+  failed = $failures.Count
   ok = ($failures.Count -eq 0)
   out_dir = $OutDir
   generated_utc = (Get-Date).ToUniversalTime().ToString('o')

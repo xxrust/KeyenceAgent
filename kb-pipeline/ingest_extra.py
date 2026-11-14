@@ -20,12 +20,12 @@ Usage:
   python ingest_extra.py --dry-run            # counts and samples, no DB write
   python ingest_extra.py                      # write into the DB + report
 """
-import os
 from __future__ import annotations
 
 import argparse
 import glob
 import json
+import os
 import re
 import sqlite3
 import zipfile
@@ -34,9 +34,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 DB = Path(os.environ.get("KB_DB") or (Path(__file__).resolve().parent.parent / "dist" / "kb-v3m-2026-11-03" / "wiki.v3m.db"))
 MINERU = HERE / "extra_docs" / "mineru"
-ZIP_SRC = Path(r"H:\KeyenceAgent\其他文件\official-examples.zip")
-SNAP = Path(r"H:\kvOp\regression13_real_20260923_final\13_project_text_snapshot_20260923_130026_242_32dd2104"
-            r"\workflow\snapshot\project")
+ZIP_SRC = Path(os.environ.get("KB_OFFICIAL_EXAMPLES") or (HERE.parent / "其他文件" / "official-examples.zip"))
+SNAP = Path(os.environ.get("KB_PROJECT_SNAPSHOT") or (HERE.parent / "dist" / "project_snapshot"))
 SOURCE_PRIORITY = {"htmlhelp": 0, "chm": 1, "t_language_example": 2, "dockinghelp": 3,
                    "table": 4, "pdf": 5, "htmlnavi_meta": 9}
 MAX = 2400          # hard cap per chunk (same order of magnitude as stage1)

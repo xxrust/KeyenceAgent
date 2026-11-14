@@ -1,8 +1,9 @@
 """Compare specific chunks between v3 and v3m to find what changed."""
 import sqlite3
+from kb_paths import control_db, runtime_db
 
-c3 = sqlite3.connect('H:/llm-wiki-v2-keyence/v3/wiki.v3.db')
-c3m = sqlite3.connect('H:/llm-wiki-v2-keyence/v3/wiki.v3m.db')
+c3 = sqlite3.connect(control_db())
+c3m = sqlite3.connect(runtime_db())
 
 # Check the chunks that should contain the missing answers
 test_chunks = [

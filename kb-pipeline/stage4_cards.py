@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sqlite3
 from collections import defaultdict
@@ -22,8 +23,8 @@ from pathlib import Path
 import yaml
 
 HERE = Path(__file__).resolve().parent
-V2 = Path(r"H:\llm-wiki-v2-keyence\wiki.v2.cleaned.db")
-DB = Path(r"H:\llm-wiki-v2-keyence\v3\wiki.v3.db")
+V2 = Path(os.environ.get("KB_SOURCE_DB") or (Path(__file__).resolve().parent.parent / "dist" / "kb-v2.cleaned.db"))
+DB = Path(os.environ.get("KB_DB") or (Path(__file__).resolve().parent.parent / "dist" / "kb-v3m-2026-11-03" / "wiki.v3m.db"))
 FIELD = HERE / "ontology" / "field_findings.yaml"
 
 LINK_RE = re.compile(r"\[([^\]]*)\]\([^)]*\)")

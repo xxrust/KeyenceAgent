@@ -2069,6 +2069,8 @@ try {
 
   [pscustomobject]@{
     Ok = $true
+    run_id = [string]$env:KV_WORKFLOW_RUN_ID
+    execution_plan_sha256 = [string]$env:KV_WORKFLOW_PLAN_SHA256
     ProjectPath = $ProjectPath
     ProjectRoot = $projectRoot
     LocalProgramName = $LocalProgramName
@@ -2091,6 +2093,8 @@ try {
   $currentStep = if ($script:LastErrorStep) { $script:LastErrorStep } else { 'set_variables' }
   [pscustomobject]@{
     ok = $false
+    run_id = [string]$env:KV_WORKFLOW_RUN_ID
+    execution_plan_sha256 = [string]$env:KV_WORKFLOW_PLAN_SHA256
     error_code = $errorCode
     operation = 'set KV STUDIO variables'
     current_step = $currentStep

@@ -1,9 +1,10 @@
 param(
   [Parameter(Mandatory=$true)][string]$PlanPath,
   [string]$OutDir = '',
-  # Treat a check that never ran (skipped) as a failure. Use it when the caller
-  # knows the plan must carry that evidence (issue #3 R01).
-  [switch]$RequireAllChecks
+  # A delivery gate requires every check by default. Diagnostic callers may opt
+  # into partial reports, but those reports are never a successful gate.
+  [switch]$AllowSkippedChecks,
+  [Alias('Strict')][switch]$RequireAllChecks
 )
 # Offline integrity gate for an execution plan. Wires the three preflight tools
 # that used to have no caller:
@@ -44,14 +45,16 @@ function Invoke-OfflineTool([string]$ScriptName, [string[]]$Arguments, [string]$
 $moduleOut = Join-Path $OutDir 'module_completion'
 # -AllowEmptyPlan turns "plan with no modules" into a skipped check below instead of
 # a hard error; a real module list must still prove itself (issue #3 R06).
-$module = Invoke-OfflineTool 'get_kv_module_completion.ps1' @('-PlanPath', $PlanPath, '-OutDir', $moduleOut, '-AllowEmptyPlan') 'module_completion.json'
+$moduleArgs = @('-PlanPath', $PlanPath, '-OutDir', $moduleOut)
+if ($AllowSkippedChecks) { $moduleArgs += '-AllowEmptyPlan' }
+$module = Invoke-OfflineTool 'get_kv_module_completion.ps1' $moduleArgs 'module_completion.json'
 $moduleResultPath = Join-Path $moduleOut 'module_completion.json'
 # A tool that exits 0 without writing its report proves nothing (issue #3 R01).
 $moduleStatus = if ($module.exit -ne 0 -or -not (Test-Path -LiteralPath $moduleResultPath -PathType Leaf)) { 'fail' } else { 'pass' }
 if ($moduleStatus -eq 'pass') {
   $moduleReport = Get-Content -LiteralPath $moduleResultPath -Raw -Encoding UTF8 | ConvertFrom-Json
   if ($moduleReport.empty_plan) {
-    $moduleStatus = 'skipped'
+    $moduleStatus = if ($AllowSkippedChecks) { 'skipped' } else { 'fail' }
     $module.detail = 'plan has no variable_sets: nothing to prove'
   }
 }
@@ -66,8 +69,15 @@ if ($globalTsv -and (Test-Path -LiteralPath $globalTsv -PathType Leaf)) {
   # are resolved instead of being reported as missing_type:* (issue #3 R01).
   $structureDefs = [string]$plan.structure_definitions_path
   if ($structureDefs -and (Test-Path -LiteralPath $structureDefs -PathType Leaf)) { $depArgs += @('-StructureDefinitionsPath', $structureDefs) }
-  foreach ($axisIndex in @($plan.axis_indexes)) { if ($null -ne $axisIndex -and [string]$axisIndex -ne '') { $depArgs += @('-AxisIndexes', [string]$axisIndex) } }
-  if ($plan.fb_types) { $depArgs += @('-FbTypes', (@($plan.fb_types) -join ',')) }
+  # A variable's _MC_Axis[n] device is a requirement, not proof that axis n is
+  # configured. Only a planner-provided verified inventory may satisfy it.
+  if ([bool]$plan.axis_context_verified) {
+    foreach ($axisIndex in @($plan.axis_indexes)) { if ($null -ne $axisIndex -and [string]$axisIndex -ne '') { $depArgs += @('-AxisIndexes', [string]$axisIndex) } }
+  }
+  if ($plan.fb_types) {
+    $depArgs += '-FbTypes'
+    $depArgs += @($plan.fb_types | ForEach-Object { [string]$_ })
+  }
   $dep = Invoke-OfflineTool 'plan_kv_variable_dependencies.ps1' $depArgs 'variable_dependencies.json'
   $depResultPath = Join-Path $depOut 'variable_dependency_report.json'
   $depStatus = 'fail'
@@ -86,7 +96,8 @@ if ($scaffoldRoot -and (Test-Path -LiteralPath $scaffoldRoot -PathType Container
   $usageOut = Join-Path $OutDir 'variable_usage'
   $usage = Invoke-OfflineTool 'verify_kv_variable_usage.ps1' @('-ScaffoldRoot', $scaffoldRoot, '-OutDir', $usageOut) 'variable_usage.json'
   $usageResultPath = Join-Path $usageOut 'variable_usage_report.json'
-  Add-Check 'variable_usage' $(if ($usage.exit -eq 0) { 'pass' } else { 'fail' }) $usage.exit $usageResultPath $usage.detail
+  $usageStatus = if ($usage.exit -eq 0 -and (Test-Path -LiteralPath $usageResultPath -PathType Leaf)) { 'pass' } else { 'fail' }
+  Add-Check 'variable_usage' $usageStatus $usage.exit $usageResultPath $usage.detail
 } else {
   Add-Check 'variable_usage' 'skipped' 0 '' 'plan has no scaffold_root'
 }
@@ -95,12 +106,11 @@ $failed = @($checks | Where-Object { $_.status -eq 'fail' })
 $skipped = @($checks | Where-Object { $_.status -eq 'skipped' })
 # A check that never ran is not a pass: with -RequireAllChecks a skipped check fails
 # the gate (issue #3 R01).
-$blocking = @($failed)
-if ($RequireAllChecks) { $blocking = @($failed) + @($skipped | ForEach-Object { [pscustomobject]@{ name = $_.name; status = 'fail'; exit_code = 41; result_path = $_.result_path; detail = 'check did not run: ' + $_.detail } }) }
+$blocking = @($failed) + @($skipped | ForEach-Object { [pscustomobject]@{ name = $_.name; status = 'fail'; exit_code = 41; result_path = $_.result_path; detail = 'check did not run: ' + $_.detail } })
 $report = [ordered]@{
   ok = ($blocking.Count -eq 0)
   plan_path = $PlanPath
-  require_all_checks = [bool]$RequireAllChecks
+  allow_skipped_checks = [bool]$AllowSkippedChecks
   checks = $checks.ToArray()
   failed_count = $failed.Count
   skipped_count = $skipped.Count

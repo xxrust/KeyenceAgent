@@ -95,7 +95,7 @@ work_root/
 
 ### wiki_root
 
-**说明：** KEYENCE 知识库（Wiki V2）根目录
+**说明：** KEYENCE 知识库（Wiki v3m）根目录或数据库文件
 
 **类型：** String
 

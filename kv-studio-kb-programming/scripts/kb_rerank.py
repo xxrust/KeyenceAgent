@@ -1,7 +1,7 @@
 """Cross-encoder reranker for kb_search.py (optional; needs torch + transformers).
 
 Model: BAAI/bge-reranker-v2-m3 (XLM-R large). Lookup order is the same as kb_vectors:
-KB_MODEL_DIR/<repo> > H:/models/<repo> > H:/models/models/<org>--<name>/snapshots/master > HF id.
+KB_MODEL_DIR layouts > the model ID through the configured model client.
 
 A cross-encoder reads the query and the passage together, so it can tell "this page is about the
 same topic" from "this page answers the question" — which is exactly what the RRF fusion of
@@ -18,7 +18,7 @@ MODELS = {"bge-reranker-v2-m3": "BAAI/bge-reranker-v2-m3",
 
 def model_path(name: str) -> str:
     repo = MODELS.get(name, name)
-    roots = [os.environ.get("KB_MODEL_DIR"), r"H:\models"]
+    roots = [os.environ.get("KB_MODEL_DIR")]
     for root in roots:
         if not root:
             continue

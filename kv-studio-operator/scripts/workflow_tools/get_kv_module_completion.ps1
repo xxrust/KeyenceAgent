@@ -26,22 +26,50 @@ function Read-JsonOrNull([string]$Path) {
   try { return (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json) } catch { return $null }
 }
 function Get-SafeModule([string]$Name) { return ($Name -replace '[^A-Za-z0-9_.-]+', '_') }
+function Get-ReceiptProject([object]$Receipt) {
+  if (-not $Receipt) { return '' }
+  $value = [string]$Receipt.ProjectPath
+  if (-not $value) { $value = [string]$Receipt.project_path }
+  if (-not $value -and $Receipt.parameters) { $value = [string]$Receipt.parameters.ProjectPath }
+  if (-not $value -and $Receipt.arguments) {
+    $args = @($Receipt.arguments | ForEach-Object { [string]$_ })
+    for ($i = 0; $i -lt ($args.Count - 1); $i++) {
+      if ($args[$i] -eq '-ProjectPath') { $value = $args[$i + 1]; break }
+    }
+  }
+  return $value
+}
 # A receipt proves this run only when it carries the expected run id. Receipts from
 # an older run (or without any run id when one is expected) are stale.
 function Test-ReceiptStale([object]$Receipt) {
   if (-not $Receipt) { return $false }
   if (-not $expectedRunId) { return $false }
   $receiptRunId = ([string]$Receipt.run_id)
-  return (-not $receiptRunId) -or ($receiptRunId -ne $expectedRunId)
+  if ((-not $receiptRunId) -or ($receiptRunId -ne $expectedRunId)) { return $true }
+  if ($expectedProjectPath) {
+    $receiptProject = Get-ReceiptProject $Receipt
+    if (-not $receiptProject) { return $true }
+    try { if ([IO.Path]::GetFullPath($receiptProject) -ine $expectedProjectPath) { return $true } } catch { return $true }
+  }
+  if ($expectedPlanHash) {
+    $receiptPlanHash = [string]$Receipt.execution_plan_sha256
+    if (-not $receiptPlanHash) { $receiptPlanHash = [string]$Receipt.plan_sha256 }
+    if (-not $receiptPlanHash -or $receiptPlanHash -cne $expectedPlanHash) { return $true }
+  }
+  return $false
 }
 
 $planPropertyNames = @($plan.PSObject.Properties.Name)
 $expectedRunId = if ($RunId) { [string]$RunId } else { [string]$plan.run_id }
+$expectedPlanHash = if ($expectedRunId) { (Get-FileHash -LiteralPath $PlanPath -Algorithm SHA256).Hash } else { '' }
+$expectedProjectPath = ''
+if ($plan.project_path) { try { $expectedProjectPath = [IO.Path]::GetFullPath([string]$plan.project_path) } catch {} }
 $sawVariableSets = $planPropertyNames -contains 'variable_sets'
 $sets = @($plan.variable_sets | Where-Object { $null -ne $_ })
 $sawVariableSetsProperty = $sawVariableSets
 $stepNames = @($plan.steps | ForEach-Object { [string]$_.name } | Where-Object { $_ })
 $hasPlanSteps = ($stepNames.Count -gt 0)
+$unboundFormalPlan = $hasPlanSteps -and [string]::IsNullOrWhiteSpace($expectedRunId)
 $modules = New-Object System.Collections.Generic.List[object]
 for ($i = 0; $i -lt $sets.Count; $i++) {
   $set = $sets[$i]
@@ -52,24 +80,30 @@ for ($i = 0; $i -lt $sets.Count; $i++) {
   $placementReceipt = Read-JsonOrNull (Join-Path $ArtifactsRoot ("module_placement\$module\step_receipt.json"))
   $argsReceipt = Read-JsonOrNull (Join-Path $ArtifactsRoot ("set_fb_arguments\module_{0:D2}_{1}\step_receipt.json" -f $number, $safe))
   $varResult = Read-JsonOrNull (Join-Path $ArtifactsRoot ("set_variables\module_{0:D2}_{1}\set_variables_result.json" -f $number, $safe))
+  $varReceipt = Read-JsonOrNull (Join-Path $ArtifactsRoot ("set_variables\module_{0:D2}_{1}\step_receipt.json" -f $number, $safe))
+  $bodyReceipt = Read-JsonOrNull (Join-Path $ArtifactsRoot ("set_fb_program_body\module_{0:D2}_{1}\step_receipt.json" -f $number, $safe))
 
   $argsExpected = if ($hasPlanSteps) {
     @($stepNames | Where-Object { $_ -match ('^(repair_)?set_fb_arguments_' + [regex]::Escape($module) + '$') }).Count -gt 0
   } else { [string]$set.category -match 'fb' }
   $placementExpected = if ($hasPlanSteps) { $stepNames -contains "verify_module_placement_$module" } else { $false }
+  $bodyExpected = if ($hasPlanSteps) { $stepNames -contains "set_fb_program_body_$module" } else { $false }
 
   $staleReceipts = @()
+  if ($unboundFormalPlan) { $staleReceipts += 'stale_receipt:missing_run_id' }
   foreach ($pair in @(
       @{ name = 'import'; receipt = $importReceipt },
       @{ name = 'module_placement'; receipt = $placementReceipt },
       @{ name = 'set_fb_arguments'; receipt = $argsReceipt },
-      @{ name = 'set_variables'; receipt = $varResult })) {
+      @{ name = 'set_variables'; receipt = $(if ($varReceipt) { $varReceipt } else { $varResult }) },
+      @{ name = 'set_fb_program_body'; receipt = $bodyReceipt })) {
     if (Test-ReceiptStale $pair.receipt) { $staleReceipts += ('stale_receipt:{0}' -f $pair.name) }
   }
   $importOk = [bool]($importReceipt -and $importReceipt.ok) -and -not ($staleReceipts -contains 'stale_receipt:import')
   $placementOk = if ($placementReceipt) { [bool]$placementReceipt.ok -and -not ($staleReceipts -contains 'stale_receipt:module_placement') } else { -not $placementExpected }
   $argsOk = if ($argsReceipt) { [bool]$argsReceipt.ok -and -not ($staleReceipts -contains 'stale_receipt:set_fb_arguments') } else { -not $argsExpected }
   $varsOk = [bool]($varResult -and $varResult.ok) -and -not ($staleReceipts -contains 'stale_receipt:set_variables')
+  $bodyOk = if ($bodyReceipt) { [bool]$bodyReceipt.ok -and -not ($staleReceipts -contains 'stale_receipt:set_fb_program_body') } else { -not $bodyExpected }
   $reason = @()
   foreach ($stale in $staleReceipts) { $reason += $stale }
   if (-not $importOk) { $reason += 'import_missing_or_failed' }
@@ -80,6 +114,8 @@ for ($i = 0; $i -lt $sets.Count; $i++) {
     if ($varResult -and $varResult.error_code) { $reason += "variables:$($varResult.error_code)" }
     else { $reason += 'variables_missing_or_failed' }
   }
+  if (-not $bodyReceipt -and $bodyExpected) { $reason += 'program_body_receipt_missing' }
+  if ($bodyReceipt -and -not $bodyOk) { $reason += 'program_body_missing_or_failed' }
   if ($placementReceipt -and -not $placementOk) { $reason += 'placement_failed' }
   $modules.Add([pscustomobject]@{
     number = $number
@@ -89,6 +125,7 @@ for ($i = 0; $i -lt $sets.Count; $i++) {
     placement_ok = $placementOk
     fb_arguments_ok = $argsOk
     variables_ok = $varsOk
+    program_body_ok = $bodyOk
     complete = ($reason.Count -eq 0)
     reasons = @($reason)
   })

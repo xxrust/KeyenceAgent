@@ -19,36 +19,31 @@ KeyenceAgent 仓库保存三个 KEYENCE skill 的发布源码。Codex 安装目�
 - Git
 - KEYENCE KV STUDIO KVS12
 - Codex
-- 已准备的 `llm-wiki-v2-keyence` 目录
+- 已准备的 v3m 知识库目录（仓库内 `dist\kb-v3m-*` 或单独发布包）
 
-## 下载 Wiki V2 知识库
+## 准备 Wiki v3m 知识库
 
-当前运行时只需要 `wiki.v2.cleaned.db` 及其查询脚本。知识库压缩包通过百度网盘发布：
+当前运行时使用 `wiki.v3m.db`，同时需要同目录的向量文件和 `jieba_userdict.txt`。仓库发布包位于 `dist\kb-v3m-*`，也可以从对应版本的 release package 解压得到。
 
-- 文件：`llm-wiki-v2-keyence-cleaned.zip`
-- 下载地址：[百度网盘分享](https://pan.baidu.com/s/16eywbrivGbS8tP7DEkTspw?pwd=tn2y)
-- 提取码：`tn2y`
-- 数据库 SHA256：`CD6D08F561913D1C8C51F6FDE8279593BF987D59F8E725B95563C2EFE1E13B7C`
-
-解压后，将 `wiki_root` 指向同时包含以下内容的目录：
+将 `wiki_root` 或 `wiki_db` 指向包含以下内容的目录或数据库文件：
 
 ```text
-llm-wiki-v2-keyence/
-├── wiki.v2.cleaned.db
-└── scripts/
-    ├── wiki_query.py
-    └── wiki_common.py
+kb-v3m-2026-11-03/
+├── wiki.v3m.db
+├── vectors.wiki.v3m.bge-m3.npy
+├── vectors.wiki.v3m.bge-m3.ids.json
+└── jieba_userdict.txt
 ```
 
-可以用下面的命令确认数据库文件和查询脚本存在：
+可以用下面的命令确认运行库存在：
 
 ```powershell
-$wiki = 'C:\Path\To\llm-wiki-v2-keyence'
-Test-Path (Join-Path $wiki 'wiki.v2.cleaned.db')
-Test-Path (Join-Path $wiki 'scripts\wiki_query.py')
+$wiki = 'C:\Path\To\kb-v3m-2026-11-03'
+Test-Path (Join-Path $wiki 'wiki.v3m.db')
+Test-Path (Join-Path $wiki 'jieba_userdict.txt')
 ```
 
-然后运行安装脚本，在 `Wiki V2 root` 提示处填写 `$wiki`。压缩包包含检索数据库和查询运行文件，不包含原始 HTML/Markdown 证据库；查询结果中的部分原始证据路径可能无法在另一台电脑直接打开。
+然后运行安装脚本，在 `KEYENCE Wiki v3m root` 提示处填写 `$wiki`。如果配置文件直接保存数据库路径，使用 `wiki_db`；旧的 V2 数据库不会被自动回退。
 
 ## 普通用户安装
 
@@ -68,7 +63,7 @@ scripts. Setup removes that metadata from the repository and installed skill
 PowerShell files without changing the system execution policy. After setup,
 scripts can be loaded directly in the normal user session.
 
-按提示填写 `Kvs.exe`、一次性工作目录和 Wiki V2 根目录。管理员凭据使用 Windows DPAPI 写入用户配置目录，不进入 Git 仓库。
+按提示填写 `Kvs.exe`、一次性工作目录和 Wiki v3m 根目录。管理员凭据使用 Windows DPAPI 写入用户配置目录，不进入 Git 仓库。
 
 验证：
 

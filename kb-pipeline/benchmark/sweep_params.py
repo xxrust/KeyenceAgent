@@ -14,6 +14,7 @@ from itertools import product
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import search_v3
+from kb_paths import runtime_db
 
 # Load test cases
 dev_cases = [json.loads(l) for l in open('cases.jsonl', encoding='utf-8')]
@@ -68,7 +69,7 @@ print("Sweeping parameters on v3m...")
 print(f"Total configs: {len(rrf_k_values) * len(seg_mult_values) * len(tri_mult_values)}")
 print()
 
-s = search_v3.Searcher(Path('H:/llm-wiki-v2-keyence/v3/wiki.v3m.db'))
+s = search_v3.Searcher(runtime_db())
 
 results = []
 for i, (rrf_k, seg_m, tri_m) in enumerate(product(rrf_k_values, seg_mult_values, tri_mult_values), 1):

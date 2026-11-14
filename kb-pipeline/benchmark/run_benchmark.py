@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sqlite3
 import sys
@@ -22,9 +23,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 PIPELINE = HERE.parent
-WIKI_ROOT = Path(r"H:\llm-wiki-v2-keyence")
-V2_DB = WIKI_ROOT / "wiki.v2.cleaned.db"
-V3_DB = WIKI_ROOT / "v3" / "wiki.v3.db"
+REPO_ROOT = PIPELINE.parent
+DEFAULT_DB = REPO_ROOT / "dist" / "kb-v3m-2026-11-03" / "wiki.v3m.db"
+V3_DB = DEFAULT_DB
 K = 10
 
 
@@ -137,7 +138,17 @@ def main():
                          "content: also count a hit when the returned chunk text contains it")
     a = ap.parse_args()
     cases = load_cases(a.cases)
-    db = a.db or (V2_DB if a.retriever == "v2" else V3_DB)
+    # KB_DB is the supported override for local benchmark runs. The v2
+    # retriever remains an explicit compatibility mode over the same shipped
+    # database; no deleted external H: drive is consulted implicitly.
+    if a.db:
+        db = a.db
+    elif os.environ.get("KB_DB"):
+        db = Path(os.environ["KB_DB"])
+    elif a.retriever == "v3":
+        db = V3_DB
+    else:
+        raise SystemExit("--retriever v2 is legacy; pass --db explicitly")
     if a.oracle:
         return oracle(cases, db)
     search = v2_search(db) if a.retriever == "v2" else v3_search(db, a.mode)

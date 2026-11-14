@@ -3,10 +3,11 @@ import re
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(r"C:\Users\Administrator\.dsh\skills\kv-studio-kb-programming\scripts")))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "kv-studio-kb-programming" / "scripts"))
 import kb_search  # noqa: E402
+from kb_paths import runtime_db
 
-DB = Path(r"H:\llm-wiki-v2-keyence\v3\wiki.v3m.db")
+DB = runtime_db()
 q = sys.argv[1] if len(sys.argv) > 1 else "找零点 原点传感器"
 s = kb_search.Searcher(DB)
 kb_search.RERANK = True

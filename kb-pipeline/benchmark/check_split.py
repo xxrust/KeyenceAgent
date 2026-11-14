@@ -1,7 +1,8 @@
 """Check if the wrong top result in v3m was affected by splitting or MinerU."""
 import sqlite3
+from kb_paths import runtime_db
 
-c3m = sqlite3.connect('H:/llm-wiki-v2-keyence/v3/wiki.v3m.db')
+c3m = sqlite3.connect(runtime_db())
 
 # Check the wrong top result in v3m
 wrong = '03_32_FBFUN_Motion::chunk-002#p3'

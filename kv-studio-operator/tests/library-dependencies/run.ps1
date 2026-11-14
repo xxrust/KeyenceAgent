@@ -100,6 +100,14 @@ $results | Format-Table -AutoSize | Out-String -Width 140 | Write-Output
 Write-Output ''
 Write-Output ("Cases: {0}  Passed: {1}  Failed: {2}" -f $results.Count, ($results.Count - $failed.Count), $failed.Count)
 Write-Output "WorkRoot: $WorkRoot"
+New-Item -ItemType Directory -Force -Path $WorkRoot | Out-Null
+[ordered]@{
+  test = 'library-dependencies'
+  passed = ($results.Count - $failed.Count)
+  failed = $failed.Count
+  cases = @($results | ForEach-Object { [ordered]@{ name = $_.case; ok = [bool]$_.pass; detail = [string]$_.detail } })
+  work_root = $WorkRoot
+} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $WorkRoot 'test_result.json') -Encoding UTF8
 if ($failed.Count -gt 0) {
   foreach ($f in $failed) { Write-Output ("FAIL {0}: {1}" -f $f.case, $f.detail) }
   exit 1

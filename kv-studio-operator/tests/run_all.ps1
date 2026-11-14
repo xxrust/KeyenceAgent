@@ -121,8 +121,10 @@ foreach ($suite in $suites) {
   $results.Add([pscustomobject]@{ suite = $suite; status = $status; exit = $exitCode; passed = $passed; failed = $failed; detail = $detail })
 }
 
-$failures = @($results | Where-Object { $_.status -in @('fail', 'timeout', 'no-evidence', 'missing') })
 $skips = @($results | Where-Object { $_.status -eq 'skip' })
+# A skip is an incomplete validation result, so it is a blocking outcome for the
+# aggregate gate. It remains separately counted for diagnostics (issue #3 R02).
+$failures = @($results | Where-Object { $_.status -in @('fail', 'timeout', 'no-evidence', 'missing', 'skip') })
 $summary = [ordered]@{
   ok = ($failures.Count -eq 0 -and $results.Count -gt 0)
   include_live = [bool]$IncludeLive

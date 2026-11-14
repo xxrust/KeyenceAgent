@@ -1,12 +1,12 @@
 """KEYENCE knowledge-base search (Wiki v3m: cleaned chunks + hybrid index + ontology cards).
 
-Built by H:/KeyenceAgent/kb-pipeline (see its PROGRESS.md); this file is the runtime entry.
-DB resolution: --db > KEYENCE_WIKI_V3_DB > config `wiki_v3_db` > config `wiki_root`/v3/wiki.v3m.db.
+Built by the repository's `kb-pipeline` (see its PROGRESS.md); this file is the runtime entry.
+DB resolution: --db > KEYENCE_WIKI_V3_DB > config `wiki_db`/legacy `wiki_v3_db` > config `wiki_root`/v3/wiki.v3m.db or `wiki_root`/wiki.v3m.db.
 The default is **wiki.v3m.db** (PDF pages with a garbled text layer replaced by MinerU output, plus cards and
-vectors); wiki.v3.db is kept as the control library and needs an explicit --db.
+vectors); archived control databases are not runtime dependencies and require an explicit --db only when available.
 config = KEYENCE_AGENT_CONFIG | KV_STUDIO_OPERATOR_CONFIG | %APPDATA%/Codex/kv-studio-operator/config.json.
 
-Hybrid retriever over wiki.v3.db.
+Hybrid retriever over the shipped wiki.v3m.db runtime library.
 
 Channels (each produces a ranked list; fused with reciprocal-rank fusion):
   seg_q / seg_x   jieba-word bm25 on the user's own words / on lexicon expansions
@@ -48,10 +48,15 @@ def resolve_db(explicit: Path | None = None) -> Path:
         if c and Path(c).exists():
             data = json.loads(Path(c).read_text(encoding="utf-8-sig"))
             configured = None
-            if data.get("wiki_db"):
-                configured = Path(os.path.expandvars(data["wiki_db"]))
+            # wiki_v3_db was the published key before the single-library
+            # resolver renamed it to wiki_db. Keep both keys during migration.
+            configured_value = data.get("wiki_db") or data.get("wiki_v3_db")
+            if configured_value:
+                configured = Path(os.path.expandvars(configured_value))
             elif data.get("wiki_root"):
-                configured = Path(os.path.expandvars(data["wiki_root"])) / "v3" / "wiki.v3m.db"
+                root = Path(os.path.expandvars(data["wiki_root"]))
+                candidates = [root / "v3" / "wiki.v3m.db", root / "wiki.v3m.db"]
+                configured = next((candidate for candidate in candidates if candidate.exists()), candidates[0])
             # A stale config that points at a deleted library must not win over the
             # single shipped one (issue #3 R07/R09).
             if configured and configured.exists():
@@ -199,6 +204,7 @@ class Searcher:
             "select 1 from sqlite_master where name='cards_fts'").fetchone())
         self._vec = None
         self._rr = None
+        self.degraded = ""
         self._chunk_card: dict[str, str] | None = None
 
     def chunk_cards(self) -> dict[str, str]:
@@ -359,7 +365,13 @@ class Searcher:
                 print("WARNING: vector channel unavailable (%s); answering with lexical+cards only"
                       % self.degraded, file=sys.stderr)
                 return []
-        return self._vec.search(q, CAND)
+        try:
+            return self._vec.search(q, CAND)
+        except Exception as exc:
+            self.degraded = "vectors_search_failed:%s" % type(exc).__name__
+            print("WARNING: vector search failed (%s); answering with lexical+cards only" % self.degraded,
+                  file=sys.stderr)
+            return []
 
     def _card_channel(self, a: dict, strong: bool = True) -> list[int]:
         """Cards point at evidence chunks; a card hit votes for its evidence."""
@@ -570,12 +582,16 @@ def main():
         ap.error("query or --card required")
     mode = "hybrid_novec" if a.fast else a.mode
     if mode == "hybrid" and not s.has_vec:
+        s.degraded = "no_vectors_table"
+        print("WARNING: vector channel unavailable (database has no vectors table); using hybrid_novec",
+              file=sys.stderr)
         mode = "hybrid_novec"
     if mode == "hybrid":
         try:
             import sentence_transformers  # noqa: F401
         except Exception:
-            print("vector channel unavailable (sentence-transformers not importable); using hybrid_novec",
+            s.degraded = "sentence_transformers_unavailable"
+            print("WARNING: vector channel unavailable (sentence-transformers not importable); using hybrid_novec",
                   file=sys.stderr)
             mode = "hybrid_novec"
     global RERANK
@@ -591,6 +607,9 @@ def main():
             RERANK = False
     cards = [] if a.no_cards else s.related_cards(a.query)
     res = s.search(a.query, a.k, mode, a.explain)
+    if s.degraded and not a.json:
+        print("WARNING: retrieval degraded (%s); result ranking excludes one or more optional channels" % s.degraded,
+              file=sys.stderr)
     if a.json:
         degraded = getattr(s, "degraded", "")
         print(json.dumps({"query": a.query, "mode": mode, "cards": cards, "results": res,

@@ -8,7 +8,7 @@ description: 编写和修改 KEYENCE PLC 程序（ST/LD）、变量、FB 接口�
 本 skill 负责程序内容和工程语义。KV STUDIO 桌面操作只使用
 `kv-studio-operator` 的公开 workflow；不要使用旧 kvtool 或历史 UI 脚本。
 KEYENCE 专有语法、指令/FB 调用、设备映射和模块行为，通过
-`kv-studio-kb-programming` 查询本地 Wiki V2 或依据当前项目导出证据确认。
+`kv-studio-kb-programming` 查询本地 Wiki v3m 或依据当前项目导出证据确认。
 
 ## 开工前必读：基础与反直觉清单
 
@@ -165,6 +165,7 @@ BOOL 梯形图按 [complete-module.md](references/complete-module.md) 使用 ope
    方向互斥、忙/完成标志。
 2. **再谈提炼**：只有"官方没有该能力"且"同一逻辑在 ≥2 处重复、只依赖自变量"时，才提炼用户 FB；
    **不要**把重复的手写逻辑搬进一个自研 FB 当作优化，也**不要**给官方 FB 再包一层用户 FB。
+   只有在一组官方 FB 的组合确实在至少两台设备/工站复用、封装只固定参数和现场接线映射而不重做官方行为，且交付说明记录复用证据时，才允许做整机单元 FB；单个轴的回原、JOG、停止组合不符合例外。
 3. **不认识的信号不许猜**：含义不明确的软元件条件原样保留为输入条件，单列"待确认信号"清单，
    不得为结构好看而删除、取反或旁路。
 

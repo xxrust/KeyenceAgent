@@ -109,13 +109,15 @@ New-Item -ItemType Directory -Force -Path $r10Out | Out-Null
 $r10Exit = $LASTEXITCODE
 $r10PlanPath = Join-Path $r10Out 'execution_plan.json'
 $r10Names = @()
+$r10ModuleName = 'ST01'
 if (Test-Path -LiteralPath $r10PlanPath) {
   $r10Plan = Get-Content -LiteralPath $r10PlanPath -Raw -Encoding UTF8 | ConvertFrom-Json
   $r10Names = @($r10Plan.steps | ForEach-Object { [string]$_.name })
+  if (@($r10Plan.variable_sets).Count -gt 0 -and $r10Plan.variable_sets[0].module_name) { $r10ModuleName = [string]$r10Plan.variable_sets[0].module_name }
 }
 $iEmpty = [array]::IndexOf($r10Names, 'import_mnm_empty_1')
-$iVars = [array]::IndexOf($r10Names, 'set_variables_ST01')
-$iBody = [array]::IndexOf($r10Names, 'set_fb_program_body_ST01')
+$iVars = [array]::IndexOf($r10Names, "set_variables_$r10ModuleName")
+$iBody = [array]::IndexOf($r10Names, "set_fb_program_body_$r10ModuleName")
 Add-Case 'R10 planner exits 0' ($r10Exit -eq 0) "exit=$r10Exit"
 Add-Case 'R10 emits placeholder import' ($iEmpty -ge 0) ($r10Names -join ',')
 Add-Case 'R10 order empty -> locals -> body' (($iEmpty -ge 0) -and ($iVars -gt $iEmpty) -and ($iBody -gt $iVars)) "empty=$iEmpty vars=$iVars body=$iBody"

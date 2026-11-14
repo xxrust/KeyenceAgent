@@ -10,7 +10,7 @@ from collections import Counter
 from pathlib import Path
 
 DB = os.environ.get("KB_DB") or str(Path(__file__).resolve().parent.parent / "dist" / "kb-v3m-2026-11-03" / "wiki.v3m.db")
-OUT = Path(r"H:\KeyenceAgent\kb-pipeline\vocab")
+OUT = Path(os.environ.get("KB_VOCAB_OUT") or (Path(__file__).resolve().parent / "vocab"))
 OUT.mkdir(exist_ok=True)
 c = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
 

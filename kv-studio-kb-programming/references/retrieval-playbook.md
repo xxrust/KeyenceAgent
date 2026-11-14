@@ -1,6 +1,6 @@
 # Retrieval Playbook
 
-Use this file when the first Wiki V2 query is weak, noisy, or ambiguous.
+Use this file when the first Wiki v3m query is weak, noisy, or ambiguous.
 
 ## Source Intent
 

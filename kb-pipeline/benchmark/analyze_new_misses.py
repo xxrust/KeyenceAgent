@@ -5,8 +5,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import search_v3
+from kb_paths import control_db
 
-s3 = search_v3.Searcher(Path('H:/llm-wiki-v2-keyence/v3/wiki.v3.db'))
+s3 = search_v3.Searcher(control_db())
 
 # Load only the new cases
 new_cases = [json.loads(l) for l in open('cases_holdout_new.jsonl', encoding='utf-8')]
