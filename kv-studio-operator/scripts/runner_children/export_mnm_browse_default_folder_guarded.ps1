@@ -535,7 +535,9 @@ try {
   Invoke-KvGuardedVkTapCallerOracle -TargetHwnd $process.MainWindowHandle -Step 'mnm export save S' -Vk 0x53 -ExpectedTitleLike 'KV STUDIO*' -Action 'S starts mnemonic-list export; caller waits for option or browse dialog' -SleepMs 900
   Save-TopWindowSnapshot 'top_windows_after_save_s.json'
   Save-ForegroundSnapshot 'foreground_after_save_s.json'
-  $optionDialog = Wait-KvsNonFolderDialog -ProcessId $process.Id -Seconds 8
+  # Nano can raise 选择注释类型 late (observed >8 s on a temp copy); wait longer before
+# falling through to the browse-folder wait.
+$optionDialog = Wait-KvsNonFolderDialog -ProcessId $process.Id -Seconds 30
   if ($optionDialog) {
     Save-TopWindowSnapshot 'top_windows_export_option_dialog.json'
     Invoke-DialogOk -Dialog $optionDialog -Label 'export option'
