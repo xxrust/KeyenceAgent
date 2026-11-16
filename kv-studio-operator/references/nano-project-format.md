@@ -94,3 +94,20 @@ compile_kv_project.ps1 -ProjectPath C:\kvrun\nano\纯48\纯48.kpr -OutDir ...\co
 
 顺带观察：本机同时装有 KVS11（`H:\Keyence\KVS11`）与 KVS12（`H:\Keyence\KVS12`），Nano 工程在
 KVS11 里也能打开编译；`compile_kv_project.ps1` 走的是当前绑定实例，不挑版本。
+## 8. 能力矩阵与待办（2026-11-16 汇总）
+
+| 能力 | Nano 状态 | 证据 / 阻塞点 |
+|---|---|---|
+| 助记符导出（MNM） | ✅ 打通 | 9 个 `.mnm`，`ok=true`；修了"默认文件夹不在 `-ExportDir`" |
+| 编译 | ✅ 打通（零改动） | `转换成功。` 879 步 / 782 指令；**绑定按路径**，路径不同会 `KV_COMPILE_PROJECT_PROCESS_NOT_FOUND` |
+| 软元件注释导出 | ✅ 打通 | Nano CSV 只 5 列，按"无 `WsTreeEnv.xml` 时最小 5 列"放行 |
+| 软元件注释导入 | ❌ 先跳过 | 导入器要求 ≥9 列且按"第 3..10 列=8 个注释区"定位；Nano 只有 1 个注释区，需重做列→注释区映射 |
+| 助记符导入（MNM） | ❌ 先跳过 | Nano `.mnm` 是 **UTF-8 无 BOM**、头 `DEVICE:128`、含 `;SCRIPT_TYPE:`；现导入器按 `DEVICE:59` + UTF-16 |
+| 工程清点（inventory） | ⚠️ 待修 | 无 `WsTreeEnv.xml` → `tree.node_count=0`、`program_modules=[]`；需用 `.mod` 文件名 + `CpuMb2.inf` 推断 |
+| 工程文本快照 | ⚠️ 依赖清点 | 清点修好后可通；当前 `inventory` 阶段"成功"但内容为空，属误判 |
+
+**两个导入项统一讨论后再决定**（都要改编码/设备号/注释区映射，属于"难度较大"）。
+
+清点的 Nano 分支设计（未实现）：遍历工程目录 `*.mod`（`Main/IO测试/正向移动/…`）作为模块名，`module_type=0`；
+CPU 用 `CpuMb2.inf` 或 KVS 标题 `[编辑器: KV-NC32]`；`asset_status` 标 `partial(nano_layout)` 而不是 `not_found`，
+避免下游把"没有树"当成"工程为空"。
