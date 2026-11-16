@@ -181,6 +181,11 @@ try {
     }
   }
 
+  # KV Nano projects have no WsTreeEnv.xml: one .mod per program, CPU only in the KVS title.
+  # Detect that layout so downstream tools do not read "no tree" as "empty project".
+  $nanoModFiles = @(Get-ChildItem -LiteralPath $projectDir -File -Filter '*.mod' -ErrorAction SilentlyContinue)
+  $nanoLayout = ((-not (Test-Path -LiteralPath (Join-Path $projectDir 'WsTreeEnv.xml'))) -and ($nanoModFiles.Count -gt 0))
+
   $treePath = Join-Path $projectDir 'WsTreeEnv.xml'
   $treeNodes = @(Read-WsTreeNodes -WsTreePath $treePath)
   # Expansion units are only the direct children of the 单元配置 branch. The
@@ -462,7 +467,7 @@ try {
   }
 
   $assetStatus = [ordered]@{
-    plc_cpu = if ($cpu) { 'extracted_from_WsTreeEnv' } else { 'missing' }
+    plc_cpu = if ($cpu) { 'extracted_from_WsTreeEnv' } elseif ($nanoLayout) { 'nano_layout_mod_files' } else { 'missing' }
     plc_expansion_units = if ($expansionUnits.Count -gt 0) { 'extracted_from_WsTreeEnv' } elseif ($sidecarExpansionCandidates.Count -gt 0) { 'none_in_tree_but_sidecar_candidates_found' } else { 'none_present' }
     ethernet_ip = $ethernetIp.status
     ethercat = $ethercat.status
@@ -483,7 +488,7 @@ try {
     asset_status = $assetStatus
     file_inventory = $files
     tree = [ordered]@{
-      source = $treePath
+      source = if ($nanoLayout) { '*.mod layout (no WsTreeEnv.xml)' } else { $treePath }
       node_count = $treeNodes.Count
       nodes = $treeNodes
       folders = $treeFolders
@@ -504,7 +509,18 @@ try {
     structure_definitions = if ($StructureDefinitionsPath -and (Test-Path -LiteralPath $StructureDefinitionsPath -PathType Leaf)) {
       try { (Get-Content -Raw -LiteralPath $StructureDefinitionsPath -Encoding UTF8 | ConvertFrom-Json).structures } catch { @() }
     } else { @() }
-    program_modules = $programModules
+    nano_layout = $nanoLayout
+  program_modules = if ($nanoLayout) {
+    @($nanoModFiles | Sort-Object Name | ForEach-Object {
+      [ordered]@{
+        name = [IO.Path]::GetFileNameWithoutExtension($_.Name)
+        module_type = 0
+        category = 'nano_mod_file'
+        source_file = $_.Name
+        evidence = '*.mod layout (no WsTreeEnv.xml)'
+      }
+    })
+  } else { $programModules }
     official_or_library_names_from_tree = $officialNames
     mnm_inventory = $mnmInventory
     sidecar_string_evidence = $sidecarEvidence
