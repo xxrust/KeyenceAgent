@@ -456,6 +456,7 @@ KV 的域类型 ST 导出为 `AREA_ST`，无需发明独立 ST 模块语言选�
 3. 查看本次 workflow 结果、步骤 receipt 和同一 `run.log`。结果为失败时停止后续 UI 动作，依据错误码和证据修复。
 4. 按实际验证范围报告。快照成功不代表写入成功，模块出现不代表程序体和声明完整，导入成功不代表编译成功。
 
+> **Nano 工程注意**：KV Nano（KV-NC32/N14/N24/N40/N60）的工程**没有 `WsTreeEnv.xml`**、程序是每个 `.mod` 一个文件。此时 tree 型清点会得到 0 节点（`topology=not_found` 不代表工程为空），MNM 文本导出会卡住。详见 `references/nano-project-format.md`。
 ## 语义项目快照
 
 需要理解整个现有项目、复刻项目、跨模块修改或交给人审核时，优先调用能力
