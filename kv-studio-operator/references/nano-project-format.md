@@ -78,3 +78,19 @@ click post-export dialog button (KV STUDIO) ×2
 
 → 影响 `import_mnm_guarded.ps1`：若以后要往 Nano 导入，必须支持 **`DEVICE:128` + UTF-8(无 BOM)**；
 当前实现按 `DEVICE:59` + UTF-16 处理，直接导入会失败。**暂列"难度较大，先跳过"**。
+## 7. 编译实测（2026-11-16，KV-NC32 / 纯48）
+
+**结论：Nano 工程可直接用 `compile_kv_project.ps1` 编译，无需改动。**
+
+```
+compile_kv_project.ps1 -ProjectPath C:\kvrun\nano\纯48\纯48.kpr -OutDir ...\compile2
+→ exit=0   转换成功。   总步数：879/32768（总指令数: 782）
+```
+
+注意：编译前**必须**让 KVS 的进程命令行绑定到同一个 `.kpr` 路径，否则会报
+`KV_COMPILE_PROJECT_PROCESS_NOT_FOUND`（本次第一次失败就是这个原因：开着的实例指向
+`C:\Users\Administrator\Downloads\纯48\纯48.kpr`，而命令传的是 `C:\kvrun\nano\纯48\纯48.kpr`）。
+两个路径内容相同也不行——绑定是**按路径**的。
+
+顺带观察：本机同时装有 KVS11（`H:\Keyence\KVS11`）与 KVS12（`H:\Keyence\KVS12`），Nano 工程在
+KVS11 里也能打开编译；`compile_kv_project.ps1` 走的是当前绑定实例，不挑版本。
