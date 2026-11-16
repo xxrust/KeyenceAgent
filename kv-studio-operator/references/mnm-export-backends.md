@@ -18,11 +18,39 @@
 
 ```
 export_mnm_guarded.ps1                ← 唯一 runner 名称（workflow/manifest 不变）
-  ├─ 探测工程布局：有 WsTreeEnv.xml → kvx；只有 *.mod → nano
-  ├─ 选定后端，记录 backend 与判定依据（日志 + 结果字段）
+  ├─ 判定 CPU 家族与能力（见 §2.1）
+  ├─ 选定后端，记录 backend / backend_reason / cpu_model（日志 + 结果字段）
   ├─ 调 backends/export_mnm_kvx.ps1   （现有逻辑迁移）
   └─ 调 backends/export_mnm_nano.ps1  （新增：菜单 → 选择注释类型 → 文件夹）
 ```
+
+### 2.1 后端判定（**正确设计**）
+
+按 **CPU 家族**判定，工程布局只做交叉校验：
+
+判定顺序（拿到第一个即用，并写进结果 `cpu_model` + `cpu_source`）：
+
+| 顺序 | 来源 | 证据 |
+|---|---|---|
+| 1 | `WsTreeEnv.xml` 的 CPU 节点，如 `[0] KV-X520` | `references/KVX样例程序_v100/WsTreeEnv.xml:4411` |
+| 2 | KVS 运行时窗口标题 `[编辑器: <CPU>]`，如 `[编辑器: KV-NC32]` | 2026-11-16 `纯48` 实测 |
+| 3 | KV STUDIO「CPU 系统设定」表格内的型号（UIA 读） | 未实测 |
+| 4 | 兜底：布局（有 `*.mod` 且无 `WsTreeEnv.xml`） | 仅当 1-3 全拿不到时使用，且必须记 `cpu_source=layout_fallback` 告警 |
+
+家族映射：`KV-NC*` / `KV-N*`（KV-N14/N24/N40/N60/NC32T）→ `nano`；`KV-X*`、`KV-8000/7000/5000/3000/1000` → `kvx`。
+
+### 2.2 当前临时实现（**TEMP，已知不正确，必须替换**）
+
+> 用户 2026-11-16 明确：按工程布局分发不对，临时可以，后期要改。
+
+第一版实现先用布局判定：`有 WsTreeEnv.xml → kvx`；`只有 *.mod → nano`。原因只是它**零成本、能立刻跑通**，
+不代表判据正确：布局是工程保存方式的**结果**，不是身份；同型号可能因版本不同出现另一套布局，反之亦然。
+
+替换成 §2.1 的完成判据（全部满足才可删掉 TEMP 分支）：
+
+1. 结果 JSON 里有真实 `cpu_model` + `cpu_source`，且来自 §2.1 的 1-3 任一来源；
+2. 布局只用于"型号与布局是否互相矛盾"的告警（矛盾时以型号为准并记录 `layout_mismatch=true`）；
+3. 契约测试含一条反例：**布局像 nano 但型号是 KV-X**（或反向），后端选择必须跟随型号。
 
 后端只允许写"菜单路径 + 对话框序列 + 窗口标题断言"，以下全部来自公共 helper，不许复制：
 
