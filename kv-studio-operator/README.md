@@ -29,6 +29,9 @@
 | **改轴参数（移动量/螺距）** | `scripts/workflows/set_kv_axis_pitch.ps1` | ✅ |
 | **改轴控制大表单元格** | `scripts/workflows/set_kv_axis_table_cell.ps1` | ⚠️ 脚本可用，缺"导航到页"步骤（见 §5）|
 | 结构变更 / 变量 / FB / ST / MNM 导入导出 / 快照 | `scripts/workflows/*.ps1` | ✅ |
+| **KV Nano：标号表导出（全局 + 每程序局部）** | `scripts/runner_children/export_nano_labels_guarded.ps1` | ✅ |
+| **KV Nano：工程快照** | `scripts/workflows/export_kv_project_text_snapshot.ps1` | ✅ `status=ready`（无对应能力的阶段自动 `skipped`）|
+| KV Nano：助记符导入 | `scripts/runner_children/import_mnm_guarded.ps1` | ❌ 产品限制（KV 自身拒绝，手工同样失败）|
 | **删除 EtherCAT 从站** | `scripts/runner_children/delete_ethercat_slave_guarded.ps1` | ❌ 未跑通（网络树是自绘控件，待用对象级键盘方案）|
 
 ---

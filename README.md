@@ -333,6 +333,35 @@ KeyenceAgent/
 | EtherCAT 节点配置 | ✅ 已验证发布 |
 | 新建项目 / 编译（独立工作流） | 🔄 pending_validation |
 
+### KV Nano（KV-NC32）支持现状（2026-11-17）
+
+KV Nano 与 KV-X 的工程格式、界面结构都不同：**没有 `WsTreeEnv.xml`**，一个程序一个 `.mod`；
+助记符列表是 **UTF-8 无 BOM + `DEVICE:128`**（KV-X 是 UTF-16LE+BOM + `DEVICE:59`）；
+变量不叫"变量"，而在工程树的 **`标号`** 里（`编辑标号` 对话框：`全局` / `局部` 两个页签）。
+
+| 能力 | 状态 | 证据 |
+|------|------|------|
+| 工程清点（按 `.mod` 识别模块） | ✅ | `纯48`：9 个模块 |
+| 整条文本快照 | ✅ `status=ready` | `missing=[]`，缺的能力记入 `skipped_capabilities` |
+| **标号表导出（全局 + 每程序局部）** | ✅ | `纯48`：全局 62 行（与人工核对 0 差异）、9 个程序全在 |
+| 助记符（MNM）导出 | ✅ | `纯48`：9 个 `.mnm` |
+| 编译 | ✅ | `转换成功。` 879 步 / 782 指令 |
+| 软元件注释导出 / 导入 | ✅ | 导入 1861 条并落盘（`纯48.cm1` 被重写） |
+| 助记符（MNM）导入 | ❌ 产品限制 | 手工执行 `文件 → 助记符列表 → 读取` 同样被 KV 拒绝 |
+| 变量 / EtherCAT / 轴参数 / 运动 / EIP 快照阶段 | ⏭️ `skipped` | Nano 无这些能力，快照会跳过而不是报错 |
+
+标号表导出：
+
+```powershell
+powershell -File kv-studio-operator/scripts/runner_children/export_nano_labels_guarded.ps1 `
+  -ProjectPath <工程>.kpr -OutDir <输出目录> -IncludeLocal
+```
+
+输出 `labels_global.tsv` 和每程序的 `labels_local_<程序>.tsv`（列：标号名 / 数据类型 / 软元件 / 标号注释）。
+
+Nano 相关的格式与排障记录见
+[kv-studio-operator/references/nano-project-format.md](kv-studio-operator/references/nano-project-format.md)。
+
 ---
 
 ## 贡献
