@@ -113,7 +113,17 @@ function Invoke-Child([string]$Script,[string[]]$Arguments,[string]$ResultPath,[
   foreach($resetPath in @($ResetPaths)){
     if($resetPath -and (Test-Path -LiteralPath $resetPath)){ Remove-Item -LiteralPath $resetPath -Recurse -Force -ErrorAction SilentlyContinue }
   }
-  & powershell -STA -NoProfile -ExecutionPolicy Bypass -File $Script @Arguments *> (Join-Path $rawRoot ($Label+'_stdout.txt'))
+  # A child that writes to stderr must not abort the snapshot: with ErrorActionPreference
+  # 'Stop' the redirection surfaces a NativeCommandError here and the caller never gets to
+  # decide (e.g. "Nano has no structure types"). Run the child with 'Continue' so only the
+  # exit code decides, then restore the caller's preference.
+  $previousErrorAction = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    & powershell -STA -NoProfile -ExecutionPolicy Bypass -File $Script @Arguments *> (Join-Path $rawRoot ($Label+'_stdout.txt'))
+  } finally {
+    $ErrorActionPreference = $previousErrorAction
+  }
   $exit=if($LASTEXITCODE -is [int]){[int]$LASTEXITCODE}else{0}
   $result=$null
   if(Test-Path -LiteralPath $ResultPath -PathType Leaf){try{$result=Get-Content -Raw -LiteralPath $ResultPath -Encoding UTF8|ConvertFrom-Json}catch{}}
@@ -169,6 +179,8 @@ New-Item -ItemType Directory -Force -Path $rawRoot,$textRoot,$architectureRoot |
 $fingerprint=Fingerprint $projectRoot
 $planPath=Join-Path $snapshotRoot 'snapshot_plan.json'
 $uiProjectPath=$ProjectPath
+$script:snapshotNano = @(Get-ChildItem -LiteralPath (Split-Path -Parent $ProjectPath) -File -Filter '*.mod' -ErrorAction SilentlyContinue).Count -gt 0
+$script:nanoSkipped = @()
 $uiProcessId=0
 $uiLifecycle=[ordered]@{
   strategy='single_isolated_project_copy';source_project_path=$ProjectPath;source_preopened=$false
@@ -220,6 +232,10 @@ $mnmWorkRoot=Join-Path ([IO.Path]::GetTempPath()) ('kv_mnm_snapshot_'+[guid]::Ne
 # otherwise export_mnm_browse_default_folder_guarded.ps1 raises
 # KV_EXPORT_RESTART_REFUSED on a cold start (no path-bound process, count 0).
 $mnmArgs=@('-ProjectPath',$ProjectPath,'-ExportDir',$mnmExportDir,'-OutDir',$mnmOut,'-WorkRoot',$mnmWorkRoot,'-AllowWorkRootOutsideExportDir','-AllowOverwrite','-NoRestartKvs','-TimeoutSeconds',[string]$TimeoutSeconds)
+# The MNM export writes into the folder KVS remembers (usually the source project dir), so
+# tell the exporter where to look for the current-run .mnm files without relying on the
+# caller setting an environment variable.
+$env:KV_MNM_RECOVERY_ROOTS=@((Split-Path -Parent $ProjectPath), $env:KV_MNM_RECOVERY_ROOTS) -join ';'
 $mnmStep=Invoke-Child $mnmWorkflow $mnmArgs $mnmResult 'mnm_export' -ResetPaths @($mnmExportDir)
 $mnmWorkspacePlanPath=Join-Path $mnmOut 'artifacts\export_workspace\export_workspace_plan.json'
 if(Test-Path -LiteralPath $mnmWorkspacePlanPath -PathType Leaf){
@@ -315,6 +331,7 @@ if(-not $structureStep.ok){
   if($structureErr -match 'KV_STRUCTURE_TYPE_ROOT_MISSING' -and $structureMods.Count -gt 0){
     Set-StageSkipped 'structure_export' 'nano_has_no_structure_types'
     $structureStep=[ordered]@{ok=$true;status='skipped';label='structure_export';reason='nano_has_no_structure_types'}
+    $script:nanoStructureSkipped=$true
     Write-Json (Join-Path $structureOut 'structure_definitions_skipped.json') ([ordered]@{ok=$true;skipped=$true;reason='nano_has_no_structure_types'}) 6
   }
 }
@@ -326,6 +343,11 @@ $globalVariablesWorkflow=Join-Path $scriptRoot 'workflows\snapshot_kv_global_var
 $variablesArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$variablesOut)
 $variablesArgs += @('-TimeoutSeconds',[string]$TimeoutSeconds)
 $variablesStep=Invoke-Child $globalVariablesWorkflow $variablesArgs $variablesResult 'variables_snapshot' -ResetPaths @($variablesOut)
+if(-not $variablesStep.ok -and $script:snapshotNano){
+  Set-StageSkipped 'variables_snapshot' 'nano_variable_editor_unavailable'
+  $variablesStep=[ordered]@{ok=$true;status='skipped';label='variables_snapshot';reason='nano_variable_editor_unavailable'}
+  $script:nanoSkipped += 'variables_snapshot'
+}
 $allVariableSnapshots=@()
 $variableSnapshotPath=Join-Path $variablesOut 'artifacts\global_variables_all_groups\variable_snapshot_result.json'
 if(Test-Path $variableSnapshotPath){
@@ -393,6 +415,11 @@ $ethercatResult=Join-Path $ethercatOut 'ethercat_configuration_result.json'
 $ethercatWorkflow=Join-Path $scriptRoot 'workflows\export_kv_ethercat_configuration.ps1'
 $ethercatArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$ethercatOut,'-ProjectName',[IO.Path]::GetFileNameWithoutExtension($ProjectPath),'-TimeoutSeconds',[string]([Math]::Max([int]$TimeoutSeconds,1800)))
 $ethercatStep=Invoke-Child $ethercatWorkflow $ethercatArgs $ethercatResult 'ethercat_configuration' -ResetPaths @($ethercatOut)
+if(-not $ethercatStep.ok -and $script:snapshotNano){
+  Set-StageSkipped 'ethercat_configuration' 'not_applicable_on_nano'
+  $ethercatStep=[ordered]@{ok=$true;status='skipped';label='ethercat_configuration';reason='not_applicable_on_nano'}
+  $script:nanoSkipped += 'ethercat_configuration'
+}
 $ethercatConfigurationPath=Join-Path $ethercatOut 'ethercat_configuration.json'
 $ethercatConfiguration=$null
 if(Test-Path -LiteralPath $ethercatConfigurationPath -PathType Leaf){ try{$ethercatConfiguration=Get-Content -Raw -LiteralPath $ethercatConfigurationPath -Encoding UTF8|ConvertFrom-Json}catch{ Add-MergeFailure 'ethercat_configuration_parse' $ethercatConfigurationPath $_.Exception.Message } }
@@ -403,18 +430,33 @@ $axisResult=Join-Path $axisOut 'axis_parameters_result.json'
 $axisWorkflow=Join-Path $scriptRoot 'workflows\export_kv_axis_parameters.ps1'
 $axisArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$axisOut,'-TimeoutSeconds',[string]$TimeoutSeconds)
 $axisStep=Invoke-Child $axisWorkflow $axisArgs $axisResult 'axis_parameters' -ResetPaths @($axisOut)
+if(-not $axisStep.ok -and $script:snapshotNano){
+  Set-StageSkipped 'axis_parameters' 'not_applicable_on_nano'
+  $axisStep=[ordered]@{ok=$true;status='skipped';label='axis_parameters';reason='not_applicable_on_nano'}
+  $script:nanoSkipped += 'axis_parameters'
+}
 $axisTsv=Join-Path $axisOut 'axes_params.tsv'
 $motionOut=Join-Path $rawRoot 'motion_settings'
 $motionResult=Join-Path $motionOut 'motion_settings_workflow_result.json'
 $motionWorkflow=Join-Path $scriptRoot 'workflows\export_kv_motion_settings.ps1'
 $motionArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$motionOut)
 $motionStep=Invoke-Child $motionWorkflow $motionArgs $motionResult 'motion_settings' -ResetPaths @($motionOut)
+if(-not $motionStep.ok -and $script:snapshotNano){
+  Set-StageSkipped 'motion_settings' 'not_applicable_on_nano'
+  $motionStep=[ordered]@{ok=$true;status='skipped';label='motion_settings';reason='not_applicable_on_nano'}
+  $script:nanoSkipped += 'motion_settings'
+}
 
 $eipOut=Join-Path $rawRoot 'eip_configuration'
 $eipResult=Join-Path $eipOut 'eip_configuration_result.json'
 $eipWorkflow=Join-Path $scriptRoot 'workflows\export_kv_eip_configuration.ps1'
 $eipArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$eipOut)
 $eipStep=Invoke-Child $eipWorkflow $eipArgs $eipResult 'eip_configuration' -ResetPaths @($eipOut)
+if(-not $eipStep.ok -and $script:snapshotNano){
+  Set-StageSkipped 'eip_configuration' 'not_applicable_on_nano'
+  $eipStep=[ordered]@{ok=$true;status='skipped';label='eip_configuration';reason='not_applicable_on_nano'}
+  $script:nanoSkipped += 'eip_configuration'
+}
 $eipConfigPath=Join-Path $eipOut 'eip_configuration.json'
 
 $fbSteps=@()
@@ -667,7 +709,7 @@ $index=@(); foreach($f in @(Get-ChildItem -LiteralPath $textRoot -File -Recurse 
 }
 Write-Json (Join-Path $snapshotRoot 'text_index.json') $index 8
 $statuses=@($inventoryStep,$mnmStep,$structureStep,$variablesStep,$ethercatStep,$axisStep,$eipStep,$motionStep)+@($allLocalVariableSteps)+@($fbSteps)+@($inventoryFinalStep,$materializationStep,$commentsStep,$annotateStep)
-$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($allLocalVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $ethercatStep.ok){$missing+='ethercat_configuration'}; if(-not $axisStep.ok){$missing+='axis_parameters'}; if(-not $eipStep.ok){$missing+='eip_configuration'}; if(-not $motionStep.ok){$missing+='motion_settings'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}; if($mergeFailures.Count -gt 0){$missing+='snapshot_merge'}
+$missing=@(); if(-not $mnmStep.ok){$missing+='mnm'}; if(-not $variablesStep.ok -or @($allLocalVariableSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='variables'}; if(-not $structureStep.ok -and -not $script:nanoStructureSkipped){$missing+='structures'}; if($fbModules.Count -gt 0 -and @($fbSteps|Where-Object {-not $_.ok}).Count -gt 0){$missing+='fb_arguments'}; if(-not $ethercatStep.ok){$missing+='ethercat_configuration'}; if(-not $axisStep.ok){$missing+='axis_parameters'}; if(-not $eipStep.ok){$missing+='eip_configuration'}; if(-not $motionStep.ok){$missing+='motion_settings'}; if(-not $commentsStep.ok){$missing+='comments'}; if(-not $annotateStep.ok){$missing+='comment_coverage'}; if($mergeFailures.Count -gt 0){$missing+='snapshot_merge'}
 $semanticStatus=if($materializationStep.ok){'complete'}else{'failed'}
 $semanticWarnings=@()
 if($materializationStep.result -and $materializationStep.result.warnings){$semanticWarnings=@($materializationStep.result.warnings)}
@@ -681,7 +723,7 @@ $manifest=[ordered]@{
   layout=[ordered]@{snapshot_root='.';project='project';text='text';raw='raw';architecture='architecture';text_index='text_index.json'}
   artifacts=[ordered]@{semantic_project='project';inventory='text/project_inventory.json';mnm='text/mnm';variables='text/variables';structures='text/structure_definitions.json';fb_arguments='text/fb_arguments';comments='text/comments';ethercat_devices='project/配置/EtherCAT/devices.json';axis_parameters='project/配置/运动/axis_parameters.tsv';motion_settings='project/配置/运动';eip_devices='project/配置/EtherNetIP/devices.json'}
   workflow_status=$statuses; discovered_modules=$moduleNames; discovered_fb_modules=@($fbModules|Sort-Object -Unique); discovered_program_local_modules=@($programLocalCandidates)
-  semantic_project_status=$semanticStatus; semantic_warnings=$semanticWarnings; missing_capabilities=@($missing); skipped_capabilities=$fbSkipped; version_control=[ordered]@{deterministic_index='text_index.json';file_hashes='sha256';binary_project_files='referenced_by_project.fingerprint_only';generated_files='isolated_snapshot_directory'}
+  semantic_project_status=$semanticStatus; semantic_warnings=$semanticWarnings; missing_capabilities=@($missing); skipped_capabilities=@($fbSkipped)+@($script:nanoSkipped); version_control=[ordered]@{deterministic_index='text_index.json';file_hashes='sha256';binary_project_files='referenced_by_project.fingerprint_only';generated_files='isolated_snapshot_directory'}
   resume=[ordered]@{enabled=[bool]$Resume;state_path='snapshot_state.json';invalidated_by_fingerprint=[bool]$script:resumeInvalidated;reused_stages=@($script:reusedStages|Sort-Object -Unique)}
 }
 Write-Json (Join-Path $snapshotRoot 'source_snapshot_manifest.json') $manifest 20
