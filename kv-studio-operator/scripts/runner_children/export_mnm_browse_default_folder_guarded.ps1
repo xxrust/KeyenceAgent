@@ -562,6 +562,32 @@ try {
   Save-ForegroundSnapshot 'foreground_after_folder_ok.json'
 
   $mnmFiles = @(Wait-CurrentRunMnmFiles -Root $ExportDir -Since $runStart -Seconds 8)
+  if ($mnmFiles.Count -eq 0) {
+    # KVS writes to the folder remembered by the browse dialog, which is not always
+    # -ExportDir (KV Nano wrote into %USERPROFILE%\Downloads\<project>), so recover the
+    # current-run .mnm files from the plausible default folders before failing.
+    $candidateRoots = @(
+      [Environment]::GetFolderPath('UserProfile'),
+      [Environment]::GetFolderPath('MyDocuments'),
+      (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'),
+      (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Desktop'),
+      (Split-Path -Parent $ProjectPath)
+    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+    $recovered = @()
+    foreach ($root in $candidateRoots) {
+      $hits = @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter '*.mnm' -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -ge $runStart.AddSeconds(-5) })
+      foreach ($hit in $hits) {
+        $target = Join-Path $ExportDir $hit.Name
+        try {
+          Move-Item -LiteralPath $hit.FullName -Destination $target -Force -ErrorAction Stop
+          $recovered += $target
+          Log ("recovered .mnm from default folder: " + $hit.FullName)
+        } catch { Log ("could not move .mnm " + $hit.FullName + ": " + $_.Exception.Message) }
+      }
+    }
+    $mnmFiles = @($recovered | Where-Object { Test-Path -LiteralPath $_ })
+  }
   $mnmFiles | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $OutDir 'mnm_files.json') -Encoding UTF8
   if ($mnmFiles.Count -eq 0) { throw "No current-run .mnm files were exported under $ExportDir" }
   Invoke-KvStudioCleanStatePostcheck | Out-Null
