@@ -556,6 +556,23 @@ $optionDialog = Wait-KvsNonFolderDialog -ProcessId $process.Id -Seconds 30
   Save-TopWindowSnapshot 'top_windows_browse_folder_found.json'
 
   Save-DialogDescendantsSnapshot -Dialog $dialog -Name 'browse_dialog_default_selection.json'
+  # The picker is a shell tree with no path field; confirming without a selection makes
+  # KV STUDIO answer 保存助记符表失败 and nothing is written. Select a known writable
+  # quick-access folder first; the recovery step then moves the .mnm files into -ExportDir.
+  foreach ($preferredNodeName in @('下载', '文档', '桌面')) {
+    $preferredNode = $null
+    foreach ($candidateNode in $dialog.FindAll([Windows.Automation.TreeScope]::Descendants, (New-Object Windows.Automation.PropertyCondition -ArgumentList ([Windows.Automation.AutomationElement]::ControlTypeProperty), ([Windows.Automation.ControlType]::TreeItem)))) {
+      if ($candidateNode.Current.Name -eq $preferredNodeName) { $preferredNode = $candidateNode; break }
+    }
+    if (-not $preferredNode) { continue }
+    $nodeSelection = $null
+    if ($preferredNode.TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern, [ref]$nodeSelection)) {
+      $nodeSelection.Select()
+      Log ("selected mnemonic output folder node: " + $preferredNodeName)
+      Start-Sleep -Milliseconds 400
+    }
+    break
+  }
   Log 'confirm current browse-folder selection'
   Invoke-DialogOk -Dialog $dialog -Label 'browse folder default'
   Start-Sleep -Seconds 2
