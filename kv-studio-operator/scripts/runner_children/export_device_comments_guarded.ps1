@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory=$true)]
   [string]$ProjectPath,
 
@@ -184,11 +184,21 @@ try {
   $fileName = if ($FileBaseName) { [string]$FileBaseName } else { 'kv_device_comments_' + $script:RunId }
   if ($fileName -notmatch '\.csv$') { $fileName = $fileName + '.csv' }
   if ($fileName -match '[\\/:*?"<>|]') { throw "KV_COMMENTS_FILENAME_INVALID: $fileName" }
+  $runStart = Get-Date
   $expectedArtifact = Join-Path $projectDir $fileName
   $finalArtifact = Join-Path $ExportDir $fileName
-  if (Test-Path -LiteralPath $expectedArtifact) { throw "KV_COMMENTS_TARGET_EXISTS: $expectedArtifact" }
-  if (Test-Path -LiteralPath $finalArtifact) { throw "KV_COMMENTS_TARGET_EXISTS: $finalArtifact" }
-  $runStart = Get-Date
+  # A file carried over from the source project (older than this run) must not block the
+  # export; only something written during this run is a real collision.
+  foreach ($existingArtifact in @($expectedArtifact, $finalArtifact)) {
+    if (-not (Test-Path -LiteralPath $existingArtifact)) { continue }
+    $existingItem = Get-Item -LiteralPath $existingArtifact
+    if ($existingItem.LastWriteTime -lt $runStart.AddSeconds(-5)) {
+      Remove-Item -LiteralPath $existingArtifact -Force
+      Log ("removed stale comment artifact: " + $existingArtifact)
+    } else {
+      throw "KV_COMMENTS_TARGET_EXISTS: $existingArtifact"
+    }
+  }
   Log "start ProjectPath=$ProjectPath ExportDir=$ExportDir file=$fileName"
 
   $processes = @(Get-KvsProjectProcess $ProjectPath $anyTitlePattern)
@@ -342,6 +352,26 @@ try {
   if ($saveButton -eq [IntPtr]::Zero) { throw 'KV_COMMENTS_SAVE_BUTTON_MISSING' }
   Log "clicking save button text='$(Get-WindowTitle $saveButton)'"
   [void][KvCommentExportWin32]::SendMessage($saveButton, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
+  # KV Nano raises a 确认另存为 overwrite-confirm modal after the save click. It is not
+  # always the foreground window (the Save As dialog can still own focus), so find it by
+  # title through UIA and press its default button (IDOK) instead of guessing focus.
+  $confirmDeadline = (Get-Date).AddSeconds(25)
+  while ((Get-Date) -lt $confirmDeadline) {
+    $confirmWin = $null
+    foreach ($candidate in [Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition)) {
+      if ($candidate.Current.Name -match '确认另存为') { $confirmWin = $candidate; break }
+    }
+    if (-not $confirmWin) { break }
+    $okButton = [KvCommentExportWin32]::GetDlgItem([IntPtr]$confirmWin.Current.NativeWindowHandle, 1)
+    if ($okButton -ne [IntPtr]::Zero) {
+      [void][KvCommentExportWin32]::SendMessage($okButton, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
+    } else {
+      $closePattern = $null
+      if ($confirmWin.TryGetCurrentPattern([Windows.Automation.WindowPattern]::Pattern, [ref]$closePattern)) { $closePattern.Close() }
+    }
+    Log ("confirmed overwrite dialog: " + $confirmWin.Current.Name)
+    Start-Sleep -Milliseconds 600
+  }
   $artifact = $null
   $deadline = (Get-Date).AddSeconds(30)
   while ((Get-Date) -lt $deadline) {
@@ -384,11 +414,12 @@ try {
   # comment row count is recorded instead of treating that as a failure; only a
   # missing header or an unreadable shape is an error.
   # KV-X exports >= 9 columns; KV Nano exports 5 (device, comment, three empty columns).
-# Accept the Nano shape only when the project has no WsTreeEnv.xml, so a truncated
-# KV-X export is still rejected.
+# The Nano layout is "one .mod per program"; do not rely on WsTreeEnv.xml being absent,
+# because saving a Nano project in KVS creates one (observed 2026-11-16).
 $minFields = 9
 $commentFormat = 'kvx'
-if ($fieldCount -eq 5 -and -not (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $ProjectPath) 'WsTreeEnv.xml'))) {
+$nanoModFiles = @(Get-ChildItem -LiteralPath (Split-Path -Parent $ProjectPath) -File -Filter '*.mod' -ErrorAction SilentlyContinue)
+if ($fieldCount -eq 5 -and $nanoModFiles.Count -gt 0) {
   $minFields = 5
   $commentFormat = 'nano'
 }

@@ -181,10 +181,10 @@ try {
     }
   }
 
-  # KV Nano projects have no WsTreeEnv.xml: one .mod per program, CPU only in the KVS title.
-  # Detect that layout so downstream tools do not read "no tree" as "empty project".
+  # KV Nano projects keep one .mod per program. Do not also require WsTreeEnv.xml to be
+  # absent: saving a Nano project in KVS creates that file (observed 2026-11-16).
   $nanoModFiles = @(Get-ChildItem -LiteralPath $projectDir -File -Filter '*.mod' -ErrorAction SilentlyContinue)
-  $nanoLayout = ((-not (Test-Path -LiteralPath (Join-Path $projectDir 'WsTreeEnv.xml'))) -and ($nanoModFiles.Count -gt 0))
+  $nanoLayout = ($nanoModFiles.Count -gt 0)
 
   $treePath = Join-Path $projectDir 'WsTreeEnv.xml'
   $treeNodes = @(Read-WsTreeNodes -WsTreePath $treePath)
