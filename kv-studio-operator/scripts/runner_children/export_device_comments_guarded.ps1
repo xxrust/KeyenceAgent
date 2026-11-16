@@ -366,7 +366,18 @@ try {
   # A project without any comment still exports a valid header-only table, so the
   # comment row count is recorded instead of treating that as a failure; only a
   # missing header or an unreadable shape is an error.
-  if ($lines.Count -lt 1 -or $fieldCount -lt 9) { throw "KV_COMMENTS_ARTIFACT_INVALID: lines=$($lines.Count) fields=$fieldCount" }
+  # KV-X exports >= 9 columns; KV Nano exports 5 (device, comment, three empty columns).
+# Accept the Nano shape only when the project has no WsTreeEnv.xml, so a truncated
+# KV-X export is still rejected.
+$minFields = 9
+$commentFormat = 'kvx'
+if ($fieldCount -eq 5 -and -not (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $ProjectPath) 'WsTreeEnv.xml'))) {
+  $minFields = 5
+  $commentFormat = 'nano'
+}
+if ($lines.Count -lt 1 -or $fieldCount -lt $minFields) { throw "KV_COMMENTS_ARTIFACT_INVALID: lines=$($lines.Count) fields=$fieldCount" }
+$script:CommentFormat = $commentFormat
+Log "comment_csv_format=$commentFormat fields=$fieldCount"
   $script:ArtifactRows = $lines.Count - 1
   $script:ArtifactHasComments = ($script:ArtifactRows -gt 0)
   Log "artifact=$($artifact.FullName) size=$($artifact.Length) lines=$($lines.Count) comment_rows=$($script:ArtifactRows)"
