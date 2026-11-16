@@ -202,6 +202,23 @@ try {
     }
   }
   Log "start ProjectPath=$ProjectPath ExportDir=$ExportDir file=$fileName"
+  # The Save As dialog opens in the folder KVS remembers (often the source project dir),
+  # so a stale copy of the same file name there raises the 确认另存为 overwrite prompt even
+  # though $projectDir is clean. Remove stale copies in the plausible folders first.
+  $staleRoots = @((Split-Path -Parent $ProjectPath), [Environment]::GetFolderPath('UserProfile'),
+    [Environment]::GetFolderPath('MyDocuments'),
+    (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'),
+    (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Desktop')) |
+    Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+  if ($env:KV_MNM_RECOVERY_ROOTS) { $staleRoots += @($env:KV_MNM_RECOVERY_ROOTS -split ';' | Where-Object { $_ }) }
+  foreach ($staleRoot in $staleRoots) {
+    foreach ($staleFile in @(Get-ChildItem -LiteralPath $staleRoot -File -Filter $fileName -ErrorAction SilentlyContinue)) {
+      if ($staleFile.LastWriteTime -lt $runStart.AddSeconds(-5)) {
+        Remove-Item -LiteralPath $staleFile.FullName -Force -ErrorAction SilentlyContinue
+        Log ("removed stale same-name file: " + $staleFile.FullName)
+      }
+    }
+  }
 
   $processes = @(Get-KvsProjectProcess $ProjectPath $anyTitlePattern)
   if ($CreatedProjectResultPath) {
@@ -354,15 +371,19 @@ try {
   if ($saveButton -eq [IntPtr]::Zero) { throw 'KV_COMMENTS_SAVE_BUTTON_MISSING' }
   Log "clicking save button text='$(Get-WindowTitle $saveButton)'"
   [void][KvCommentExportWin32]::SendMessage($saveButton, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
-  # KV Nano raises a 确认另存为 overwrite-confirm modal after the save click. It does not
-  # always own the foreground (the Save As dialog can keep it), so find it by title and
-  # close it with WM_CLOSE, which the live probe showed removes it reliably.
+  # KV Nano raises a 确认另存为 overwrite-confirm modal after the save click. These DirectUI
+  # dialogs are NOT found by FindWindow and do not necessarily own the foreground, but the
+  # UIA desktop tree exposes them; close the window handle directly with WM_CLOSE, which
+  # the manual probe showed removes it cleanly.
   $confirmDeadline = (Get-Date).AddSeconds(25)
   while ((Get-Date) -lt $confirmDeadline) {
-    $confirmHwnd = [KvCommentExportWin32]::FindWindow($null, '确认另存为')
-    if ($confirmHwnd -eq [IntPtr]::Zero) { break }
-    [void][KvCommentExportWin32]::PostMessage($confirmHwnd, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
-    Log 'closed 确认另存为 overwrite dialog'
+    $confirmElement = $null
+    foreach ($topWindow in [Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition)) {
+      if ($topWindow.Current.Name -match '确认另存为') { $confirmElement = $topWindow; break }
+    }
+    if (-not $confirmElement) { break }
+    [void][KvCommentExportWin32]::PostMessage([IntPtr]$confirmElement.Current.NativeWindowHandle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
+    Log 'closed 确认另存为 overwrite dialog (UIA handle + WM_CLOSE)'
     Start-Sleep -Milliseconds 700
   }
   $artifact = $null
