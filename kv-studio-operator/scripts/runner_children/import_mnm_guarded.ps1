@@ -1314,6 +1314,18 @@ function AssertMnmChineseEncoding([string]$path){
     }
   }elseif($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF){
     throw 'MNM encoding validation failed: UTF-8 BOM is not accepted for this KV STUDIO MNM import workflow.'
+  }elseif(@($bytes | Where-Object { $_ -ge 0x80 } | Select-Object -First 1).Count -gt 0){
+    # KV Nano exports the mnemonic list as UTF-8 *without* a BOM; decoding that as ANSI
+    # would mangle the Chinese comments and module names. Prefer UTF-8 whenever the file
+    # carries multi-byte content and is valid strict UTF-8.
+    try {
+      $strictUtf8 = New-Object System.Text.UTF8Encoding($false, $true)
+      $utf8Text = $strictUtf8.GetString($bytes)
+      $decodedText = $utf8Text
+      $decodeName = 'UTF-8 without BOM'
+    } catch {
+      # not valid UTF-8: keep the ANSI decode
+    }
   }
   $headerDevice = $null
   $headerModuleType = $null
@@ -1325,11 +1337,14 @@ function AssertMnmChineseEncoding([string]$path){
   if($null -eq $headerModuleType){
     throw 'MNM module type validation failed: missing ;MODULE_TYPE:<n>.'
   }
-  $deviceOk = (($headerModuleType -eq 2 -and ($headerDevice -eq 60 -or $headerDevice -eq 59)) -or ($headerModuleType -eq 0 -and ($headerDevice -eq 60 -or $headerDevice -eq 63 -or $headerDevice -eq 59)))
+  # DEVICE numbers seen so far: 60 (KV-X520 sample), 63, 59 (KV-X310) and 128 (KV-NC32, Nano).
+  # The header value is the CPU family marker the file was exported from, so accepting 128 is
+  # what lets a Nano mnemonic list be imported at all.
+  $deviceOk = (($headerModuleType -eq 2 -and ($headerDevice -eq 60 -or $headerDevice -eq 59)) -or ($headerModuleType -eq 0 -and ($headerDevice -eq 60 -or $headerDevice -eq 63 -or $headerDevice -eq 59 -or $headerDevice -eq 128)))
   if(-not $deviceOk){
     $allowedDeviceText = 'unsupported'
     if($headerModuleType -eq 2){ $allowedDeviceText = '60 or 59' }
-    elseif($headerModuleType -eq 0){ $allowedDeviceText = '60, 63, or 59' }
+    elseif($headerModuleType -eq 0){ $allowedDeviceText = '60, 63, 59, or 128' }
     throw ('MNM device header validation failed: MODULE_TYPE='+$headerModuleType+' allows DEVICE:'+$allowedDeviceText+', actual DEVICE:'+$headerDevice+'.')
   }
   Log ('MNM encoding validation passed by '+$decodeName+': '+$path)

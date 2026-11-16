@@ -128,3 +128,29 @@ Nano 工程跑 `export_kv_project_text_snapshot.ps1` 时，逐阶段把阻塞点
 
 **下一处代码改动**：在 `export_device_comments_guarded.ps1` 点击"保存(&S)"之后，增加与 MNM 导出同款的后处理循环——
 识别标题 `确认另存为`（以及 `是否覆盖` 一类），点 `是(Y)` / `确定`，再继续等待产物出现。
+## 10. 助记符导入（MNM）实测：已被 KV STUDIO 自身拒绝（2026-11-16）
+
+导入器侧的两处 Nano 差异已修（`AssertMnmChineseEncoding`）：
+
+1. **编码**：Nano 的 `.mnm` 是 **UTF-8 无 BOM**（KV-X 是 UTF-16LE+BOM）；旧逻辑按 ANSI 解码会毁掉中文，
+   现在检测到多字节内容且严格 UTF-8 可解时按 UTF-8 读取；
+2. **设备号**：允许 `DEVICE:128`（KV-NC32）；原来只接受 60/63/59。
+
+然后在 Nano 工程副本上实跑导入 `Main.mnm`（`-DeleteExistingModuleBeforeImport -SaveAfterImport`）：
+
+```
+import exit=1  14.6s
+KV STUDIO 弹窗：
+  读取助记符列表失败。可能是以下原因。
+    /包含非法助记符字符串。
+    /PLC 的机型不同。
+    /包含 ST/脚本、压缩指令。
+    /选项设定的表示方式 (XYM 等) 与助记符表制作时不同。
+    /超过最大行数。
+```
+
+**结论：失败发生在 KV STUDIO 读取阶段，不是我们的解析器**。原因很可能是 Nano 导出的文件带
+`;SCRIPT_TYPE:` 头、或该菜单路径不接受 Nano 的助记符列表格式（与 KV-X 的"读取"入口不同）。
+
+因此 **MNM 导入对 Nano 目前不可用**；继续做需要先确定 KV STUDIO 里"向 Nano 工程读入助记符"的正确入口
+（可能是脚本程序专用的读入，而不是 `文件→助记符列表→读取`）。按约定归入"难度较大，先跳过"。
