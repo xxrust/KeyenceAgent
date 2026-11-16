@@ -649,15 +649,22 @@ try {
   }
 
   # Effect-based post-condition: reading a comment table changes the project, and
-  # KV STUDIO marks a changed project with "*" in its title.  A clean title here
-  # means the dialog was probably dismissed without reading anything, so stop
-  # instead of reporting a success that the caller's diff would have to discover.
+  # KV STUDIO usually marks a changed project with "*" in its title.  KV Nano keeps the
+  # title clean after a successful read (observed with 读取了 1861 个软元件注释), so an
+  # explicit "read N comments" information box counts as evidence too.  Without either
+  # signal the dialog was probably dismissed without reading anything, so stop.
   $afterImport = Get-Process -Id $targetId -ErrorAction SilentlyContinue
   $titleAfterImport = if ($afterImport) { $afterImport.MainWindowTitle } else { '' }
   $script:DialogEvidence['title_after_import'] = $titleAfterImport
   Log "title after import='$titleAfterImport'"
+  $readEvidence = @($handled | Where-Object { $_ -match '读取了|Read|read\s+\d+' })
   if ($titleAfterImport -and $titleAfterImport -notmatch '\*') {
-    throw "KV_COMMENTS_IMPORT_NO_EFFECT: project title is still clean ('$titleAfterImport')"
+    if ($readEvidence.Count -gt 0) {
+      $script:DialogEvidence['import_effect'] = 'info_box_read_count'
+      Log ("project title stayed clean but the info box proves the read: " + ($readEvidence -join ' / '))
+    } else {
+      throw "KV_COMMENTS_IMPORT_NO_EFFECT: project title is still clean ('$titleAfterImport')"
+    }
   }
 
   # -------------------------------------------------------------------------
