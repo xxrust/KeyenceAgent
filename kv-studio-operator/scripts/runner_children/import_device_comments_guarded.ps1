@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory=$true)]
   [string]$ProjectPath,
 
@@ -122,19 +122,25 @@ function Read-CommentTable([string]$Path) {
   if ($lines.Count -lt 2) { throw "KV_COMMENTS_IMPORT_TOO_FEW_LINES: $($lines.Count)" }
 
   $header = @($lines[0] -split ',')
-  # The exporter/save dialog always writes the eight comment banks as columns
-  # 3..10 (indexes 2..9), so a table with a different shape is not a KV comment
-  # table and must not be imported.
-  if ($header.Count -lt 9) { throw "KV_COMMENTS_IMPORT_HEADER_INVALID: fields=$($header.Count)" }
-  # A comment table always starts with two empty columns (device, spare) followed
-  # by the eight comment banks, so the shape is checked structurally instead of by
-  # matching localised header text.
-  if ([string]$header[0] -ne '' -or [string]$header[1] -ne '') { throw "KV_COMMENTS_IMPORT_HEADER_UNEXPECTED: '$($header[0])','$($header[1])'" }
-  if (-not [string]$header[2]) { throw "KV_COMMENTS_IMPORT_HEADER_UNEXPECTED: empty comment bank header" }
+  # KV Nano writes a headerless table: the first line is already a device row and the
+  # table has 5 columns (device, spare, one comment bank, two trailing empties), while
+  # KV-X writes a header with the eight banks at columns 3..10. Detect the shape.
+  $headerless = ([string]$header[0]).Trim() -match '^[A-Za-z]{1,3}[0-9][0-9A-Fa-f]*(\.[0-9A-Fa-f]+)?$'
+  $dataStart = 1
+  if ($headerless) {
+    $dataStart = 0
+  } else {
+    # A comment table always starts with two empty columns (device, spare) followed
+    # by the eight comment banks, so the shape is checked structurally instead of by
+    # matching localised header text.
+    if ($header.Count -lt 9) { throw "KV_COMMENTS_IMPORT_HEADER_INVALID: fields=$($header.Count)" }
+    if ([string]$header[0] -ne '' -or [string]$header[1] -ne '') { throw "KV_COMMENTS_IMPORT_HEADER_UNEXPECTED: '$($header[0])','$($header[1])'" }
+    if (-not [string]$header[2]) { throw "KV_COMMENTS_IMPORT_HEADER_UNEXPECTED: empty comment bank header" }
+  }
 
   $rows = New-Object System.Collections.Generic.List[object]
   $seen = New-Object 'System.Collections.Generic.HashSet[string]'
-  for ($i = 1; $i -lt $lines.Count; $i++) {
+  for ($i = $dataStart; $i -lt $lines.Count; $i++) {
     $fields = @($lines[$i] -split ',')
     $device = ([string]$fields[0]).Trim()
     if (-not $device) { throw "KV_COMMENTS_IMPORT_DEVICE_MISSING: line=$($i + 1)" }
@@ -533,8 +539,10 @@ try {
   $script:DialogEvidence['program_selector'] = $programSelector
   Log "open dialog hwnd=$($dialogHwnd.ToInt64()) title='$(Get-WindowTitle $dialogHwnd)' file_type='$fileType' program='$programSelector'"
   # A file-type selector that no longer offers CSV means the menu item is not the
-  # table we validated, so stop instead of importing into an unknown format.
-  if ($fileType -and $fileType -notmatch 'CSV') { throw "KV_COMMENTS_IMPORT_FILE_TYPE_UNEXPECTED: $fileType" }
+  # table we validated, so stop instead of importing into an unknown format. On KV Nano
+  # the combo exposes only its label ("文件类型(T):"), so fall back to the input file's
+  # own extension instead of rejecting an otherwise valid CSV import.
+  if ($fileType -and $fileType -notmatch 'CSV' -and $CommentsPath -notmatch '\.csv$') { throw "KV_COMMENTS_IMPORT_FILE_TYPE_UNEXPECTED: $fileType" }
   if ($programSelector -and $programSelector -ne $script:ZhGlobal) { throw "KV_COMMENTS_IMPORT_PROGRAM_SELECTOR_MISMATCH: '$programSelector'" }
 
   if (-not (Set-FileNameText $dialogHwnd $CommentsPath)) { throw 'KV_COMMENTS_IMPORT_FILENAME_FIELD_MISSING' }
