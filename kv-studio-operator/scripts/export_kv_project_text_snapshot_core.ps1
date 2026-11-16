@@ -305,6 +305,19 @@ $structureArgs=@('-ProjectPath',$uiProjectPath,'-OutDir',$structureOut,'-Timeout
 $structureStep=Invoke-Child $structureWorkflow $structureArgs $structureResult 'structure_export' -ResetPaths @($structureOut)
 $structureJson=Join-Path $structureOut 'structure_definitions.json'
 if(Test-Path $structureJson){Copy-Item $structureJson (Join-Path $textRoot 'structure_definitions.json') -Force}
+# KV Nano has no user data types at all, so the structure editor has no 数据类型 root and the
+# stage fails with KV_STRUCTURE_TYPE_ROOT_MISSING. That is "nothing to export", not a defect:
+# record it as skipped so the snapshot can complete for a Nano project.
+if(-not $structureStep.ok){
+  $structureErrPath=Join-Path $structureOut 'step_stderr.txt'
+  $structureErr=if(Test-Path -LiteralPath $structureErrPath){Get-Content -LiteralPath $structureErrPath -Raw -Encoding UTF8}else{''}
+  $structureMods=@(Get-ChildItem -LiteralPath (Split-Path -Parent $uiProjectPath) -File -Filter '*.mod' -ErrorAction SilentlyContinue)
+  if($structureErr -match 'KV_STRUCTURE_TYPE_ROOT_MISSING' -and $structureMods.Count -gt 0){
+    Set-StageSkipped 'structure_export' 'nano_has_no_structure_types'
+    $structureStep=[ordered]@{ok=$true;status='skipped';label='structure_export';reason='nano_has_no_structure_types'}
+    Write-Json (Join-Path $structureOut 'structure_definitions_skipped.json') ([ordered]@{ok=$true;skipped=$true;reason='nano_has_no_structure_types'}) 6
+  }
+}
 
 $moduleNames=@()
 if($initial -and $initial.program_modules){$moduleNames=@($initial.program_modules|ForEach-Object {[string]$_.module_name}|Where-Object {$_}|Sort-Object -Unique)}

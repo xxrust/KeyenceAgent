@@ -371,27 +371,29 @@ try {
   if ($saveButton -eq [IntPtr]::Zero) { throw 'KV_COMMENTS_SAVE_BUTTON_MISSING' }
   Log "clicking save button text='$(Get-WindowTitle $saveButton)'"
   [void][KvCommentExportWin32]::SendMessage($saveButton, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
-  # KV Nano raises a 确认另存为 overwrite-confirm modal after the save click. These DirectUI
-  # dialogs are NOT found by FindWindow and do not necessarily own the foreground, but the
-  # UIA desktop tree exposes them; close the window handle directly with WM_CLOSE, which
-  # the manual probe showed removes it cleanly.
-  $confirmDeadline = (Get-Date).AddSeconds(25)
-  while ((Get-Date) -lt $confirmDeadline) {
-    $confirmElement = $null
-    foreach ($topWindow in [Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition)) {
-      if ($topWindow.Current.Name -match '确认另存为') { $confirmElement = $topWindow; break }
-    }
-    if (-not $confirmElement) { break }
-    [void][KvCommentExportWin32]::PostMessage([IntPtr]$confirmElement.Current.NativeWindowHandle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
-    Log 'closed 确认另存为 overwrite dialog (UIA handle + WM_CLOSE)'
-    Start-Sleep -Milliseconds 700
-  }
+  # KV Nano may raise a 确认另存为 confirmation after the save click, and it can appear late.
+  # Poll for both outcomes in one loop: accept the confirmation whenever it shows up, and
+  # stop as soon as the current-run artifact exists. Closing the dialog would cancel the
+  # export, so it is accepted with Enter through the UI guard.
   $artifact = $null
-  $deadline = (Get-Date).AddSeconds(30)
+  $deadline = (Get-Date).AddSeconds(90)
   while ((Get-Date) -lt $deadline) {
     if (Test-Path -LiteralPath $expectedArtifact -PathType Leaf) {
       $candidate = Get-Item -LiteralPath $expectedArtifact
       if ($candidate.Length -gt 0 -and $candidate.LastWriteTime -ge $runStart.AddSeconds(-2)) { $artifact = $candidate; break }
+    }
+    $confirmElement = $null
+    foreach ($topWindow in [Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition)) {
+      if ($topWindow.Current.Name -match '确认另存为') { $confirmElement = $topWindow; break }
+    }
+    if ($confirmElement) {
+      $confirmHwnd = [IntPtr]$confirmElement.Current.NativeWindowHandle
+      [void][KvCommentExportWin32]::SetForegroundWindow($confirmHwnd)
+      Start-Sleep -Milliseconds 250
+      Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $confirmHwnd -Step 'accept save-as confirmation' -Keys '{ENTER}' -ExpectedTitleLike '*' -SuccessTitleLike @('KV STUDIO*') -SleepMs 700
+      Log 'accepted 确认另存为 with Enter'
+      Start-Sleep -Milliseconds 600
+      continue
     }
     Start-Sleep -Milliseconds 300
   }
@@ -404,7 +406,9 @@ try {
       (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Desktop'))
     if ($env:KV_MNM_RECOVERY_ROOTS) { $recoveryRoots += @($env:KV_MNM_RECOVERY_ROOTS -split ';') }
     foreach ($root in @($recoveryRoots | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique)) {
-      $hit = @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter 'KV_DEVICE_COMMENTS_*.CSV' -ErrorAction SilentlyContinue |
+      # The workflow asks for a fixed name (device_comments.csv), so a fixed prefix filter
+      # misses it; take any CSV written during this run.
+      $hit = @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter '*.csv' -ErrorAction SilentlyContinue |
         Where-Object { $_.LastWriteTime -ge $runStart.AddSeconds(-5) } | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
       if ($hit.Count -gt 0) {
         Copy-Item -LiteralPath $hit[0].FullName -Destination $expectedArtifact -Force
