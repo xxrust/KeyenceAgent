@@ -230,6 +230,19 @@ try {
       if ($marker -and $name) { $programs += $name }
     }
     $programs = @($programs | Select-Object -Unique)
+    # Prefer the combo items: the tree walk can miss programs, but the combo is exactly the
+    # list of programs that have local labels.
+    $comboPrograms = @()
+    $expand = $null
+    if ($combo.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$expand)) {
+      $expand.Expand(); Start-Sleep -Milliseconds 500
+      foreach ($item in $combo.FindAll([Windows.Automation.TreeScope]::Descendants, (New-Object Windows.Automation.PropertyCondition -ArgumentList ([Windows.Automation.AutomationElement]::ControlTypeProperty), ([Windows.Automation.ControlType]::ListItem)))) {
+        if ($item.Current.Name) { $comboPrograms += [string]$item.Current.Name }
+      }
+      $expand.Collapse(); Start-Sleep -Milliseconds 300
+    }
+    if ($comboPrograms.Count -gt 0) { $programs = @($comboPrograms | Select-Object -Unique) }
+    Log ("program list: " + ($programs -join ", "))
     if ($programs.Count -eq 0) { throw 'KV_NANO_LABELS_PROGRAMS_MISSING' }
     Log ("local programs: " + ($programs -join ', '))
 
@@ -241,7 +254,9 @@ try {
       Start-Sleep -Milliseconds 300
       [void][System.Windows.Forms.SendKeys]::SendWait('%m')
       Start-Sleep -Milliseconds 350
-      [void][System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
+      # Home does not reliably return a DropDownList combo to its first item, so saturate
+      # upwards first: Up x (count+4) always lands on the first program, then Down x index.
+      for ($saturate = 0; $saturate -lt ($programs.Count + 4); $saturate++) { [void][System.Windows.Forms.SendKeys]::SendWait('{UP}'); Start-Sleep -Milliseconds 40 }
       Start-Sleep -Milliseconds 200
       for ($step = 0; $step -lt $index; $step++) { [void][System.Windows.Forms.SendKeys]::SendWait('{DOWN}'); Start-Sleep -Milliseconds 120 }
       Start-Sleep -Milliseconds 500
