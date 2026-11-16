@@ -352,6 +352,23 @@ try {
     Start-Sleep -Milliseconds 300
   }
   if (-not $artifact) {
+    # KV can save the CSV into the folder remembered by the Save As dialog (same class of
+    # problem as the .mnm export). Recover the current-run file before failing.
+    $recoveryRoots = @((Split-Path -Parent $ProjectPath), (Split-Path -Parent (Split-Path -Parent $ProjectPath)),
+      [Environment]::GetFolderPath('UserProfile'), [Environment]::GetFolderPath('MyDocuments'),
+      (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'),
+      (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Desktop'))
+    if ($env:KV_MNM_RECOVERY_ROOTS) { $recoveryRoots += @($env:KV_MNM_RECOVERY_ROOTS -split ';') }
+    foreach ($root in @($recoveryRoots | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique)) {
+      $hit = @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter 'KV_DEVICE_COMMENTS_*.CSV' -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -ge $runStart.AddSeconds(-5) } | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
+      if ($hit.Count -gt 0) {
+        Copy-Item -LiteralPath $hit[0].FullName -Destination $expectedArtifact -Force
+        if (Test-Path -LiteralPath $expectedArtifact) { $artifact = Get-Item -LiteralPath $expectedArtifact; Log ("recovered comments csv from " + $hit[0].FullName); break }
+      }
+    }
+  }
+  if (-not $artifact) {
     $recent = @(Get-ChildItem $projectDir -File -Filter '*.csv' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | ForEach-Object { $_.Name })
     Log ('artifact missing; recent csv: ' + ($recent -join ', '))
     throw 'KV_COMMENTS_ARTIFACT_MISSING'
