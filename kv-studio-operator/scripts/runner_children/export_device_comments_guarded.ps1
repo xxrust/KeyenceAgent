@@ -352,25 +352,15 @@ try {
   if ($saveButton -eq [IntPtr]::Zero) { throw 'KV_COMMENTS_SAVE_BUTTON_MISSING' }
   Log "clicking save button text='$(Get-WindowTitle $saveButton)'"
   [void][KvCommentExportWin32]::SendMessage($saveButton, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
-  # KV Nano raises a 确认另存为 overwrite-confirm modal after the save click. It is not
-  # always the foreground window (the Save As dialog can still own focus), so find it by
-  # title through UIA and press its default button (IDOK) instead of guessing focus.
-  $confirmDeadline = (Get-Date).AddSeconds(25)
-  while ((Get-Date) -lt $confirmDeadline) {
-    $confirmWin = $null
-    foreach ($candidate in [Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition)) {
-      if ($candidate.Current.Name -match '确认另存为') { $confirmWin = $candidate; break }
-    }
-    if (-not $confirmWin) { break }
-    $okButton = [KvCommentExportWin32]::GetDlgItem([IntPtr]$confirmWin.Current.NativeWindowHandle, 1)
-    if ($okButton -ne [IntPtr]::Zero) {
-      [void][KvCommentExportWin32]::SendMessage($okButton, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
-    } else {
-      $closePattern = $null
-      if ($confirmWin.TryGetCurrentPattern([Windows.Automation.WindowPattern]::Pattern, [ref]$closePattern)) { $closePattern.Close() }
-    }
-    Log ("confirmed overwrite dialog: " + $confirmWin.Current.Name)
-    Start-Sleep -Milliseconds 600
+  # KV Nano raises a 确认另存为 overwrite-confirm modal after the save click. It is a
+  # modal owned by the Save As dialog and normally owns the foreground, so acknowledge it
+  # with Enter through the guard instead of walking the UIA tree (which does not expose it).
+  Start-Sleep -Milliseconds 1500
+  $confirmForeground = [KvCommentExportWin32]::GetForegroundWindow()
+  if ($confirmForeground -ne [IntPtr]::Zero -and (Get-WindowTitle $confirmForeground) -match '确认另存为') {
+    Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $confirmForeground -Step 'confirm overwrite' -Keys '{ENTER}' -ExpectedTitleLike '*' -SuccessTitleLike @('KV STUDIO*') -SleepMs 800
+    Log 'pressed Enter on 确认另存为'
+    Start-Sleep -Milliseconds 800
   }
   $artifact = $null
   $deadline = (Get-Date).AddSeconds(30)
