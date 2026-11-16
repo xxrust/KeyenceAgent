@@ -38,3 +38,43 @@ Nano（KV-N14/N24/N40/N60/NC32T）只支持**梯形图 + KV 脚本**，不支持
 
 - 给 `export_kv_project_inventory.ps1` 增加"Nano 分支"：无 `WsTreeEnv.xml` 时用 `.mod` 文件名 + `CpuMb2.inf` 推断 CPU/程序列表，并把 `asset_status` 标成 `partial(nano_layout)` 而不是 `not_found`。
 - `export_mnm_browse_default_folder_guarded.ps1` 需要查清 Nano 菜单差异（KV-NC32 的导出菜单项/快捷键是否不同），否则 MNM 导出永远超时。
+## 5. 助记符导出实测（2026-11-16，KV-NC32 / 纯48）
+
+**结论：Nano 用同一套 `Alt+F → 助记符列表(R) → 保存(S)` 可以导出，导出器只差两处。**
+
+实测命令（有界 90s）：
+
+```
+export_mnm_browse_default_folder_guarded.ps1 -ProjectPath 纯48.kpr -ExportDir <空目录> -OutDir <日志目录> -TimeoutSeconds 90
+```
+
+日志显示全部步骤成功：
+
+```
+mnm export Alt+F → mnm export mnemonic R → mnm export save S
+click OK on export option dialog title=选择注释类型
+confirm current browse-folder selection
+click OK on browse folder default dialog title=浏览文件夹
+click post-export dialog button (KV STUDIO) ×2
+```
+
+产物：**9 个 `.mnm` 成功生成**，但落在 **KVS 记忆的默认文件夹**（本次是 `C:\Users\Administrator\Downloads\纯48\`），
+不在 `-ExportDir`，于是结果被判 `KV_MNM_EXPORT_NO_FILES`。
+
+→ 修法（未实现）：点 OK 前把目标文件夹设成 `ExportDir`，或点 OK 后读取对话框选中的路径/扫描默认文件夹，
+把时间窗内的新 `.mnm` 移入 `ExportDir`。
+
+## 6. Nano 的 MNM 文本格式（与 KV-X 不同）
+
+| 项 | KV-X（KV-X310） | KV Nano（KV-NC32） |
+|---|---|---|
+| 文件编码 | UTF-16 LE + BOM | **UTF-8（无 BOM）**，`\r\n` 换行 |
+| 头行 | `DEVICE:59` | **`DEVICE:128`** |
+| 额外头字段 | `;MODULE:` / `;MODULE_TYPE:` | 另有 **`;SCRIPT_TYPE:`** |
+| 程序体 | 梯形图为主，可含 ST | 只有梯形图 / KV 脚本 |
+
+实测样本：`C:\kvrun\nano\export_try2\mnm\Main.mnm`（前 60 字节 = `DEVICE:128\r\n;MODULE:Main\r\n;MODULE_TYPE:0\r\n;SCRIPT_TYPE:\r\n;cm8…`），
+9 个程序全部导出成功。
+
+→ 影响 `import_mnm_guarded.ps1`：若以后要往 Nano 导入，必须支持 **`DEVICE:128` + UTF-8(无 BOM)**；
+当前实现按 `DEVICE:59` + UTF-16 处理，直接导入会失败。**暂列"难度较大，先跳过"**。
