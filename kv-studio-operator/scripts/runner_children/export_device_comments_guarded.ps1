@@ -92,6 +92,8 @@ using System;
 using System.Text;
 using System.Runtime.InteropServices;
 public class KvCommentExportWin32 {
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -352,15 +354,16 @@ try {
   if ($saveButton -eq [IntPtr]::Zero) { throw 'KV_COMMENTS_SAVE_BUTTON_MISSING' }
   Log "clicking save button text='$(Get-WindowTitle $saveButton)'"
   [void][KvCommentExportWin32]::SendMessage($saveButton, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
-  # KV Nano raises a 确认另存为 overwrite-confirm modal after the save click. It is a
-  # modal owned by the Save As dialog and normally owns the foreground, so acknowledge it
-  # with Enter through the guard instead of walking the UIA tree (which does not expose it).
-  Start-Sleep -Milliseconds 1500
-  $confirmForeground = [KvCommentExportWin32]::GetForegroundWindow()
-  if ($confirmForeground -ne [IntPtr]::Zero -and (Get-WindowTitle $confirmForeground) -match '确认另存为') {
-    Invoke-KvGuardedSendKeysAllowTargetClose -TargetHwnd $confirmForeground -Step 'confirm overwrite' -Keys '{ENTER}' -ExpectedTitleLike '*' -SuccessTitleLike @('KV STUDIO*') -SleepMs 800
-    Log 'pressed Enter on 确认另存为'
-    Start-Sleep -Milliseconds 800
+  # KV Nano raises a 确认另存为 overwrite-confirm modal after the save click. It does not
+  # always own the foreground (the Save As dialog can keep it), so find it by title and
+  # close it with WM_CLOSE, which the live probe showed removes it reliably.
+  $confirmDeadline = (Get-Date).AddSeconds(25)
+  while ((Get-Date) -lt $confirmDeadline) {
+    $confirmHwnd = [KvCommentExportWin32]::FindWindow($null, '确认另存为')
+    if ($confirmHwnd -eq [IntPtr]::Zero) { break }
+    [void][KvCommentExportWin32]::PostMessage($confirmHwnd, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
+    Log 'closed 确认另存为 overwrite dialog'
+    Start-Sleep -Milliseconds 700
   }
   $artifact = $null
   $deadline = (Get-Date).AddSeconds(30)
