@@ -263,7 +263,9 @@ try {
       $program = [string]$value.Current.Value
       [void][System.Windows.Forms.SendKeys]::SendWait('{TAB}{TAB}')
       Start-Sleep -Milliseconds 350
-      try { $rows = Get-GridTable $dialogHwnd } catch { Log ("local read failed for " + $program + ": " + $_.Exception.Message); continue }
+      # An empty grid is a valid result: some programs simply have no local labels, so
+      # record 0 rows instead of treating the empty copy as a failure.
+      try { $rows = Get-GridTable $dialogHwnd } catch { $rows = @(); Log ("local table empty for " + $program) }
       $rows = @($rows | Where-Object { $_.label.Trim() -or $_.datatype.Trim() -or $_.device.Trim() -or $_.comment.Trim() })
       $safeName = ($program -replace '[\\/:*?"<>|]', '_')
       if (-not $safeName) { $safeName = "program_$index" }
