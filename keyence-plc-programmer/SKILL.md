@@ -10,6 +10,7 @@ description: 编写和修改 KEYENCE PLC 程序（ST/LD）、变量、FB 接口�
 KEYENCE 专有语法、指令/FB 调用、设备映射和模块行为，通过
 `kv-studio-kb-programming` 查询本地 Wiki v3m 或依据当前项目导出证据确认。
 
+> **机型硬约束**：KV **Nano** 系列只支持**梯形图 + KV 脚本**，**不支持 ST / FBD**。目标机型是 Nano 时不要规划 ST 模块或 ST 代码，只能出梯形图 / 脚本（依据与移植注意事项见 `references/keyence-basics-and-pitfalls.md` §12）。
 ## 开工前必读：基础与反直觉清单
 
 读陌生 KEYENCE 工程、或准备改程序/变量/注释之前，先扫一遍

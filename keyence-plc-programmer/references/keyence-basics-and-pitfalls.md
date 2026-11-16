@@ -130,3 +130,22 @@
 - 新增条目必须写清**依据类型**（手册 / 实测 / 仓库）和**具体的验证方式**，不要写"经验上"。
 - 属于 KEYENCE 语义的条目，先在 `kv-studio-kb-programming` 里查到证据再写入；查不到就写"未证实"。
 - 属于本仓库约定的条目，必须同时说明**是哪个门禁/脚本**在保证它。
+## §12 机型 × 编程方式（KV Nano 不支持 ST/FBD）
+
+**结论（用户确认 2026-11-16）**：KV Nano 系列只支持**梯形图**与**KV 脚本**，**不支持 ST 与 FBD**。
+
+| 机型 | 梯形图 | KV 脚本 | ST | FBD |
+|---|---|---|---|---|
+| KV Nano（KV-N14/N24/N40/N60/NC32T） | ✅ | ✅ | ❌ | ❌ |
+| KV-X / KV-8000/7000 等 | ✅ | ✅ | ✅ | ✅（按机型） |
+
+证据（KB v3m）：
+- `KV-AD_DANano.pdf` p12-16 术语表：「《KV STUDIO》= KV Nano 系列创建程序的支持软件」「梯形图程序 = KV STUDIO 生成的程序」；p51-54 要求 KV STUDIO **V7 以上**。
+- `KvsHardNano.pdf` p126-128 / `KvsHardNanoC.pdf` p106-108 有「KV 脚本」专章。
+- 指令参考有 Nano 专用适用性页 `chm::InstructionRef--cmd_add-cpu_kvnano-*`（ABSENC/INCENC/FCNT/RCNT/PLSOUT/TRGD/LOGE/LOGD/MCMP…）。
+- **没有** Nano 的 ST/FBD 章节——这也是本结论的直接依据。
+
+实战影响：
+1. 目标机型是 Nano 时，**不要**规划 ST 模块、不要用 `create_kv_st_module`；只能用梯形图（MNM `LD/...` 体）或 KV 脚本（脚本程序）。
+2. 从 KV-X/8000 往 Nano 移植时，ST 程序必须改写为梯形图或脚本，不能直接转换。
+3. 生成计划前先确认 `cpu_model`：Nano 型号出现在 scaffold 里却排了 ST 步骤，属于必然编译失败的计划。
