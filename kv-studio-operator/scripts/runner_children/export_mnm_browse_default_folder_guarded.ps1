@@ -573,8 +573,13 @@ $optionDialog = Wait-KvsNonFolderDialog -ProcessId $process.Id -Seconds 30
       [Environment]::GetFolderPath('MyDocuments'),
       (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads'),
       (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Desktop'),
-      (Split-Path -Parent $ProjectPath)
-    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+      (Split-Path -Parent $ProjectPath),
+      (Split-Path -Parent (Split-Path -Parent $ProjectPath))
+    )
+    if ($env:KV_MNM_RECOVERY_ROOTS) {
+      $candidateRoots += @($env:KV_MNM_RECOVERY_ROOTS -split ';')
+    }
+    $candidateRoots = @($candidateRoots | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique)
     $recovered = @()
     foreach ($root in $candidateRoots) {
       $hits = @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter '*.mnm' -ErrorAction SilentlyContinue |
