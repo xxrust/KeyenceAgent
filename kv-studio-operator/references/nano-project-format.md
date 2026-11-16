@@ -111,3 +111,20 @@ KVS11 里也能打开编译；`compile_kv_project.ps1` 走的是当前绑定实�
 清点的 Nano 分支设计（未实现）：遍历工程目录 `*.mod`（`Main/IO测试/正向移动/…`）作为模块名，`module_type=0`；
 CPU 用 `CpuMb2.inf` 或 KVS 标题 `[编辑器: KV-NC32]`；`asset_status` 标 `partial(nano_layout)` 而不是 `not_found`，
 避免下游把"没有树"当成"工程为空"。
+## 9. 快照链路现状与已定位的阻塞点（2026-11-16 连续实测）
+
+Nano 工程跑 `export_kv_project_text_snapshot.ps1` 时，逐阶段把阻塞点一个个暴露出来，按顺序修过：
+
+| # | 阻塞现象 | 根因 | 处理 |
+|---|---|---|---|
+| 1 | `mnm export` 卡 30 分钟无输出 | 采样日志与 runner 日志是两份文件，误判卡点 | 认准 runner 自己写的那份日志 |
+| 2 | 导出成功却 `KV_MNM_EXPORT_NO_FILES` | KVS 把 `.mnm` 写进"上次使用的文件夹"，不是 `-ExportDir` | 新增恢复扫描（含 `KV_MNM_RECOVERY_ROOTS`） |
+| 3 | `选择注释类型` 被跳过 | 8 秒探测窗口内该对话框可能还没弹出（临时副本上更慢） | 等待 8 s → 30 s |
+| 4 | `KV_COMMENTS_TARGET_EXISTS` | 源工程里残留上一次的 `device_comments.csv`，被复制进每个临时副本 | 目标早于本次运行则自动删除 |
+| 5 | `KV_COMMENTS_ARTIFACT_MISSING` | 导出文件名是 `device_comments.csv`，恢复扫描只匹配 `KV_DEVICE_COMMENTS_*.CSV` | 匹配放宽为 `*.csv` |
+| 6 | 点击"保存"后永久挂起（20 分钟） | 弹出 **`确认另存为`** 覆盖确认框，脚本未处理 | **未修**：需在保存后增加该对话框处理（点 是/确定） |
+
+当前阶段状态：`inventory_initial` ✅、`mnm_export` ✅、`export_device_comments` ❌（卡在第 6 项）。
+
+**下一处代码改动**：在 `export_device_comments_guarded.ps1` 点击"保存(&S)"之后，增加与 MNM 导出同款的后处理循环——
+识别标题 `确认另存为`（以及 `是否覆盖` 一类），点 `是(Y)` / `确定`，再继续等待产物出现。
