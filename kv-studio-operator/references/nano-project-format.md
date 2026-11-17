@@ -274,3 +274,19 @@ LD CR2008 / SET CR8401 / LD CR8402 / SET CR8403 / LD CR8404 / OUT MR100
 也可以逐个指令直接敲：选中单元后直接键入 `LD CR2008` 回车即可（实测有效，KV 会自动放置输出指令并推进到下一行）。
 
 `write_nano_program_guarded.ps1` 正在按此实现；其中「新建程序」对话框的名字输入框 UIA 不可见，需要用 Win32 `EnumChildWindows` 找 `Edit` 再点击输入，`编辑列表` 的打开时机也需在窗口就绪后再发 `Ctrl+D`。
+### 14.1 复用 `set_fb_program_body_guarded.ps1` 的守护流程（2026-11-17）
+
+`write_nano_program_guarded.ps1` 改为**复用 KV-X 那套守护机制**（`kv_ui_guard.ps1`）：
+
+- 树中选中程序 → `Enter` 打开梯形图；
+- `Invoke-KvGuardedCtrlChord -Vk 0x44 -AllowModalAfter` 打开「编辑列表」；
+- `Invoke-KvGuardedClipboardPaste` 粘贴正文（自动去掉 `DEVICE:`/`;MODULE:`/`;MODULE_TYPE:` 头）；
+- 若弹「全部覆盖」则接受；
+- 模态窗口走「替换块(&R)」（UIA 拿不到按钮时用 Win32 `id=1370` 兜底），内嵌面板走 `Tab`+`Enter`；
+- `Ctrl+S` 保存。
+
+实测：`ok=true`、6 行正文粘贴成功、`mode=embedded_panel`。
+
+**尚未解决**：粘贴后编译报 `转换结果 NG（错误数量:1）WriteTest(行:00002)(列:01)(错误:400)`，
+且脚本在「编辑列表」仍打开时也会返回 `ok=true`（假成功）。下一步要在应用后**回读编译状态**
+并关闭对话框后再判定成功。
