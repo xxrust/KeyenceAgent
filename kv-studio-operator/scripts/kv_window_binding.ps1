@@ -13,6 +13,48 @@ function Get-KvProcessesByCommandLine {
   return @($hits | ForEach-Object { Get-Process -Id ([int]$_.ProcessId) -ErrorAction SilentlyContinue } | Where-Object { $_ })
 }
 
+# A basename is not a project identity: two copies commonly have the same name.
+# Match one complete command-line argument, never a path substring or title alone.
+function Test-KvProjectCommandLine {
+  param([string]$CommandLine,[string]$ProjectPath)
+  if (-not $CommandLine) { return $false }
+  $path=[IO.Path]::GetFullPath($ProjectPath)
+  $pattern='(?:^|\s)(?:"'+[regex]::Escape($path)+'"|'+[regex]::Escape($path)+')(?=\s|$)'
+  return [bool]($CommandLine -match $pattern)
+}
+
+function Get-KvProjectSession {
+  param([Parameter(Mandatory=$true)][string]$ProjectPath,[string]$CreatedProjectResultPath='',[switch]$AllowMissing)
+  $path=[IO.Path]::GetFullPath($ProjectPath)
+  $bound=@(Get-CimInstance Win32_Process -Filter "Name='Kvs.exe'" -ErrorAction Stop |
+    Where-Object { Test-KvProjectCommandLine $_.CommandLine $path } |
+    ForEach-Object { Get-Process -Id ([int]$_.ProcessId) -ErrorAction SilentlyContinue })
+  if ($CreatedProjectResultPath) {
+    . (Join-Path $PSScriptRoot 'kv_project_process_binding.ps1')
+    $created=Get-KvCreatedProjectProcess $path $CreatedProjectResultPath
+    if (@($bound | Where-Object { $_.Id -ne $created.Id }).Count) { throw 'KV_PROJECT_PROCESS_AMBIGUOUS' }
+    $bound=@($created)
+  }
+  if ($bound.Count -gt 1) { throw 'KV_PROJECT_PROCESS_AMBIGUOUS' }
+  if (-not $bound.Count) {
+    if ($AllowMissing) { return $null }
+    throw 'KV_PROJECT_PATH_BOUND_PROCESS_MISSING'
+  }
+  $process=$bound[0]
+  $hwnd=Get-KvProjectEditorHwnd -ProcessId $process.Id
+  if ($hwnd -eq [IntPtr]::Zero) {
+    if ($AllowMissing) { return $null }
+    throw 'KV_PROJECT_EDITOR_WINDOW_MISSING'
+  }
+  $element=[Windows.Automation.AutomationElement]::FromHandle($hwnd)
+  $title=[string]$element.Current.Name
+  $pattern='^KV STUDIO.* - \['+[regex]::Escape([IO.Path]::GetFileNameWithoutExtension($path))+'(?: \*)?\]$'
+  if ($title -notmatch $pattern) { throw 'KV_PROJECT_WINDOW_IDENTITY_MISMATCH' }
+  $cpu=''
+  if ($title -match '\[编辑器:\s*(KV-[A-Za-z0-9-]+)\]') { $cpu=$matches[1] }
+  [pscustomobject]@{project_path=$path;process_id=$process.Id;process_start_utc=$process.StartTime.ToUniversalTime().ToString('o');hwnd=$hwnd;title=$title;cpu_model=$cpu;kvs_exe=$process.Path;kvs_version=$process.FileVersion}
+}
+
 function Test-KvWindowHasProjectTree {
   param([Parameter(Mandatory=$true)][IntPtr]$Hwnd)
   if ($Hwnd -eq [IntPtr]::Zero) { return $false }

@@ -333,35 +333,21 @@ KeyenceAgent/
 | EtherCAT 节点配置 | ✅ 已验证发布 |
 | 新建项目 / 编译（独立工作流） | 🔄 pending_validation |
 
-### KV Nano（KV-NC32）支持现状（2026-11-17）
+### KV Nano（KV-NC32）支持现状（2026-11-17 审计）
 
-KV Nano 与 KV-X 的工程格式、界面结构都不同：**没有 `WsTreeEnv.xml`**，一个程序一个 `.mod`；
-助记符列表是 **UTF-8 无 BOM + `DEVICE:128`**（KV-X 是 UTF-16LE+BOM + `DEVICE:59`）；
-变量不叫"变量"，而在工程树的 **`标号`** 里（`编辑标号` 对话框：`全局` / `局部` 两个页签）。
+`纯48` 的实际 CPU 为 KV-NC32；该样本按 `.mod` 保存程序，没有 `WsTreeEnv.xml`。
+本机导出的 MNM 是 **Windows-936（GBK）无 BOM + `DEVICE:128`**；此前 UTF-8 的记录有误。
 
-| 能力 | 状态 | 证据 |
-|------|------|------|
-| 工程清点（按 `.mod` 识别模块） | ✅ | `纯48`：9 个模块 |
-| 整条文本快照 | ✅ `status=ready` | `missing=[]`，缺的能力记入 `skipped_capabilities` |
-| **标号表导出（全局 + 每程序局部）** | ✅ | `纯48`：全局 62 行（与人工核对 0 差异）、9 个程序全在 |
-| 助记符（MNM）导出 | ✅ | `纯48`：9 个 `.mnm` |
-| 编译 | ✅ | `转换成功。` 879 步 / 782 指令 |
-| 软元件注释导出 / 导入 | ✅ | 导入 1861 条并落盘（`纯48.cm1` 被重写） |
-| **程序导入（`.mod`/`.mcr`，跨工程）** | ✅ | `import_nano_program_win32.ps1`：导入 `imp_A\Main.mod` 后 `导入完成。`、工程树断言通过 |
-| 助记符（MNM）文本导入 | ❌ 产品限制 | 三种入口（导入程序 / 助记符列表→读取 / 新程序内重试）均被 KV 拒绝 |
-| 变量 / EtherCAT / 轴参数 / 运动 / EIP 快照阶段 | ⏭️ `skipped` | Nano 无这些能力，快照会跳过而不是报错 |
+| 能力 | 当前证据 |
+| --- | --- |
+| MNM 导出 | 正式 workflow 实机通过：已打开副本及冷启动副本均导出 9 个程序，明确选择本次空目录、复制后校验 SHA256 |
+| 编译 | 复用 `compile_kv_project.ps1`；已有样本转换记录，修改后仍须重新编译 |
+| 标号、正文替换、程序/宏创建及导入 | 研究脚本尚缺正式入口或保存回读/编译验收，不能按旧 `ok=true` 宣称已完成 |
+| 整体文本快照 | 待修复失败转 skipped、标号缺失和布局推断；旧 `ready` 不代表完整 |
+| 注释读写及配置 | 复用既有 workflow；Nano 分支的新增恢复/弹窗处理仍需审计与回归 |
 
-标号表导出：
-
-```powershell
-powershell -File kv-studio-operator/scripts/runner_children/export_nano_labels_guarded.ps1 `
-  -ProjectPath <工程>.kpr -OutDir <输出目录> -IncludeLocal
-```
-
-输出 `labels_global.tsv` 和每程序的 `labels_local_<程序>.tsv`（列：标号名 / 数据类型 / 软元件 / 标号注释）。
-
-Nano 相关的格式与排障记录见
-[kv-studio-operator/references/nano-project-format.md](kv-studio-operator/references/nano-project-format.md)。
+入口以 manifest 的 `customer_callable` 为准，不直接调用 Nano `runner_children`。
+当前证据、限制及待办见 [Nano 适配记录](kv-studio-operator/references/nano-project-format.md)。
 
 ---
 

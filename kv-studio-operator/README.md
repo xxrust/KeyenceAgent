@@ -29,9 +29,10 @@
 | **改轴参数（移动量/螺距）** | `scripts/workflows/set_kv_axis_pitch.ps1` | ✅ |
 | **改轴控制大表单元格** | `scripts/workflows/set_kv_axis_table_cell.ps1` | ⚠️ 脚本可用，缺"导航到页"步骤（见 §5）|
 | 结构变更 / 变量 / FB / ST / MNM 导入导出 / 快照 | `scripts/workflows/*.ps1` | ✅ |
-| **KV Nano：标号表导出（全局 + 每程序局部）** | `scripts/runner_children/export_nano_labels_guarded.ps1` | ✅ |
-| **KV Nano：工程快照** | `scripts/workflows/export_kv_project_text_snapshot.ps1` | ✅ `status=ready`（无对应能力的阶段自动 `skipped`）|
-| **KV Nano：程序导入（`.mod`/`.mcr`，跨工程）** | `scripts/runner_children/import_nano_program_win32.ps1` | ✅ |
+| **KV Nano：标号表读写** | 正式 workflow 待接入 | 研究实现，未完成保存回读验收 |
+| **KV Nano：工程快照** | `scripts/workflows/export_kv_project_text_snapshot.ps1` | 待修复：失败转 skipped、标号缺失 |
+| **KV Nano：程序/宏导入及正文替换** | 正式 workflow 待接入 | 旧成功标记缺保存回读/编译证据 |
+| **KV Nano：MNM 导出** | `scripts/workflows/export_kv_project_mnm.ps1` | 本次实机通过，详见 [Nano 适配记录](references/nano-project-format.md) |
 | **删除 EtherCAT 从站** | `scripts/runner_children/delete_ethercat_slave_guarded.ps1` | ❌ 未跑通（网络树是自绘控件，待用对象级键盘方案）|
 
 ---
@@ -125,4 +126,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\run-all-with-shots.ps1
 - 自动 1:1 导入：`false`（EtherCAT per-device parameters 只有截图）；人工复刻：`true`。
 - live 验收（EtherCAT 节点、EIP 读写、轴参数、13 快照 bat）必须在目标 KV STUDIO 环境单独执行，并在运行目录保留结果。
 - 已知边界：`高级设定` 无结构化导出路径（UIA/剪贴板/菜单/OCR 均失败），只保留截图。
-> 机器可读状态汇总见 [eferences/capability-status.generated.md](references/capability-status.generated.md)（由 manifest/ontology/最近测试与快照生成）。
+> 机器可读状态汇总见 [references/capability-status.generated.md](references/capability-status.generated.md)（由 manifest/ontology/最近测试与快照生成）。

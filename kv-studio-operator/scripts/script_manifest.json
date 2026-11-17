@@ -1,4 +1,4 @@
-{
+﻿{
     "schema_version":  2,
     "layout_policy":  "role_directories",
     "notes":  [
@@ -1229,6 +1229,7 @@
                                           }
                                       ],
                     "probe_research":  [
+                                           {"path": "probes/inspect_nano_editor.ps1", "status": "research", "customer_callable": false}
 
                                        ],
                     "gate":  [
@@ -1283,6 +1284,7 @@
                                  }
                              ],
                     "support_library":  [
+                                            {"path": "workflow_tools/kv_mnm_text.ps1", "status": "approved", "customer_callable": false},
                                             {
                                                 "path":  "Capture-KvFrame.ps1",
                                                 "status":  "library",

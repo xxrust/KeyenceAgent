@@ -34,6 +34,7 @@ $offline = @(
   'library-dependencies',
   'write-ontology',
   'system-layout'
+  'nano-contract'
 )
 $live = @(
   'axis-rename-live',
