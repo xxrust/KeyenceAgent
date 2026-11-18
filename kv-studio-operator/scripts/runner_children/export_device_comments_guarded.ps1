@@ -83,6 +83,7 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 $sharedUiGuard = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'guards\kv_ui_guard.ps1'
+. (Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'kv_window_binding.ps1')
 if (-not (Test-Path -LiteralPath $sharedUiGuard -PathType Leaf)) { throw "Shared KV UI guard script not found: $sharedUiGuard" }
 . $sharedUiGuard
 Initialize-KvUiGuard -OutDir $OutDir -CheckpointSubdir 'device_comments'
@@ -249,8 +250,9 @@ try {
   $stableSince = $null
   do {
     $process = Get-Process -Id $targetId -ErrorAction SilentlyContinue
-    if (-not $process -or $process.MainWindowHandle -eq 0) { Start-Sleep -Milliseconds 400; continue }
-    $title = $process.MainWindowTitle
+    $boundSession=Get-KvProjectSession -ProjectPath $ProjectPath -CreatedProjectResultPath $CreatedProjectResultPath -AllowMissing
+    if (-not $process -or -not $boundSession -or $boundSession.process_id -ne $targetId) { Start-Sleep -Milliseconds 400; continue }
+    $title = $boundSession.title
     if ($title -match $cleanTitlePattern) {
       if ($stableSince -and ((Get-Date) - $stableSince).TotalSeconds -ge 2.5) { break }
       if (-not $stableSince) { $stableSince = Get-Date }
@@ -260,11 +262,11 @@ try {
     Start-Sleep -Milliseconds 400
   } while ((Get-Date) -lt $deadline)
   $process = Get-Process -Id $targetId -ErrorAction Stop
-  if ($process.MainWindowHandle -eq 0 -or $process.MainWindowTitle -notmatch $cleanTitlePattern) {
-    throw "KV_COMMENTS_TARGET_WINDOW_NOT_READY: $($process.MainWindowTitle)"
+  if (-not $boundSession -or $boundSession.title -notmatch $cleanTitlePattern) {
+    throw "KV_COMMENTS_TARGET_WINDOW_NOT_READY: $title"
   }
-  $hwnd = [IntPtr]$process.MainWindowHandle
-  Log "bound pid=$targetId hwnd=$($hwnd.ToInt64()) title='$($process.MainWindowTitle)'"
+  $hwnd = [IntPtr]$boundSession.hwnd
+  Log "bound pid=$targetId hwnd=$($hwnd.ToInt64()) title='$($boundSession.title)'"
 
   if ([KvCommentExportWin32]::IsIconic($hwnd)) { [void][KvCommentExportWin32]::ShowWindow($hwnd, 9) }
   Save-TopWindowSnapshot 'top_windows_before_export.json'
@@ -337,6 +339,11 @@ try {
     if ($row.automation_id -eq $script:DialogFileTypeComboAutomationId) { $fileType = [string]$row.name }
     if ($row.automation_id -eq $script:DialogProgramComboAutomationId) { $programName = [string]$row.name }
   }
+  # On the classic Nano dialog UIA Name is the associated static label, not the
+  # selected format. Read the native combo's current text, never infer from its
+  # list of available options.
+  $nativeFileType=Get-ControlText $dialogHwnd $script:DialogFileTypeComboId
+  if($nativeFileType){$fileType=$nativeFileType}
   $folderText = Get-ControlText $dialogHwnd $script:DialogFolderComboId
   $requestedProgram = if ($ProgramName) { [string]$ProgramName } else { $script:ZhGlobal }
   $script:DialogEvidence = [ordered]@{

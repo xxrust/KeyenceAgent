@@ -12,7 +12,7 @@
 
 | 项 | 值 |
 |---|---|
-| KV STUDIO | Ver.12G，`H:\Keyence\KVS12\KVS\Kvs.exe`（单实例）|
+| KV STUDIO | KV-X 使用 KVS12；Nano 本次实测 12.41.0.0，安装路径 `H:\Keyence\KVS11\KVS\Kvs.exe`；按完整工程路径绑定进程 |
 | 共享样例工程 | `references\KVX样例程序_v100\KVX样例程序_v100.kpr`（31 轴 + EtherCAT 从站）|
 | 测试运行目录 | 建议用**短路径**（如 `C:\kvrun\...`）——守卫有路径长度预算，超长会报 `KV_UI_GUARD_CHECKPOINT_PATH_TOO_LONG` |
 
@@ -29,9 +29,11 @@
 | **改轴参数（移动量/螺距）** | `scripts/workflows/set_kv_axis_pitch.ps1` | ✅ |
 | **改轴控制大表单元格** | `scripts/workflows/set_kv_axis_table_cell.ps1` | ⚠️ 脚本可用，缺"导航到页"步骤（见 §5）|
 | 结构变更 / 变量 / FB / ST / MNM 导入导出 / 快照 | `scripts/workflows/*.ps1` | ✅ |
-| **KV Nano：标号表读写** | 正式 workflow 待接入 | 研究实现，未完成保存回读验收 |
-| **KV Nano：工程快照** | `scripts/workflows/export_kv_project_text_snapshot.ps1` | 待修复：失败转 skipped、标号缺失 |
-| **KV Nano：程序/宏导入及正文替换** | 正式 workflow 待接入 | 旧成功标记缺保存回读/编译证据 |
+| **KV Nano：脚本 / 梯形图 / 标号增删改查** | `scripts/workflows/manage_kv_nano_program.ps1` | 空项目编译、保存重开回读通过；用例 25 / 26 分别 32 / 59 项 |
+| **KV Nano：完整程序计划** | `scripts/workflows/apply_kv_nano_program_plan.ps1` | 冻结完整 TSV 和源码，批量写入、编译、重开逐项比较；[交通灯示例](examples/nano-traffic-labels/README.md) |
+| **KV Nano：工程快照** | `scripts/workflows/export_kv_nano_snapshot.ps1` | 九程序三单元副本通过；空项目交通灯 BAT 87 项；[范围与证据](references/nano-snapshot.md) |
+| **KV Nano：单元 / 内置 Port0** | `scripts/workflows/manage_kv_nano_units.ps1` | NC32/NC1EP/NC16EXT 主表及增删改查，BAT 43 项通过；不含嵌套设定窗口 |
+| **KV Nano：CPU 定位参数** | `scripts/workflows/manage_kv_nano_cpu_position.ps1` | 六页完整读取；I/O 输出模式与 JOG 四项写入、重开、恢复通过 |
 | **KV Nano：MNM 导出** | `scripts/workflows/export_kv_project_mnm.ps1` | 本次实机通过，详见 [Nano 适配记录](references/nano-project-format.md) |
 | **删除 EtherCAT 从站** | `scripts/runner_children/delete_ethercat_slave_guarded.ps1` | ❌ 未跑通（网络树是自绘控件，待用对象级键盘方案）|
 
@@ -46,11 +48,21 @@ examples\axis-registration\run.bat   插 2 个从站 + 登录 2 个轴 + 填螺�
 examples\axis-table-edit\run.bat     改轴控制大表的某个单元格（对象级选中）
 tests\axis-pitch\run.bat             改轴参数 + 断言 + 重开回读
 tests\table-cell\run.bat             改大表单元格 + 整表 diff 断言
+tests\kv-interface-regression\28_nano_snapshot\run.bat  空项目交通灯快照验收
 import_kv_device_comments.bat        软元件注释表写回工程（导入 → 保存 → 回读 diff）
 ```
 
 > ⚠️ **bat 必须纯 ASCII**：中文参数不要写进 `.bat`（cmd 会把它变成 `?`）；
 > 用脚本默认值或让 `.ps1` 里带中文。
+
+### Nano 单次快照
+
+```powershell
+powershell -STA -NoProfile -ExecutionPolicy Bypass -File scripts/workflows/export_kv_nano_snapshot.ps1 `
+  -ProjectPath C:\projects\Nano\Nano.kpr -OutDir C:\kvrun\nano_snap
+```
+
+输出目录须不存在且位于源工程目录之外。结果在 `snapshot/source_snapshot_manifest.json`，可读文件位于 `snapshot/project`，完整源文件与 MNM 位于 `snapshot/raw`。入口校验源哈希、关闭自己的副本并保留原有窗口；`ready` 要求全部必需读取和清理通过。读取已保存的离线工程，不采集 NC1EP 嵌套设定或 PLC 实时值。宏创建/导入尚未验证；KV-X 保持原路线。
 
 ### 3.2 全量回归（harness）
 
@@ -119,7 +131,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\run-all-with-shots.ps1
 
 详见 → [`tests/README.md`](tests/README.md)
 
-## 当前验收状态（2026-11-01）
+## Nano 当前验收状态（2026-11-18）
+
+- 空项目交通灯快照 BAT：**87 通过 / 0 失败**，核对框脚本、域脚本全文、全部计划梯形图指令、标号表、六页参数及产物哈希；见 [用例 28](tests/kv-interface-regression/28_nano_snapshot/README.md)。
+- 九程序、NC32/NC1EP/NC16EXT 工程副本：95 个索引产物哈希全部一致；原文件未变，所属进程正常关闭，仅保留原有三个进程。实机证据：`C:/kvrun/nsfinal/acceptance.json`。
+- 语法/编码检查：292 个 PS1 文件零失败；本体覆盖检查 3 项通过。以上均为工程离线验收，未在实体 PLC 上验证。
+
+## KV-X 历史验收状态（2026-11-01）
 
 - 离线：16 suites / 175 cases（`tests/run_all.ps1`），**不包含 live UI**。
 - 最近一次完整快照：`status=ready`；EtherCAT PDO 32/32；EIP 3 条连接 + 3 份软元件分配。

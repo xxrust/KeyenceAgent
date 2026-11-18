@@ -1,0 +1,14 @@
+{
+  "name": "26_nano_area_labels_crud",
+  "enabled": true,
+  "project_mode": "new_project",
+  "project_name": "NanoAreaLabels",
+  "cpu_model": "KV-NC32",
+  "open_project": false,
+  "workflow": "scripts/workflows/manage_kv_nano_program.ps1",
+  "result_file": "test_result.json",
+  "expected_compile_result": "OK",
+  "arguments": [],
+  "harness": "run.ps1",
+  "description": "Blank Nano project: area-script CRUD, global/local label append/overwrite/direct delete, neighbour preservation, compile, reopen and owned-process cleanup."
+}

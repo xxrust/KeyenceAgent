@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory=$true)][string]$ScenarioPath,
   [string]$OutRoot = '',
   [switch]$PlanOnly,
@@ -16,6 +16,19 @@ $scriptsRoot=Join-Path $skillRoot 'scripts'
 $scenarioPath = [IO.Path]::GetFullPath($ScenarioPath)
 $scenario = Get-Content -Raw -LiteralPath $scenarioPath -Encoding UTF8 | ConvertFrom-Json
 if (-not $scenario.name -or -not $scenario.workflow) { throw 'Scenario requires name and workflow.' }
+if($scenario.harness){
+  # This mixed Nano case composes many flat workflows and owns its processes.
+  # Keep it on its dedicated harness, including run-all / PlanOnly dispatch.
+  $customRoutes=@{'25_nano_traffic_crud'='scripts/workflows/manage_kv_nano_program.ps1';'26_nano_area_labels_crud'='scripts/workflows/manage_kv_nano_program.ps1';'27_nano_units_crud'='scripts/workflows/manage_kv_nano_units.ps1';'28_nano_snapshot'='scripts/workflows/export_kv_nano_snapshot.ps1'}
+  if(-not $customRoutes.ContainsKey([string]$scenario.name) -or $scenario.harness -cne 'run.ps1' -or $scenario.workflow -cne $customRoutes[[string]$scenario.name]){throw 'KV_TEST_CUSTOM_HARNESS_NOT_REGISTERED'}
+  if($KeepProjectOpen){throw 'KV_TEST_NANO_CLEANUP_IS_MANDATORY'}
+  if(-not $OutRoot){$OutRoot=Join-Path $scenarioRunnerDir 'runs'}
+  $customOut=Join-Path ([IO.Path]::GetFullPath($OutRoot)) ($scenario.name+'_'+(Get-Date -Format 'yyyyMMdd_HHmmss_fff')+'_'+[guid]::NewGuid().ToString('N').Substring(0,8))
+  $customArguments=@('-STA','-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path (Split-Path -Parent $scenarioPath) 'run.ps1'),'-OutRoot',$customOut)
+  if($PlanOnly){$customArguments+='-PlanOnly'}
+  & powershell @customArguments
+  exit $LASTEXITCODE
+}
 $projectMode=if($scenario.project_mode){[string]$scenario.project_mode}else{'sample_copy'}
 if($projectMode -notin @('sample_copy','fixture_copy','new_project')){throw 'KV_TEST_PROJECT_MODE_INVALID'}
 if($projectMode -eq 'new_project' -and ($scenario.open_project -ne $false -or -not $scenario.project_name -or [string]$scenario.project_name -notmatch '^[A-Za-z][A-Za-z0-9_]{0,47}$' -or -not $scenario.cpu_model -or $scenario.workflow -ne 'scripts/workflows/create_kv_project.ps1')){throw 'KV_TEST_NEW_PROJECT_CONTRACT_INVALID'}

@@ -1,0 +1,3 @@
+'Global and local labels in the area script
+TrafficScratchUpdated = TrafficCycleUpdated + 1
+DM12 = TrafficScratchUpdated

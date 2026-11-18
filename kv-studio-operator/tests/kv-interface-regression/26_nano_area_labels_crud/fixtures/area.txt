@@ -1,0 +1,2 @@
+'Traffic area diagnostic
+DM12 = DM0

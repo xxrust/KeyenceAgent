@@ -955,3 +955,26 @@ function Invoke-KvGuardedAltVk {
   Write-KvUiGuardCheckpoint -Step $Step -Status 'after' -Action 'Alt+virtual key' -Expected @{ hwnd = $TargetHwnd.ToInt64(); title_like = $ExpectedTitleLike; vk = $Vk } -Before $before -After $after -Message 'Postcondition passed; target still owns foreground.' -Evidence @($beforePath) | Out-Null
   Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step $Step -Action 'Alt+virtual key' -TargetHwnd $TargetHwnd -ExpectedTitleLike $ExpectedTitleLike | Out-Null
 }
+
+function Invoke-KvGuardedExportFolderSelection {
+  param([Parameter(Mandatory=$true)][IntPtr]$DialogHwnd,[Parameter(Mandatory=$true)][IntPtr]$TreeHwnd,[Parameter(Mandatory=$true)][int]$ProcessId,[Parameter(Mandatory=$true)][string]$Path)
+  $watch=[Diagnostics.Stopwatch]::StartNew()
+  $Path=[IO.Path]::GetFullPath($Path)
+  if($Path -notmatch '^[A-Za-z]:\\' -or -not (Test-Path -LiteralPath $Path -PathType Container)){throw 'KV_EXPORT_LOCAL_DIRECTORY_REQUIRED'}
+  . (Join-Path $PSScriptRoot '../workflow_tools/kv_export_folder.ps1')
+  Initialize-KvExportFolderNative
+  Assert-KvUiForegroundHwnd -ExpectedHwnd $DialogHwnd -Step 'select explicit export folder through native shell tree' -ExpectedTitleLike '浏览文件夹' | Out-Null
+  Write-KvUiGuardCheckpoint -Step 'native export folder selection' -Status 'before' -Action 'shell folder selection' -Expected @{path=$Path;hwnd=$DialogHwnd.ToInt64()} | Out-Null
+  $selected=@([KvExportFolderNative]::Select($DialogHwnd,$TreeHwnd,$ProcessId,$Path))
+  $parts=@($Path.Substring(3).TrimEnd('\').Split('\') | Where-Object {$_})
+  [array]::Reverse($parts)
+  if($selected.Count -lt ($parts.Count+1)){throw 'KV_EXPORT_FOLDER_SELECTED_PATH_MISMATCH'}
+  for($i=0;$i -lt $parts.Count;$i++) {
+    if($selected[$i] -ine $parts[$i]){throw 'KV_EXPORT_FOLDER_SELECTED_PATH_MISMATCH'}
+  }
+  if($selected[$parts.Count] -notmatch ('\('+[regex]::Escape($Path.Substring(0,2))+'\)$')){throw 'KV_EXPORT_FOLDER_SELECTED_DRIVE_MISMATCH'}
+  Assert-KvUiForegroundHwnd -ExpectedHwnd $DialogHwnd -Step 'verify native export folder selection' -ExpectedTitleLike '浏览文件夹' | Out-Null
+  Write-KvUiGuardCheckpoint -Step 'native export folder selection' -Status 'after' -Action 'shell folder selection' -Expected @{path=$Path;selected_ancestors=$selected} | Out-Null
+  Complete-KvUiGuardAtomicAction -Stopwatch $watch -Step 'native export folder selection' -Action 'shell folder selection' -TargetHwnd $DialogHwnd -ExpectedTitleLike '浏览文件夹' | Out-Null
+  return $selected
+}

@@ -1,0 +1,2 @@
+'TrafficDiagnostic_v3_statement_deleted
+DM10 = DM0

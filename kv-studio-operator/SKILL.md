@@ -1,4 +1,4 @@
----
+﻿---
 name: kv-studio-operator
 description: 通过稳定 workflow 操作和快照化 KEYENCE KV STUDIO 桌面项目。用于项目创建、语义项目快照、MNM 导入导出、FB 自变量与局部变量、数据类型、编译结果和单元/EtherCAT 配置；从能力清单选择接口，由脚本负责焦点、输入、验证和日志。
 ---
@@ -457,6 +457,10 @@ KV 的域类型 ST 导出为 `AREA_ST`，无需发明独立 ST 模块语言选�
 4. 按实际验证范围报告。快照成功不代表写入成功，模块出现不代表程序体和声明完整，导入成功不代表编译成功。
 
 > **Nano 工程注意**：KV Nano（KV-NC32/N14/N24/N40/N60）的工程**没有 `WsTreeEnv.xml`**、程序是每个 `.mod` 一个文件。此时 tree 型清点会得到 0 节点（`topology=not_found` 不代表工程为空），MNM 文本导出会卡住。详见 `references/nano-project-format.md`。
+
+Nano CPU 的脉冲定位参数（工具 Alt+T → CPU 定位参数设定 I）使用能力 `nano_cpu_position_parameters`，先读 [Nano CPU 定位参数](references/nano-cpu-position-parameters.md)。当前限定实测 KV-NC32：六页完整读取，I/O 输出模式与 JOG 四项已验证写入、保存重开和恢复。JOG 加减速度单位为 Hz/ms；“应用”只更新工程，不能当作 PLC 传送。使用六页旧表／目标表契约后执行 `ApplyPlan`，固定 Z 相及限位地址不可改；测试使用空工程并关闭自己打开的进程。不要套用 EtherCAT 的 `MC_Jog` 参数或 KV-X 表格操作器。
+
+Nano 的单元主参数、KV-NC1EP、KV-NC16EXT 和 CPU 内置 Port0 使用能力 `nano_unit_editor_crud`，先读 [Nano 单元编辑器](references/nano-unit-editor.md)。Query 读取完整主表；添加/删除后核对型号顺序，修改后保存回读。内置串口是固有硬件，只修改或恢复其配置；新建工程默认串口模式与既有业务工程可能不同。`<设定>` 子窗口未展开就不能声称已扫描其内部数据。测试使用独立空工程并清理所属进程，不复用 KV-X 的 EIP 工程树入口。
 ## 语义项目快照
 
 需要理解整个现有项目、复刻项目、跨模块修改或交给人审核时，优先调用能力

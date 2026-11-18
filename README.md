@@ -333,7 +333,7 @@ KeyenceAgent/
 | EtherCAT 节点配置 | ✅ 已验证发布 |
 | 新建项目 / 编译（独立工作流） | 🔄 pending_validation |
 
-### KV Nano（KV-NC32）支持现状（2026-11-17 审计）
+### KV Nano（KV-NC32）支持现状（2026-11-18 实测）
 
 `纯48` 的实际 CPU 为 KV-NC32；该样本按 `.mod` 保存程序，没有 `WsTreeEnv.xml`。
 本机导出的 MNM 是 **Windows-936（GBK）无 BOM + `DEVICE:128`**；此前 UTF-8 的记录有误。
@@ -342,12 +342,24 @@ KeyenceAgent/
 | --- | --- |
 | MNM 导出 | 正式 workflow 实机通过：已打开副本及冷启动副本均导出 9 个程序，明确选择本次空目录、复制后校验 SHA256 |
 | 编译 | 复用 `compile_kv_project.ps1`；已有样本转换记录，修改后仍须重新编译 |
-| 标号、正文替换、程序/宏创建及导入 | 研究脚本尚缺正式入口或保存回读/编译验收，不能按旧 `ok=true` 宣称已完成 |
-| 整体文本快照 | 待修复失败转 skipped、标号缺失和布局推断；旧 `ready` 不代表完整 |
-| 注释读写及配置 | 复用既有 workflow；Nano 分支的新增恢复/弹窗处理仍需审计与回归 |
+| 框脚本、域脚本、普通梯形图增删改查 | `manage_kv_nano_program.ps1`；空项目交通灯验证编译、保存、重开回读，框脚本/梯形图 32 项、域脚本/标号 59 项通过 |
+| 全局/局部标号表 | 同一接口；完整四列 TSV 批量粘贴、旧表校验、覆盖、删除及保存回读；禁止为系统注释软元件登记标号或改写其注释 |
+| 先规划再写入完整程序 | `apply_kv_nano_program_plan.ps1`；冻结标号、脚本和梯形图源文件，写入后编译并重开逐项比较；[中文标号交通灯示例](kv-studio-operator/examples/nano-traffic-labels/README.md) |
+| 单元与内置串口 | `manage_kv_nano_units.ps1`；NC32/NC1EP/NC16EXT 主表、扩展模块增删、Port0 模式/波特率及 IP/滤波修改恢复，空项目 BAT 43 项通过 |
+| CPU 定位参数 | `manage_kv_nano_cpu_position.ps1`；六页完整读取，I/O 脉冲输出模式与 JOG 四项写入、保存重开、恢复已验证 |
+| Nano 专用快照 | `export_kv_nano_snapshot.ps1`；一次采集真实程序顺序、程序文本、全局/逐模块局部标号、单元主表/Port0、六页定位参数和全局注释；九程序三单元副本通过，空项目交通灯 BAT 87 项通过 |
 
 入口以 manifest 的 `customer_callable` 为准，不直接调用 Nano `runner_children`。
-当前证据、限制及待办见 [Nano 适配记录](kv-studio-operator/references/nano-project-format.md)。
+从仓库根目录执行一次快照（输出目录必须不存在且位于源工程目录之外）：
+
+```powershell
+powershell -STA -NoProfile -ExecutionPolicy Bypass -File kv-studio-operator/scripts/workflows/export_kv_nano_snapshot.ps1 `
+  -ProjectPath C:\projects\Nano\Nano.kpr -OutDir C:\kvrun\nano_snap
+```
+
+快照操作完整工程副本，校验原文件哈希并关闭所属进程；保留原始工程、可读文本、哈希索引和步骤回执。必需读取失败会返回失败，`-PlanOnly` 仅标记为规划完成。本机导出的脚本行以 `;` 为前缀保存在 MNM 中，带脚本的 MNM 不支持脚本回导。
+
+当前范围为**已保存的离线 KV-NC32 工程**，不含 NC1EP 的 `<设定>` 子窗口、在线 PLC 数据或实体 I/O/运动联调；宏创建/导入尚未验证。KV-X 保持原有路线。详细范围和证据见 [Nano 快照](kv-studio-operator/references/nano-snapshot.md)、[程序接口](kv-studio-operator/references/nano-program-interface.md)及 [BAT 验收用例](kv-studio-operator/tests/kv-interface-regression/28_nano_snapshot/README.md)。
 
 ---
 

@@ -52,6 +52,7 @@
 # comment table and diffing it (see workflows/import_kv_device_comments.ps1).
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'workflow_tools/kv_nano_label_contract.ps1')
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 $script:ProcessId = 0
@@ -151,6 +152,7 @@ function Read-CommentTable([string]$Path) {
     # (B0B, W0F4) or a bit member (DM10090.0).  Requiring a leading digit after the
     # area keeps pure words such as 'ABC' from passing as a device.
     if ($device -notmatch '^[A-Za-z]{1,3}[0-9][0-9A-Fa-f]*(\.[0-9A-Fa-f]+)?$') { throw "KV_COMMENTS_IMPORT_DEVICE_INVALID: '$device' line=$($i + 1)" }
+    Assert-KvUserDeviceWrite $device
     if (-not $seen.Add($device.ToUpperInvariant())) { throw "KV_COMMENTS_IMPORT_DEVICE_DUPLICATE: '$device'" }
     $comments = @()
     for ($c = 2; $c -lt [Math]::Min($fields.Count, 10); $c++) {

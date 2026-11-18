@@ -1,0 +1,8 @@
+{
+ "name":"28_nano_snapshot",
+ "enabled":true,
+ "project_mode":"new_project",
+ "workflow":"scripts/workflows/export_kv_nano_snapshot.ps1",
+ "harness":"run.ps1",
+ "description":"Blank Nano traffic-light fixture: one snapshot command preserves script, ladder, labels, main unit tables, serial Port0, six positioning pages, global comments, source hashes and process ownership."
+}

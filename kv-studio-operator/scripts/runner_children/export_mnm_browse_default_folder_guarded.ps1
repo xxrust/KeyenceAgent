@@ -65,6 +65,7 @@ function Assert-ExportProjectSaved([string]$Stage) {
   $result.project_save_checks+=@{stage=$Stage;process_id=$current.process_id;hwnd=$current.hwnd.ToInt64();final_title=$current.title;project_saved=$true}
 }
 try {
+  Write-KvUiGuardRunLog -Event 'mnm_session_binding_started' -Data @{path=$result.project_path}
   $session=Get-KvProjectSession -ProjectPath $result.project_path -CreatedProjectResultPath $CreatedProjectResultPath -AllowMissing
   if($RestartKvs -and $session) {
     # Restart is allowed only for the sole path-bound, saved session.
@@ -80,6 +81,7 @@ try {
       $KvsExe=$install.kvs_exe
     }
     $launched=Start-Process -FilePath $KvsExe -ArgumentList ('"'+$result.project_path+'"') -PassThru
+    Write-KvUiGuardRunLog -Event 'mnm_project_launched' -Data @{launcher_process_id=$launched.Id;path=$result.project_path}
     $result.launched_by_runner=$true
     $deadline=(Get-Date).AddSeconds($TimeoutSeconds)
     do {
@@ -93,6 +95,7 @@ try {
     $result.launcher_process_id=$launched.Id
   }
   $result.process_id=$session.process_id;$result.session=$session
+  Write-KvUiGuardRunLog -Event 'mnm_session_bound' -Data @{process_id=$session.process_id;hwnd=$session.hwnd.ToInt64();title=$session.title}
   if($InspectOnly){throw 'KV_EXPORT_INSPECTION_ONLY: no export was performed'}
   # Never select a remembered download folder or collect recent files elsewhere.
   # The unique empty directory also prevents overwrite prompts or stale exports.
@@ -114,14 +117,21 @@ try {
   if($staging -notmatch '^[A-Za-z]:\\'){throw 'KV_EXPORT_LOCAL_DIRECTORY_REQUIRED'}
   $drive='^.*\('+[regex]::Escape($staging.Substring(0,2))+'\)$'
   $segments=@('桌面','此电脑',$drive)+@($staging.Substring(3).TrimEnd('\').Split('\')|Where-Object{$_})
-  $node=Resolve-KvTreeNodeByPath -Tree $tree -Path $segments
-  if(-not $node){throw 'KV_EXPORT_FOLDER_TREE_PATH_MISSING'}
-  Assert-KvUiForegroundHwnd -ExpectedHwnd ([IntPtr]$dialog.Current.NativeWindowHandle) -Step 'select explicit mnemonic export directory' -ExpectedTitleLike '浏览文件夹' | Out-Null
-  $select=$node.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern)
-  $select.Select()
-  if(-not $select.Current.IsSelected){throw 'KV_EXPORT_FOLDER_NOT_SELECTED'}
+  if(@(Get-KvTreeChildItems -Element $tree).Count) {
+    $node=Resolve-KvTreeNodeByPath -Tree $tree -Path $segments
+    if(-not $node){throw 'KV_EXPORT_FOLDER_TREE_PATH_MISSING'}
+    Assert-KvUiForegroundHwnd -ExpectedHwnd ([IntPtr]$dialog.Current.NativeWindowHandle) -Step 'select explicit mnemonic export directory' -ExpectedTitleLike '浏览文件夹' | Out-Null
+    $select=$node.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern)
+    $select.Select()
+    if(-not $select.Current.IsSelected){throw 'KV_EXPORT_FOLDER_NOT_SELECTED'}
+  } else {
+    $ancestors=Invoke-KvGuardedExportFolderSelection -DialogHwnd ([IntPtr]$dialog.Current.NativeWindowHandle) -TreeHwnd ([IntPtr]$tree.Current.NativeWindowHandle) -ProcessId $session.process_id -Path $staging
+    Write-KvUiGuardRunLog -Event 'mnm_export_native_folder_selected' -Data @{path=$staging;selected_ancestors=$ancestors}
+  }
   Write-KvUiGuardRunLog -Event 'mnm_export_folder_selected' -Data @{path=$staging;tree_path=$segments;selected=$true}
-  Confirm-ExportDialog $dialog '1' @('KV STUDIO')
+  # Larger projects return briefly to the editor before the completion message.
+  # The next wait still requires the same process and the verified message body.
+  Confirm-ExportDialog $dialog '1' @('KV STUDIO*')
   $completed=$false
   for($index=0;$index -lt 2;$index++){
     $message=Wait-ExportWindow @('KV STUDIO')

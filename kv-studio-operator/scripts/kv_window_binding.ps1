@@ -41,18 +41,70 @@ function Get-KvProjectSession {
     throw 'KV_PROJECT_PATH_BOUND_PROCESS_MISSING'
   }
   $process=$bound[0]
-  $hwnd=Get-KvProjectEditorHwnd -ProcessId $process.Id
+  $pattern='^KV STUDIO.* - \['+[regex]::Escape([IO.Path]::GetFileNameWithoutExtension($path))+'(?: \*)?\]$'
+  $hwnd=Get-KvPathBoundEditorHwnd -ProcessId $process.Id -TitlePattern $pattern
   if ($hwnd -eq [IntPtr]::Zero) {
     if ($AllowMissing) { return $null }
     throw 'KV_PROJECT_EDITOR_WINDOW_MISSING'
   }
   $element=[Windows.Automation.AutomationElement]::FromHandle($hwnd)
   $title=[string]$element.Current.Name
-  $pattern='^KV STUDIO.* - \['+[regex]::Escape([IO.Path]::GetFileNameWithoutExtension($path))+'(?: \*)?\]$'
   if ($title -notmatch $pattern) { throw 'KV_PROJECT_WINDOW_IDENTITY_MISMATCH' }
   $cpu=''
   if ($title -match '\[编辑器:\s*(KV-[A-Za-z0-9-]+)\]') { $cpu=$matches[1] }
   [pscustomobject]@{project_path=$path;process_id=$process.Id;process_start_utc=$process.StartTime.ToUniversalTime().ToString('o');hwnd=$hwnd;title=$title;cpu_model=$cpu;kvs_exe=$process.Path;kvs_version=$process.FileVersion}
+}
+
+# Avoid a desktop-wide UIA descendant search while KVS is constructing its
+# editor. Inspect native tree handles only after the path-bound editor title
+# exists; UIA is used on each individual tree to prove its semantic identity.
+function Get-KvPathBoundEditorHwnd {
+  param([int]$ProcessId,[string]$TitlePattern)
+  if(-not ('KvProjectWindowNative' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.RegularExpressions;
+public static class KvProjectWindowNative {
+  public delegate bool EnumProc(IntPtr hwnd, IntPtr parameter);
+  [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc callback, IntPtr parameter);
+  [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, EnumProc callback, IntPtr parameter);
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int count);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr hwnd, StringBuilder text, int count);
+  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hwnd);
+  public static IntPtr[][] FindTrees(int processId, string titlePattern) {
+    var found=new List<IntPtr[]>();
+    EnumWindows((window, unused) => {
+      uint pid; GetWindowThreadProcessId(window, out pid);
+      if(pid!=processId || !IsWindowVisible(window)) return true;
+      var title=new StringBuilder(1024); GetWindowText(window,title,title.Capacity);
+      if(!Regex.IsMatch(title.ToString(),titlePattern,RegexOptions.IgnoreCase)) return true;
+      EnumChildWindows(window,(child, ignored) => {
+        var cls=new StringBuilder(256); GetClassName(child,cls,cls.Capacity);
+        if(cls.ToString().IndexOf("SysTreeView32",StringComparison.OrdinalIgnoreCase)>=0)
+          found.Add(new[]{window,child});
+        return true;
+      },IntPtr.Zero);
+      return true;
+    },IntPtr.Zero);
+    return found.ToArray();
+  }
+}
+'@
+  }
+  Add-Type -AssemblyName UIAutomationClient
+  Add-Type -AssemblyName UIAutomationTypes
+  $editors=@(foreach($pair in [KvProjectWindowNative]::FindTrees($ProcessId,$TitlePattern)) {
+    $tree=[Windows.Automation.AutomationElement]::FromHandle($pair[1])
+    if($tree -and $tree.Current.ProcessId -eq $ProcessId -and $tree.Current.AutomationId -eq 'ProjectTreeView') { $pair[0] }
+  })
+  $editors=@($editors | Select-Object -Unique)
+  if($editors.Count -gt 1){throw 'KV_PROJECT_EDITOR_WINDOW_AMBIGUOUS'}
+  if($editors.Count){return [IntPtr]$editors[0]}
+  return [IntPtr]::Zero
 }
 
 function Test-KvWindowHasProjectTree {

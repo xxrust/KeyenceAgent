@@ -1,4 +1,4 @@
-{
+﻿{
   "schema_version": 1,
   "generated_from": "manual v2; read and write routes cross-checked with script_manifest.json",
   "assets": {
@@ -9,6 +9,10 @@
     "data_types": { "snapshot_status": "wired", "snapshot_artifact": "project/类型/structure_definitions.json", "snapshot_stage": "structure_export", "restore_strategy": "mutate_structure_definitions", "depends_on": [] },
     "comments": { "snapshot_status": "wired", "snapshot_artifact": "project/注释", "snapshot_stage": "device_comments", "restore_strategy": "not_restorable_read_only", "depends_on": ["program"] },
     "unit_configuration": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/单元/configuration.json", "snapshot_stage": "materialize_semantic_project", "restore_strategy": "configure_units", "depends_on": [], "note": "project has only CPU [0] KV-X520; no expansion units. KV-EC01 is an EtherCAT slave, captured under ethercat_slave" },
+    "nano_unit_parameters": { "snapshot_status": "wired", "snapshot_artifact": "project/units.json", "snapshot_stage": "nano_snapshot_collect", "restore_strategy": "nano_unit_editor_crud", "depends_on": ["unit_configuration"], "note": "Explicit Nano workflow reads full NC32/NC1EP/NC16EXT main tables. Integrated into dedicated nano_project_snapshot only; nested <setting> dialogs remain separate." },
+    "nano_labels":{"snapshot_status":"wired","snapshot_artifact":"project/global_labels.tsv and project/program_N/labels.tsv","snapshot_stage":"nano_snapshot_collect","restore_strategy":"nano_label_table_crud","depends_on":["program"],"note":"Global and every live program local table; bulk TSV read. Nine-module selector verified."},
+ "nano_cpu_position":{"snapshot_status":"wired","snapshot_artifact":"project/cpu_position","snapshot_stage":"nano_snapshot_collect","restore_strategy":"nano_cpu_position_parameters","depends_on":["nano_unit_parameters"],"note":"Six complete offline KV-NC32 parameter pages."},
+ "nano_serial_port": { "snapshot_status": "wired", "snapshot_artifact": "project/serial_port0.json", "snapshot_stage": "nano_snapshot_collect", "restore_strategy": "nano_unit_editor_crud", "depends_on": ["nano_unit_parameters"], "note": "Built-in NC32 Port0 configuration is part of CPU main table; fixed hardware is not addable/deletable. Mode/baud change and restore verified offline." },
     "ethercat_slave": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/EtherCAT/devices.json", "snapshot_stage": "ethercat_configuration", "restore_strategy": "configure_ethercat_nodes", "depends_on": ["unit_configuration"] },
     "ethercat_pdo": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/EtherCAT/pdo_index.json", "snapshot_stage": "ethercat_configuration", "restore_strategy": "configure_ethercat_nodes", "depends_on": ["ethercat_slave"] },
     "ethercat_device_parameters": { "snapshot_status": "wired_limited", "snapshot_artifact": "project/配置/EtherCAT/details", "snapshot_stage": "ethercat_configuration", "restore_strategy": "configure_ethercat_nodes", "depends_on": ["ethercat_slave"], "limited_reason": "高级设定 tab has no structured route: clipboard copy fails, UIA/MSAA expose no rows, no context-menu export, project files are encrypted; screenshots are the maximum evidence" },
@@ -21,6 +25,7 @@
     "axis_parameter": { "snapshot_status": "wired", "snapshot_artifact": "project/配置/运动/axis_parameters.tsv", "snapshot_stage": "axis_parameters", "restore_strategy": "axis_parameters_write", "depends_on": ["motion_axis"] }
   },
   "stages": {
+ "nano_snapshot_collect":{"producer":"nano_project_snapshot"},
     "inventory_initial": { "producer": "export_kv_project_inventory" },
     "mnm_export": { "producer": "export_mnm_project_copy" },
     "device_comments": { "producer": "export_kv_device_comments" },
@@ -38,6 +43,8 @@
     "device_comment_coverage": { "producer": "annotate_kv_program_with_comments" }
   },
   "capabilities": {
+ "nano_project_snapshot":{"script":"workflows/export_kv_nano_snapshot.ps1","assets":["program","comments","nano_labels","nano_unit_parameters","nano_serial_port","nano_cpu_position"],"evidence":["references/nano-snapshot.md","tests/kv-interface-regression/28_nano_snapshot","local:C:/kvrun/ns3/snapshot/source_snapshot_manifest.json"]},
+    "nano_unit_editor_crud": { "script": "workflows/manage_kv_nano_units.ps1", "assets": ["nano_unit_parameters", "nano_serial_port"], "evidence": ["tests/kv-interface-regression/27_nano_units_crud", "references/nano-unit-editor.md", "local:C:/kvrun/nano_units_bat_20261117_f/test_result.json"] },
     "export_mnm_project_copy": { "script": "workflows/export_mnm_project_copy_default_folder.ps1", "assets": ["program", "fb"], "evidence": ["tests/kv-interface-regression/10_export_mnm"] },
     "snapshot_kv_global_variables_all_groups": { "script": "workflows/snapshot_kv_global_variables_all_groups.ps1", "assets": ["global_variables"], "evidence": ["tests/kv-interface-regression/20_global_variable_groups"] },
     "export_kv_structure_definitions": { "script": "workflows/export_kv_structure_definitions.ps1", "assets": ["data_types"], "evidence": ["tests/kv-interface-regression/04_structures_snapshot"] },
@@ -58,6 +65,7 @@
     "export_kv_project_inventory": { "script": "export_kv_project_inventory.ps1", "assets": ["unit_configuration", "data_types"], "evidence": ["tests/inventory-expansion"] }
   },
   "write_capabilities": {
+    "nano_unit_editor_crud": { "script": "workflows/manage_kv_nano_units.ps1", "assets": ["unit_configuration", "nano_unit_parameters", "nano_serial_port"], "inputs": ["action", "unit_index", "expected_model", "parameter_name", "expected_value", "value", "expected_after_rows"], "outputs": ["saved_project", "workflow_result.json", "units.json"], "depends_on": ["create_project"], "evidence": ["tests/kv-interface-regression/27_nano_units_crud"], "validation_scope": "KV-NC32 offline main tables only; two expansion models at slots 1/2, Port0 mode/baud. Nested NC1EP settings are not scanned by this route." },
     "create_project": { "script": "workflows/create_kv_project.ps1", "assets": ["unit_configuration"], "inputs": ["project_name", "cpu_model"], "outputs": ["saved_project", "workflow_result.json"], "depends_on": [], "evidence": ["tests/kv-interface-regression/16_create_project"] },
     "write_data_types": { "script": "workflows/mutate_kv_structure_definitions.ps1", "assets": ["data_types"], "inputs": ["structure_plan.json", "project_path"], "outputs": ["workflow_result.json", "structure_mutation_result.json", "saved_project"], "depends_on": ["create_project"], "evidence": ["tests/kv-interface-regression/11_structure_mutation"] },
     "configure_expansion_units": { "script": "workflows/configure_kv_expansion_units.ps1", "assets": ["unit_configuration"], "inputs": ["unit_configuration_request"], "outputs": ["saved_project", "workflow_result.json"], "depends_on": ["create_project"], "evidence": ["tests/kv-interface-regression/06_expansion_units"] },

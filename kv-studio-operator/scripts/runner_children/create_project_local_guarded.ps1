@@ -489,6 +489,8 @@ try {
   $launched = Start-Process -FilePath $KvsExe -WorkingDirectory (Split-Path -Parent $KvsExe) -PassThru
   $script:CreateProcessId = $launched.Id
   $script:CreateProcessStartUtc = $launched.StartTime.ToUniversalTime().ToString('o')
+  @{process_id=$script:CreateProcessId;process_start_utc=$script:CreateProcessStartUtc;kvs_exe=$KvsExe;project_path=$targetProjectPath} |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutDir 'launched_process.json') -Encoding UTF8
   Log ("created isolated KV STUDIO instance pid="+$script:CreateProcessId)
 
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -589,11 +591,27 @@ try {
   }
 
   $treePath = Join-Path (Split-Path -Parent $found) 'WsTreeEnv.xml'
+  if ($CpuModel -match '^KV-N') {
+    # Older Nano projects can omit WsTreeEnv.xml. Verify the live CPU node
+    # belonging to the newly launched editor instead of inventing that file.
+    $createdRoot = [Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
+    $createdTree = $createdRoot.FindFirst([Windows.Automation.TreeScope]::Descendants,
+      (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty,'ProjectTreeView')))
+    if (-not $createdTree) { throw 'KV_CREATE_NANO_CPU_TREE_MISSING' }
+    $cpuNodes = @($createdTree.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition) |
+      Where-Object { $_.Current.Name -match ('^\[0\]\s+'+[regex]::Escape($CpuModel)+'(?:\s|$)') })
+    if ($cpuNodes.Count -ne 1 -or $process.MainWindowTitle -notmatch ('\[编辑器:\s*'+[regex]::Escape($CpuModel)+'\]')) { throw 'KV_CREATE_SAVED_CPU_MISMATCH' }
+    $treePath = Join-Path $OutDir 'nano_cpu_evidence.json'
+    @{cpu_model=$CpuModel;node=$cpuNodes[0].Current.Name;process_id=$process.Id;title=$process.MainWindowTitle} |
+      ConvertTo-Json | Set-Content -LiteralPath $treePath -Encoding UTF8
+    $cpuModels = @($CpuModel)
+  } else {
   [xml]$savedTree = Get-Content -LiteralPath $treePath -Raw -Encoding UTF8
   $cpuModels = @($savedTree.SelectNodes('//value.first') | ForEach-Object {
     if ($_.InnerText -match '^\[0\]\s+(KV-[A-Z0-9*]+)\s*$') { $Matches[1] }
   } | Select-Object -Unique)
   if ($cpuModels.Count -ne 1 -or $cpuModels[0] -ne $CpuModel) { throw 'KV_CREATE_SAVED_CPU_MISMATCH' }
+  }
 
   $result = [pscustomobject]@{
     ok = $true

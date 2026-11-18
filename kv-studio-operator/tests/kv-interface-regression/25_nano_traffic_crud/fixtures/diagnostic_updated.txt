@@ -1,0 +1,3 @@
+'TrafficDiagnostic_v2
+DM10 = DM0
+DM11 = 28

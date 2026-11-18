@@ -1,0 +1,30 @@
+'交通灯二十八秒周期，启动全红
+'CR2002 常时接通，为框脚本执行条件
+'CR2006 系统一秒时钟电平
+'CR2008 运行开始首次扫描接通
+IF CR2008 = ON THEN
+周期秒计数 = 27
+全红阶段记录 = 0
+ELSE IF CR2006 = ON AND 秒时钟上次状态 = OFF THEN
+周期秒计数 = 周期秒计数 + 1
+IF 周期秒计数 >= 28 THEN
+周期秒计数 = 0
+END IF
+END IF
+南北绿灯请求 = OFF
+南北黄灯请求 = OFF
+东西绿灯请求 = OFF
+东西黄灯请求 = OFF
+IF 周期秒计数 < 10 THEN
+南北绿灯请求 = ON
+ELSE IF 周期秒计数 < 13 THEN
+南北黄灯请求 = ON
+ELSE IF 周期秒计数 < 14 THEN
+全红阶段记录 = 2
+ELSE IF 周期秒计数 < 24 THEN
+东西绿灯请求 = ON
+ELSE IF 周期秒计数 < 27 THEN
+东西黄灯请求 = ON
+ELSE
+全红阶段记录 = 5
+END IF

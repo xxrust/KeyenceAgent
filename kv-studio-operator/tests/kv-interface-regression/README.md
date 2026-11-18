@@ -1,4 +1,4 @@
-# KV STUDIO Interface Regression
+﻿# KV STUDIO Interface Regression
 
 Latest actual desktop evidence: [2026-09-20 acceptance report](ACCEPTANCE_20260920.md), with a [machine-readable evidence index](ACCEPTANCE_20260920.json).
 
@@ -6,6 +6,14 @@ Subsequent blank-creation repair and actual scenarios 16/08 evidence:
 [creation repair report](CREATE_ROUTE_REPAIR_20260920.md).
 
 This directory is a human- or agent-runnable smoke/regression harness for the published `kv-studio-operator` workflows. Each numbered child directory contains a `README.md` defining the operation, fixed input, execution route, acceptance boundary, and exact evidence locations. UI behavior is not duplicated here: `run-workflow-test.ps1` invokes the workflow from the skill, and the workflow invokes the shared flat executor and UI guard.
+
+The [Nano traffic-light CRUD case](25_nano_traffic_crud/README.md) uses a dedicated serial harness dispatched by `run-workflow-test.ps1`. It creates an empty KV-NC32 project, exercises script and plain-ladder CRUD through flat workflows, reopens the same project, reads every final rung, and closes owned processes in `finally`, including failed runs. Its BAT supports `-NoPause`; `-PlanOnly` records preparation without desktop execution.
+
+The [Nano area-script and label CRUD case](26_nano_area_labels_crud/README.md) uses the same dispatch and cleanup contract. It adds area-script CRUD, global/local label append, direct overwrite and direct deletion, stale-table rejection, neighbouring-row preservation and reopen checks. Labelled area source must compile before declarations are removed.
+
+The [Nano unit editor CRUD case](27_nano_units_crud/README.md) creates a blank KV-NC32 project, adds/deletes/re-adds NC1EP and NC16EXT, edits and restores Port0 mode/baud, IP and input filter, and compares complete main tables after process restarts. The 2026-11-17 BAT passed 43 checks, preserving comment hashes and all three preexisting user processes: `C:/kvrun/nano_units_bat_20261117_f/test_result.json`. Nested NC1EP setting dialogs and online communication are outside this case.
+
+The [Nano snapshot case](28_nano_snapshot/README.md) creates a blank traffic-light fixture, then calls the dedicated snapshot once and checks scripts, ladder, labels, unit/Port0 and positioning tables, indexed hashes, source preservation and process closure. The same snapshot also passed on the nine-program NC32/NC1EP/NC16EXT source copy: `C:/kvrun/ns3/snapshot/source_snapshot_manifest.json`.
 
 Whenever a numbered scenario is added or changed, update
 [atomic-operation-coverage.html](atomic-operation-coverage.html) in the same change. The page is the

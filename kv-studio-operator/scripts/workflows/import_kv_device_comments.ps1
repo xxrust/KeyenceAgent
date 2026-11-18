@@ -29,8 +29,10 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $root 'Resolve-KvStudioOperatorScript.ps1')
 . (Join-Path $root 'workflow_tools/kv_workflow_plan.ps1')
+. (Join-Path $root 'workflow_tools/kv_nano_label_contract.ps1')
 
 $CommentsPath = [IO.Path]::GetFullPath($CommentsPath)
+Assert-KvCommentFileSystemProtection $CommentsPath
 $OutDir = [IO.Path]::GetFullPath($OutDir)
 $plan = New-KvWorkflowPlan -ScriptsRoot $root -Operation 'import_device_comments' -ProjectPath $ProjectPath -OutDir $OutDir -TimeoutSeconds $TimeoutSeconds
 

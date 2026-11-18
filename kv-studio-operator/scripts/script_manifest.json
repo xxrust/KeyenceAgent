@@ -37,6 +37,7 @@
                               },
     "ui_atomic_actions":  {
                               "approved":  [
+                                               "Invoke-KvGuardedExportFolderSelection",
                                                "Assert-KvUiForegroundHwnd",
                                                "Invoke-KvGuardedAltVk",
                                                "Invoke-KvGuardedClipboardPaste",
@@ -63,6 +64,10 @@
                                           ]
                           },
     "step_result_contracts":  {
+ "runner_children/nano_snapshot_session_guarded.ps1":{"files":["nano_snapshot_session_result.json"]},
+                                  "runner_children/nano_unit_editor_guarded.ps1":{"files":["nano_unit_result.json"]},
+                                  "runner_children/nano_cpu_position_guarded.ps1": {"files": ["cpu_position_result.json"]},
+                                  "runner_children/nano_box_script_guarded.ps1": {"files": ["nano_operation_result.json"]},
                                   "runner_children/import_device_comments_guarded.ps1":  {
                                                                                              "files":  [
                                                                                                            "device_comments_import_result.json"
@@ -490,6 +495,11 @@
                                                  }
                                              ],
                     "customer_workflow":  [
+                                              {"path":"workflows/export_kv_nano_snapshot.ps1","status":"published","customer_callable":true,"capabilities":["nano_project_snapshot"],"execution":"flat_manifest_steps","runner_children":["runner_children/nano_snapshot_session_guarded.ps1","runner_children/export_mnm_browse_default_folder_guarded.ps1","runner_children/nano_box_script_guarded.ps1","runner_children/nano_unit_editor_guarded.ps1","runner_children/nano_cpu_position_guarded.ps1","runner_children/export_device_comments_guarded.ps1"],"verification":"2026-11-17 KV-NC32 / KVS 12.41: source-copy snapshot passed 9 live modules, 10 global/local label tables, NC32/NC1EP/NC16EXT main tables, Port0, six positioning pages and 1860 global comment rows. Source hashes unchanged, owned process closed. Evidence C:/kvrun/nsfinal/acceptance.json and C:/kvrun/nsfinal/snapshot/source_snapshot_manifest.json (final release rerun). Nested settings excluded. Blank traffic-light BAT replay C:/kvrun/nsbat3/test_result.json passed 87 checks: complete box/area source, every ladder instruction, planned labels, six page row counts, all artifact hashes, source preservation and no leaked processes."},
+ {"path":"workflows/manage_kv_nano_units.ps1","status":"published","customer_callable":true,"capabilities":["nano_unit_editor_crud"],"execution":"flat_manifest_steps","runner_children":["runner_children/nano_unit_editor_guarded.ps1"],"verification":"2026-11-17 KVS 12.41 / blank KV-NC32: BAT passed 43 checks. NC1EP and NC16EXT added/deleted/re-added; Port0 mode/baud, NC1EP IP and NC16EXT filter edited and restored. Full main-table equality after process restarts, stale-value rejection, cm1/cm2 hashes unchanged, all owned processes closed and 3 user processes preserved. Evidence C:/kvrun/nano_units_bat_20261117_f/test_result.json. Main parameter tables only; nested NC1EP settings and PLC runtime are not covered."},
+                                              {"path":"workflows/manage_kv_nano_cpu_position.ps1","status":"pilot","customer_callable":true,"capabilities":["nano_cpu_position_parameters"],"execution":"flat_manifest_steps","runner_children":["runner_children/nano_cpu_position_guarded.ps1"],"verification":"2026-11-17 KV-NC32 / KVS 12.41: read six complete pages; changed axis-1 output single/dual pulse and four JOG values with exact full-table readback. Modified values persisted after save/reopen; frozen six-page restore plan passed 29 steps, reopened baseline equals all six initial tables and closed owned project. Preexisting 3 user processes preserved. Evidence: C:/kvrun/nano_cpu_position_20261117/restore_verified/workflow_result.json. Offline only; other I/O enums and other-page writes remain unverified."},
+                                              {"path":"workflows/apply_kv_nano_program_plan.ps1","status":"published","customer_callable":true,"capabilities":["nano_program_plan"],"execution":"flat_manifest_steps","runner_children":["runner_children/nano_box_script_guarded.ps1","runner_children/compile_and_copy_result_bounded.ps1","runner_children/copy_convert_result_from_tree_handle.ps1"],"verification":"2026-11-17 KV-NC32 / KVS 12.41: blank_b passed 21 steps; overwrite_c passed 19 steps. Both paste 14 TSV rows once, compile 152 steps / 116 instructions, reopen and compare full labels, box/area scripts and 7 rungs, then close. Overwrite clears 10 redundant comments through verified block rebuild; cm1/cm2 unchanged. Evidence: C:/kvrun/nano_batch_plan_20261117/{blank_b,overwrite_c}/test_result.json. Offline editor only."},
+                                              {"path": "workflows/manage_kv_nano_program.ps1", "status": "published", "customer_callable": true, "capabilities": ["nano_box_script_crud", "nano_plain_ladder_crud", "nano_area_script_crud", "nano_label_crud"], "execution": "flat_manifest_steps", "runner_children": ["runner_children/nano_box_script_guarded.ps1", "runner_children/compile_and_copy_result_bounded.ps1", "runner_children/copy_convert_result_from_tree_handle.ps1"], "verification": "2026-11-17 KV-NC32 / KVS 12.41: blank traffic BAT passed 32 checks (146 steps / 113 instructions), C:/kvrun/nano_traffic_bat_20261117_pass/test_result.json. Blank area-script and global/Main local-label BAT passed 59 checks (149 steps / 116 instructions), C:/kvrun/nano_area_labels_bat_20261117_e/test_result.json. Append, overwrite, direct delete, stale source rejection, label references, reopen readback and all 7 original rungs verified; no owned process leaks; offline editor only."},
                                               {
                                                   "path":  "workflows/configure_kv_eip_devices.ps1",
                                                   "status":  "published",
@@ -939,6 +949,10 @@
                                                }
                                            ],
                     "runner_child_approved":  [
+                                                  {"path":"runner_children/nano_snapshot_session_guarded.ps1","status":"approved","customer_callable":false,"ui_guard_required":true},
+ {"path":"runner_children/nano_unit_editor_guarded.ps1","status":"approved","customer_callable":false,"ui_guard_required":true},
+                                                  {"path":"runner_children/nano_cpu_position_guarded.ps1","status":"approved","customer_callable":false},
+                                              {"path": "runner_children/nano_box_script_guarded.ps1", "status": "approved", "customer_callable": false, "ui_guard_required": true},
                                                   {
                                                       "path":  "runner_children/dump_motion_views_guarded.ps1",
                                                       "status":  "approved",
@@ -1284,6 +1298,10 @@
                                  }
                              ],
                     "support_library":  [
+                                            {"path":"workflow_tools/kv_nano_cpu_position_contract.ps1","status":"library","customer_callable":false},
+                                            {"path":"workflow_tools/kv_nano_unit_native.ps1","status":"library","customer_callable":false},
+                                            {"path":"workflow_tools/kv_nano_label_contract.ps1","status":"library","customer_callable":false},
+                                            {"path": "workflow_tools/kv_export_folder.ps1", "status": "library", "customer_callable": false},
                                             {"path": "workflow_tools/kv_mnm_text.ps1", "status": "approved", "customer_callable": false},
                                             {
                                                 "path":  "Capture-KvFrame.ps1",

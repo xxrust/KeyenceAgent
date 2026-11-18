@@ -1,0 +1,2 @@
+TrafficCycle	1 字无符号整数	DM0	交通灯秒位
+TrafficGlobalSentinel	1 字无符号整数	DM20	保留全局行

@@ -1,0 +1,13 @@
+{
+  "name": "27_nano_units_crud",
+  "enabled": true,
+  "project_mode": "new_project",
+  "project_name": "NanoUnitsTest",
+  "cpu_model": "KV-NC32",
+  "open_project": false,
+  "workflow": "scripts/workflows/manage_kv_nano_units.ps1",
+  "result_file": "test_result.json",
+  "arguments": [],
+  "harness": "run.ps1",
+  "description": "Blank Nano project: NC1EP/NC16EXT module CRUD, built-in Port0 mode/baud edit and restore, full main-table comparison after restart, comment preservation and process cleanup."
+}

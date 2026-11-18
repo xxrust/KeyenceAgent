@@ -1,0 +1,3 @@
+'Traffic area diagnostic updated
+DM12 = DM0 + 1
+DM13 = 28
