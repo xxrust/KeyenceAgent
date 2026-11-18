@@ -1,0 +1,55 @@
+# KVN60_PWM
+
+KV Nano系列60点型 内置功能（中断、高速计数器等）PWM | KV-N60 | AS_59089 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59089
+KPZ SHA-256 d915e98d3019a4231dcc239d33da3a76be20ea4767b72fd4f6606376b77a4f7e
+KV STUDIO 12.41.0.0 | 1 个模块和宏 | 38/16384 步 | 29 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 e5ee8d52d067afd30551d575e5fa5d7ea84c2cb89e764d3494bce5d67ecd82da
+
+DEVICE:132
+;MODULE:Main
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : PWM Control
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;Using a high-speed counter (CTH1) and a high-speed comparator (CTC2,CTC3), 
+;it is possible to output pulses with a period of 500us and ON width of 200us (Duty cycle 40%) in R501. 
+LD CR2008
+MPS
+SET CR4503
+CON
+RES CR4504
+CON
+RES CR4505
+CON
+SET CR4506
+CON
+RES CR4507
+MPP
+RES CR4508
+CON
+SET CR4509
+CON
+RES CR4510
+CON
+RES CR4511
+CON
+RES CR4512
+CON
+RES CTH1
+LD CR2002
+CTH.D #1 CR4402
+CTC.D #2 #50
+CTC.D #3 #20
+END
+ENDH
+

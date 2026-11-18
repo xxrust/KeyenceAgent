@@ -1,0 +1,114 @@
+# KVN60_Calc
+
+KV Nano系列60点型 演算示例 四则运算 | KV-N60 | AS_59117 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59117
+KPZ SHA-256 2360814da7e29d1beafc009623663e358b45b64338c5699bbb2dd9fd0fc6ead9
+KV STUDIO 12.41.0.0 | 1 个模块和宏 | 88/16384 步 | 68 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 8c53bbfcd1a2a5fa7bb6e2cf7f64b86924aec209a9c2c4b8e339b0bcc096dcb7
+
+DEVICE:132
+;MODULE:Main
+;MODULE_TYPE:0
+;SCRIPT_TYPE:
+;-------------------------------------------------------------------------------
+;-- File        : Calculation
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for arithmetic
+;To calculate the target amount within the remaining time
+;Target value/min = (Target value - Current value)/(Expected time of completion - Current time)
+;In KV STUDIO, you can use a script or ladder to perform the above calculation. 
+;In particular, it is possible to use a script to write mathematical expressions directly, 
+;and compared with a ladder, it occupies less devices, and the number of program rungs required is reduced either, reducing the programming time. 
+;<h1/>Time setting
+;When calendar time of a PLC is not consistent with the actual time, the value of the calendar timer can be changed as follows. 
+;(Device No. can be changed according to actual need. See the Help of WTIME)  
+;DM100:Year
+;DM101:Month
+;DM102:Day
+;DM103:Hour
+;DM104:Minute
+;DM105:Second
+LDP MR000
+WTIME DM100
+;<h1/>To save production data 
+LD CR2008
+MOV.D #100000 DM10
+MOV.D #68500 DM12
+MOV #17 DM16
+MOV #30 DM17
+;<h1/>Calculation by KV Script
+;DM0.L=(DM10.L-DM12.L)/((DM16-CM703)*60+(DM17-CM704))
+LDP MR001
+NCJ #1000
+;DM0.L=(DM10.L-DM12.L)/((DM16-CM703)*60+(DM17-CM704))
+LD CR2002
+LDA CM704
+CON
+EXT
+CON
+STA.L @VM0
+CON
+LDA DM17
+CON
+EXT
+CON
+SUB.L @VM0
+CON
+STA.L @VM2
+CON
+LDA CM703
+CON
+EXT
+CON
+STA.L @VM4
+CON
+LDA DM16
+CON
+EXT
+CON
+SUB.L @VM4
+CON
+MUL.L +60
+CON
+ADD.L @VM2
+CON
+STA.L @VM6
+CON
+LDA.L DM10
+CON
+SUB.L DM12
+CON
+EXT.L
+CON
+DIV.L @VM6
+CON
+STA.L DM0
+LABEL #1000
+;
+;<h1/>Calculation by ladder
+LDP MR002
+CAL-.L DM10 DM12 DM14
+CAL-.S DM16 CM703 DM20
+CAL*.S +60 DM20 DM22
+CAL-.S DM17 CM704 DM24
+CAL+.S DM22 DM24 DM26
+MPS
+LDA.S DM26
+CON
+EXT.L
+CON
+STA.L DM28
+MPP
+CAL/.L DM14 DM28 DM0
+END
+ENDH
+

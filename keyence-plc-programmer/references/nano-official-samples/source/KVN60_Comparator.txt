@@ -1,0 +1,48 @@
+# KVN60_Comparator
+
+KV Nano系列60点型 内置功能（中断、高速计数器等）比较器 | KV-N60 | AS_59081 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59081
+KPZ SHA-256 d0d95cda5e27bbf6e648391ce51b845c02bf7143cf788898fabb663296fa6e9f
+KV STUDIO 12.41.0.0 | 1 个模块和宏 | 32/16384 步 | 22 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 5045a39a84d09b31e8cefa7d00b70371e51cd62eb2a28586d328de4dd9e2c63b
+
+DEVICE:132
+;MODULE:Main
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Comparator
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>To count a encoder with phase difference 1x using the high-speed counter 0 (R008/R009) 
+;When the count value reaches setting of the high-speed counter comparator CTC0 (which is 1000), the output relay R500 will be ON. 
+LD CR2008
+RES CR4313
+CON
+SET CR4314
+CON
+RES CR4315
+CON
+SET CR4303
+LD CR2002
+HSP R008
+HSP R009
+LD CR2002
+CTH.D #0 R008
+CTC.D #0 #1000
+LD CTC0
+SET R500
+CON
+RES CTC0
+LDP MR000
+RES R500
+END
+ENDH
+

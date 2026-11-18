@@ -1,0 +1,1546 @@
+# KVN60_Pos_CN
+
+KV Nano系列60点型 定位（马达控制）功能定位（马达控制）功能 (简体中文) | KV-N60 | AS_56855 | zh-CN
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_56855
+KPZ SHA-256 e3b33298b5fcd48d5daf9b9f6dd7b58e50535458b224008d9a5c4100dc0048f8
+KV STUDIO 12.41.0.0 | 13 个模块和宏 | 1223/16384 步 | 993 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 c5ae48506490342fdc3c42d66106a78329f8baa422bc39e39cef6ff5cc71283d
+
+DEVICE:132
+;MODULE:Main
+;MODULE_TYPE:0
+END
+ENDH
+
+## JOG.mnm
+原导出 MNM SHA-256 1117bcad633474fe4784efac09ed5423dbd5c3678dade4f82568773397766642
+
+DEVICE:132
+;MODULE:JOG
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : JOG
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 //ON时执行正方向JOG
+;               : @MR1 //ON时执行负方向JOG
+;               : @MR2 //ON时执行高速JOG。需与@MR0和MR1配合使用
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>执行JOG的示例
+;与实际的旋转方向不一致时，请从工具〉CPU定位参数设定〉I/O设定〉正方向动作时的输出脉冲来设定
+LD @MR000
+LD @MR001
+LD @MR002
+JOG #0 #1
+END
+ENDH
+
+## Linear_Interpolation.mnm
+原导出 MNM SHA-256 0b04eb688bf365b62ac768462f6ef25d65b63c2b117bcb42826121232682e256
+
+DEVICE:132
+;MODULE:Linear_Interpolation
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Linear Interpolation
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 //ON时执行简易直线插补宏
+;-------------------------------------------------------------------------------
+;-- Id          : v 2.0 2014/10/30
+;-------------------------------------------------------------------------------
+;<h1/>各参数的设定范围（无需在CPU定位参数设定中进行设定）
+;根据条件不同，有时会有数个扫描周期的延迟，请确认后再使用。
+;主轴/插补轴编号：KV-N14AT/DT，KV-N24AT/DT：1~2
+;                 KV-N40AT/DT：1~3
+;                 KV-N60AT：1~4
+;点编号：1~20
+;主轴/插补轴目标坐标：-2147483648~2147483647
+;插补加速度/减速度：1~65535
+;插补速度：1~100000
+;动作模式：0(定位INC)，1(定位ABS)
+;插补起动速度：0~65535(此速度必须指定为小于插补速度的值)
+LDP @MR000
+MCALL 直线插补宏 @DM0 @DM2 @DM4 @DM6 @DM8 @DM10 @DM12 @DM14 @DM16 @DM18
+PSTRT #0 @DM0 @DM4
+PSTRT #0 @DM2 @DM4
+;<h1/>插补动作的完成需从主轴与插补轴的定位完成继电器来确认！
+;轴1定位完成继电器：CR8401
+;轴2定位完成继电器：CR8501
+;轴3定位完成继电器：CR8601
+;轴4定位完成继电器：CR8701
+;例如，使用轴1与轴2时
+LD CR8401
+AND CR8501
+OUT @MR001
+END
+ENDH
+
+## Origin_return.mnm
+原导出 MNM SHA-256 8595d3bd2cd1879d8692a5b8ecd2b8412c1a197f3e860e2813e72a512dd25fa3
+
+DEVICE:132
+;MODULE:Origin_return
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Origin Return
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 //ON时执行原点复归
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>执行原点复归的示例
+;R000：轴1限位开关CCW方向输入
+;R001：轴1原点传感器输入
+;R002：轴1限位开关CW方向输入
+;@MR000:原点复归开始触发
+;原点复归方法：DOG式(无Z相)  原点复归方向：CCW
+;请根据需要更改参数
+LDP @MR000
+ANB CR8400
+ORG #0 #1
+LD CR8401
+AND CR8405
+RES @MR000
+LD R000
+OUT CR8013
+LD R002
+OUT CR8012
+END
+ENDH
+
+## Positioning_direct.mnm
+原导出 MNM SHA-256 60226c49f0618bce4e26c4ad4bbf7c3fa9c181a329c24893b699b88082f7b4ef
+
+DEVICE:132
+;MODULE:Positioning_direct
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Change Point Parameter
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 //ON时设定轴1点6的参数
+;               : @MR1 //ON时执行轴1点6的定位
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>直接指定点参数的内容进行定位运行的示例
+;可根据实际情况选择使用的轴和点
+LDP @MR000
+MOV.L +10000 CM8050
+MOV #20 CM8052
+MOV #20 CM8053
+MOV.L +60000 CM8054
+MPS
+SET CM8056.0
+CON
+RES CM8056.1
+CON
+RES CM8056.4
+MPP
+MOV #600 CM8068
+LDP @MR001
+ANB CR8400
+PSTRT #0 #1 #6
+END
+ENDH
+
+## Positioning_highspeed.mnm
+原导出 MNM SHA-256 c50e8abeafa28edbfeb2cbbf2b24a81b9b9a344dd5fecfb0678f2ca0a27350a1
+
+DEVICE:132
+;MODULE:Positioning_highspeed
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : High Speed Point Start
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : R003 //ON时 高速启动点1的定位运行
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>定位运行的高速启动示例
+;输入中断条件时，高速启动定位运行
+;请根据实际情况，更改高速启动触发软元件（R003）
+LD CR2002
+EI
+HSP R003
+END
+INT R003
+LDB CR8400
+PSTRT #0 #1 #5
+RETI
+ENDH
+
+## Positioning_morethan20.mnm
+原导出 MNM SHA-256 7c0ff1242771b598dd8e4f0db467af55cfefde3ea2e0d4f17ba2bd7d0c6883b6
+
+DEVICE:132
+;MODULE:Positioning_morethan20
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Point Control 21 points or more )
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 //ON时执行移动到10000的定位控制
+;               : @MR1 //ON时执行移动到20000的定位控制
+;               : @MR2 //ON时执行移动到30000的定位控制
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>超过21点时的定位控制示例
+;通过不断更改同一点的目标坐标来执行定位控制
+;本程序通过更改轴1的点6来实现定位控制，可根据实际情况，更改使用的点参数。
+LDP @MR000
+DW.L +1000 CM8050
+CON
+PSTRT #0 #1 #6
+LDP @MR001
+DW.L +2000 CM8050
+CON
+PSTRT #0 #1 #6
+LDP @MR002
+DW.L +3000 CM8050
+CON
+PSTRT #0 #1 #6
+END
+ENDH
+
+## Positioning_start.mnm
+原导出 MNM SHA-256 51764d7ca559a01586d739badf61d8a32c70a3995e5230dd2728a7129e83e337
+
+DEVICE:132
+;MODULE:Positioning_start
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Point Control
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 //ON时执行点1的定位
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/10/17
+;-------------------------------------------------------------------------------
+;<h1/>埵抲寛傔惂屼傪奐巒偡傞嶲峫椺
+LDP @MR000
+ANB CR8400
+PSTRT #0 #1 #8
+LD @MR000
+ANP CR8401
+RES @MR000
+END
+ENDH
+
+## PositioningConsecutively.mnm
+原导出 MNM SHA-256 924345297d1dab16190ac9d84e09f2ad4a723fd6aafeeacb5448afc684a14817
+
+DEVICE:132
+;MODULE:PositioningConsecutively
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Sequential Points Control
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 //ON时执行点1的定位运行
+;               : @MR1 //点1的定位完成后ON，然后执行点2的定位
+;               : @MR2 //点2的定位完成后ON，然后执行点3的定位
+;               : @MR3 //点3的定位完成后ON，然后执行点4的定位
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/10/17
+;-------------------------------------------------------------------------------
+;<h1/>连续执行多点定位的示例
+;点1：INC模式向正方向移动5000脉冲
+;点2：INC模式向正方向移动2000脉冲
+;点3：INC模式向负方向移动3000脉冲
+;点4：INC模式向正方向移动4000脉冲
+LDP @MR000
+PSTRT #0 #1 #1
+LD CR8401
+AND= CM8835 #1
+ONDL #50 @MR001
+CON
+AND @MR001
+PSTRT #0 #1 #2
+LD CR8401
+AND= CM8835 #2
+ONDL #100 @MR002
+CON
+AND @MR002
+PSTRT #0 #1 #3
+LD CR8401
+AND= CM8835 #3
+ONDL #150 @MR003
+CON
+AND @MR003
+PSTRT #0 #1 #4
+END
+ENDH
+
+## Speedchange_interrupt.mnm
+原导出 MNM SHA-256 7558d1b17c947b6146dd8860030e8f0515d7adc817b622d7de2bae85a3df9fda
+
+DEVICE:132
+;MODULE:Speedchange_interrupt
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Change Operation Speed(Interrupt)
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 //ON时执行点7的定位运行
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>运行过程中更改速度的示例
+;比较器一致时更改速度
+;当前位置为3000时，将运转速度更改为2000
+;当前位置为6000时，将运转速度更改为3000
+;当前位置为9000时，将运转速度更改为4000
+LD @CR2008
+EI
+LDP @MR000
+MOV.D #0 DM5000
+MPS
+MOV.D #3000 CM8806
+MPP
+ANB CR8400
+PSTRT #0 #1 #7
+END
+INT CR8415
+LD= DM5000 #0
+MPS
+MOV.D #6000 CM8806
+MPP
+AND CR8400
+CHGSP #0 #1 #2000
+LD= DM5000 #1
+MPS
+MOV.D #9000 CM8806
+MPP
+AND CR8400
+CHGSP #0 #1 #3000
+LD= DM5000 #2
+AND CR8400
+CHGSP #0 #1 #4000
+LD CR2002
+INC DM5000
+RETI
+ENDH
+
+## Speedchange_relay.mnm
+原导出 MNM SHA-256 ba2d44c635de8487dda75cb9e408853c524dd9861ceafb837ba3e7f21c084f38
+
+DEVICE:132
+;MODULE:Speedchange_relay
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Change Operation Speed
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 //ON时执行点1的定位运行
+;               : @MR1 //点1的定位过程中ON时，将速度更改为5000
+;               : @MR2 //点1的定位过程中ON时，将速度更改为6000
+;               : @MR3 //点1的定位过程中ON时，将速度更改为7000
+;               : @MR4 //定位过程中ON时，使轴1停止传感器输入ON后停止
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>运行过程中更改速度的示例
+;将运转速度从3000更改为5000/6000/7000
+;运转速度更改要求继电器ON时，运转速度更改设定值发生变化的话，运转速度也变化
+LDP @MR000
+MOV.D #3000 CM8826
+MPS
+SET CR8005
+MPP
+ANB CR8400
+PSTRT #0 #1 #1
+LDP @MR001
+MOV.D #5000 CM8826
+LDP @MR002
+MOV.D #6000 CM8826
+LDP @MR003
+MOV.D #7000 CM8826
+LDP @MR004
+RES CR8005
+OUT CR8015
+END
+ENDH
+
+## Targetchange_function.mnm
+原导出 MNM SHA-256 864c3c500bd4af5f689f2c4c2c8fbcf2c668888815ae3eb2ff78f48b5fe4b0e7
+
+DEVICE:132
+;MODULE:Targetchange_function
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Change Target Coordinate
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 //ON时执行轴1点5的定位运行
+;               : @MR1 //点1的定位运行过程中ON时，更改目标坐标
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>运行过程中更改目标坐标的示例
+;轴1在向点5的目标值8000移动过程中，
+;@MR001 ON的话，将改为向目标值5000移动
+LDP @MR000
+ANB CR8400
+PSTRT #0 #1 #5
+LDP @MR001
+AND CR8400
+CHGTGT #0 #1 +5000
+END
+ENDH
+
+## 直线插补宏.mnm
+原导出 MNM SHA-256 3302596903f92db76578a5af411a1b4b99527044fad58b6c26d1f08735121c81
+
+DEVICE:132
+;MODULE:直线插补宏
+;MODULE_TYPE:1
+;SCRIPT_TYPE:
+;主轴编号 = V0
+;从轴编号 = V1
+;点编号   = V2
+;主轴目标坐标 = V3.L
+;从轴目标坐标 = V4.L
+;合成加速度 = V5
+;合成减速度 = V6
+;合成速度 = TODF(V7.D)
+;动作模式 = V8'  0:INC   1:ABS
+;合成起动速度 = V9
+;'-------------------------------------------------------动作模式设定------------------------------------------------------
+;@DM10 = (V0 - 1) * 40
+;@DM11 = (V1 - 1) * 40
+;@DM12 = (V0 - 1) * 200 + (V2 - 1) * 10
+;@DM13 = (V1 - 1) * 200 + (V2 - 1) * 10
+;
+;SELECT CASE V8
+;CASE 0
+;BRES(CM8006:@DM12,0)'将主轴动作模式设定为定位INC
+;BRES(CM8006:@DM12,1)
+;BRES(CM8006:@DM13,0)'将插补轴动作模式设定为定位INC
+;BRES(CM8006:@DM13,1)
+;主轴移动量 = ABS(主轴目标坐标)'主轴的移动量
+;从轴移动量 = ABS(从轴目标坐标)'插补轴的移动量
+;CASE 1
+;BSET(CM8006:@DM12,0)'将主轴动作模式设定为定位ABS
+;BRES(CM8006:@DM12,1)
+;BSET(CM8006:@DM13,0)'将插补轴动作模式设定为定位ABS
+;BRES(CM8006:@DM13,1)
+;主轴移动量 = ABS(主轴目标坐标 - CM8830.L:@DM10)'主轴的移动量
+;从轴移动量 = ABS(从轴目标坐标 - CM8830.L:@DM11)'插补轴的移动量
+;END SELECT
+;'---------------------------------------------------------参数计算----------------------------------------------------------
+;#PRAGMA DOUBLE ON
+;
+;合成距离 = ROOT(TODF(主轴移动量)^2 + TODF(从轴移动量)^2)
+;'--------------------------------------------------------加减速度是否为0----------------------------------------------------
+;IF  合成速度 = 合成起动速度 THEN
+;	加速距离 = 0
+;	减速距离 = 0
+;ELSE
+;	SELECT CASE 合成加速度
+;	CASE 0
+;	    加速距离 = 0
+;	CASE ELSE
+;	    加速时间 = ABS((合成速度 - 合成起动速度) / (合成加速度 * 1000))
+;	    加速距离 = 0.5 * (合成起动速度 + 合成速度) * 加速时间
+;	END SELECT
+;
+;	SELECT CASE 合成减速度
+;	CASE 0
+;	   减速距离 = 0
+;	CASE ELSE
+;	   减速时间 = ABS((合成速度-合成起动速度)/(合成减速度*1000))
+;	   减速距离 = 0.5*(合成起动速度+合成速度)*减速时间
+;	END SELECT
+;END IF
+;
+;IF 合成距离 >= (加速距离+减速距离) THEN'-----------------------------合成距离>=加减速距离   速度能达到合成速度的情况
+;
+;   主轴起动速度 = 合成起动速度 * 主轴移动量 / 合成距离
+;   主轴运行速度 = 合成速度     * 主轴移动量 / 合成距离
+;   主轴加速度   = 合成加速度   * 主轴移动量 / 合成距离
+;   主轴减速度   = 合成减速度   * 主轴移动量 / 合成距离
+; 
+;   从轴起动速度 = 合成起动速度 * 从轴移动量 / 合成距离
+;   从轴运行速度 = 合成速度     * 从轴移动量 / 合成距离
+;   从轴加速度   = 合成加速度   * 从轴移动量 / 合成距离
+;   从轴减速度   = 合成减速度   * 从轴移动量 / 合成距离
+;
+;ELSE'----------------------------------------------------------------合成距离<加减速距离    速度达不到合成速度的情况
+;   
+;   T加 = ROOT(2 * 合成距离 / (合成加速度 * (1 + 合成加速度 / 合成减速度)) + (合成起动速度 / 合成加速度)^2) - 合成起动速度 / 合成加速度
+;   最大速度 = 合成起动速度 + T加 * 合成加速度
+;
+;   主轴起动速度 = 合成起动速度 * 主轴移动量 / 合成距离
+;   主轴运行速度 = 最大速度     * 主轴移动量 / 合成距离
+;   主轴加速度   = 合成加速度   * 主轴移动量 / 合成距离
+;   主轴减速度   = 合成减速度   * 主轴移动量 / 合成距离
+;
+;   从轴起动速度 = 合成起动速度 * 从轴移动量 / 合成距离
+;   从轴运行速度 = 最大速度     * 从轴移动量 / 合成距离
+;   从轴加速度   = 合成加速度   * 从轴移动量 / 合成距离
+;   从轴减速度   = 合成减速度   * 从轴移动量 / 合成距离
+;END IF
+;
+;#PRAGMA DOUBLE OFF   
+;'---------------------------------------------------------参数写入----------------------------------------------------------
+;
+;CM8000.L:@DM12 = 主轴目标坐标
+;CM8808:@DM10 = TOU(主轴起动速度 + 0.5)
+;IF 主轴运行速度 = 0 THEN
+;	CM8004.D:@DM12 = 1
+;ELSE
+;	CM8004.D:@DM12 = TOD(主轴运行速度 + 0.5)
+;END IF
+;CM8002:@DM12 = TOU(主轴加速度 + 0.5)
+;CM8003:@DM12 = TOU(主轴减速度 + 0.5)
+;'-------------------------------------------
+;CM8000.L:@DM13 = 从轴目标坐标   
+;CM8808:@DM11 = TOU(从轴起动速度 + 0.5)   
+;IF 从轴运行速度 = 0 THEN
+;	CM8004.D:@DM13 = 1
+;ELSE
+;	CM8004.D:@DM13 = TOD(从轴运行速度 + 0.5)   
+;END IF
+;CM8002:@DM13 = TOU(从轴加速度 + 0.5)
+;CM8003:@DM13 = TOU(从轴减速度 + 0.5)
+;主轴编号 = V0
+;
+LD CR2002
+MOV V0 主轴编号
+;从轴编号 = V1
+;
+LD CR2002
+MOV V1 从轴编号
+;点编号   = V2
+;
+LD CR2002
+MOV V2 点编号
+;主轴目标坐标 = V3.L
+;
+LD CR2002
+MOV.L V3 主轴目标坐标
+;从轴目标坐标 = V4.L
+;
+LD CR2002
+MOV.L V4 从轴目标坐标
+;合成加速度 = V5
+;
+LD CR2002
+MOV V5 合成加速度
+;合成减速度 = V6
+;
+LD CR2002
+MOV V6 合成减速度
+;合成速度 = TODF(V7.D)
+;
+LD CR2002
+LDA.D V7
+CON
+DFLOAT.D
+CON
+STA.DF 合成速度
+;动作模式 = V8'  0:INC   1:ABS
+;
+LD CR2002
+MOV V8 动作模式
+;合成起动速度 = V9
+;
+LD CR2002
+MOV V9 合成起动速度
+;'-------------------------------------------------------动作模式设定------------------------------------------------------
+;
+;@DM10 = (V0 - 1) * 40
+;
+LD CR2002
+LDA V0
+CON
+EXT
+CON
+SUB.L +1
+CON
+MUL.L +40
+CON
+STA @DM10
+;@DM11 = (V1 - 1) * 40
+;
+LD CR2002
+LDA V1
+CON
+EXT
+CON
+SUB.L +1
+CON
+MUL.L +40
+CON
+STA @DM11
+;@DM12 = (V0 - 1) * 200 + (V2 - 1) * 10
+;
+LD CR2002
+LDA V2
+CON
+EXT
+CON
+SUB.L +1
+CON
+MUL.L +10
+CON
+STA.L @VM0
+CON
+LDA V0
+CON
+EXT
+CON
+SUB.L +1
+CON
+MUL.L +200
+CON
+ADD.L @VM0
+CON
+STA @DM12
+;@DM13 = (V1 - 1) * 200 + (V2 - 1) * 10
+;
+LD CR2002
+LDA V2
+CON
+EXT
+CON
+SUB.L +1
+CON
+MUL.L +10
+CON
+STA.L @VM2
+CON
+LDA V1
+CON
+EXT
+CON
+SUB.L +1
+CON
+MUL.L +200
+CON
+ADD.L @VM2
+CON
+STA @DM13
+;SELECT CASE V8
+;
+LD CR2002
+MOV V8 @VM4
+;CASE 0
+;
+LD= @VM4 #0
+NCJ #2000
+;BRES(CM8006:@DM12,0)'将主轴动作模式设定为定位INC
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z12
+BRES CM8006:Z12 #0
+;BRES(CM8006:@DM12,1)
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z12
+BRES CM8006:Z12 #1
+;BRES(CM8006:@DM13,0)'将插补轴动作模式设定为定位INC
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z12
+BRES CM8006:Z12 #0
+;BRES(CM8006:@DM13,1)
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z12
+BRES CM8006:Z12 #1
+;主轴移动量 = ABS(主轴目标坐标)'主轴的移动量
+;
+LD CR2002
+LDA.L 主轴目标坐标
+CON
+CMP.L +0
+LD CR2009
+NEG.L
+LD CR2002
+STA.L 主轴移动量
+;从轴移动量 = ABS(从轴目标坐标)'插补轴的移动量
+;
+LD CR2002
+LDA.L 从轴目标坐标
+CON
+CMP.L +0
+LD CR2009
+NEG.L
+LD CR2002
+STA.L 从轴移动量
+LD CR2002
+CJ #2001
+LABEL #2000
+;CASE 1
+;
+LD= @VM4 #1
+NCJ #2002
+;BSET(CM8006:@DM12,0)'将主轴动作模式设定为定位ABS
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z12
+BSET CM8006:Z12 #0
+;BRES(CM8006:@DM12,1)
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z12
+BRES CM8006:Z12 #1
+;BSET(CM8006:@DM13,0)'将插补轴动作模式设定为定位ABS
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z12
+BSET CM8006:Z12 #0
+;BRES(CM8006:@DM13,1)
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z12
+BRES CM8006:Z12 #1
+;主轴移动量 = ABS(主轴目标坐标 - CM8830.L:@DM10)'主轴的移动量
+;
+LD CR2002
+LDA @DM10
+CON
+EXT
+CON
+STA.L Z12
+CON
+LDA.L 主轴目标坐标
+CON
+SUB.L CM8830:Z12
+CON
+CMP.L +0
+LD CR2009
+NEG.L
+LD CR2002
+STA.L 主轴移动量
+;从轴移动量 = ABS(从轴目标坐标 - CM8830.L:@DM11)'插补轴的移动量
+;
+LD CR2002
+LDA @DM11
+CON
+EXT
+CON
+STA.L Z12
+CON
+LDA.L 从轴目标坐标
+CON
+SUB.L CM8830:Z12
+CON
+CMP.L +0
+LD CR2009
+NEG.L
+LD CR2002
+STA.L 从轴移动量
+;END SELECT
+;
+LABEL #2002
+LABEL #2001
+;'---------------------------------------------------------参数计算----------------------------------------------------------
+;
+;#PRAGMA DOUBLE ON
+;
+;合成距离 = ROOT(TODF(主轴移动量)^2 + TODF(从轴移动量)^2)
+;
+LD CR2002
+LDA.L 从轴移动量
+CON
+DFLOAT.L
+CON
+POW.DF +2
+CON
+STA.DF @VM6
+CON
+LDA.L 主轴移动量
+CON
+DFLOAT.L
+CON
+POW.DF +2
+CON
+ADD.DF @VM6
+CON
+ROOT.DF
+CON
+STA.DF 合成距离
+;'--------------------------------------------------------加减速度是否为0----------------------------------------------------
+;
+;IF  合成速度 = 合成起动速度 THEN
+;
+LD CR2002
+LDA 合成起动速度
+CON
+DFLOAT
+CON
+CMP.DF 合成速度
+LD CR2010
+NCJ #2003
+;	加速距离 = 0
+;
+LD CR2002
+MOV.DF +0 加速距离
+;	减速距离 = 0
+;
+LD CR2002
+MOV.DF +0 减速距离
+;ELSE
+;
+LD CR2002
+CJ #2004
+LABEL #2003
+;	SELECT CASE 合成加速度
+;
+LD CR2002
+MOV 合成加速度 @VM5
+;	CASE 0
+;
+LD= @VM5 #0
+NCJ #2005
+;	    加速距离 = 0
+;
+LD CR2002
+MOV.DF +0 加速距离
+LD CR2002
+CJ #2006
+LABEL #2005
+;	CASE ELSE
+;
+;	    加速时间 = ABS((合成速度 - 合成起动速度) / (合成加速度 * 1000))
+;
+LD CR2002
+LDA 合成加速度
+CON
+EXT
+CON
+MUL.L +1000
+CON
+STA.L @VM10
+CON
+LDA 合成起动速度
+CON
+EXT
+CON
+DFLOAT.L
+CON
+STA.DF @VM12
+CON
+LDA.DF 合成速度
+CON
+SUB.DF @VM12
+CON
+STA.DF @VM16
+CON
+LDA.L @VM10
+CON
+DFLOAT.L
+CON
+STA.DF @VM20
+CON
+LDA.DF @VM16
+CON
+DIV.DF @VM20
+CON
+CMP.DF +0
+LD CR2009
+NEG.DF
+LD CR2002
+STA.DF 加速时间
+;	    加速距离 = 0.5 * (合成起动速度 + 合成速度) * 加速时间
+;
+LD CR2002
+LDA 合成起动速度
+CON
+DFLOAT
+CON
+ADD.DF 合成速度
+CON
+MUL.DF +0.5
+CON
+MUL.DF 加速时间
+CON
+STA.DF 加速距离
+;	END SELECT
+;
+LABEL #2006
+;	SELECT CASE 合成减速度
+;
+LD CR2002
+MOV 合成减速度 @VM24
+;	CASE 0
+;
+LD= @VM24 #0
+NCJ #2007
+;	   减速距离 = 0
+;
+LD CR2002
+MOV.DF +0 减速距离
+LD CR2002
+CJ #2008
+LABEL #2007
+;	CASE ELSE
+;
+;	   减速时间 = ABS((合成速度-合成起动速度)/(合成减速度*1000))
+;
+LD CR2002
+LDA 合成减速度
+CON
+EXT
+CON
+MUL.L +1000
+CON
+STA.L @VM26
+CON
+LDA 合成起动速度
+CON
+EXT
+CON
+DFLOAT.L
+CON
+STA.DF @VM28
+CON
+LDA.DF 合成速度
+CON
+SUB.DF @VM28
+CON
+STA.DF @VM32
+CON
+LDA.L @VM26
+CON
+DFLOAT.L
+CON
+STA.DF @VM36
+CON
+LDA.DF @VM32
+CON
+DIV.DF @VM36
+CON
+CMP.DF +0
+LD CR2009
+NEG.DF
+LD CR2002
+STA.DF 减速时间
+;	   减速距离 = 0.5*(合成起动速度+合成速度)*减速时间
+;
+LD CR2002
+LDA 合成起动速度
+CON
+DFLOAT
+CON
+ADD.DF 合成速度
+CON
+MUL.DF +0.5
+CON
+MUL.DF 减速时间
+CON
+STA.DF 减速距离
+;	END SELECT
+;
+LABEL #2008
+;END IF
+;
+LABEL #2004
+;IF 合成距离 >= (加速距离+减速距离) THEN'-----------------------------合成距离>=加减速距离   速度能达到合成速度的情况
+;
+LD CR2002
+LDA.DF 加速距离
+CON
+ADD.DF 减速距离
+CON
+CMP.DF 合成距离
+LDB CR2011
+NCJ #2009
+;   主轴起动速度 = 合成起动速度 * 主轴移动量 / 合成距离
+;
+LD CR2002
+LDA 合成起动速度
+CON
+EXT
+CON
+MUL.L 主轴移动量
+CON
+DFLOAT.L
+CON
+DIV.DF 合成距离
+CON
+STA.DF 主轴起动速度
+;   主轴运行速度 = 合成速度     * 主轴移动量 / 合成距离
+;
+LD CR2002
+LDA.L 主轴移动量
+CON
+DFLOAT.L
+CON
+MUL.DF 合成速度
+CON
+DIV.DF 合成距离
+CON
+STA.DF 主轴运行速度
+;   主轴加速度   = 合成加速度   * 主轴移动量 / 合成距离
+;
+LD CR2002
+LDA 合成加速度
+CON
+EXT
+CON
+MUL.L 主轴移动量
+CON
+DFLOAT.L
+CON
+DIV.DF 合成距离
+CON
+STA.DF 主轴加速度
+;   主轴减速度   = 合成减速度   * 主轴移动量 / 合成距离
+;
+LD CR2002
+LDA 合成减速度
+CON
+EXT
+CON
+MUL.L 主轴移动量
+CON
+DFLOAT.L
+CON
+DIV.DF 合成距离
+CON
+STA.DF 主轴减速度
+;   从轴起动速度 = 合成起动速度 * 从轴移动量 / 合成距离
+;
+LD CR2002
+LDA 合成起动速度
+CON
+EXT
+CON
+MUL.L 从轴移动量
+CON
+DFLOAT.L
+CON
+DIV.DF 合成距离
+CON
+STA.DF 从轴起动速度
+;   从轴运行速度 = 合成速度     * 从轴移动量 / 合成距离
+;
+LD CR2002
+LDA.L 从轴移动量
+CON
+DFLOAT.L
+CON
+MUL.DF 合成速度
+CON
+DIV.DF 合成距离
+CON
+STA.DF 从轴运行速度
+;   从轴加速度   = 合成加速度   * 从轴移动量 / 合成距离
+;
+LD CR2002
+LDA 合成加速度
+CON
+EXT
+CON
+MUL.L 从轴移动量
+CON
+DFLOAT.L
+CON
+DIV.DF 合成距离
+CON
+STA.DF 从轴加速度
+;   从轴减速度   = 合成减速度   * 从轴移动量 / 合成距离
+;
+LD CR2002
+LDA 合成减速度
+CON
+EXT
+CON
+MUL.L 从轴移动量
+CON
+DFLOAT.L
+CON
+DIV.DF 合成距离
+CON
+STA.DF 从轴减速度
+;ELSE'----------------------------------------------------------------合成距离<加减速距离    速度达不到合成速度的情况
+;
+LD CR2002
+CJ #2010
+LABEL #2009
+;   T加 = ROOT(2 * 合成距离 / (合成加速度 * (1 + 合成加速度 / 合成减速度)) + (合成起动速度 / 合成加速度)^2) - 合成起动速度 / 合成加速度
+;
+LD CR2002
+LDA 合成加速度
+CON
+EXT
+CON
+STA.L @VM40
+CON
+LDA 合成起动速度
+CON
+EXT
+CON
+EXT.L
+CON
+DIV.L @VM40
+CON
+STA.L @VM42
+CON
+LDA 合成加速度
+CON
+EXT
+CON
+STA.L @VM44
+CON
+LDA 合成起动速度
+CON
+EXT
+CON
+EXT.L
+CON
+DIV.L @VM44
+CON
+STA.L @VM46
+LD CR2002
+LDA.L +1
+CON
+EXT.L
+FOR #2
+LD CR2002
+MUL.L @VM46
+NEXT
+LD CR2002
+STA.L @VM48
+CON
+LDA 合成减速度
+CON
+EXT
+CON
+STA.L @VM50
+CON
+LDA 合成加速度
+CON
+EXT
+CON
+EXT.L
+CON
+DIV.L @VM50
+CON
+ADD.L +1
+CON
+STA.L @VM52
+CON
+LDA 合成加速度
+CON
+EXT
+CON
+MUL.L @VM52
+CON
+STA.L @VM54
+CON
+LDA.DF +2
+CON
+MUL.DF 合成距离
+CON
+STA.DF @VM56
+CON
+LDA.L @VM54
+CON
+DFLOAT.L
+CON
+STA.DF @VM60
+CON
+LDA.DF @VM56
+CON
+DIV.DF @VM60
+CON
+STA.DF @VM64
+CON
+LDA.L @VM48
+CON
+DFLOAT.L
+CON
+ADD.DF @VM64
+CON
+ROOT.DF
+CON
+STA.DF @VM68
+CON
+LDA.L @VM42
+CON
+DFLOAT.L
+CON
+STA.DF @VM72
+CON
+LDA.DF @VM68
+CON
+SUB.DF @VM72
+CON
+STA.DF T加
+;   最大速度 = 合成起动速度 + T加 * 合成加速度
+;
+LD CR2002
+LDA 合成加速度
+CON
+DFLOAT
+CON
+MUL.DF T加
+CON
+STA.DF @VM76
+CON
+LDA 合成起动速度
+CON
+DFLOAT
+CON
+ADD.DF @VM76
+CON
+STA.DF 最大速度
+;   主轴起动速度 = 合成起动速度 * 主轴移动量 / 合成距离
+;
+LD CR2002
+LDA 合成起动速度
+CON
+EXT
+CON
+MUL.L 主轴移动量
+CON
+DFLOAT.L
+CON
+DIV.DF 合成距离
+CON
+STA.DF 主轴起动速度
+;   主轴运行速度 = 最大速度     * 主轴移动量 / 合成距离
+;
+LD CR2002
+LDA.L 主轴移动量
+CON
+DFLOAT.L
+CON
+MUL.DF 最大速度
+CON
+DIV.DF 合成距离
+CON
+STA.DF 主轴运行速度
+;   主轴加速度   = 合成加速度   * 主轴移动量 / 合成距离
+;
+LD CR2002
+LDA 合成加速度
+CON
+EXT
+CON
+MUL.L 主轴移动量
+CON
+DFLOAT.L
+CON
+DIV.DF 合成距离
+CON
+STA.DF 主轴加速度
+;   主轴减速度   = 合成减速度   * 主轴移动量 / 合成距离
+;
+LD CR2002
+LDA 合成减速度
+CON
+EXT
+CON
+MUL.L 主轴移动量
+CON
+DFLOAT.L
+CON
+DIV.DF 合成距离
+CON
+STA.DF 主轴减速度
+;   从轴起动速度 = 合成起动速度 * 从轴移动量 / 合成距离
+;
+LD CR2002
+LDA 合成起动速度
+CON
+EXT
+CON
+MUL.L 从轴移动量
+CON
+DFLOAT.L
+CON
+DIV.DF 合成距离
+CON
+STA.DF 从轴起动速度
+;   从轴运行速度 = 最大速度     * 从轴移动量 / 合成距离
+;
+LD CR2002
+LDA.L 从轴移动量
+CON
+DFLOAT.L
+CON
+MUL.DF 最大速度
+CON
+DIV.DF 合成距离
+CON
+STA.DF 从轴运行速度
+;   从轴加速度   = 合成加速度   * 从轴移动量 / 合成距离
+;
+LD CR2002
+LDA 合成加速度
+CON
+EXT
+CON
+MUL.L 从轴移动量
+CON
+DFLOAT.L
+CON
+DIV.DF 合成距离
+CON
+STA.DF 从轴加速度
+;   从轴减速度   = 合成减速度   * 从轴移动量 / 合成距离
+;
+LD CR2002
+LDA 合成减速度
+CON
+EXT
+CON
+MUL.L 从轴移动量
+CON
+DFLOAT.L
+CON
+DIV.DF 合成距离
+CON
+STA.DF 从轴减速度
+;END IF
+;
+LABEL #2010
+;#PRAGMA DOUBLE OFF   
+;
+;'---------------------------------------------------------参数写入----------------------------------------------------------
+;
+;CM8000.L:@DM12 = 主轴目标坐标
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z11
+CON
+MOV.L 主轴目标坐标 CM8000:Z11
+;CM8808:@DM10 = TOU(主轴起动速度 + 0.5)
+;
+LD CR2002
+LDA @DM10
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF 主轴起动速度
+CON
+ADD.DF +0.5
+CON
+DINTG
+CON
+STA CM8808:Z11
+;IF 主轴运行速度 = 0 THEN
+;
+LD=.DF 主轴运行速度 +0
+NCJ #2011
+;	CM8004.D:@DM12 = 1
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z11
+CON
+MOV.D #1 CM8004:Z11
+;ELSE
+;
+LD CR2002
+CJ #2012
+LABEL #2011
+;	CM8004.D:@DM12 = TOD(主轴运行速度 + 0.5)
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF 主轴运行速度
+CON
+ADD.DF +0.5
+CON
+DINTG.D
+CON
+STA.D CM8004:Z11
+;END IF
+;
+LABEL #2012
+;CM8002:@DM12 = TOU(主轴加速度 + 0.5)
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF 主轴加速度
+CON
+ADD.DF +0.5
+CON
+DINTG
+CON
+STA CM8002:Z11
+;CM8003:@DM12 = TOU(主轴减速度 + 0.5)
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF 主轴减速度
+CON
+ADD.DF +0.5
+CON
+DINTG
+CON
+STA CM8003:Z11
+;'-------------------------------------------
+;
+;CM8000.L:@DM13 = 从轴目标坐标   
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z11
+CON
+MOV.L 从轴目标坐标 CM8000:Z11
+;CM8808:@DM11 = TOU(从轴起动速度 + 0.5)   
+;
+LD CR2002
+LDA @DM11
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF 从轴起动速度
+CON
+ADD.DF +0.5
+CON
+DINTG
+CON
+STA CM8808:Z11
+;IF 从轴运行速度 = 0 THEN
+;
+LD=.DF 从轴运行速度 +0
+NCJ #2013
+;	CM8004.D:@DM13 = 1
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z11
+CON
+MOV.D #1 CM8004:Z11
+;ELSE
+;
+LD CR2002
+CJ #2014
+LABEL #2013
+;	CM8004.D:@DM13 = TOD(从轴运行速度 + 0.5)   
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF 从轴运行速度
+CON
+ADD.DF +0.5
+CON
+DINTG.D
+CON
+STA.D CM8004:Z11
+;END IF
+;
+LABEL #2014
+;CM8002:@DM13 = TOU(从轴加速度 + 0.5)
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF 从轴加速度
+CON
+ADD.DF +0.5
+CON
+DINTG
+CON
+STA CM8002:Z11
+;CM8003:@DM13 = TOU(从轴减速度 + 0.5)
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF 从轴减速度
+CON
+ADD.DF +0.5
+CON
+DINTG
+CON
+STA CM8003:Z11
+;
+END
+ENDH
+

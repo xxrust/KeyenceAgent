@@ -1,0 +1,44 @@
+# KVN40_PLClink
+
+KV Nano系列40点型 串行通讯功能 串行PLC链路 | KV-N40 | AS_59112 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59112
+KPZ SHA-256 a85181bc1b1716c17291759f942300b81c7d3f086926aca4964b1b785f77a567
+KV STUDIO 12.41.0.0 | 1 个模块和宏 | 27/16384 步 | 16 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 f7565d79d95b56b43494e415cfafffa88a810d460ec29b309abdf1aca08f0a57
+
+DEVICE:133
+;MODULE:Main
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : PLC Link Slave
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for changing the slave No. of a PLC link via a ladder
+;Note: Slave No. can be set up directly in the Unit Editor. 
+;Slave No. of the serial PLC link of Port1 will be changed on the rising edge of MR001. 
+LD MR000
+MOV #3 DM0
+LDP MR001
+ANB CR6704
+ANB CR6705
+SET CR6604
+MOV DM0 CM6000
+;<h1/>When this change fails, R500 will be ON. 
+LDP CR6704
+MPS
+ANB CR6705
+RES CR6604
+MPP
+AND CR6705
+OUT R500
+END
+ENDH
+

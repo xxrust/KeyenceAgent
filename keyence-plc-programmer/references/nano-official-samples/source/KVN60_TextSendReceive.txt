@@ -1,0 +1,172 @@
+# KVN60_TextSendReceive
+
+KV Nano系列60点型 串行通讯功能 KV模式(文本收发信) | KV-N60 | AS_59101 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59101
+KPZ SHA-256 6d4df5433ecf48b84c5f76a79c416c4528298486b5b037f18e38ba408a836e7d
+KV STUDIO 12.41.0.0 | 3 个模块和宏 | 133/16384 步 | 83 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 d075551f6a729863d9706ada0fec8e2edacbf1a6400d4ec83fda468b0773d03d
+
+DEVICE:132
+;MODULE:Main
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Text Send and Receive
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 //When it is ON, [Text_Ladder] module will be executed.
+;               : @MR1 //When it is ON, [Text_Script] module will be executed.
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Send/receive text data(Ladder)
+LDP @MR000
+ANB @MR001
+MDSTRT Text_Ladder
+LDF @MR000
+MDSTOP Text_Ladder
+;<h1/>Send/receive text data(Script)
+LDP @MR001
+ANB @MR000
+MDSTRT Text_Script
+LDF @MR001
+MDSTOP Text_Script
+END
+ENDH
+
+## Text_Ladder.mnm
+原导出 MNM SHA-256 a11c66e45eb4cad8dda11e340d50d6759a7e1b7934d07263a83e635ee72f588e
+
+DEVICE:132
+;MODULE:Text_Ladder
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Text Send and Receive
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // when it is ON, sending of text data will be performed. 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for sending/receiving text data(Ladder) 
+;To perform text data sending and receiving via Port0 
+;Initialization will be performed and communication enabled when operation is started. 
+;When using Port1, please change the related devices of Port0 to those of Port1. 
+LD @CR2008
+SET CR6105
+CON
+SET CR6100
+;Send text data "STX KEYENCE ETX"
+LDP @MR000
+MOV #9 CM5101
+MOV $024B CM5102
+SMOV "EYENCE" CM5103
+MOV $0300 CM5106
+SET CR6104
+;Receive text data (for monitoring confirmation) 
+LD CR6101
+BMOV CM5002 DM1000 CM5001
+RES CR6101
+;R500 is ON when a communication error occurs 
+LD CR6002
+OUT R500
+;When a receive processing error occurs, output R501 will be ON.
+LD CR6001
+OUT R501
+END
+ENDH
+
+## Text_Script.mnm
+原导出 MNM SHA-256 4682f1413fadd2733c0a9d70695e7faeb3d47bb6eff0c6973f43fe98cda1051d
+
+DEVICE:132
+;MODULE:Text_Script
+;MODULE_TYPE:0
+;SCRIPT_TYPE:
+;-------------------------------------------------------------------------------
+;-- File        : Text Send and Receive
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // when it is ON, sending of text data will be executed.
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for sending/receiving text(Script) 
+;To perform text data sending and receiving via Port0 
+;Initialization will be performed and communication enabled when operation is started. 
+;When using Port1, please change the related devices of Port0 to those of Port1. 
+LD @CR2008
+SET CR6105
+CON
+SET CR6100
+;Send text data "STX KEYENCE ETX" 
+;CM5101 = 9
+;CM5102.T = CHR ($02) + "KEYENCE" + CHR ($03)
+;SET (CR6104)
+LDP @MR000
+NCJ #1000
+;CM5101 = 9
+;
+LD CR2002
+MOV #9 CM5101
+;CM5102.T = CHR ($02) + "KEYENCE" + CHR ($03)
+;
+LD CR2002
+ADRSET VM2 VM0
+MOV #0 VM2
+MOV.D VM0 @VM2
+LD CR2002
+LDA $0003
+CON
+SLA #8
+CON
+STA @VM0
+CON
+SMOV @VM0 *@VM2
+LD CR2002
+ADRADD.S +1 VM0
+LD CR2002
+MOV.D VM0 @VM4
+LD CR2002
+LDA $0002
+CON
+SLA #8
+CON
+STA @VM1
+CON
+SMOV @VM1 *@VM4
+LD CR2002
+SADD *@VM4 "KEYENCE" *@VM4
+SADD *@VM4 *@VM2 *@VM4
+SMOV *@VM4 CM5102
+;SET (CR6104)
+LD CR2002
+SET CR6104
+LABEL #1000
+;
+;Receive text data (for monitoring confirmation) 
+;BMOV (CM5002, DM1000, CM5001)
+;RES (CR6101)
+LD CR6101
+NCJ #1001
+;BMOV (CM5002, DM1000, CM5001)
+;
+LD CR2002
+BMOV CM5002 DM1000 CM5001
+;RES (CR6101)
+LD CR2002
+RES CR6101
+LABEL #1001
+;
+;R500 is ON when a communication error occurs
+LD CR6002
+OUT R500
+;When a receive processing error occurs, output R501 will be ON.
+LD CR6001
+OUT R501
+END
+ENDH
+

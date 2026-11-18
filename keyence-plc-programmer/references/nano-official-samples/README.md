@@ -1,32 +1,32 @@
 # KV Nano 官方范例程序
 
-按目标 CPU 和功能选择范例。表格链接指向基恩士中国官网的下载确认页。下载后在 KV STUDIO 打开工程，并按下文的模块导航查看梯形图、KV 脚本或宏。 [基恩士中国样本目录](https://www.keyence.com.cn/support/user/controls/plc/software/sample-program)
+按目标 CPU 和功能打开范例文本，再按模块导航查看梯形图、KV 脚本或宏。需要查看工程程序树、扫描顺序或单元参数时，从文本开头的官网下载链接获取原工程，在 KV STUDIO 中打开。 [基恩士中国样本目录](https://www.keyence.com.cn/support/user/controls/plc/software/sample-program)
 
-## 按功能和 CPU 下载
+## 按功能和 CPU 查看正文
 
 | 功能 | KV-N14 | KV-N24 | KV-N40 | KV-N60 |
 | --- | --- | --- | --- | --- |
-| 定位（简体中文） | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_56810) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_56825) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_56840) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_56855) |
-| 定位（英文） | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59130) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59071) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59072) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59073) |
-| 定位（繁体中文） | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_66945) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_66946) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_66947) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_66948) |
-| 脉冲捕获 | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59074) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59075) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59076) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59077) |
-| 比较器 | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59078) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59079) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59080) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59081) |
-| 高速计数 | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59082) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59083) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59084) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59085) |
-| PWM | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59086) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59087) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59088) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59089) |
-| 时钟脉冲停止 | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59090) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59091) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59092) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59093) |
-| 凸轮开关 | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59094) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59095) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59096) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59097) |
-| KV 文本收发 | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59098) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59099) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59100) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59101) |
-| 无协议串行通信 | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59102) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59103) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59104) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59105) |
-| Modbus RTU 主站 | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59106) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59107) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59108) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59109) |
-| 串行 PLC 链路 | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59110) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59111) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59112) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59113) |
-| 四则运算 | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59114) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59115) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59116) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59117) |
-| 双精度浮点运算 | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59118) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59119) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59120) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59121) |
-| 读保护功能 | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59122) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59123) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59124) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59125) |
-| 后备模块 | [14 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59126) | [24 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59127) | [40 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59128) | [60 点](https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59129) |
+| 定位（简体中文） | [14 点](source/KVN14_Pos_CN.txt) | [24 点](source/KVN24_Pos_CN.txt) | [40 点](source/KVN40_Pos_CN.txt) | [60 点](source/KVN60_Pos_CN.txt) |
+| 定位（英文） | [14 点](source/KVN14_Pos_GB.txt) | [24 点](source/KVN24_Pos_GB.txt) | [40 点](source/KVN40_Pos_GB.txt) | [60 点](source/KVN60_Pos_GB.txt) |
+| 定位（繁体中文） | [14 点](source/KVN14_Pos_TW.txt) | [24 点](source/KVN24_Pos_TW.txt) | [40 点](source/KVN40_Pos_TW.txt) | [60 点](source/KVN60_Pos_TW.txt) |
+| 脉冲捕获 | [14 点](source/KVN14_SignalConverter.txt) | [24 点](source/KVN24_SignalConverter.txt) | [40 点](source/KVN40_SignalConverter.txt) | [60 点](source/KVN60_SignalConverter.txt) |
+| 比较器 | [14 点](source/KVN14_Comparator.txt) | [24 点](source/KVN24_Comparator.txt) | [40 点](source/KVN40_Comparator.txt) | [60 点](source/KVN60_Comparator.txt) |
+| 高速计数 | [14 点](source/KVN14_Counter.txt) | [24 点](source/KVN24_Counter.txt) | [40 点](source/KVN40_Counter.txt) | [60 点](source/KVN60_Counter.txt) |
+| PWM | [14 点](source/KVN14_PWM.txt) | [24 点](source/KVN24_PWM.txt) | [40 点](source/KVN40_PWM.txt) | [60 点](source/KVN60_PWM.txt) |
+| 时钟脉冲停止 | [14 点](source/KVN14_Clockpulse.txt) | [24 点](source/KVN24_Clockpulse.txt) | [40 点](source/KVN40_Clockpulse.txt) | [60 点](source/KVN60_Clockpulse.txt) |
+| 凸轮开关 | [14 点](source/KVN14_CamSwitch.txt) | [24 点](source/KVN24_CamSwitch.txt) | [40 点](source/KVN40_CamSwitch.txt) | [60 点](source/KVN60_CamSwitch.txt) |
+| KV 文本收发 | [14 点](source/KVN14_TextSendReceive.txt) | [24 点](source/KVN24_TextSendReceive.txt) | [40 点](source/KVN40_TextSendReceive.txt) | [60 点](source/KVN60_TextSendReceive.txt) |
+| 无协议串行通信 | [14 点](source/KVN14_NonProcedure.txt) | [24 点](source/KVN24_NonProcedure.txt) | [40 点](source/KVN40_NonProcedure.txt) | [60 点](source/KVN60_NonProcedure.txt) |
+| Modbus RTU 主站 | [14 点](source/KVN14_ModbusMaster.txt) | [24 点](source/KVN24_ModbusMaster.txt) | [40 点](source/KVN40_ModbusMaster.txt) | [60 点](source/KVN60_ModbusMaster.txt) |
+| 串行 PLC 链路 | [14 点](source/KVN14_PLClink.txt) | [24 点](source/KVN24_PLClink.txt) | [40 点](source/KVN40_PLClink.txt) | [60 点](source/KVN60_PLClink.txt) |
+| 四则运算 | [14 点](source/KVN14_Calc.txt) | [24 点](source/KVN24_Calc.txt) | [40 点](source/KVN40_Calc.txt) | [60 点](source/KVN60_Calc.txt) |
+| 双精度浮点运算 | [14 点](source/KVN14_Calc_DF.txt) | [24 点](source/KVN24_Calc_DF.txt) | [40 点](source/KVN40_Calc_DF.txt) | [60 点](source/KVN60_Calc_DF.txt) |
+| 读保护功能 | [14 点](source/KVN14_Protect.txt) | [24 点](source/KVN24_Protect.txt) | [40 点](source/KVN40_Protect.txt) | [60 点](source/KVN60_Protect.txt) |
+| 后备模块 | [14 点](source/KVN14_StandbyModule.txt) | [24 点](source/KVN24_StandbyModule.txt) | [40 点](source/KVN40_StandbyModule.txt) | [60 点](source/KVN60_StandbyModule.txt) |
 
 ## 使用范例
 
-本机已有导出文本时，可按逐工程验证表的 `text` 列在本目录的 `source/` 下查找。文本保留助记符、KV 脚本、宏和厂商注释。按官网下载许可，完整导出文本保存在本机。 [逐工程验证表](verification.tsv) · [软件下载许可](https://www.keyence.com.cn/modal/downloads/license-agree/software/)
+每个工程对应 `source/` 下的一份 UTF-8 文本，按模块和宏分节，保留助记符、KV 脚本和厂商注释。每节列出原导出 MNM 的 SHA-256。 [逐工程验证表](verification.tsv)
 
 - 先按机型和模块导航定位程序，再读相应的助记符和注释。例如编写回原点逻辑时，查 `Origin_return` 的执行条件、原点输入、限位映射和完成反馈。
 - 样本中出现的地址、轴号、点号、参数和输入有效条件属于样本工程。编写或修改实际工程时，按目标手册和工程快照核对这些条件，标明调用方需要提供的配置。 [项目本体与行为验证](../project-model.md)

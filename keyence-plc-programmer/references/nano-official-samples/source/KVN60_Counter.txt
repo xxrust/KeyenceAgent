@@ -1,0 +1,122 @@
+# KVN60_Counter
+
+KV Nano系列60点型 内置功能（中断、高速计数器等）计数器 | KV-N60 | AS_59085 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59085
+KPZ SHA-256 667dfe7589fc3b3e9773e549660f8fabf5bb3e9aee4b1e86ca3e809b7ebfbc36
+KV STUDIO 12.41.0.0 | 2 个模块和宏 | 98/16384 步 | 60 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 d3ac5eff447acb1c53b4a8caec8e8bc38ace1f8c83ea187d7ba2728343588046
+
+DEVICE:132
+;MODULE:Main
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Counter
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>To change the state of R1500/R1501 using the latest value of the high-speed counter 0
+;Please change settings of the high-speed counter according to actual usage (INIT_CTH0 Every-scan execution module). 
+LD CR2002
+RFSCTH #0
+LD<.D CTH0 #1000
+OUT R1500
+LD>=.D CTH0 #1000
+AND<.D CTH0 #2000
+OUT R1501
+END
+ENDH
+
+## INIT_CTH0.mnm
+原导出 MNM SHA-256 afdb1a6e9baf36eddbf12deb0c7bf1f04b774a95a999a5513c80c65b1d73f791
+
+DEVICE:132
+;MODULE:INIT_CTH0
+;MODULE_TYPE:0
+;------------------------------------------------------------------------------------------------------
+;-- Title									: CPU high speed counter set value(CTH0)
+;------------------------------------------------------------------------------------------------------
+;-- Operation mode							: Up/down count
+;-- Input mode								: External input(Phase diff. (quad edge eval))
+;-- Input time constant						: 10us
+;-- Calculation range						: Unsigned 32-bit
+;-- Count mode								: Linear counter
+;-- Setting(CTH0) default					: No
+;------------------------------------------------------------------------------------------------------
+;-- Comparator								: Not used
+;------------------------------------------------------------------------------------------------------
+;-- Preset									: Not used
+;------------------------------------------------------------------------------------------------------
+;-- Counter enable							: Not used
+;------------------------------------------------------------------------------------------------------
+;-- Input mode								: External input(Phase diff. (quad edge eval))
+LD CR2008
+RES CR4313
+CON
+RES CR4314
+CON
+SET CR4315
+;-- Input time constant						: 10us
+LD CR2008
+MOV #0 CM1620
+SET CR2305
+;-- Calculation range						: Unsigned 32-bit
+LD CR2008
+BRES CM4801 #7
+;-- Count mode								: Linear counter
+LD CR2008
+RES CR4210
+;-- Setting(CTH0) default					: No
+;-- Comparator								: Not used
+;-- Initialize the comparator setting
+LD CR2008
+RES CR4303
+CON
+SET CR4304
+CON
+RES CR4305
+CON
+RES CR4306
+CON
+RES CR4307
+LD CR2008
+RES CR4312
+CON
+SET CR4308
+CON
+RES CR4309
+CON
+RES CR4310
+CON
+RES CR4311
+;-- Preset									: Not used
+;-- Initialize the presetting
+LD CR2008
+RES CR4208
+CON
+RES CR4209
+;-- Counter enable							: Not used
+;-- Initialize the counter enable setting
+LD CR2008
+BRES CM4801 #0
+CON
+BRES CM4801 #1
+CON
+BRES CM4801 #2
+LD CR2008
+BRES CM4801 #4
+CON
+BRES CM4801 #5
+;-- Action of CPU high-speed counter
+;-- Input mode								: External input(Phase diff. (quad edge eval))
+LD CR2002
+CTH.D #0 R008
+END
+ENDH
+

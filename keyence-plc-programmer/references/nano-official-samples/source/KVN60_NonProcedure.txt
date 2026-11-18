@@ -1,0 +1,254 @@
+# KVN60_NonProcedure
+
+KV Nano系列60点型 串行通讯功能无协议 | KV-N60 | AS_59105 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59105
+KPZ SHA-256 cf9eb32b049b0721261deaf8c0fb2307973db2b469c7d8b7bcc04152b2d83cba
+KV STUDIO 12.41.0.0 | 3 个模块和宏 | 201/16384 步 | 129 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 90259f19f7e1d7b9af0143cb81e8990e78bea6802fb5f1de2de80d3f37e47ac1
+
+DEVICE:132
+;MODULE:Main
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Non-procedure Mode 
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 //When it is ON, [NonProcedure_Script] module is executed.
+;               : @MR1 //When it is ON, [NonProcedure_Ladder] module is executed.
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Non-Procedure communication program(Ladder)
+LDP @MR000
+ANB @MR001
+MDSTRT NonProcedure_Ladder
+LDF @MR000
+ANB @MR001
+MDSTOP NonProcedure_Ladder
+;<h1/>Non-Procedure communication program(Script)
+LDP @MR001
+ANB @MR000
+MDSTRT NonProcedure_Script
+LDF @MR001
+ANB @MR000
+MDSTOP NonProcedure_Script
+END
+ENDH
+
+## NonProcedure_Ladder.mnm
+原导出 MNM SHA-256 7106fdc232e6781fa0c233cf91e5767c4a33a1345d5ccb46031c20064d495f18
+
+DEVICE:132
+;MODULE:NonProcedure_Ladder
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Non-procedure Mode (Ladder)
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // When it is ON, a Break signal will be output (to set the communication settings to default values). 
+;               : @MR1 // When it is ON, data will be sent. 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Non-Procedure communication program(Ladder)
+;<h1/>To send a Break signal from Port0
+LDP @MR000
+SET CR6107
+LDF @MR000
+RES CR6107
+;<h1/>A ladder example for performing general data receiving/sending via Port0
+;Please change the related devices to those for Port1 when you need to use Port1. 
+;Initial communication setup is performed and communication is enabled when power is turned on. 
+;Data storage unit: Byte;    Mode setting: normal mode 
+;Send header: none;          Send delimiter: CR LF
+;Receive header: none;       Receive delimiter: CR LF
+;Receive data length: 512
+LD @CR2008
+MOV $0000 CM5515
+MOV $0000 CM5516
+MOV $0000 CM5518
+MOV $0D0A CM5519
+MOV $0000 CM5520
+MOV $0D0A CM5521
+SET CR6100
+;<h1/>Sending of text data "KEYENCE CR LF"
+LD CR6000
+ANP @MR001
+ANB CR6007
+MOV #7 CM5001
+MOV $4B45 CM5002
+MOV $5945 CM5003
+MOV $4E43 CM5004
+MOV $4500 CM5005
+SET CR6101
+LD CR6001
+RES CR6101
+;<h1/>Receiving of text data
+LD CR2002
+LDA CM5258
+CON
+EXT
+CON
+DIV #2
+CON
+MPS
+AND= TM1 #0
+STA DM100
+MPP
+AND= TM1 #1
+ADD #1
+CON
+STA DM100
+LD CR6002
+BMOV CM5259 DM1000 DM100
+SET CR6102
+LDB CR6002
+RES CR6102
+;<h1/>The output relay R500 will be ON when a communication error occurs 
+LD CR6004
+OUT R500
+;<h1/>The output relay R501 will be ON when a receive error occurs 
+LD CR6003
+OUT R501
+END
+ENDH
+
+## NonProcedure_Script.mnm
+原导出 MNM SHA-256 3fdf4c057c907ad19987ed32d6579a2cbb84d916c863ca4316100415422366f5
+
+DEVICE:132
+;MODULE:NonProcedure_Script
+;MODULE_TYPE:0
+;SCRIPT_TYPE:
+;-------------------------------------------------------------------------------
+;-- File        : Non-procedure Mode (Script)
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // When it is ON, a Break signal will be output (to set the communication settings to default values). 
+;               : @MR1 // When it is ON, data will be sent. 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Non-Procedure communication program(Script)
+;<h1/>To send a Break signal from Port0
+LDP @MR000
+SET CR6107
+LDF @MR000
+RES CR6107
+;<h1/>A ladder example for performing general data receiving/sending via Port0
+;Please change the related devices to those for Port1 when you need to use Port1. 
+;Initial communication setup is performed and communication is enabled when power is turned on. 
+;Data storage unit: Byte;    Mode setting: normal mode 
+;Send header: none;          Send delimiter: CR LF
+;Receive header: none;       Receive delimiter: CR LF
+;Receive data length: 512
+;CM5515 = $0
+;CM5516 = $0
+;CM5518 = $0        'Send header: none    
+;CM5519 = $0D0A     'Send delimiter: CR LF
+;CM5520 = $0        'Receive header: none
+;CM5521 = $0D0A     'Receive delimiter: CR LF
+;SET(CR6100)
+LD @CR2008
+NCJ #1000
+;CM5515 = $0
+;
+LD CR2002
+MOV $0000 CM5515
+;CM5516 = $0
+;
+LD CR2002
+MOV $0000 CM5516
+;CM5518 = $0        'Send header: none    
+;
+LD CR2002
+MOV $0000 CM5518
+;CM5519 = $0D0A     'Send delimiter: CR LF
+;
+LD CR2002
+MOV $0D0A CM5519
+;CM5520 = $0        'Receive header: none
+;
+LD CR2002
+MOV $0000 CM5520
+;CM5521 = $0D0A     'Receive delimiter: CR LF
+;
+LD CR2002
+MOV $0D0A CM5521
+;SET(CR6100)
+LD CR2002
+SET CR6100
+LABEL #1000
+;
+;<h1/>文本数据的发送"KEYENCE CR LF"
+;CM5001 = 7         'Number of byte
+;CM5002 = $4B45     'KE
+;CM5003 = $5945     'YE
+;CM5004 = $4E43     'NC
+;CM5005 = $4500     'E
+;SET(CR6101)
+LD CR6000
+ANB CR6007
+ANP @MR001
+NCJ #1001
+;CM5001 = 7         'Number of byte
+;
+LD CR2002
+MOV #7 CM5001
+;CM5002 = $4B45     'KE
+;
+LD CR2002
+MOV $4B45 CM5002
+;CM5003 = $5945     'YE
+;
+LD CR2002
+MOV $5945 CM5003
+;CM5004 = $4E43     'NC
+;
+LD CR2002
+MOV $4E43 CM5004
+;CM5005 = $4500     'E
+;
+LD CR2002
+MOV $4500 CM5005
+;SET(CR6101)
+LD CR2002
+SET CR6101
+LABEL #1001
+;
+LD CR6001
+RES CR6101
+;<h1/>Receiving of text data
+LD CR2002
+LDA CM5258
+CON
+EXT
+CON
+DIV #2
+CON
+MPS
+AND= TM1 #0
+STA DM100
+MPP
+AND= TM1 #1
+ADD #1
+CON
+STA DM100
+LD CR6002
+BMOV CM5259 DM1000 DM100
+SET CR6102
+LDB CR6002
+RES CR6102
+;<h1/>The output relay R500 will be ON when a communication error occurs 
+LD CR6004
+OUT R500
+;<h1/>The output relay R501 will be ON when a receive error occurs 
+LD CR6003
+OUT R501
+END
+ENDH
+

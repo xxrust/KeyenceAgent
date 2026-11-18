@@ -1,0 +1,75 @@
+# KVN40_CamSwitch
+
+KV Nano系列40点型 内置功能（中断、高速计数器等）凸轮开关 | KV-N40 | AS_59096 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59096
+KPZ SHA-256 1b2e2c01dc8232ea106ca0502cd410a8667e0e1c3e4c9728d87ab2096adf26ad
+KV STUDIO 12.41.0.0 | 1 个模块和宏 | 56/16384 步 | 34 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 04cec90a77cc5f4cff51e7fb5e016c7d3cd13af928f5d4ad8320d4149506e9b6
+
+DEVICE:133
+;MODULE:Main
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Cam Switch
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Input value of an incremental encoder is detected via the high-speed counter CTH0,
+;then compared with the setting value to turn the relay ON/OFF. 
+;Input time constant of the input source of the high-speed counter CTH0 is set to 10us. 
+LD CR2002
+HSP R008
+HSP R009
+;Number of relays: 10    Encoder resolution: 25     Zero degree value: 0  
+;Encoder count input mode: phase difference 4x 
+;Please use the above settings according to actual situations. 
+LD CR2002
+MOV #10 @DM0
+MOV #100 @DM1
+MOV #0 @DM2
+;When the CTH0 value is greater than or equal to 0.0 and is less than 36.0, MR001 is turned ON
+;When the CTH0 value is greater than or equal to 36.1 and is less than 72.0, MR002 is turned ON
+;When the CTH0 value is greater than or equal to 72.1 and is less than 108.0, MR003 is turned ON
+;When the CTH0 value is greater than or equal to 108.1 and is less than 144.0, MR004 is turned ON
+;When the CTH0 value is greater than or equal to 144.1 and is less than 180.0, MR005 is turned ON
+;When the CTH0 value is greater than or equal to 180.1 and is less than 216.0, MR006 is turned ON
+;When the CTH0 value is greater than or equal to 216.1 and is less than 252.0, MR007 is turned ON
+;When the CTH0 value is greater than or equal to 252.1 and is less than 288.0, MR008 is turned ON
+;When the CTH0 value is greater than or equal to 288.1 and is less than 324.0, MR009 is turned ON
+;When the CTH0 value is greater than or equal to 324.1 and is less than 360.0, MR010 is turned ON
+LD CR2002
+MOV #0 @DM10
+MOV #360 @DM11
+MOV #361 @DM12
+MOV #720 @DM13
+MOV #721 @DM14
+MOV #1080 @DM15
+MOV #1081 @DM16
+MOV #1440 @DM17
+MOV #1441 @DM18
+MOV #1800 @DM19
+MOV #1801 @DM20
+MOV #2160 @DM21
+MOV #2161 @DM22
+MOV #2520 @DM23
+MOV #2521 @DM24
+MOV #2880 @DM25
+MOV #2881 @DM26
+MOV #3240 @DM27
+MOV #3241 @DM28
+MOV #3599 @DM29
+;<h1/>If you use an absolute encoder, please see ABSENC Instruction Programming. 
+LD MR000
+INCENC @DM10 #0 #4 MR001 @DM0
+LDB MR000
+RES CTH0
+END
+ENDH
+

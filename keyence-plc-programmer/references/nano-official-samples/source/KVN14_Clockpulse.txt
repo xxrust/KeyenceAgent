@@ -1,0 +1,73 @@
+# KVN14_Clockpulse
+
+KV Nano系列14点型 内置功能（中断、高速计数器等）时钟脉冲停止 | KV-N14 | AS_59090 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59090
+KPZ SHA-256 191b4056541c35fc1b00c1081c4ddaef6050084d18ec6f48807428389def6459
+KV STUDIO 12.41.0.0 | 1 个模块和宏 | 57/8192 步 | 47 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 8b63889fb633012ecf16135782129d1b195217f6b7e5a21e3d2afda461cc57bc
+
+DEVICE:135
+;MODULE:Main
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Clock Pluse
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>When R003 is ON, clock pulses with a period of 500 us (2 kHz) and a pulse width of 200 us are generated from output R500.
+;Clock pulses will be stopped after 10000 clock pulses.
+LD CR2002
+EI
+CON
+MPS
+SET CR4303
+CON
+RES CR4304
+CON
+SET CR4305
+CON
+SET CR4306
+CON
+RES CR4307
+MRD
+RES CR4308
+CON
+SET CR4309
+CON
+RES CR4310
+CON
+RES CR4311
+CON
+RES CR4312
+MPP
+SET CR4503
+CON
+RES CTH0
+CON
+RES CTH1
+LD R003
+DIFU R1000
+CON
+AND R1000
+RES CR4304
+LD CR2002
+CTH.D #0 CR4201
+CTC.D #0 #50
+CTC.D #1 #20
+LD CR2002
+CTH.D #1 R500
+CTC.D #2 #20
+END
+INT CTC2
+LD CR2002
+SET CR4304
+RETI
+ENDH
+

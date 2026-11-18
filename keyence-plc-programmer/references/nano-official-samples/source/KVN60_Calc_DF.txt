@@ -1,0 +1,55 @@
+# KVN60_Calc_DF
+
+KV Nano系列60点型 演算示例 双精度浮点型运算 | KV-N60 | AS_59121 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59121
+KPZ SHA-256 a61fa2683a2abce3ebf3f34f0c1d5ac0b8de9e2996fa5fecc9b53b9c574d43e4
+KV STUDIO 12.41.0.0 | 1 个模块和宏 | 37/16384 步 | 22 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 82053f23412bf0e7f1801ff18529eba7c3244e09fce4373403a0099c52fb9cb2
+
+DEVICE:132
+;MODULE:Main
+;MODULE_TYPE:0
+;SCRIPT_TYPE:
+;-------------------------------------------------------------------------------
+;-- File        : Calculation (Double Float)
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for double precision arithmetic
+;To calculate defective rate (ppm)  
+;Defective rate (ppm) = Number of defective products/Number of manufactured products * 1000000
+LD CR2008
+MOV.DF +349876 DM10
+MOV.DF +350000 DM20
+;<h1/>Calculation by KV Script
+;DM0.DF=(DM20.DF-DM10.DF)/DM20.DF*1000000
+LDP MR000
+NCJ #1000
+;DM0.DF=(DM20.DF-DM10.DF)/DM20.DF*1000000
+LD CR2002
+LDA.DF DM20
+CON
+SUB.DF DM10
+CON
+DIV.DF DM20
+CON
+MUL.DF +1000000
+CON
+STA.DF DM0
+LABEL #1000
+;
+;<h1/>Calculation by ladder
+LDP MR001
+CAL-.DF DM20 DM10 DM30
+CAL/.DF DM30 DM20 DM40
+CAL*.DF DM40 +1000000 DM0
+END
+ENDH
+

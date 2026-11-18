@@ -1,0 +1,79 @@
+# KVN60_StandbyModule
+
+KV Nano系列60点型 其他便利功能 后备模块 | KV-N60 | AS_59129 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59129
+KPZ SHA-256 5c8c7dee7386cb0afd4e9ef9062ae15b1c2ec078168083e02c2b52a2e9445f3a
+KV STUDIO 12.41.0.0 | 4 个模块和宏 | 42/16384 步 | 32 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 ddee89fa9a49a531d599b987f593a8ea035d07268ec185a141ad2acea07e8822
+
+DEVICE:132
+;MODULE:Main
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Standby Module
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>To select a module to be executed through the mode changing switch (MR001 to MR003) 
+LDB _Module2
+ANB _Module3
+ANP MR001
+MDSTRT Module1
+LDB _Module1
+ANB _Module3
+ANP MR002
+MDSTRT Module2
+LDB _Module1
+ANB _Module2
+ANP MR003
+MDSTRT Module3
+;The module in execution will be stopped on the falling edge of each selected switch. 
+LDF MR001
+MDSTOP Module1
+LDF MR002
+MDSTOP Module2
+LDF MR003
+MDSTOP Module3
+END
+ENDH
+
+## Module1.mnm
+原导出 MNM SHA-256 d874153ed0e74d00481bc82e7951731daf8351f10b74251a0a94316dd0067adc
+
+DEVICE:132
+;MODULE:Module1
+;MODULE_TYPE:0
+LD= DM0 #1
+SET MR101
+END
+ENDH
+
+## Module2.mnm
+原导出 MNM SHA-256 dce9a007727f81820b380c341b3c710f5b7ac802d806e56e3984a2958fc227b0
+
+DEVICE:132
+;MODULE:Module2
+;MODULE_TYPE:0
+LD= DM0 #2
+SET MR102
+END
+ENDH
+
+## Module3.mnm
+原导出 MNM SHA-256 f2e04def10560a0b787162e197b306e907346e1e798491e33194250ffdce5154
+
+DEVICE:132
+;MODULE:Module3
+;MODULE_TYPE:0
+LD= DM0 #3
+SET MR103
+END
+ENDH
+

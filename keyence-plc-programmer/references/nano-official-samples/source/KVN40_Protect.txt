@@ -1,0 +1,36 @@
+# KVN40_Protect
+
+KV Nano系列40点型 其他便利功能 读保护功能 | KV-N40 | AS_59124 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59124
+KPZ SHA-256 2012f282e701471494b71f932950fc8a4d8282ef935610a076158f3ee280a34b
+KV STUDIO 12.41.0.0 | 1 个模块和宏 | 11/16384 步 | 2 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 f24e53188be8df674d9352348221387741eb61871bcf9ec0c00d878815d21cdc
+
+DEVICE:133
+;MODULE:Main
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Read protect
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;About protection setup
+;In the CPU system settings, it is possible to set up write protection, read protection and project encryption. 
+;When write protection is selected, the dialog box "The CPU is write protected, are you sure to force execution?" will appear 
+;if you transfer a program to the CPU unit with write protection. 
+;When read protection is selected, it is not possible to read a program from the CPU with read protection. 
+;When you click "Setup", the encryption screen will appear. 
+;The password will become valid after it is entered and confirmed. 
+;After you read the program from CPU with KV STUDIO, you must enter the password to open it. 
+;Note: A password must not exceed 32 letters or numbers. 
+;For detailed setup sequence, see "Protect". 
+END
+ENDH
+

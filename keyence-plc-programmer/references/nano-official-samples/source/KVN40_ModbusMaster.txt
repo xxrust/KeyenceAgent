@@ -1,0 +1,76 @@
+# KVN40_ModbusMaster
+
+KV Nano系列40点型 串行通讯功能ModbusRTU主站 | KV-N40 | AS_59108 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59108
+KPZ SHA-256 aa20c78fb9ce53795b244cd71ca28eb668254b4571be86890a63d8efa1628ef6
+KV STUDIO 12.41.0.0 | 2 个模块和宏 | 51/16384 步 | 31 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 e1f30e6223208e5f63fcbc51456e8f199ede35775899a8d6d1355c2e0a77902a
+
+DEVICE:133
+;MODULE:Main
+;MODULE_TYPE:0
+END
+ENDH
+
+## ReadHoldingregister.mnm
+原导出 MNM SHA-256 a7e7bbc8cce6b4820fc9cef294373f81397ff411702371df2bdb600fdd04a956
+
+DEVICE:133
+;MODULE:ReadHoldingregister
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Modbus Master
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // When it is ON, the hold memory will be read.
+;--             : @MR1 // When it is ON, the send wait time will be set to 10ms.
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;2 words of program data starting from the hold memory 0 of the Modbus-capable machine will be read via Port0. 
+;Please set a send wait time if it is required. 
+;Please change to the related devices of Port1 if you want to use Port1. 
+;<h1/>2 words of data are read starting from the hold memory 0 
+;<h1/>Data storage unit: Byte 
+LD @CR2008
+MOV $0000 CM5006
+;<h1/>Reading of the hold memory 
+;Slave station No.: 1
+;Function code: 03 (to read the hold memory) 
+;Start address:  0
+;Number of words to be read: 2
+;Send command
+LDP @MR000
+ANB CR6101
+ANB CR6102
+ANB CR6103
+MOV #1 CM5001
+MOV $0003 CM5002
+MOV $0000 CM5007
+MOV #2 CM5008
+SET CR6001
+;<h1/>Receive response
+LDP CR6101
+ANB CR6103
+MPS
+ANB CR6102
+BMOV CM5311 DM0 #2
+MRD
+AND CR6102
+MOV CM5300 DM10
+MPP
+RES CR6001
+;<h1/>Setting of send wait time: 10ms
+LDP @MR001
+DW #1 CM5571
+CON
+SET CR6004
+LD CR6104
+RES CR6004
+END
+ENDH
+

@@ -1,0 +1,1551 @@
+# KVN24_Pos_GB
+
+KV Nano系列24点型 定位（马达控制）功能定位（马达控制）功能 (英语) | KV-N24 | AS_59071 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59071
+KPZ SHA-256 595e4cbc86ecbe06f2a19c3a619b4ac6a38661f5511e4facbdf987d0f8024a8a
+KV STUDIO 12.41.0.0 | 13 个模块和宏 | 1223/8192 步 | 993 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Main.mnm
+原导出 MNM SHA-256 921bb4570de1213c19b37bf8caf20731f2778ccba09252f0d77f0441679c50ba
+
+DEVICE:134
+;MODULE:Main
+;MODULE_TYPE:0
+END
+ENDH
+
+## JOG.mnm
+原导出 MNM SHA-256 7fa20d0f6a16c63fe6dd3ee672083fbaaeddb56220a4552d2e65d5abc609418e
+
+DEVICE:134
+;MODULE:JOG
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : JOG
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // when it is ON, JOG operation in CW direction will be performed.
+;               : @MR1 // When it is ON, JOG operation in CCW direction will be performed.
+;               : @MR2 // When it is ON, high-speed JOG operation will be performed. This needs to be used with @MR0 and MR1. 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for JOG operation
+;When the rotation direction is not consistent with the actual direction, 
+;please set up via "Tools > CPU positioning parameter setting > Input/Output setting
+; > Output pulse during forward operation". 
+LD @MR000
+LD @MR001
+LD @MR002
+JOG #0 #1
+END
+ENDH
+
+## LINEAR.mnm
+原导出 MNM SHA-256 c2e4ef6d7b9a41d32ed2ba2d926302018e941d058ce39c27a7ee90c27bc489f3
+
+DEVICE:134
+;MODULE:LINEAR
+;MODULE_TYPE:1
+;SCRIPT_TYPE:
+;Master_Ax_No = V0
+;Slave_Ax_No = V1
+;Point_parameter_No = V2
+;Master_target_coordinate = V3.L
+;Slave_target_coordinate = V4.L
+;Interpolation_acceleration = V5
+;Interpolation_deceleration = V6
+;Interpolation_speed = TODF(V7.D)
+;Operation_mode = V8'  0:INC   1:ABS
+;Interpolation_start_speed = V9
+;'---------------------------------------------------Operation mode setting--------------------------------------------------
+;@DM10 = (V0 - 1) * 40
+;@DM11 = (V1 - 1) * 40
+;@DM12 = (V0 - 1) * 200 + (V2 - 1) * 10
+;@DM13 = (V1 - 1) * 200 + (V2 - 1) * 10
+;
+;SELECT CASE V8
+;CASE 0
+;BRES(CM8006:@DM12,0)'Set the operation mode of master axis as "Positioning INC"
+;BRES(CM8006:@DM12,1)
+;BRES(CM8006:@DM13,0)'Set the operation mode of slave axis as "Positioning INC"
+;BRES(CM8006:@DM13,1)
+;Master_Ax_movement = ABS(Master_target_coordinate)'Movement of master axis
+;Slave_Ax_movement = ABS(Slave_target_coordinate)'Movement of slave axis
+;CASE 1
+;BSET(CM8006:@DM12,0)'Set the operation mode of master axis as "Positioning ABS"
+;BRES(CM8006:@DM12,1)
+;BSET(CM8006:@DM13,0)'Set the operation mode of slave axis as "Positioning ABS"
+;BRES(CM8006:@DM13,1)
+;Master_Ax_movement = ABS(Master_target_coordinate - CM8830.L:@DM10)'Movement of master axis
+;Slave_Ax_movement = ABS(Slave_target_coordinate - CM8830.L:@DM11)'Movement of slave axis
+;END SELECT
+;'------------------------------------------------Parameter calculation--------------------------------------------------
+;#PRAGMA DOUBLE ON
+;
+;Interpolation_movement = ROOT(TODF(Master_Ax_movement)^2 + TODF(Slave_Ax_movement)^2)
+;'----------------------------------------Check if acceleration and deceleration are zero------------------------------------
+;IF Interpolation_speed = Interpolation_start_speed THEN
+;	Acceleration_movement = 0
+;	Deceleration_movement = 0
+;ELSE
+;	SELECT CASE Interpolation_acceleration
+;	CASE 0
+;	    Acceleration_movement = 0
+;	CASE ELSE
+;	    Acceleration_time = ABS((Interpolation_speed - Interpolation_start_speed) / (Interpolation_acceleration * 1000))
+;	    Acceleration_movement=0.5 * (Interpolation_start_speed + Interpolation_speed) * Acceleration_time
+;	END SELECT
+;
+;	SELECT CASE Interpolation_deceleration
+;	CASE 0
+;	   Deceleration_movement = 0
+;	CASE ELSE
+;	   Deceleration_time = ABS((Interpolation_speed - Interpolation_start_speed) / (Interpolation_deceleration * 1000))
+;	   Deceleration_movement = 0.5*(Interpolation_start_speed + Interpolation_speed) * Deceleration_time
+;	END SELECT
+;END IF
+;
+;IF Interpolation_movement >= (Acceleration_movement+Deceleration_movement) THEN '-------Moving by operation speed is possible--------
+;
+;   Master_Ax_start_speed = Interpolation_start_speed * Master_Ax_movement / Interpolation_movement
+;   Master_Ax_operation_speed = Interpolation_speed * Master_Ax_movement / Interpolation_movement
+;   Master_Ax_acceleration = Interpolation_acceleration * Master_Ax_movement / Interpolation_movement
+;   Master_Ax_deceleration = Interpolation_deceleration * Master_Ax_movement / Interpolation_movement
+; 
+;   Slave_Ax_start_speed = Interpolation_start_speed * Slave_Ax_movement / Interpolation_movement
+;   Slave_Ax_operation_speed = Interpolation_speed * Slave_Ax_movement / Interpolation_movement
+;   Slave_Ax_acceleration = Interpolation_acceleration * Slave_Ax_movement / Interpolation_movement
+;   Slave_Ax_deceleration = Interpolation_deceleration * Slave_Ax_movement / Interpolation_movement
+;
+;ELSE	'-------------Moving by operation speed is impossible----------------
+;   
+;   T_acceleration = ROOT(2 * Interpolation_movement / (Interpolation_acceleration * (1 + Interpolation_acceleration / Interpolation_deceleration)) + (Interpolation_start_speed / Interpolation_acceleration)^2) - Interpolation_start_speed / Interpolation_acceleration
+;   Max_speed = Interpolation_start_speed + T_acceleration * Interpolation_acceleration
+;
+;   Master_Ax_start_speed = Interpolation_start_speed * Master_Ax_movement / Interpolation_movement
+;   Master_Ax_operation_speed = Max_speed * Master_Ax_movement / Interpolation_movement
+;   Master_Ax_acceleration = Interpolation_acceleration * Master_Ax_movement / Interpolation_movement
+;   Master_Ax_deceleration = Interpolation_deceleration * Master_Ax_movement / Interpolation_movement
+;
+;   Slave_Ax_start_speed = Interpolation_start_speed * Slave_Ax_movement / Interpolation_movement
+;   Slave_Ax_operation_speed = Max_speed * Slave_Ax_movement / Interpolation_movement
+;   Slave_Ax_acceleration = Interpolation_acceleration * Slave_Ax_movement / Interpolation_movement
+;   Slave_Ax_deceleration = Interpolation_deceleration * Slave_Ax_movement / Interpolation_movement
+;END IF
+;
+;#PRAGMA DOUBLE OFF   
+;'---------------------------------------------------------Write parameter----------------------------------------------------------
+;   
+;CM8000.L:@DM12 = Master_target_coordinate
+;CM8808:@DM10 = TOU(Master_Ax_start_speed + 0.5)
+;IF Master_Ax_operation_speed = 0 THEN
+;	CM8004.D:@DM12 = 1
+;ELSE
+;	CM8004.D:@DM12 = TOD(Master_Ax_operation_speed + 0.5)
+;END IF
+;CM8002:@DM12 = TOU(Master_Ax_acceleration + 0.5)
+;CM8003:@DM12 = TOU(Master_Ax_deceleration + 0.5)
+;'-------------------------------------------
+;CM8000.L:@DM13 = Slave_target_coordinate   
+;CM8808:@DM11 = TOU(Slave_Ax_start_speed + 0.5)   
+;IF Slave_Ax_operation_speed = 0 THEN
+;	CM8004.D:@DM13 = 1
+;ELSE
+;	CM8004.D:@DM13 = TOD(Slave_Ax_operation_speed + 0.5)   
+;END IF
+;CM8002:@DM13 = TOU(Slave_Ax_acceleration + 0.5)
+;CM8003:@DM13 = TOU(Slave_Ax_deceleration + 0.5)
+;Master_Ax_No = V0
+;
+LD CR2002
+MOV V0 Master_Ax_No
+;Slave_Ax_No = V1
+;
+LD CR2002
+MOV V1 Slave_Ax_No
+;Point_parameter_No = V2
+;
+LD CR2002
+MOV V2 Point_parameter_No
+;Master_target_coordinate = V3.L
+;
+LD CR2002
+MOV.L V3 Master_target_coordinate
+;Slave_target_coordinate = V4.L
+;
+LD CR2002
+MOV.L V4 Slave_target_coordinate
+;Interpolation_acceleration = V5
+;
+LD CR2002
+MOV V5 Interpolation_acceleration
+;Interpolation_deceleration = V6
+;
+LD CR2002
+MOV V6 Interpolation_deceleration
+;Interpolation_speed = TODF(V7.D)
+;
+LD CR2002
+LDA.D V7
+CON
+DFLOAT.D
+CON
+STA.DF Interpolation_speed
+;Operation_mode = V8'  0:INC   1:ABS
+;
+LD CR2002
+MOV V8 Operation_mode
+;Interpolation_start_speed = V9
+;
+LD CR2002
+MOV V9 Interpolation_start_speed
+;'---------------------------------------------------Operation mode setting--------------------------------------------------
+;
+;@DM10 = (V0 - 1) * 40
+;
+LD CR2002
+LDA V0
+CON
+EXT
+CON
+SUB.L +1
+CON
+MUL.L +40
+CON
+STA @DM10
+;@DM11 = (V1 - 1) * 40
+;
+LD CR2002
+LDA V1
+CON
+EXT
+CON
+SUB.L +1
+CON
+MUL.L +40
+CON
+STA @DM11
+;@DM12 = (V0 - 1) * 200 + (V2 - 1) * 10
+;
+LD CR2002
+LDA V2
+CON
+EXT
+CON
+SUB.L +1
+CON
+MUL.L +10
+CON
+STA.L @VM0
+CON
+LDA V0
+CON
+EXT
+CON
+SUB.L +1
+CON
+MUL.L +200
+CON
+ADD.L @VM0
+CON
+STA @DM12
+;@DM13 = (V1 - 1) * 200 + (V2 - 1) * 10
+;
+LD CR2002
+LDA V2
+CON
+EXT
+CON
+SUB.L +1
+CON
+MUL.L +10
+CON
+STA.L @VM2
+CON
+LDA V1
+CON
+EXT
+CON
+SUB.L +1
+CON
+MUL.L +200
+CON
+ADD.L @VM2
+CON
+STA @DM13
+;SELECT CASE V8
+;
+LD CR2002
+MOV V8 @VM4
+;CASE 0
+;
+LD= @VM4 #0
+NCJ #2000
+;BRES(CM8006:@DM12,0)'Set the operation mode of master axis as "Positioning INC"
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z12
+BRES CM8006:Z12 #0
+;BRES(CM8006:@DM12,1)
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z12
+BRES CM8006:Z12 #1
+;BRES(CM8006:@DM13,0)'Set the operation mode of slave axis as "Positioning INC"
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z12
+BRES CM8006:Z12 #0
+;BRES(CM8006:@DM13,1)
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z12
+BRES CM8006:Z12 #1
+;Master_Ax_movement = ABS(Master_target_coordinate)'Movement of master axis
+;
+LD CR2002
+LDA.L Master_target_coordinate
+CON
+CMP.L +0
+LD CR2009
+NEG.L
+LD CR2002
+STA.L Master_Ax_movement
+;Slave_Ax_movement = ABS(Slave_target_coordinate)'Movement of slave axis
+;
+LD CR2002
+LDA.L Slave_target_coordinate
+CON
+CMP.L +0
+LD CR2009
+NEG.L
+LD CR2002
+STA.L Slave_Ax_movement
+LD CR2002
+CJ #2001
+LABEL #2000
+;CASE 1
+;
+LD= @VM4 #1
+NCJ #2002
+;BSET(CM8006:@DM12,0)'Set the operation mode of master axis as "Positioning ABS"
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z12
+BSET CM8006:Z12 #0
+;BRES(CM8006:@DM12,1)
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z12
+BRES CM8006:Z12 #1
+;BSET(CM8006:@DM13,0)'Set the operation mode of slave axis as "Positioning ABS"
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z12
+BSET CM8006:Z12 #0
+;BRES(CM8006:@DM13,1)
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z12
+BRES CM8006:Z12 #1
+;Master_Ax_movement = ABS(Master_target_coordinate - CM8830.L:@DM10)'Movement of master axis
+;
+LD CR2002
+LDA @DM10
+CON
+EXT
+CON
+STA.L Z12
+CON
+LDA.L Master_target_coordinate
+CON
+SUB.L CM8830:Z12
+CON
+CMP.L +0
+LD CR2009
+NEG.L
+LD CR2002
+STA.L Master_Ax_movement
+;Slave_Ax_movement = ABS(Slave_target_coordinate - CM8830.L:@DM11)'Movement of slave axis
+;
+LD CR2002
+LDA @DM11
+CON
+EXT
+CON
+STA.L Z12
+CON
+LDA.L Slave_target_coordinate
+CON
+SUB.L CM8830:Z12
+CON
+CMP.L +0
+LD CR2009
+NEG.L
+LD CR2002
+STA.L Slave_Ax_movement
+;END SELECT
+;
+LABEL #2002
+LABEL #2001
+;'------------------------------------------------Parameter calculation--------------------------------------------------
+;
+;#PRAGMA DOUBLE ON
+;
+;Interpolation_movement = ROOT(TODF(Master_Ax_movement)^2 + TODF(Slave_Ax_movement)^2)
+;
+LD CR2002
+LDA.L Slave_Ax_movement
+CON
+DFLOAT.L
+CON
+POW.DF +2
+CON
+STA.DF @VM6
+CON
+LDA.L Master_Ax_movement
+CON
+DFLOAT.L
+CON
+POW.DF +2
+CON
+ADD.DF @VM6
+CON
+ROOT.DF
+CON
+STA.DF Interpolation_movement
+;'----------------------------------------Check if acceleration and deceleration are zero------------------------------------
+;
+;IF Interpolation_speed = Interpolation_start_speed THEN
+;
+LD CR2002
+LDA Interpolation_start_speed
+CON
+DFLOAT
+CON
+CMP.DF Interpolation_speed
+LD CR2010
+NCJ #2003
+;	Acceleration_movement = 0
+;
+LD CR2002
+MOV.DF +0 Acceleration_movement
+;	Deceleration_movement = 0
+;
+LD CR2002
+MOV.DF +0 Deceleration_movement
+;ELSE
+;
+LD CR2002
+CJ #2004
+LABEL #2003
+;	SELECT CASE Interpolation_acceleration
+;
+LD CR2002
+MOV Interpolation_acceleration @VM5
+;	CASE 0
+;
+LD= @VM5 #0
+NCJ #2005
+;	    Acceleration_movement = 0
+;
+LD CR2002
+MOV.DF +0 Acceleration_movement
+LD CR2002
+CJ #2006
+LABEL #2005
+;	CASE ELSE
+;
+;	    Acceleration_time = ABS((Interpolation_speed - Interpolation_start_speed) / (Interpolation_acceleration * 1000))
+;
+LD CR2002
+LDA Interpolation_acceleration
+CON
+EXT
+CON
+MUL.L +1000
+CON
+STA.L @VM10
+CON
+LDA Interpolation_start_speed
+CON
+EXT
+CON
+DFLOAT.L
+CON
+STA.DF @VM12
+CON
+LDA.DF Interpolation_speed
+CON
+SUB.DF @VM12
+CON
+STA.DF @VM16
+CON
+LDA.L @VM10
+CON
+DFLOAT.L
+CON
+STA.DF @VM20
+CON
+LDA.DF @VM16
+CON
+DIV.DF @VM20
+CON
+CMP.DF +0
+LD CR2009
+NEG.DF
+LD CR2002
+STA.DF Acceleration_time
+;	    Acceleration_movement=0.5 * (Interpolation_start_speed + Interpolation_speed) * Acceleration_time
+;
+LD CR2002
+LDA Interpolation_start_speed
+CON
+DFLOAT
+CON
+ADD.DF Interpolation_speed
+CON
+MUL.DF +0.5
+CON
+MUL.DF Acceleration_time
+CON
+STA.DF Acceleration_movement
+;	END SELECT
+;
+LABEL #2006
+;	SELECT CASE Interpolation_deceleration
+;
+LD CR2002
+MOV Interpolation_deceleration @VM24
+;	CASE 0
+;
+LD= @VM24 #0
+NCJ #2007
+;	   Deceleration_movement = 0
+;
+LD CR2002
+MOV.DF +0 Deceleration_movement
+LD CR2002
+CJ #2008
+LABEL #2007
+;	CASE ELSE
+;
+;	   Deceleration_time = ABS((Interpolation_speed - Interpolation_start_speed) / (Interpolation_deceleration * 1000))
+;
+LD CR2002
+LDA Interpolation_deceleration
+CON
+EXT
+CON
+MUL.L +1000
+CON
+STA.L @VM26
+CON
+LDA Interpolation_start_speed
+CON
+EXT
+CON
+DFLOAT.L
+CON
+STA.DF @VM28
+CON
+LDA.DF Interpolation_speed
+CON
+SUB.DF @VM28
+CON
+STA.DF @VM32
+CON
+LDA.L @VM26
+CON
+DFLOAT.L
+CON
+STA.DF @VM36
+CON
+LDA.DF @VM32
+CON
+DIV.DF @VM36
+CON
+CMP.DF +0
+LD CR2009
+NEG.DF
+LD CR2002
+STA.DF Deceleration_time
+;	   Deceleration_movement = 0.5*(Interpolation_start_speed + Interpolation_speed) * Deceleration_time
+;
+LD CR2002
+LDA Interpolation_start_speed
+CON
+DFLOAT
+CON
+ADD.DF Interpolation_speed
+CON
+MUL.DF +0.5
+CON
+MUL.DF Deceleration_time
+CON
+STA.DF Deceleration_movement
+;	END SELECT
+;
+LABEL #2008
+;END IF
+;
+LABEL #2004
+;IF Interpolation_movement >= (Acceleration_movement+Deceleration_movement) THEN '-------Moving by operation speed is possible--------
+;
+LD CR2002
+LDA.DF Acceleration_movement
+CON
+ADD.DF Deceleration_movement
+CON
+CMP.DF Interpolation_movement
+LDB CR2011
+NCJ #2009
+;   Master_Ax_start_speed = Interpolation_start_speed * Master_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA Interpolation_start_speed
+CON
+EXT
+CON
+MUL.L Master_Ax_movement
+CON
+DFLOAT.L
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Master_Ax_start_speed
+;   Master_Ax_operation_speed = Interpolation_speed * Master_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA.L Master_Ax_movement
+CON
+DFLOAT.L
+CON
+MUL.DF Interpolation_speed
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Master_Ax_operation_speed
+;   Master_Ax_acceleration = Interpolation_acceleration * Master_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA Interpolation_acceleration
+CON
+EXT
+CON
+MUL.L Master_Ax_movement
+CON
+DFLOAT.L
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Master_Ax_acceleration
+;   Master_Ax_deceleration = Interpolation_deceleration * Master_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA Interpolation_deceleration
+CON
+EXT
+CON
+MUL.L Master_Ax_movement
+CON
+DFLOAT.L
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Master_Ax_deceleration
+;   Slave_Ax_start_speed = Interpolation_start_speed * Slave_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA Interpolation_start_speed
+CON
+EXT
+CON
+MUL.L Slave_Ax_movement
+CON
+DFLOAT.L
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Slave_Ax_start_speed
+;   Slave_Ax_operation_speed = Interpolation_speed * Slave_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA.L Slave_Ax_movement
+CON
+DFLOAT.L
+CON
+MUL.DF Interpolation_speed
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Slave_Ax_operation_speed
+;   Slave_Ax_acceleration = Interpolation_acceleration * Slave_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA Interpolation_acceleration
+CON
+EXT
+CON
+MUL.L Slave_Ax_movement
+CON
+DFLOAT.L
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Slave_Ax_acceleration
+;   Slave_Ax_deceleration = Interpolation_deceleration * Slave_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA Interpolation_deceleration
+CON
+EXT
+CON
+MUL.L Slave_Ax_movement
+CON
+DFLOAT.L
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Slave_Ax_deceleration
+;ELSE	'-------------Moving by operation speed is impossible----------------
+;
+LD CR2002
+CJ #2010
+LABEL #2009
+;   T_acceleration = ROOT(2 * Interpolation_movement / (Interpolation_acceleration * (1 + Interpolation_acceleration / Interpolation_deceleration)) + (Interpolation_start_speed / Interpolation_acceleration)^2) - Interpolation_start_speed / Interpolation_acceleration
+;
+LD CR2002
+LDA Interpolation_acceleration
+CON
+EXT
+CON
+STA.L @VM40
+CON
+LDA Interpolation_start_speed
+CON
+EXT
+CON
+EXT.L
+CON
+DIV.L @VM40
+CON
+STA.L @VM42
+CON
+LDA Interpolation_acceleration
+CON
+EXT
+CON
+STA.L @VM44
+CON
+LDA Interpolation_start_speed
+CON
+EXT
+CON
+EXT.L
+CON
+DIV.L @VM44
+CON
+STA.L @VM46
+LD CR2002
+LDA.L +1
+CON
+EXT.L
+FOR #2
+LD CR2002
+MUL.L @VM46
+NEXT
+LD CR2002
+STA.L @VM48
+CON
+LDA Interpolation_deceleration
+CON
+EXT
+CON
+STA.L @VM50
+CON
+LDA Interpolation_acceleration
+CON
+EXT
+CON
+EXT.L
+CON
+DIV.L @VM50
+CON
+ADD.L +1
+CON
+STA.L @VM52
+CON
+LDA Interpolation_acceleration
+CON
+EXT
+CON
+MUL.L @VM52
+CON
+STA.L @VM54
+CON
+LDA.DF +2
+CON
+MUL.DF Interpolation_movement
+CON
+STA.DF @VM56
+CON
+LDA.L @VM54
+CON
+DFLOAT.L
+CON
+STA.DF @VM60
+CON
+LDA.DF @VM56
+CON
+DIV.DF @VM60
+CON
+STA.DF @VM64
+CON
+LDA.L @VM48
+CON
+DFLOAT.L
+CON
+ADD.DF @VM64
+CON
+ROOT.DF
+CON
+STA.DF @VM68
+CON
+LDA.L @VM42
+CON
+DFLOAT.L
+CON
+STA.DF @VM72
+CON
+LDA.DF @VM68
+CON
+SUB.DF @VM72
+CON
+STA.DF T_acceleration
+;   Max_speed = Interpolation_start_speed + T_acceleration * Interpolation_acceleration
+;
+LD CR2002
+LDA Interpolation_acceleration
+CON
+DFLOAT
+CON
+MUL.DF T_acceleration
+CON
+STA.DF @VM76
+CON
+LDA Interpolation_start_speed
+CON
+DFLOAT
+CON
+ADD.DF @VM76
+CON
+STA.DF Max_speed
+;   Master_Ax_start_speed = Interpolation_start_speed * Master_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA Interpolation_start_speed
+CON
+EXT
+CON
+MUL.L Master_Ax_movement
+CON
+DFLOAT.L
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Master_Ax_start_speed
+;   Master_Ax_operation_speed = Max_speed * Master_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA.L Master_Ax_movement
+CON
+DFLOAT.L
+CON
+MUL.DF Max_speed
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Master_Ax_operation_speed
+;   Master_Ax_acceleration = Interpolation_acceleration * Master_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA Interpolation_acceleration
+CON
+EXT
+CON
+MUL.L Master_Ax_movement
+CON
+DFLOAT.L
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Master_Ax_acceleration
+;   Master_Ax_deceleration = Interpolation_deceleration * Master_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA Interpolation_deceleration
+CON
+EXT
+CON
+MUL.L Master_Ax_movement
+CON
+DFLOAT.L
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Master_Ax_deceleration
+;   Slave_Ax_start_speed = Interpolation_start_speed * Slave_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA Interpolation_start_speed
+CON
+EXT
+CON
+MUL.L Slave_Ax_movement
+CON
+DFLOAT.L
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Slave_Ax_start_speed
+;   Slave_Ax_operation_speed = Max_speed * Slave_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA.L Slave_Ax_movement
+CON
+DFLOAT.L
+CON
+MUL.DF Max_speed
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Slave_Ax_operation_speed
+;   Slave_Ax_acceleration = Interpolation_acceleration * Slave_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA Interpolation_acceleration
+CON
+EXT
+CON
+MUL.L Slave_Ax_movement
+CON
+DFLOAT.L
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Slave_Ax_acceleration
+;   Slave_Ax_deceleration = Interpolation_deceleration * Slave_Ax_movement / Interpolation_movement
+;
+LD CR2002
+LDA Interpolation_deceleration
+CON
+EXT
+CON
+MUL.L Slave_Ax_movement
+CON
+DFLOAT.L
+CON
+DIV.DF Interpolation_movement
+CON
+STA.DF Slave_Ax_deceleration
+;END IF
+;
+LABEL #2010
+;#PRAGMA DOUBLE OFF   
+;
+;'---------------------------------------------------------Write parameter----------------------------------------------------------
+;
+;CM8000.L:@DM12 = Master_target_coordinate
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z11
+CON
+MOV.L Master_target_coordinate CM8000:Z11
+;CM8808:@DM10 = TOU(Master_Ax_start_speed + 0.5)
+;
+LD CR2002
+LDA @DM10
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF Master_Ax_start_speed
+CON
+ADD.DF +0.5
+CON
+DINTG
+CON
+STA CM8808:Z11
+;IF Master_Ax_operation_speed = 0 THEN
+;
+LD=.DF Master_Ax_operation_speed +0
+NCJ #2011
+;	CM8004.D:@DM12 = 1
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z11
+CON
+MOV.D #1 CM8004:Z11
+;ELSE
+;
+LD CR2002
+CJ #2012
+LABEL #2011
+;	CM8004.D:@DM12 = TOD(Master_Ax_operation_speed + 0.5)
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF Master_Ax_operation_speed
+CON
+ADD.DF +0.5
+CON
+DINTG.D
+CON
+STA.D CM8004:Z11
+;END IF
+;
+LABEL #2012
+;CM8002:@DM12 = TOU(Master_Ax_acceleration + 0.5)
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF Master_Ax_acceleration
+CON
+ADD.DF +0.5
+CON
+DINTG
+CON
+STA CM8002:Z11
+;CM8003:@DM12 = TOU(Master_Ax_deceleration + 0.5)
+;
+LD CR2002
+LDA @DM12
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF Master_Ax_deceleration
+CON
+ADD.DF +0.5
+CON
+DINTG
+CON
+STA CM8003:Z11
+;'-------------------------------------------
+;
+;CM8000.L:@DM13 = Slave_target_coordinate   
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z11
+CON
+MOV.L Slave_target_coordinate CM8000:Z11
+;CM8808:@DM11 = TOU(Slave_Ax_start_speed + 0.5)   
+;
+LD CR2002
+LDA @DM11
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF Slave_Ax_start_speed
+CON
+ADD.DF +0.5
+CON
+DINTG
+CON
+STA CM8808:Z11
+;IF Slave_Ax_operation_speed = 0 THEN
+;
+LD=.DF Slave_Ax_operation_speed +0
+NCJ #2013
+;	CM8004.D:@DM13 = 1
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z11
+CON
+MOV.D #1 CM8004:Z11
+;ELSE
+;
+LD CR2002
+CJ #2014
+LABEL #2013
+;	CM8004.D:@DM13 = TOD(Slave_Ax_operation_speed + 0.5)   
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF Slave_Ax_operation_speed
+CON
+ADD.DF +0.5
+CON
+DINTG.D
+CON
+STA.D CM8004:Z11
+;END IF
+;
+LABEL #2014
+;CM8002:@DM13 = TOU(Slave_Ax_acceleration + 0.5)
+;
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF Slave_Ax_acceleration
+CON
+ADD.DF +0.5
+CON
+DINTG
+CON
+STA CM8002:Z11
+;CM8003:@DM13 = TOU(Slave_Ax_deceleration + 0.5)
+LD CR2002
+LDA @DM13
+CON
+EXT
+CON
+STA.L Z11
+CON
+LDA.DF Slave_Ax_deceleration
+CON
+ADD.DF +0.5
+CON
+DINTG
+CON
+STA CM8003:Z11
+;
+END
+ENDH
+
+## Linear_Interpolation.mnm
+原导出 MNM SHA-256 6a15a6f69434427d2315df41b01c0d99399cea88f1499cb49752d9926fea6a77
+
+DEVICE:134
+;MODULE:Linear_Interpolation
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Linear Interpolation
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // When it is ON, a simple linear interpolation macro will be executed. 
+;-------------------------------------------------------------------------------
+;-- Id          : v 2.0 2014/10/30
+;-------------------------------------------------------------------------------
+;<h1/>Setting range of parameters (no need to set up in the CPU positioning parameter settings) 
+;Depending on various conditions, sometimes there will be a delay of several scan periods. 
+;Please use it after this is confirmed. 
+;Master axis/slave axis No.: 	KV-N14AT/DT, V-N24AT/DT: 1 to 2
+;                                KV-N40AT/DT: 1 to 3
+;                                KV-N60AT: 1 to 4
+;Point No.: 1 to 20
+;Master axis/Slave axis target coordinate: -2147483648 to 2147483647
+;Interpolation acceleration/deceleration: 1 to 65535
+;Interpolation speed: 1 to 100000
+;Operation mode: 0 (INC positioning), 1 (ABS positioning) 
+;Interpolation startup speed: 0 to 65535 (this speed must be specified to a value smaller than the interpolation speed value) 
+LDP @MR000
+MCALL LINEAR @DM0 @DM2 @DM4 @DM6 @DM8 @DM10 @DM12 @DM14 @DM16 @DM18
+PSTRT #0 @DM0 @DM4
+PSTRT #0 @DM2 @DM4
+;<h1/>Completion of interpolation operation must be verified via the positioning completion relay of the main axis and interpolation axis! 
+;Positioning completion relay of axis1: CR8401 
+;Positioning completion relay of axis2: CR8501 
+;Positioning completion relay of axis3: CR8601 
+;Positioning completion relay of axis4: CR8701
+;For example, when axis1 and axis2 are used 
+LD CR8401
+AND CR8501
+OUT @MR001
+END
+ENDH
+
+## Origin_return.mnm
+原导出 MNM SHA-256 5ef42b32ff0f9e86a2b53345e93993660a0d543c5c6b156b450aa6f73261c431
+
+DEVICE:134
+;MODULE:Origin_return
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Origin Return
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // When it is ON, origin return will be executed. 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for origin return 
+;R000: Axis1 limit switch CCW direction input
+;R001: Axis1 origin sensor input 
+;R002: Axis1 limit switch CW direction input 
+;@MR000: Origin return trigger 
+;Origin return method: DOG type (without Z-phase)   Origin return direction: CCW 
+;Please change parameters as required. 
+LDP @MR000
+ANB CR8400
+ORG #0 #1
+LD CR8401
+AND CR8405
+RES @MR000
+LD R000
+OUT CR8013
+LD R002
+OUT CR8012
+END
+ENDH
+
+## Positioning_direct.mnm
+原导出 MNM SHA-256 a699cfc771376f532390a5367863ed91baf6f5d44e3d453bc5b41cec34647dfc
+
+DEVICE:134
+;MODULE:Positioning_direct
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Change Point Parameter
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // When it is ON, positioning parameter of point 6 of axis1 will be set. 
+;               : @MR1 // When it is ON, positioning operation of point 6 of axis1 will be executed.
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for setting positioning parameter directly.
+;You can change the point No. and Axis No. according to actual situations.
+LDP @MR000
+MOV.L +10000 CM8050
+MOV #20 CM8052
+MOV #20 CM8053
+MOV.L +60000 CM8054
+MPS
+SET CM8056.0
+CON
+RES CM8056.1
+CON
+RES CM8056.4
+MPP
+MOV #600 CM8068
+LDP @MR001
+ANB CR8400
+PSTRT #0 #1 #6
+END
+ENDH
+
+## Positioning_highspeed.mnm
+原导出 MNM SHA-256 ffd11118cb0195232ace0137299928f686d4e7f46fdae53f1bd08152ead804a3
+
+DEVICE:134
+;MODULE:Positioning_highspeed
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : High Speed Point Start
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : R003 // When it is ON, positioning operation of point 1 will be started in high speed. 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for high-speed startup of positioning operation
+;Positioning operation is started in high speed when an interrupt condition is input
+;Please change the high-speed startup trigger device (R003) according to actual situations. 
+LD CR2002
+EI
+HSP R003
+END
+INT R003
+LDB CR8400
+PSTRT #0 #1 #5
+RETI
+ENDH
+
+## Positioning_morethan20.mnm
+原导出 MNM SHA-256 00559185d54d485e4480f3d298a700c38e60c34098c406b5044a573d4761ad3a
+
+DEVICE:134
+;MODULE:Positioning_morethan20
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Point Control 21 points or more )
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // When it is ON, positioning control for moving to 10000 will be executed.
+;               : @MR1 // When it is ON, positioning control for moving to 20000 will be executed.
+;               : @MR2 // When it is ON, positioning control for moving to 30000 will be executed.
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for positioning control in case of more than 20 points
+;Positioning control is performed by continuously changing the target coordinate of same point. 
+;With this program, it is possible realize positioning control by changing point 6 of axis1, 
+;and you can change the point parameters used according to actual situations. 
+LDP @MR000
+DW.L +1000 CM8050
+CON
+PSTRT #0 #1 #6
+LDP @MR001
+DW.L +2000 CM8050
+CON
+PSTRT #0 #1 #6
+LDP @MR002
+DW.L +3000 CM8050
+CON
+PSTRT #0 #1 #6
+END
+ENDH
+
+## Positioning_start.mnm
+原导出 MNM SHA-256 8893500a114d7f0e2a9a5ac440f6cc0ddacb94de52387158aa79b9cceac53430
+
+DEVICE:134
+;MODULE:Positioning_start
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Point Control
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // When it is ON, positioning of point 1 will be performed. 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/10/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for positioning of 1 point
+LDP @MR000
+ANB CR8400
+PSTRT #0 #1 #8
+LD @MR000
+ANP CR8401
+RES @MR000
+END
+ENDH
+
+## PositioningConsecutively.mnm
+原导出 MNM SHA-256 071fc526f07222aa3a510fcd6fc3b162a85da50ccf3df69e3bf1c6346457ae49
+
+DEVICE:134
+;MODULE:PositioningConsecutively
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Sequential Points Control
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // When it is ON, positioning operation of point 1 will be performed.
+;               : @MR1 // It will be ON when positioning of point 1 is finished, then positioning of point 2 will be performed 
+;               : @MR2 // It will be ON when positioning of point 2 is finished, then positioning of point 3 will be performed. 
+;               : @MR3 // It will be ON when positioning of point 3 is finished, then positioning of point 4 will be performed. 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/10/17
+;-------------------------------------------------------------------------------
+;<h1/>Example of continuously performing multi-point positioning 
+;Point 1: moving 5000 pulses in CW direction in INC mode
+;Point 2: moving 2000 pulses in CW direction in INC mode
+;Point 3: moving 3000 pulses in CCW direction in INC mode
+;Point 4: moving 4000 pulses in CW direction in INC mode
+LDP @MR000
+PSTRT #0 #1 #1
+LD CR8401
+AND= CM8835 #1
+ONDL #50 @MR001
+CON
+AND @MR001
+PSTRT #0 #1 #2
+LD CR8401
+AND= CM8835 #2
+ONDL #100 @MR002
+CON
+AND @MR002
+PSTRT #0 #1 #3
+LD CR8401
+AND= CM8835 #3
+ONDL #150 @MR003
+CON
+AND @MR003
+PSTRT #0 #1 #4
+END
+ENDH
+
+## Speedchange_interrupt.mnm
+原导出 MNM SHA-256 01a0eb2cd97c9d479a4f34f4cc11a1b1219ec708f975657aaee0aff83a3f5eae
+
+DEVICE:134
+;MODULE:Speedchange_interrupt
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Change Operation Speed(Interrupt)
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // When it is ON, positioning operation of point 7 will be executed. 
+;
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for changing speed during operation
+;To change speed in case of consistent comparator values
+;When current position is 3000, operation speed will be changed to 2000.
+;When current position is 6000, operation speed will be changed to 3000.
+;When current position is 9000, operation speed will be changed to 4000.
+LD @CR2008
+EI
+LDP @MR000
+MOV.D #0 DM5000
+MPS
+MOV.D #3000 CM8806
+MPP
+ANB CR8400
+PSTRT #0 #1 #7
+END
+INT CR8415
+LD= DM5000 #0
+MPS
+MOV.D #6000 CM8806
+MPP
+AND CR8400
+CHGSP #0 #1 #2000
+LD= DM5000 #1
+MPS
+MOV.D #9000 CM8806
+MPP
+AND CR8400
+CHGSP #0 #1 #3000
+LD= DM5000 #2
+AND CR8400
+CHGSP #0 #1 #4000
+LD CR2002
+INC DM5000
+RETI
+ENDH
+
+## Speedchange_relay.mnm
+原导出 MNM SHA-256 f63d7cdb127ff4d31dab971a5d39c78ed77903ecee58b45bb1aeeec3b1e61f54
+
+DEVICE:134
+;MODULE:Speedchange_relay
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Change Operation Speed
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // When it is ON, positioning operation of point 1 will be executed. 
+;               : @MR1 // When it is ON during positioning of point 1, speed will be changed to 5000. 
+;               : @MR2 // When it is ON during positioning of point 1, speed will be changed to 6000. 
+;               : @MR3 // When it is ON during positioning of point 1, speed will be changed to 7000. 
+;               : @MR4 // When it is ON during positioning, operation will stop after the stop sensor input of axis1 is ON.
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for changing speed during operation
+;To change speed from 3000 to 5000/6000/7000
+;When the operation speed change request is ON, if the operation speed setting is changed, operation speed will also be changed.
+LDP @MR000
+MOV.D #3000 CM8826
+MPS
+SET CR8005
+MPP
+ANB CR8400
+PSTRT #0 #1 #1
+LDP @MR001
+MOV.D #5000 CM8826
+LDP @MR002
+MOV.D #6000 CM8826
+LDP @MR003
+MOV.D #7000 CM8826
+LDP @MR004
+RES CR8005
+OUT CR8015
+END
+ENDH
+
+## Targetchange_function.mnm
+原导出 MNM SHA-256 0430227f00583e519e439902a5e91c653db73e3829813dfda753053ab37d7ad4
+
+DEVICE:134
+;MODULE:Targetchange_function
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Change Target Coordinate
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : @MR0 // When it is ON, positioning operation of point 5 of axis1 will be performed. 
+;               : @MR1 // When it is ON during positioning operation of point 1, the target coordinate will be changed.
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for changing target coordinate during operation
+;While axis1 is moving towards the target value 8000 of point 5,
+;if @MR001 is ON, movement will be changed towards target value 5000.
+LDP @MR000
+ANB CR8400
+PSTRT #0 #1 #5
+LDP @MR001
+AND CR8400
+CHGTGT #0 #1 +5000
+END
+ENDH
+

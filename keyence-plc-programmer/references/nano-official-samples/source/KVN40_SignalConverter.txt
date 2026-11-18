@@ -1,0 +1,44 @@
+# KVN40_SignalConverter
+
+KV Nano系列40点型 内置功能（中断、高速计数器等）脉冲捕获 | KV-N40 | AS_59076 | en-GB
+https://www.keyence.com.cn/download/download/confirmation/?dlAssetId=AS_59076
+KPZ SHA-256 d149264c9cfb98f32867718490395fe7585474056dd5ab2c5905e82583b9ccc2
+KV STUDIO 12.41.0.0 | 1 个模块和宏 | 25/16384 步 | 14 条指令
+模块按文件名列出。保留导出头、注释、脚本及梯形图，统一转为 UTF-8 和 LF。
+软元件和值属于样本工程。使用时按目标型号核对 I/O、参数与执行顺序。
+
+## Signal_converter.mnm
+原导出 MNM SHA-256 41f5dddf713ea13f434aed702e3f7def9aa1e315869774bd5cfc80668c0a235d
+
+DEVICE:133
+;MODULE:Signal_converter
+;MODULE_TYPE:0
+;-------------------------------------------------------------------------------
+;-- File        : Interrupt Routine In A Signal Converter
+;-- Company     : KEYENCE CORPORATION
+;-------------------------------------------------------------------------------
+;-- Definition  : R000 / An input signal with very small ON width 
+;               : R500 // After R000 is ON, R500 will be ON for 1 second. 
+;-------------------------------------------------------------------------------
+;-- Id          : v 1.0 2012/12/17
+;-------------------------------------------------------------------------------
+;<h1/>Example for using a signal converter to interrupt 
+;Input signals with very small ON width are output according to a specific ON width using interrupt processing 
+;. Small pulses of the input relay R000 are converted into pulses with ON width of 1 second that are output via R500. 
+;. R500 will be ON for 1 second starting from the rising edge of the input relay R000. 
+;For R000 and R500, please change the ON width according to actual usage. 
+LD CR2008
+EI
+LD CR2002
+HSP R000
+LD R500
+TMU #0 #100000
+LD T0
+RES R500
+END
+INT R000
+LD CR2002
+SET R500
+RETI
+ENDH
+
