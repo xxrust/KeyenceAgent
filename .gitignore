@@ -145,3 +145,6 @@ $RECYCLE.BIN/
 
 # Official KEYENCE PDFs and sample-program archives used as KB inputs (not redistributable)
 /其他文件/
+
+# Local MNM-derived texts from the official KV Nano samples
+/keyence-plc-programmer/references/nano-official-samples/source/

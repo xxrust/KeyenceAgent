@@ -13,10 +13,11 @@ an accepted execution path.
 
 ## Evidence Boundary
 
-Planning, a dry run, and a snapshot are separate from desktop acceptance. A
-successful delivery requires a fresh same-run result, step receipts, and the
-workflow's declared readback or compile evidence. A skipped check means that the
-claim was not verified and must not make a delivery gate green.
+For desktop acceptance, keep the same-run result, step receipts, and the
+workflow's declared readback or compile evidence. Associate these with the
+project version they cover. After Save As or subsequent edits, verify the final
+copy and the applicability of prior evidence. PLC behavior and field
+acceptance follow the programmer skill's project model and acceptance cases.
 
 ## Labels and system comments
 
@@ -42,9 +43,6 @@ prove that KV STUDIO matches the documents.
 
 ## FB Boundary
 
-Use an official FB directly when it provides the required behaviour. A user FB is
-allowed only when the official library lacks the capability, the logic is
-repeated or must move between machines, and the delivery records the reuse
-evidence. A whole-machine unit may compose official FBs when that unit is reused
-on at least two stations or machines and adds fixed parameter and mapping policy;
-it must not reimplement the official FB's state machine.
+Use the programmer skill to assess target compatibility, equivalent behavior,
+and reuse before planning changes to FBs or native instructions.
+[FB refactoring](../../keyence-plc-programmer/references/fb-first-refactor.md)

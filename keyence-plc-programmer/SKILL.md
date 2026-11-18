@@ -1,6 +1,6 @@
 ---
 name: keyence-plc-programmer
-description: 编写和修改 KEYENCE PLC 程序（ST/LD）、变量、FB 接口与 MNM；用于代码生成、工程修复和样例复刻。KEYENCE 专有语义依据 Wiki/项目证据，桌面操作交给 kv-studio-operator。
+description: 审查、编写、修改和复刻 KEYENCE PLC 程序（梯形图、ST、KV 脚本、变量和 FB）。先用现场与工程证据建立项目本体，再设计和验证行为变更。KEYENCE 专有语义查 Wiki，桌面操作交给 kv-studio-operator。
 ---
 
 # KEYENCE PLC 编程
@@ -16,13 +16,26 @@ KEYENCE 专有语法、指令/FB 调用、设备映射和模块行为，通过
 读陌生 KEYENCE 工程、或准备改程序/变量/注释之前，先扫一遍
 [keyence-basics-and-pitfalls.md](references/keyence-basics-and-pitfalls.md)。
 它只收"大模型最容易按其它品牌习惯搞错"的条目，每条都标了依据类型（手册 / 实测 / 仓库）。
-最常踩的五条：
+最常踩的六条：
 
 - **没有 X/Y**：单元 I/O 在 **R 区**（输入继电器/输出继电器）。搜不到 `LD X` 不代表这台机没有 IO。
-- **MNM 里 `;` 开头的是 ST 代码**，不是注释；`BOX_ST` 下面那些行都在执行。
+- **`ANP` 是串联上升沿接点（OFF→ON），`ANF` 才是串联下降沿接点（ON→OFF）**。不要把 `ANP` 中的 `N` 当成取反或下降沿；完整对应及手册依据见必读清单 §3。
+- MNM 的分号行可能承载 ST、KV 脚本或注释。解析时按模块格式和脚本范围判定。
 - **`.kpr` 是压缩/加密二进制**，不能离线解析；必须先在 KV STUDIO 里导出再分析。
 - **注释 / 变量 / 变量注释是三套机制**，互不替代（见下节与本文第 2 节）。
 - 脚本层面：含非 ASCII 的 `.ps1` 必须带 UTF-8 BOM，`.bat` 必须纯 ASCII。
+
+## 先理解设备，再设计程序
+
+首次接手、审核或修改实际工程，以及为实际设备新增控制功能时，按 [项目本体与行为验证](references/project-model.md) 建立与任务范围匹配的工程认知。先查器件、端子、I/O 和有效电平，再将工艺、扫描顺序、上位机握手及安全回路连成可追溯的关系。审查可以停在证据与结论。行为修改须在编写替代逻辑前明确当前行为、目标行为和验收条件。
+
+现有快照提供程序和配置证据。接线、外部写入和安全功能需要各自的资料。记录会影响变更的未知项并暂缓依赖它的改动，继续审查或处理证据独立的部分。仅修改注释或单个局部逻辑时，追踪对应信号及受影响的路径即可。
+
+## KV Nano 编程与官方范例
+
+写、改或移植 Nano 程序时，先读 [KV Nano 编程摘要](references/nano-programming.md)，核对 I/O、首扫、扫描边沿、定时器、数据宽度、定位和串口握手。
+
+查具体梯形图、KV 脚本或宏时，按功能和 CPU 选取厂商示例，结合索引中的模块导航阅读。范例覆盖 14、24、40、60 点型，移植到其他型号前核对手册中的 I/O 分配和指令适用范围。 [KV Nano 官方范例索引](references/nano-official-samples/README.md)
 
 ## 变量表 vs 软元件注释：先判断项目现状，再决定改法
 
@@ -31,23 +44,31 @@ KEYENCE 专有语法、指令/FB 调用、设备映射和模块行为，通过
 
 | 项目形态 | 判断依据 | 默认做法 |
 |---|---|---|
-| **新项目**（从零新建、或为本机新写模块） | 还没有历史包袱 | **默认用变量表**：每个点位建设备绑定变量（`name` / `data_type` / `device` / `comment`），程序里用变量名 |
+| **新建项目或独立新模块** | 目标 CPU 与项目约定允许使用命名符号 | 按机型使用变量或 Nano 标号。只为经证实的现场接口绑定设备，内部状态优先使用合适作用域的符号 |
 | **既有项目：大量裸地址 + 软元件注释** | 程序体里满是 `MR1000`、`DM2000`，变量表里几乎没有用户变量；注释表里有手写注释 | **以补软元件注释为主**。不要为了可读性把整段程序改成变量名——那会动到 MNM 显示形式，等于重写程序 |
 | **既有项目：已大量命名变量** | 程序体里以变量名为主，变量表有较完整的用户变量 | **沿用变量表**：新点位建变量，说明写变量 `comment`；只有裸地址补软元件注释 |
 
-- 判据要**量化**：用 `read_only_project_text_snapshot` 的 `text/comments/usage.tsv`（每个设备被引用次数）
-  与 `text/variables/*`（用户变量条数）对比。建议口径：**用户变量引用占多数（经验阈值 ≥50%）→ 变量化项目**；
-  裸地址占绝对多数 → 注释优先。这是**建议**，最终由项目所有者确认。
+- 从同一批程序体统计命名符号和裸设备地址的引用比例。对支持变量表的工程，可用
+  `text/comments/usage.tsv` 辅助识别裸地址，以变量声明解析命名引用。Nano 以 MNM 和标号表为依据。
+  已有规范时沿用项目约定，混用时按本次涉及的模块判断。
 - 只在"注释优先"的项目里做**增量变量化**：一次一个工位/一个 FB 实例，改完必须编译 + 回读，
   不要批量把裸地址替换成变量名。
-- 无论走哪条路，**改注释不改逻辑**是可验证的底线：改完后导出 MNM 与改前逐字节比对，
-  应当完全一致（`.cm1` 变了、程序体没变）。
+- 仅修改软元件注释时，导出 MNM 与改前逐字节比对，应当完全一致（`.cm1` 变了、程序体没变）。
+  此检查只适用于注释修改，不限制用户要求的程序逻辑优化。
 
-本项目用户约定：优先用有含义的标号；名称已经表达的含义不再复制到标号注释，注释仅补充单位、范围、边沿条件等信息。标号表预先规划为完整 TSV，一次批量粘贴，不逐行调用 UI 和编译。有系统注释的软元件禁止登记标号、禁止修改或清空系统注释；CR/CM 整区受写入保护，其余系统点按目标 CPU 手册和工程证据识别。完整 Nano 程序使用 operator 的 `apply_kv_nano_program_plan.ps1`，冻结声明、脚本、梯形图和旧内容预期后执行，编译并重开回读；文档与该份源文件及验收结果对应。
+Nano 标号和系统点保护按 operator 的 [Nano 接口契约](../kv-studio-operator/references/nano-program-interface.md) 执行。完整逻辑修改使用 `nano_program_plan`，准备标号、源码、旧内容预期与保存重开后的回读预期。
+
+## 注释以程序作者和工程师的身份编写
+
+注释可留空。标号或代码已清楚表达的含义不再解释，例如“准备检测”无需补写“中断置位”或扩写成一段请求协议。
+
+只在有助于理解设计时补充简短注释，例如必要的单位、限制或不直观的工艺原因；不要求每个位都说明产生、消费和复位过程。“未见置位路径”等审查发现放入报告，不能填进工程注释，也不能编造设计意图来代替未知信息。
+
+写入的说明须符合实际回路与指令依据；`ANP 输入` 是输入上升沿，不据此推断工件进入或离开。编译成功和 TSV 回读一致不证明注释语义正确。
 
 ## 快速 ST 路径
 
-用户只要 ST 逻辑/代码、明确不要求改工程或操作 KV STUDIO 时，直接给程序主体和需要定义的变量/FB 接口；不生成 MNM、`MODULE_TYPE`、TSV 或工程目录，不读项目快照，也不启动协作者。只在当前问题确实涉及对应语法时，按下表读取一份 ST reference；遇到不能由这些已整理模式确定的 KEYENCE 专有行为，再转 KB 查询。
+纯语法、通用算法或独立 ST 片段按下表选参考，给出可执行主体与需要登记的接口。KEYENCE 专有语义按 `kv-studio-kb-programming` 查证。即使交付物只有代码，只要指定了现有工程或实际设备行为，仍按受影响接口建立项目本体。
 
 | 任务内容 | 按需参考 |
 | --- | --- |
@@ -75,11 +96,10 @@ KEYENCE 专有语法、指令/FB 调用、设备映射和模块行为，通过
 
 ## 编辑流程
 
-1. 对现有内容取得与修改范围匹配的新鲜证据。跨模块理解、整项目复刻或全面审核优先使用 operator 的 `read_only_project_text_snapshot`；窄范围修改可只取相关 MNM、变量/自变量或配置快照。
-2. 设计或修改可审查的源文件。缺失的声明、类型、设备依据明确列出并解决。
-3. 按依赖顺序调用 operator workflow；类型先于引用它的声明和模块。
-4. 使用复制出的 KV STUDIO 编译错误修改源文件，再导入和转换。
-5. 依据实际验证报告结果；编译通过不替代控制逻辑和设备行为验收。
+1. 识别目标工程、CPU 和影响范围。取得与基线版本一致的证据。跨模块、复刻或全面审核按下节选择快照，窄范围可读取相关程序、声明和配置。
+2. 建立项目本体并追踪受影响的读写方、间接引用和扫描顺序。设计前记录每项变更的触发、改前／改后行为、证据和验收用例，针对缺失资料缩小可执行范围。
+3. 准备可审查的源码和声明。按依赖顺序调用公开 operator workflow，类型先于引用它的声明和模块。用回执提供的编译错误修正源文件后重试。
+4. 将编译、保存重开回读和适用的行为检查绑定到最终交付版本。报告已取得的现场证据及待核事项。仅提供代码时按实际完成的检查报告。
 
 从零建工程时，先用 operator 的 `get_kv_capabilities.ps1 -Capability create_project`
 读取公开入口及 `regression_scenarios`，查看匹配的 README 和场景参数后创建目标 CPU 工程。
@@ -87,10 +107,9 @@ KEYENCE 专有语法、指令/FB 调用、设备映射和模块行为，通过
 接口失败时先核对标准契约和本次证据，不把尚未完成的算法/ST 集成与已有工程创建能力混为一谈。
 测试契约用于学习受支持的调用方式，算法和声明仍按本次需求独立生成。
 
-自然语言要求新增完整程序或 FB 时，准备程序体、声明、目标树路径和 Wiki 证据。
-BOOL 梯形图按 [complete-module.md](references/complete-module.md) 使用 operator 的
-`create_kv_complete_module`；数值 ST 按 operator 的 `references/st-programs.md`
-使用 `create_kv_st_module`。提交整套契约预检；仅修改已有程序体或一张变量表时仍使用对应窄接口。
+新增完整程序或 FB 时，准备程序体、声明、目标树路径和 Wiki 证据。支持该路径的机型按
+[complete-module.md](references/complete-module.md) 使用 `create_kv_complete_module` 写入 BOOL 梯形图，
+或按 operator 的 `references/st-programs.md` 使用 `create_kv_st_module` 写入数值 ST。Nano 的完整逻辑使用 `nano_program_plan`。单项修改走对应窄接口。
 
 复刻整个项目才需要完整资产清单和比较，见 [reproduction-gate.md](references/reproduction-gate.md)。
 不要删减逻辑、变量或硬件要求来获得通过。官方 FB 保持来源、名称和行为；
@@ -98,7 +117,11 @@ BOOL 梯形图按 [complete-module.md](references/complete-module.md) 使用 ope
 
 ## 从语义快照理解项目
 
-完整快照以 `snapshot/project/` 为首要阅读入口，而不是把分散的原子输出重新拼成工程：
+KV-NC32 优先使用 operator 的 `nano_project_snapshot`。从 `snapshot/project/modules.json` 读扫描顺序，
+从 `program_N/` 读 MNM 与局部标号，并结合全局标号、单元配置及六页 CPU 定位参数。
+以 [Nano 快照](../kv-studio-operator/references/nano-snapshot.md) 的实际读取范围为准。
+
+支持通用快照的机型使用 `read_only_project_text_snapshot`，从 `snapshot/project/` 阅读：
 
 - `功能块/<项目树分组>/<FB>/`：`body.mnm`、`arguments.tsv`、`locals.tsv`、`entity.json`。
 - `程序/<模块类别>/<模块>/`：`body.mnm`、`locals.tsv`、`entity.json`。
@@ -143,7 +166,7 @@ BOOL 梯形图按 [complete-module.md](references/complete-module.md) 使用 ope
   导出读回用同脚本 `-ExportPath` 精确比较全部 ST 行。
 - ST 程序体只写 KV STUDIO 接受的可执行语句。变量声明位于编辑器变量表，
   不把通用 IEC 声明块直接塞进程序体。
-- **MNM 是 UTF-16LE + BOM（首两字节 `FF FE`），按读取工具分别对待**：PowerShell 自己的 cmdlet
+- **读取 MNM 时按导出编码解码**。KV-NC32 样本的无 BOM 导出用 Windows-936。对 UTF-16LE + BOM（首两字节 `FF FE`）的导出，PowerShell 自己的 cmdlet
   （`Get-Content`/`Select-String`/`[IO.File]::ReadAllLines`）因 BOM 检测，**不写 `-Encoding` 也能正确读**
   （实测 5.1.26100：ascii 与中文命中都与显式 `-Encoding Unicode` 一致）；**真正会"假空"的是非 PowerShell
   路径**——`findstr` 会报 "input file … is in Unicode format" 且两种查询都 0 命中，Python 默认 `open()`
@@ -159,21 +182,10 @@ BOOL 梯形图按 [complete-module.md](references/complete-module.md) 使用 ope
 - TSV 的实际粘贴列和读回边界以 operator 的 variable-editor.md 及校验脚本为准；
   不在两个 skill 中分别维护 UI schema。
 
-## 重构的判定顺序：先官方 FB，后自建 FB（必读）
+## 重构时评估官方实现和 FB 复用
 
-优化任何既有程序前，先读 `references/fb-first-refactor.md`。三条硬规则：
+建立项目本体后，涉及替代指令、官方 FB 或封装时读 [FB 重构判定](references/fb-first-refactor.md)。优先用目标 CPU、单元和项目版本支持且满足行为要求的官方实现。核对请求、仲裁、互锁、完成、停止和故障处理，再决定替换范围。Nano 按机型支持的原生指令与 KV 脚本评估。
 
-1. **先查官方**：官方/单元库 FB 已经提供的能力（轴的运动控制、通信的连接与收发、报警清除），
-   一律直接用官方 FB，把现场信号当输入参数喂进去；**不要**用手写梯形图重建它的上升沿、自保持、
-   方向互斥、忙/完成标志。
-2. **再谈提炼**：只有"官方没有该能力"且"同一逻辑在 ≥2 处重复、只依赖自变量"时，才提炼用户 FB；
-   **不要**把重复的手写逻辑搬进一个自研 FB 当作优化，也**不要**给官方 FB 再包一层用户 FB。
-   只有在一组官方 FB 的组合确实在至少两台设备/工站复用、封装只固定参数和现场接线映射而不重做官方行为，且交付说明记录复用证据时，才允许做整机单元 FB；单个轴的回原、JOG、停止组合不符合例外。
-3. **不认识的信号不许猜**：含义不明确的软元件条件原样保留为输入条件，单列"待确认信号"清单，
-   不得为结构好看而删除、取反或旁路。
-
-判定的证据要求、反模式与交付清单见 `references/fb-first-refactor.md`。
-房规侧对应 `kv-studio-operator/references/project-standard.json` 的 `reuse_principle`（类 A 先于类 B）。
 ## 可复用 FB
 
 调用方拥有真实设备映射、全局集成变量、轴/模块绑定和 FB 实例。

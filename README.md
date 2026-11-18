@@ -76,10 +76,10 @@ KeyenceAgent 把问题分成三层，每层一个技能：
 | 技能 | 职责 | 解决什么问题 |
 |------|------|-------------|
 | **知识库技能** `kv-studio-kb-programming` | 查询本地基恩士知识库（Wiki V3m） | AI 不知道基恩士专有指令 |
-| **编程技能** `keyence-plc-programmer` | 生成 MNM 格式程序文件、变量声明、功能块接口 | AI 无法生成正确的 KV STUDIO 程序格式 |
+| **编程技能** `keyence-plc-programmer` | 建立项目本体，设计与审查 PLC 逻辑，生成程序文件、声明和功能块接口 | 把现场设备和工艺要求落实到可验证的程序行为 |
 | **操作技能** `kv-studio-operator` | 直接操作 KV STUDIO 桌面 | AI 无法读取/写入散落各处的项目信息 |
 
-三个技能配合形成完整的闭环：**查 → 写 → 导入 → 验证**，每一步都产生可检查的证据文件（`run.log`、`result.json`、项目快照）。
+三个技能协同完成 **理解工程 → 设计变更 → 写入 → 验证**。修改已有设备程序前，先从电气图、I/O 表、工程快照和接口资料追踪器件、端子、有效电平、工艺时序、上位机握手与安全回路。方案记录当前行为、目标行为和验收条件，并引用适用的标准及基恩士手册。交付时把编译与回读结果对应到最终工程版本。 [项目本体与行为验证](keyence-plc-programmer/references/project-model.md)
 
 ---
 
@@ -297,7 +297,7 @@ powershell -ExecutionPolicy Bypass -File setup_keyence_agent.ps1
 KeyenceAgent/
 ├── kv-studio-kb-programming/   技能1：查询基恩士知识库
 │   └── scripts/                kb_search.py（检索入口）、kb_vectors.py、kb_rerank.py
-├── keyence-plc-programmer/     技能2：生成 PLC 程序文件
+├── keyence-plc-programmer/     技能2：理解工程、审查及编写 PLC 程序
 ├── kv-studio-operator/         技能3：操作 KV STUDIO 桌面
 │   ├── scripts/workflows/      对外发布的工作流（Agent 唯一入口）
 │   ├── scripts/guards/         UI 原子操作防护层
@@ -333,10 +333,15 @@ KeyenceAgent/
 | EtherCAT 节点配置 | ✅ 已验证发布 |
 | 新建项目 / 编译（独立工作流） | 🔄 pending_validation |
 
-### KV Nano（KV-NC32）支持现状（2026-11-18 实测）
+### KV Nano 编程与官方范例
 
-`纯48` 的实际 CPU 为 KV-NC32；该样本按 `.mod` 保存程序，没有 `WsTreeEnv.xml`。
-本机导出的 MNM 是 **Windows-936（GBK）无 BOM + `DEVICE:128`**；此前 UTF-8 的记录有误。
+Nano 使用梯形图和 KV 脚本。编程技能汇总了容易从其他 PLC 平台带入的假设，包括 R 区 I/O、PLC 与模块首扫、边沿接点、定时单位、数据宽度，以及定位与串口握手。 [KV Nano 编程摘要](keyence-plc-programmer/references/nano-programming.md)
+
+基恩士中国官网的 **68 个 KV-N14／N24／N40／N60 范例工程**已在 KV STUDIO 12.41.0.0 打开、导出并通过离线转换，共核对 **248 个模块和宏**。可按 CPU、语言和功能直达官网下载。KV-3000／5000／5500 的官方编程资料也收录在索引中。 [KEYENCE 官方示例索引](docs/keyence-official-samples.md) · [Nano 逐工程验证表](keyence-plc-programmer/references/nano-official-samples/verification.tsv)
+
+### KV-NC32 桌面操作支持（2026-11-18 实测）
+
+KV-NC32 实测可按 `.mod` 保存程序。简体中文环境下的无 BOM MNM 导出为 **Windows-936（GBK）**，文件头为 `DEVICE:128`。
 
 | 能力 | 当前证据 |
 | --- | --- |

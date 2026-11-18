@@ -134,7 +134,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\run-all-with-shots.ps1
 ## Nano 当前验收状态（2026-11-18）
 
 - 空项目交通灯快照 BAT：**87 通过 / 0 失败**，核对框脚本、域脚本全文、全部计划梯形图指令、标号表、六页参数及产物哈希；见 [用例 28](tests/kv-interface-regression/28_nano_snapshot/README.md)。
-- 九程序、NC32/NC1EP/NC16EXT 工程副本：95 个索引产物哈希全部一致；原文件未变，所属进程正常关闭，仅保留原有三个进程。实机证据：`C:/kvrun/nsfinal/acceptance.json`。
 - 语法/编码检查：292 个 PS1 文件零失败；本体覆盖检查 3 项通过。以上均为工程离线验收，未在实体 PLC 上验证。
 
 ## KV-X 历史验收状态（2026-11-01）

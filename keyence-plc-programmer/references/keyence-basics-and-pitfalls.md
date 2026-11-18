@@ -16,7 +16,7 @@
 
 | 反直觉点 | 正确的做法 |
 |---|---|
-| 直觉上"输入是 X、输出是 Y"（三菱/欧姆龙习惯） | 基恩士 KV 的**单元 I/O 落在 R（继电器）区**：R 区低段是**输入继电器**、再一段是**输出继电器**。 |
+| 沿用其他平台的输入和输出地址命名 | 基恩士 KV 的**单元 I/O 落在 R（继电器）区**。输入和输出的范围按具体 CPU、单元配置及端子表确认。 |
 | 想找硬接线点就 `grep "LD X"` / `"OUT Y"` | 找不到是正常的，别据此判定"这台机没有 IO"。要看 **EtherNet/IP 单元 / 扩展单元的 R 区分配**。 |
 
 - 【手册】FUN `RefreshX（输入继电器状态刷新）` 的参数就是 `InRelay`（输入继电器起始）与
@@ -55,8 +55,19 @@
   `TMR T5 #20` = 20 × 100ms = **2.0 s**。`#` 前缀表示常数。
 - 【实测】库 FB `MC_MultiParameterRead_PANAS_A6BE_V100` 的 `BOX_ST` 之下直接就是
   `;FOR Idx := 0 TO MAX_PARAMETER_NUM BY 1 DO` —— 厂家自己也是这么写的，可以确认 `;` 是代码。
-- MNM 编码：**UTF-16LE + 带 BOM**；`DEVICE:` 码按 CPU 系列不同（KV-X310 = `59`，KV-X520 = `60`），
-  含中文的 MNM 必须用目标编码写。
+- MNM 编码和 `DEVICE:` 码以目标工程实际导出为准。已见 KV-X 导出使用带 BOM 的 UTF-16LE，简体中文 Nano 环境可导出无 BOM 的 Windows-936。 [Nano 工程格式](../../kv-studio-operator/references/nano-project-format.md)
+
+### 边沿接点：ANP 是上升沿
+
+【手册】`ANP` 是与回路块串联的上升沿接点：指定软元件 **OFF→ON** 时接通一个扫描周期。`ANF` 才是串联下降沿接点；不要按 `ANP` 的字母 `N` 猜测为取反或下降沿。
+
+| 接点位置 | 上升沿（OFF→ON） | 下降沿（ON→OFF） |
+|---|---|---|
+| 左母线 | `LDP` | `LDF` |
+| 串联 | **`ANP`** | `ANF` |
+| 并联 | `ORP` | `ORF` |
+
+依据：Wiki v3m `chm::InstructionRef--KVSREF-FC24CM_021J-LDP_ANP_ORP_LDF_ANF_ORF.htm::chunk-001` 的“操作说明”。核对方式：检索 `ANP` 并阅读该正文，再对照目标回路中的实际指令与操作数。`ANP 光纤输入` 应描述为“光纤输入上升沿”；是否对应工件进入或离开还取决于传感器输出设置，不能仅凭此指令推断。
 
 ## 4. 数据类型与宽度（上位机/变量表都受影响）
 

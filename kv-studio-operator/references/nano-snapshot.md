@@ -25,7 +25,5 @@ Artifacts are under `snapshot/project` (readable programs, labels, units, Port0,
 
 Verified on KVS 12.41 / KV-NC32, 2026-11-17–18:
 
-- Final release rerun: `C:/kvrun/nsfinal/acceptance.json` and `snapshot/source_snapshot_manifest.json`. All indexed artifact hashes match; the nine-program/three-unit collection is ready, source files are unchanged, the owned process is closed and exactly the original three user processes remain.
-- `C:/kvrun/ns3/snapshot/source_snapshot_manifest.json`: nine live programs in order, ten global/local label tables, NC32/NC1EP/NC16EXT complete main tables, Port0, six positioning pages and 1860 global comment rows; unchanged source files and normal owned-process closure.
 - `C:/kvrun/nsbat3/test_result.json`: blank traffic-light fixture replay through BAT, 87 passed / 0 failed. Both complete original script blocks, every planned ladder instruction, full label TSV, six page sizes, every indexed artifact hash and no additional KVS processes were checked. The fixture itself was created from an empty project in `C:/kvrun/nsbat1/fixture` and saved/reopened through its frozen plan.
 - Syntax and encoding: 292 PS1 files, zero failures; write ontology coverage: three passed / zero failed, `C:/kvrun/nano_snap_checks/ontology_release/test_result.json`.

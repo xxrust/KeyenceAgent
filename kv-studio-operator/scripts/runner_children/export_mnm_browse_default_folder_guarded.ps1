@@ -134,9 +134,14 @@ try {
   Confirm-ExportDialog $dialog '1' @('KV STUDIO*')
   $completed=$false
   for($index=0;$index -lt 2;$index++){
-    $message=Wait-ExportWindow @('KV STUDIO')
-    $warning=Find-Control $message 'Name' '不能读取包括ST/脚本, 数据包的程序助记符文件, 请注意。'
-    $success=Find-Control $message 'Name' '保存了助记符表。'
+    $messageDeadline=(Get-Date).AddSeconds(3)
+    do {
+      $message=Wait-ExportWindow @('KV STUDIO')
+      $warning=Find-Control $message 'Name' '不能读取包括ST/脚本, 数据包的程序助记符文件, 请注意。'
+      $success=Find-Control $message 'Name' '保存了助记符表。'
+      if($warning -or $success){break}
+      Start-Sleep -Milliseconds 100
+    } while((Get-Date) -lt $messageDeadline)
     if(-not $warning -and -not $success){throw 'KV_EXPORT_UNEXPECTED_MESSAGE'}
     $completed=[bool]$success
     Write-KvUiGuardRunLog -Event 'mnm_export_message' -Data @{text=if($success){$success.Current.Name}else{$warning.Current.Name};hwnd=$message.Current.NativeWindowHandle}

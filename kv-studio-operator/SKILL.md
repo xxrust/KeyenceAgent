@@ -1,4 +1,4 @@
-﻿---
+---
 name: kv-studio-operator
 description: 通过稳定 workflow 操作和快照化 KEYENCE KV STUDIO 桌面项目。用于项目创建、语义项目快照、MNM 导入导出、FB 自变量与局部变量、数据类型、编译结果和单元/EtherCAT 配置；从能力清单选择接口，由脚本负责焦点、输入、验证和日志。
 ---
@@ -30,13 +30,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skill-root>\scripts\workflo
 |---|---|---|
 | Policy note | The public operator boundary is documented in [operator-policy.md](references/operator-policy.md): callers use manifest capabilities and workflows; direct `runner_children` calls are internal and bypass the receipt contract. | See the reference for the stable policy. |
 | B1 | **没有实跑不许写"已验证"**。结论若涉及"在 KV STUDIO 里成立"，必须有一次真实执行 | live 步骤回执（`ok/exit_code`）、编译输出行（`转换成功。` + 步数）、或 `run_all.ps1` 汇总；三者都没有就只能写"计划层已验证，执行层未验证" |
-| B2 | **执行只走两条公开路径**：planner 产出计划 → flat executor；或用 `rerun_kv_plan_step.ps1` 对既有计划做受控单步复跑。`runner_children/*.ps1` 只属于内部实现，Agent 不得直接调用；禁止手拼 plan JSON | 计划 JSON 由 `new_kv_module_execution_plan.ps1` / `new_kv_existing_project_update_workspace.ps1` 生成；单步复跑必须保留计划的 `run_id`、工程路径和步骤参数，并写入独立回执 |
+| B2 | 从 manifest 调用 `customer_callable` workflow，由其内置规划或公开 planner 生成执行计划。受控复跑用 `rerun_kv_plan_step.ps1`。Agent 不直接调用 runner 或手写执行计划 | 保存公开入口生成的计划和回执。复跑保留计划的 `run_id`、工程路径和步骤参数，并写入独立回执 |
 | B3 | **改既有脚本前先定位耦合**：grep 目标标识符的出现次数与用途，把"命名"和"路径"分开改；优先纯增量（新名字 + 新分支） | 改动前贴 grep 结果；改后 `[Parser]::ParseFile` = 0 错，且对应套件绿 |
 | B4 | **每次提交只含本次声明的文件**；改名时行为零变化 | `git status --porcelain` 核过；`git show --stat` 只含目标文件；改名后全仓 grep 旧名 = 0 |
 | B5 | **含非 ASCII 的 `.ps1` 必须 UTF-8 BOM** | `scripts/gates/assert_kv_script_syntax.ps1` 的 `encoding_failure_count=0` |
-| B6 | **live 前四件套齐备**：合规 `CHECKLIST.md`（`# Checklist`/`## KV STUDIO`/`## Steps`）、runner 参数逐字取自其 `param()`、变量名为语义名（非 `MR9000` 这类软元件样式）、夹具模块名不与目标工程冲突 | checklist 文件路径 + `param()` 片段 + TSV 首行 |
+| B6 | 按公开入口的参数和计划契约准备输入。填写该入口明确要求的 checklist。新增变量使用语义名，测试夹具模块名须与目标工程区分 | 已验证的执行计划及本次输入文件 |
 | B7 | **失败必须报可复现三件套**：`error_code` + 触发命令 + 已排除项；不许用"可能是…"代替 | 报错原文 + 你实际跑的命令行 |
-| B8 | **live 只动副本**：任何写操作先复制工程（`references/KVX样例程序_v100` → 临时目录），验收后核对原工程未被改动 | 副本路径 + 原工程 `git status` 干净 |
+| B8 | 对既有工程的编辑验收使用该工程的独立副本。新建夹具用对应机型的测试工程 | 副本路径和原件的前后哈希，或 workflow 提供的原件保护回执 |
 
 交付前自查顺序：B3 → B5 → B2 → B1 → B4。任一条给不出证明，就不要说"完成/验证通过"。
 
@@ -334,19 +334,18 @@ MNM 中以 `;` 开头的 ST 行算使用、`BOOKMARK` 标签不算。`coverage.j
 （`sample_copy` + `open_project:false`，覆盖冷启动；`run.ps1` 另断言 `saved=true` 与 `*.cm1` 落盘）。
 2026-11-13 实机通过：3 条注释、`mismatch_count=0`、`cm1` 205,820 字节。
 
-要"一条命令拿到完整项目映射"用 `-Capability read_only_project_text_snapshot`（场景 13）：它在同一次隔离 UI 会话里一并导出注释表并与程序体 join，产物落在 `text/comments/`，`architecture/project_map.json` 的
+支持通用快照的工程用 `-Capability read_only_project_text_snapshot`（场景 13）。它在同一次隔离 UI 会话里导出注释表并与程序体关联，产物落在 `text/comments/`。`architecture/project_map.json` 的
 `extension_points.comments` 直接给出作用域、统计和未注释软元件清单；`status=ready` 且
 `missing_capabilities` 为空才代表这份映射完整（缺注释层会如实报 `partial`）。
 
-扫描一个既有工程后，按这个顺序**先给结论、不擅自改工程**：
+需要分析支持通用快照的既有工程时，可以按范围调用以下只读接口：
 
 1. `read_only_project_text_snapshot` —— 只读完整映射。
 2. `summarize_kv_project`（`summarize_kv_project.ps1`，非 UI）—— 产出 `project_summary.json` 与 `项目总结.md`：
    设备构成、工站分层、每个模块的功能与执行顺序、对外接口（外部在写的位、单元 I/O、Modbus）、缺口。
 3. `assert_project_standard`（`assert_kv_project_standard.ps1`，非 UI）—— 产出 `standard_report.json`，
    按 `references/project-standard.json` 报 STD-01..06（命名/分层/类型/注释/同实例复用）。
-4. **把 2、3 的结论交给用户，并明确询问是否按房规调整**。报告的 `requires_user_decision=true` 时，
-   必须先拿到回答，再生成迁移计划，并在工程**副本**上执行（原件不动），逐步编译验证。
+4. 房规迁移按用户任务范围处理。单纯审核交付结论。用户已要求的优化按编程技能的行为依据和验收条件执行。
 
 房规只是本仓库从范例程序归纳的内部约定（KV STUDIO 不强制任何命名或分区），因此永远只作建议，
 不得据此判定项目"错误"，也不得在未获同意时改结构。
@@ -390,23 +389,15 @@ MNM 中以 `;` 开头的 ST 行算使用、`BOOKMARK` 标签不算。`coverage.j
 - `-AllowUnresolved` 只影响"**用户程序内**未解析符号"的判定（库 FB 体内的未解析本来就只记 info）。
   元素是**符号名**，例如 `-AllowUnresolved 'SocketTCP_Send_Inst','SocketTCP_Recv_Inst'`；被豁免的符号
   仍会出现在 `unresolved_symbols` 里，但不再计入 `failures`，理由是"该符号的声明不在任何快照路由中"。
-- MNM 是 UTF-16LE + BOM。**PowerShell 自己的 cmdlet 通常安全**：`Get-Content`/`Select-String` 因 BOM 检测，
+- MNM 编码以本次导出为准。KV-NC32 无 BOM 样本按 Nano 格式解码。对 UTF-16LE + BOM，`Get-Content`/`Select-String` 因 BOM 检测，
   即使不写 `-Encoding` 也能正确读取（实测 5.1.26100 下 ascii 与中文命中都与显式 `-Encoding Unicode` 一致）。
   **真正会"假空"的是非 PowerShell 读取路径**：`findstr` 会报 "input file … is in Unicode format" 且两种查询
   都 0 命中；Python 默认 `open()` 直接 `UnicodeDecodeError`（gbk）。这类工具请显式指定编码，或读快照提供的
   `text\mnm_utf8\`（UTF-8 无 BOM，仅供阅读；权威、可导入的副本始终是 `text\mnm\`）。
 ### FB 复用口径（项目所有者裁决）
 
-The stable official-FB versus user-FB boundary, including the whole-machine
-unit exception and its required reuse evidence, is maintained in
-`kv-studio-operator/references/operator-policy.md` and the programmer reference.
-
-- **可复用、或需要经常移植到其他机器的标准程序，一律做成功能块**（`功能块\FB_*`）；扫描程序只保留现场映射、
-  时序与调用层。依据是**本仓库房规**（`project-standard.json` 的 `reuse_principle`），不是 KEYENCE 的硬性要求。
-- 复用候选**分两类报告，各自标注依据**，不得混为一谈：
-  - **类 A：官方 FB 可用而未用** —— 必须有 Wiki/手册证据；无证据一律写"未证实"（第二轮的严格口径只适用于这类）。
-  - **类 B：应抽成用户 FB 的标准逻辑** —— 依据是房规 + 复用性证据（同一逻辑按轴/工位重复，或需移植到其他机器），
-    **不需要** KEYENCE 文档。台州工程的 `Axis_FB`（三轴重复的使能/回原/JOG/复位/停止与信号映射）属类 B。
+官方实现与用户 FB 的设计判断交给编程技能。项目标准报告的类 A 候选需核对目标机型的手册与实际行为，
+类 B 候选需核对复用场景和接口。 [FB 重构判定](../keyence-plc-programmer/references/fb-first-refactor.md)
 - **每个轴/工位一个实例**：可复用单位是轴或工位，跨轴共享同一实例（`MC_Power_1` 驱动三轴、`MC_Home2` 用于 #2/#3）
   是**缺陷**而非风格，与厂商手册"每轴一个 MC_Power 实例"一致。
 
@@ -451,19 +442,22 @@ KV 的域类型 ST 导出为 `AREA_ST`，无需发明独立 ST 模块语言选�
 
 ## 调用与验收
 
-1. 明确目标项目和修改范围，准备 TSV、MNM 或配置 JSON。现有内容的修改以相关快照为依据；无需为一次自变量修改导出无关硬件。
+1. 明确目标项目和修改范围，准备 TSV、MNM 或配置 JSON。逻辑变更由编程技能先建立相应的项目本体与行为预期。局部编辑只取相关证据。
 2. 使用 `powershell -STA -NoProfile -ExecutionPolicy Bypass -File <workflow>`。支持 `-PlanOnly` 的接口可先准备计划；执行前脚本统一检查入口、结果契约与参数。
 3. 查看本次 workflow 结果、步骤 receipt 和同一 `run.log`。结果为失败时停止后续 UI 动作，依据错误码和证据修复。
-4. 按实际验证范围报告。快照成功不代表写入成功，模块出现不代表程序体和声明完整，导入成功不代表编译成功。
+4. 将回执、编译和持久化回读绑定到对应的项目版本，按实际覆盖范围报告。发生另存或后续编辑时，核对最终交付副本。
 
-> **Nano 工程注意**：KV Nano（KV-NC32/N14/N24/N40/N60）的工程**没有 `WsTreeEnv.xml`**、程序是每个 `.mod` 一个文件。此时 tree 型清点会得到 0 节点（`topology=not_found` 不代表工程为空），MNM 文本导出会卡住。详见 `references/nano-project-format.md`。
+Nano 用目标 CPU 和已验证能力选择接口。有的 Nano 工程缺少 `WsTreeEnv.xml`，另存后的工程也可能带该文件。用实际程序树和导出结果识别模块，遵循 Nano 的专用快照与编辑契约。 [Nano 项目格式](references/nano-project-format.md)
 
 Nano CPU 的脉冲定位参数（工具 Alt+T → CPU 定位参数设定 I）使用能力 `nano_cpu_position_parameters`，先读 [Nano CPU 定位参数](references/nano-cpu-position-parameters.md)。当前限定实测 KV-NC32：六页完整读取，I/O 输出模式与 JOG 四项已验证写入、保存重开和恢复。JOG 加减速度单位为 Hz/ms；“应用”只更新工程，不能当作 PLC 传送。使用六页旧表／目标表契约后执行 `ApplyPlan`，固定 Z 相及限位地址不可改；测试使用空工程并关闭自己打开的进程。不要套用 EtherCAT 的 `MC_Jog` 参数或 KV-X 表格操作器。
 
 Nano 的单元主参数、KV-NC1EP、KV-NC16EXT 和 CPU 内置 Port0 使用能力 `nano_unit_editor_crud`，先读 [Nano 单元编辑器](references/nano-unit-editor.md)。Query 读取完整主表；添加/删除后核对型号顺序，修改后保存回读。内置串口是固有硬件，只修改或恢复其配置；新建工程默认串口模式与既有业务工程可能不同。`<设定>` 子窗口未展开就不能声称已扫描其内部数据。测试使用独立空工程并清理所属进程，不复用 KV-X 的 EIP 工程树入口。
 ## 语义项目快照
 
-需要理解整个现有项目、复刻项目、跨模块修改或交给人审核时，优先调用能力
+KV-NC32 使用 `nano_project_snapshot`，按实际程序树读取模块与扫描顺序、标号、单元和 CPU 定位参数。
+范围以该快照 manifest 为准。其它机型先核对 manifest 支持范围。 [Nano 快照](references/nano-snapshot.md)
+
+支持通用快照的机型遇到跨模块理解、复刻或全面审查时，优先调用能力
 `read_only_project_text_snapshot`。该 workflow 在同一次运行中调用原子读取接口，并直接形成：
 
 ```text
@@ -515,10 +509,10 @@ workflow 的已验证执行计划就是前置操作清单；不必另写只含�
 
 ## 按任务阅读
 
-- **第一次接触一台机器/一个工程**：先读 [keyence-basics-and-pitfalls.md](../keyence-plc-programmer/references/keyence-basics-and-pitfalls.md)。它写的是最容易按其它品牌习惯搞错的事（KV 没有 X/Y、单元 I/O 在 R 区、MNM 里 `;` 开头是 ST 代码、`.kpr` 不能离线解析、注释/变量/变量注释是三套机制）。读代码前的三十秒投资，省掉后面几十分钟返工。
-- **要"优化/重构"既有程序**（含判断某个程序该不该做成 FB）：先读 [fb-first-refactor.md](../keyence-plc-programmer/references/fb-first-refactor.md)。顺序是**先看官方 FB 是否已提供该能力**（轴运动、通信连接与收发、报警清除），官方有就直接用、把现场信号当自变量喂进去；只有官方没有、且同一逻辑在 ≥2 处重复时，才提炼用户 FB。**反模式**：给官方 FB 再包一层用户 FB；把重复的手写梯形图搬进自研 FB 当优化；把含义不明的条件删掉或旁路。
+- **第一次接触一台机器或一个工程**：先核对目标机型的 I/O、MNM、变量和注释机制。 [KEYENCE 基础与易错项](../keyence-plc-programmer/references/keyence-basics-and-pitfalls.md)
+- **审查或修改实际设备程序**：由 `keyence-plc-programmer` 建立与任务范围匹配的项目本体，随后按变更方案取证、执行和回读。 [项目本体与行为验证](../keyence-plc-programmer/references/project-model.md)
 - 编写 PLC 逻辑、MNM 和 FB 接口：使用 `keyence-plc-programmer`；KEYENCE 专有语法依据 Wiki 或导出证据。
-- 决定"补注释还是建变量"：按 `keyence-plc-programmer` 里的「变量表 vs 软元件注释」策略——新项目默认变量表；既有项目先量 `usage.tsv` 与用户变量数，裸地址为主就补软元件注释，已变量化就沿用变量表。
+- 决定标号、变量或软元件注释时，按编程技能的机型和项目现状判断。
 - 新增完整扫描程序/FB 的契约、BOOL 范围及整套预检：[complete-module.md](references/complete-module.md)；只改已有单项仍走窄接口。
 - 变量/结构体 schema、FB 表格状态及持久化范围：[variable-editor.md](references/variable-editor.md)。
 - 硬件、EtherCAT、EtherNet/IP 和 ESI 边界：[project-configuration.md](references/project-configuration.md)。

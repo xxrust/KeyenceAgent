@@ -31,8 +31,8 @@ operator 配置 `wiki_db` > 配置 `wiki_root`\v3\wiki.v3m.db > 仓库内 `dist/
 
 当前项目的语义快照可作为“这个项目实际包含什么”的证据，例如程序树归属、变量类型、
 FB 接口和单元/EtherCAT 配置；优先读取 `snapshot/project/`，必要时追溯 `text/` 和 `raw/`。
-它不能替代知识库对 KEYENCE 指令语法、产品约束和模块行为的确认。反过来，知识库的通用说明
-也不能证明当前项目已经配置或声明了某个对象。回答时分别标注知识库依据与项目快照依据。
+KEYENCE 指令、产品约束和模块行为由目标系列手册与知识库确认。项目快照用于确认实际声明与程序行为，
+接线、外部读写和安全功能各自引用项目资料与联调证据。按编程技能的项目本体关联这些依据。
 
 ## 工作流
 
@@ -99,14 +99,12 @@ FB IN/OUT/局部变量语义；标题相似或系统局部变量条目不能代�
 提供给 operator 完整模块契约的 `evidence_paths` 应引用这些非空文件；文件存在仅证明依据可追溯，
 不证明 MNM 可编译或运行行为正确。查询失败时保留错误并修复查询入口，不用空文件冒充证据。
 
-旧入口 `query_keyence_kb.py`（Wiki V2）已随 V2 库删除而失效，仅作历史参考，不要作为回退
-（benchmark holdout hit@5 = 0.14），只在 v3 库不可用时使用。
+运行时只使用 v3m。缺库或查询失败时按上面的路径顺序检查配置，保留错误；依赖该知识的结论标为待查。
+旧入口 `query_keyence_kb.py` 和 V2 资料仅供追溯历史。
 
 弱召回时：
 
 ```yaml
-Legacy note: `query_keyence_kb.py` is an explicit V2 compatibility tool only when a V2 database path is supplied; it is never an automatic fallback for the v3m runtime.
-
 weak_recall:
   actions:
     - split_query_into_exact_identifier_and_semantic_terms

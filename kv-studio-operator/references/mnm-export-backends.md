@@ -1,6 +1,6 @@
 ﻿# MNM 导出：一入口 + 两后端（契约与合并判据）
 
-状态：**设计定稿，待实现**（2026-11-16）。触发原因：KV Nano 工程（`纯48` / KV-NC32）上
+状态：**历史设计草案**（2026-11-16）。当前接口与工程格式见 [Nano 工程格式与接口](nano-project-format.md)。触发原因是 KV-NC32 工程上
 `export_mnm_browse_default_folder_guarded.ps1` 实测卡住，而人工导出可用。
 
 ## 1. 为什么要两套实现
@@ -8,9 +8,9 @@
 | 事实 | 证据 |
 |---|---|
 | KV-X / KV-8000 工程：有 `WsTreeEnv.xml`、程序在 `All.prgx` | 台州 v10 / KVX 样例 |
-| KV Nano 工程：**没有 `WsTreeEnv.xml`**，每个程序一个 `.mod` | `纯48.zip` 实测，见 `nano-project-format.md` |
+| KV-NC32 工程可按程序保存 `.mod`，部分工程没有 `WsTreeEnv.xml` | [Nano 工程格式与接口](nano-project-format.md) |
 | Nano 导出多一个「选择注释类型」对话框 | 2026-11-16 手动 Alt+F→R→S 截屏 |
-| 现有 runner 在 Nano 上卡在导出前的保存步骤（`Save-KvExportProject`），根本没走到按键 | `snapshot/nano48/raw/mnm/run.log` 只到 `export_step: start` |
+| 早期 runner 在 Nano 上曾卡在导出前的保存步骤（`Save-KvExportProject`） | 当次日志停在 `export_step: start` |
 
 所以：**实现分成两套**（动作序列不同），但**契约必须一套**，否则就是第二个 R03。
 
@@ -33,7 +33,7 @@ export_mnm_guarded.ps1                ← 唯一 runner 名称（workflow/manife
 | 顺序 | 来源 | 证据 |
 |---|---|---|
 | 1 | `WsTreeEnv.xml` 的 CPU 节点，如 `[0] KV-X520` | `references/KVX样例程序_v100/WsTreeEnv.xml:4411` |
-| 2 | KVS 运行时窗口标题 `[编辑器: <CPU>]`，如 `[编辑器: KV-NC32]` | 2026-11-16 `纯48` 实测 |
+| 2 | KVS 运行时窗口标题 `[编辑器: <CPU>]`，如 `[编辑器: KV-NC32]` | KV-NC32 编辑器实测 |
 | 3 | KV STUDIO「CPU 系统设定」表格内的型号（UIA 读） | 未实测 |
 | 4 | 兜底：布局（有 `*.mod` 且无 `WsTreeEnv.xml`） | 仅当 1-3 全拿不到时使用，且必须记 `cpu_source=layout_fallback` 告警 |
 
@@ -121,6 +121,6 @@ export_mnm_guarded.ps1                ← 唯一 runner 名称（workflow/manife
 
 1. 抽公共 helper + 结果 schema（不改行为）；
 2. 迁移 kvx 后端（行为不变，跑一次 KV-X 工程导出验证）；
-3. 新增 nano 后端（`选择注释类型` → 文件夹），用 `纯48` 验证；
+3. 新增 Nano 后端（`选择注释类型` → 文件夹），用独立 KV-NC32 夹具验证。
 4. 补契约测试（本文件 §6 第 1、2 条）；
 5. 清点加 Nano 分支（`.mod` + `CpuMb2.inf`），修 `project_inventory` 的 `not_found` 误判。
