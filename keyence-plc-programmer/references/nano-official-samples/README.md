@@ -1,14 +1,12 @@
 # KV Nano 官方范例程序
 
-按目标 CPU 和功能打开范例文本，再按模块导航查看梯形图、KV 脚本或宏。需要查看工程程序树、扫描顺序或单元参数时，从文本开头的官网下载链接获取原工程，在 KV STUDIO 中打开。 [基恩士中国样本目录](https://www.keyence.com.cn/support/user/controls/plc/software/sample-program)
+按目标 CPU 和功能打开范例文本，再按模块导航查看梯形图、KV 脚本或宏。库内共 60 份范例，定位按点型保留简体中文版，其他功能沿用官网提供的英文版。需要查看工程程序树、扫描顺序或单元参数时，从文本开头的官网下载链接获取原工程，在 KV STUDIO 中打开。 [基恩士中国样本目录](https://www.keyence.com.cn/support/user/controls/plc/software/sample-program)
 
 ## 按功能和 CPU 查看正文
 
 | 功能 | KV-N14 | KV-N24 | KV-N40 | KV-N60 |
 | --- | --- | --- | --- | --- |
 | 定位（简体中文） | [14 点](source/KVN14_Pos_CN.txt) | [24 点](source/KVN24_Pos_CN.txt) | [40 点](source/KVN40_Pos_CN.txt) | [60 点](source/KVN60_Pos_CN.txt) |
-| 定位（英文） | [14 点](source/KVN14_Pos_GB.txt) | [24 点](source/KVN24_Pos_GB.txt) | [40 点](source/KVN40_Pos_GB.txt) | [60 点](source/KVN60_Pos_GB.txt) |
-| 定位（繁体中文） | [14 点](source/KVN14_Pos_TW.txt) | [24 点](source/KVN24_Pos_TW.txt) | [40 点](source/KVN40_Pos_TW.txt) | [60 点](source/KVN60_Pos_TW.txt) |
 | 脉冲捕获 | [14 点](source/KVN14_SignalConverter.txt) | [24 点](source/KVN24_SignalConverter.txt) | [40 点](source/KVN40_SignalConverter.txt) | [60 点](source/KVN60_SignalConverter.txt) |
 | 比较器 | [14 点](source/KVN14_Comparator.txt) | [24 点](source/KVN24_Comparator.txt) | [40 点](source/KVN40_Comparator.txt) | [60 点](source/KVN60_Comparator.txt) |
 | 高速计数 | [14 点](source/KVN14_Counter.txt) | [24 点](source/KVN24_Counter.txt) | [40 点](source/KVN40_Counter.txt) | [60 点](source/KVN60_Counter.txt) |
@@ -30,7 +28,7 @@
 
 - 先按机型和模块导航定位程序，再读相应的助记符和注释。例如编写回原点逻辑时，查 `Origin_return` 的执行条件、原点输入、限位映射和完成反馈。
 - 样本中出现的地址、轴号、点号、参数和输入有效条件属于样本工程。编写或修改实际工程时，按目标手册和工程快照核对这些条件，标明调用方需要提供的配置。 [项目本体与行为验证](../project-model.md)
-- KV STUDIO 导出保留了以分号开头的 KV 脚本源行和说明。阅读时结合模块、脚本范围和实际助记符判定。简体中文定位样本的 `Positioning_start` 有一行标题注释在导出中显示为乱码，可对照该模块的执行指令和同型号其他语言版本。
+- KV STUDIO 导出保留了以分号开头的 KV 脚本源行和说明。阅读时结合模块、脚本范围和实际助记符判定。简体中文定位样本的 `Positioning_start` 有一行标题注释在导出中显示为乱码，可结合该模块的执行指令和定位参数阅读。
 
 ## 定位程序导航
 
@@ -44,7 +42,7 @@
 | `Speedchange_relay`、`Speedchange_interrupt`、`Targetchange_function` | 运行中改速、比较器中断、改目标坐标。 |
 | `Linear_Interpolation` 与插补宏 | 通过 `MCALL` 传入两轴和点参数，然后用 `PSTRT` 分别启动两轴。调用方按两轴的定位完成信号判断完成。 |
 
-定位范例按 14、24、40、60 点型和简体中文、英文、繁体中文选择。程序文本中的 `DEVICE` 由 KV STUDIO 导出，KV-N14 为 135，KV-N24 为 134，KV-N40 为 133，KV-N60 为 132。
+每种点型保留一份简体中文定位范例。程序文本中的 `DEVICE` 由 KV STUDIO 导出，KV-N14 为 135，KV-N24 为 134，KV-N40 为 133，KV-N60 为 132。
 
 ## 高速输入和计数导航
 

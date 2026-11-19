@@ -337,7 +337,7 @@ KeyenceAgent/
 
 Nano 使用梯形图和 KV 脚本。编程技能汇总了容易从其他 PLC 平台带入的假设，包括 R 区 I/O、PLC 与模块首扫、边沿接点、定时单位、数据宽度，以及定位与串口握手。 [KV Nano 编程摘要](keyence-plc-programmer/references/nano-programming.md)
 
-基恩士中国官网的 **68 个 KV-N14／N24／N40／N60 范例工程**已在 KV STUDIO 12.41.0.0 打开、导出并通过离线转换，共核对 **248 个模块和宏**。可在技能内按 CPU、语言和功能查看导出的梯形图助记符、KV 脚本和宏。KV-3000／5000／5500 的官方编程资料也收录在索引中。 [Nano 范例正文索引](keyence-plc-programmer/references/nano-official-samples/README.md) · [KEYENCE 官方示例索引](docs/keyence-official-samples.md)
+技能收录 **60 个 KV-N14／N24／N40／N60 官方范例工程的导出文本**，共 **144 个模块和宏**，均已在 KV STUDIO 12.41.0.0 通过离线转换。定位范例按点型保留简体中文版，其他功能沿用官网提供的英文版。可按 CPU 和功能查看梯形图助记符、KV 脚本和宏。KV-3000／5000／5500 的官方编程资料也收录在索引中。 [Nano 范例正文索引](keyence-plc-programmer/references/nano-official-samples/README.md) · [KEYENCE 官方示例索引](docs/keyence-official-samples.md)
 
 ### KV-NC32 桌面操作支持（2026-11-18 实测）
 

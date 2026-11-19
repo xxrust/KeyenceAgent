@@ -6,7 +6,7 @@
 
 中国官网有独立的样本程序页，覆盖定位、脉冲捕获、比较器、高速计数、PWM、时钟脉冲停止、凸轮开关、串行通信、算术和其他功能。目录按 14、24、40、60 点型列出资源。 [官方样本程序目录](https://www.keyence.com.cn/support/user/controls/plc/software/sample-program/)
 
-截至 2026-11-19，目录中的 68 个工程均已在 KV STUDIO 12.41.0.0 打开、导出并通过离线转换，共核对 248 个模块和宏。编程技能提供每个工程的导出文本、模块阅读导航和逐工程验证表。每份文本开头附原工程官网下载链接。 [Nano 范例索引](../keyence-plc-programmer/references/nano-official-samples/README.md)
+2026-11-19 使用 KV STUDIO 12.41.0.0 离线验证了官网目录的 68 个工程。比对同型号定位示例的助记符和宏后，技能收录其中 60 个工程的导出文本，共 144 个模块和宏。定位保留简体中文版，其他功能沿用官网提供的英文版。每份文本开头附原工程官网下载链接。 [Nano 范例索引](../keyence-plc-programmer/references/nano-official-samples/README.md)
 
 | 主题 | 官方入口 |
 | --- | --- |
