@@ -1,6 +1,6 @@
 # KV Nano 编程摘要
 
-写、改或移植 Nano 程序前先确认 CPU 完整型号、端子排型或连接器型、扩展单元和实际 I/O 分配。把原工艺的输入、输出、时序和验收要求还原出来，再选 Nano 的指令和软元件。熟悉其他平台时尤其要重新核对地址、边沿、首扫、定时单位和轴完成条件。 [项目本体与行为验证](project-model.md) · [官方范例索引](nano-official-samples/README.md)
+写、改或移植 Nano 程序前先确认 CPU 完整型号、端子排型或连接器型、扩展单元和实际 I/O 分配。把原工艺的输入、输出、时序和验收要求还原出来，再选 Nano 的指令和软元件。熟悉其他平台时尤其要重新核对地址、边沿、首扫、定时单位和轴完成条件。 [项目本体与行为验证](project-model.md) · [PLC 代码规范](plc-code-standard.md#kv-x-与-nano-的实现选择) · [官方范例索引](nano-official-samples/README.md)
 
 ## 最容易凭习惯写错的地方
 
@@ -12,7 +12,7 @@
 | 把裸 `DM` 当成确定的数据类型，或把双字一律当有符号数 | `DM` 每地址 16 位。对支持这些后缀的数值指令，`.U/.S` 为无符号／有符号 16 位，`.D/.L` 为无符号／有符号 32 位，`.F` 占两字，`.DF` 占四字。逐条确认后缀、常数写法和占字范围。配置 HMI 或 PC 接口时同时核对数据宽度、符号和协议字序。 | 端子排型手册 p129–132、p145–147 及数据存储器章节。 [双精度运算](nano-official-samples/source/KVN14_Calc_DF.txt) |
 | 把所有定时器预置值当毫秒，或把 10 μs 刻度当成现场响应精度 | `TMR` 为 100 ms，`TMH` 为 10 ms，`TMS` 为 1 ms，`TMU` 为 10 μs。`TMU #0 #100000` 使用 T0，设定时间为 1 s。普通减定时器的误差包含扫描周期。检查作用域内是否重用了同一定时器，尤其是跨模块使用全局 T 号，并核对初始化模块及中断中对定时器的使用限制。 | 指令参考 `TMR, TMH, TMS`、`TMU` 的操作说明。 [脉冲捕获](nano-official-samples/source/KVN14_SignalConverter.txt) |
 | 把高速输入处理当作普通扫描接点，或每次都取到最新计数 | 先核对型号支持的端子、滤波和高速通道。官方脉冲捕获范例用 `HSP` 设置输入时间常数，`INT…RETI` 捕获窄脉冲，主扫描定时复位。计数范例用 `RFSCTH` 在比较前刷新 `CTH` 当前值。手册明确指出，对不支持的输入继电器使用 `HSP`，Nano 可无转换错误但指令不执行。 | 指令参考 `HSP`、`RFSCTH`，连接器型手册 p190–193。 [脉冲捕获](nano-official-samples/source/KVN14_SignalConverter.txt) · [计数](nano-official-samples/source/KVN14_Counter.txt) |
-| 把 KV 脚本当成 IEC ST，或认为框内逻辑每扫都运行 | Nano 使用梯形图、KV 脚本。框脚本在左侧回路成立时执行，域脚本占整行，在所属模块执行时每扫经过。框脚本被跳过时，差分函数的前态可能仍是上一次执行时的状态。定时器复位、边沿检测和输出的 OFF 分支要一起设计。导出 MNM 中脚本原文和普通注释均可能以分号开头，展开的梯形图也可能同时出现。 | `ScriptUse.pdf` p51–55。 [四则运算](nano-official-samples/source/KVN14_Calc.txt) · [梯形图与脚本收发](nano-official-samples/source/KVN14_TextSendReceive.txt) · [Nano 工程格式](../../kv-studio-operator/references/nano-project-format.md) |
+| 把 KV 脚本当成 IEC ST，或认为框内逻辑每次扫描都运行 | Nano 使用梯形图、KV 脚本。框脚本在左侧回路成立时执行，域脚本占整行，在所属模块执行时每次经过。框脚本被跳过时，差分函数的前态可能仍是上一次执行时的状态。定时器复位、边沿检测和输出的 OFF 分支要一起设计。导出 MNM 中脚本原文和普通注释均可能以分号开头，展开的梯形图也可能同时出现。 | `ScriptUse.pdf` p51–55。 [四则运算](nano-official-samples/source/KVN14_Calc.txt) · [梯形图与脚本收发](nano-official-samples/source/KVN14_TextSendReceive.txt) · [Nano 工程格式](../../kv-studio-operator/references/nano-project-format.md) |
 
 ## 定位和串口先追握手
 

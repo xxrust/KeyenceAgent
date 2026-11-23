@@ -104,6 +104,9 @@ function Open-Script {
   return (Get-ScriptWindow)
 }
 function Save-Project {
+  if ([KvSharedUiGuardWin32]::IsIconic($s.hwnd)) {
+    Assert-KvUiForegroundHwnd -ExpectedHwnd $s.hwnd -ExpectedTitleLike 'KV STUDIO*' -Step 'restore Nano editor before reading save command' -AllowSingleRecovery | Out-Null
+  }
   Click-Named '保存项目(Ctrl+S)' 'Button'
   $deadline=(Get-Date).AddSeconds(8)
   do {

@@ -351,3 +351,7 @@ holdout 50 的 hit@1 掉了 4 个百分点，逐条查过：全是手册之间�
   如 `KV-XH_ControlCycle.pdf`、`EpGraph.pdf`、各伺服调谐速查）。所以"137 本"按文件算，不等于 137 本大部头
 - 另外 8 个 Excel 设备映射表（`DeviceMap(KV-X/XH/XHEC/ML_MC/SH04PL)`、`DeviceMap(MV-L40)`、CR/CM 转换表）
   逐地址展开后占 **33,167 块 = 全库 62%**；CHM/HTML 帮助（598 + 70 + 11 + 51 个页面）合计约 5,940 块
+
+## KV STUDIO 12.41 安装示例（2026-11-23）
+
+[安装示例索引](kvs-install-examples.md) 按主题生成 6 个 `kb_note`，保留简体中文安装路径、CPU 或单元适用范围及证据出处。单独更新已有库时，在副本上执行 `ingest_extra.py --only install --db <DB>`，再执行 `stage2_index.py --db <DB>`。新增条目可通过关键词检索，原有向量行号沿用。完整构建仍由默认导入流程处理。

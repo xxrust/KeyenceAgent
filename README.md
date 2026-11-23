@@ -88,7 +88,7 @@ KeyenceAgent 把问题分成三层，每层一个技能：
 知识库是一个本地 SQLite（`wiki.v3m.db`，约 450 MB）+ 一份 bge-m3 向量矩阵，由 [`kb-pipeline/`](kb-pipeline/) 从下列资料编译而来。
 **数据库不进 git**（体积太大），通过网盘分发，放到配置里的 `wiki_root` 即可。
 
-### 获取
+### 获取（2026-11-03 基础包）
 
 | | |
 |---|---|
@@ -126,9 +126,9 @@ KeyenceAgent 把问题分成三层，每层一个技能：
 | **标准化工程快照** | 基恩士公开的 `KVX样例程序_v100`：40 个 FB（四品牌伺服参数读写/初始化/软件复位/型号检查、ABS 编码器设定、ModbusTCP 客户端、level1 组件 Cylinder/Motion/Vacuum、level3 设备 McMode）+ 24 个执行型程序模块 + 结构体 + 全局变量表；每个 FB 都带自变量、局部变量和程序体 | 新增 |
 | **本体卡片 2,162 张** | 481 功能块 / 281 指令 / 44 单元 / 1,342 概念 / 6 错误码 / 8 实机验证经验，全部挂证据块 | 原有（本次重建） |
 | **同义词 1,683 对** | 761 个中文说法 → 620 个真实存在的目标词（含并查集同义组、df 过滤、中文否定保护） | 原有（本次扩容） |
-| **知识库说明 3 条** | 变量命名规范对照（教材 vs 样例程序）、资料构成、标准程序分层结构 | 新增 |
+| **知识库说明** | 基础包含命名规范、资料构成和标准程序分层 3 条说明。仓库另提供 6 条安装示例索引，可增量入库 | 见下方更新方法 |
 
-### 规模
+### 基础包规模
 
 - 文本块 **53,146**：设备映射表 33,167、PDF 手册 13,628、各类帮助 5,940、教材/示例/快照/说明 354
 - 向量：18,979 个块 + 2,148 张卡片的 bge-m3 向量（1024 维）
@@ -149,7 +149,7 @@ KeyenceAgent 把问题分成三层，每层一个技能：
 ```powershell
 cd kb-pipeline
 python stage1_clean_chunk.py --mineru --dst <wiki_root>\v3\wiki.v3m.db   # 清洗切块 + MinerU 文本
-python ingest_extra.py                                                    # 教材 / 示例程序 / 工程快照
+python ingest_extra.py  --db <wiki_root>\v3\wiki.v3m.db                  # 教材 / 示例程序 / 工程快照 / 安装示例索引
 python stage2_index.py   --db <wiki_root>\v3\wiki.v3m.db                  # FTS + 同义词 + df
 python stage4_cards.py   --db <wiki_root>\v3\wiki.v3m.db                  # 本体卡片
 python stage5_vectors.py --db <wiki_root>\v3\wiki.v3m.db --model bge-m3   # 向量
@@ -158,6 +158,21 @@ python stage5_vectors.py --db <wiki_root>\v3\wiki.v3m.db --model bge-m3   # 向�
 耗时参考：stage1 ~10 s、stage2 ~4 min（含 df 扫描）、stage4 ~5 s、stage5 ~3 min（RTX A4000）。
 教材 PDF 需要先用 MinerU 解析（`mineru-kit parse <pdf> -o kb-pipeline/extra_docs/mineru/<key> --tier standard`）。
 
+### 为基础包加入安装示例索引
+
+索引依据 KV STUDIO 12.41 简体中文安装目录 `KVS/Language/2052`，覆盖 SystemMacro 的 13 类宏包，以及 PROTOCOL STUDIO 设备预设、KMP 运动帮助和诊断表。可以用 `STSGET-2TFI`、`STSGET-2TFP`、`PLS-H20G` 或 `APRF` 搜索。每条说明保留安装路径、适用机型和证据来源。 [安装示例索引](kb-pipeline/kvs-install-examples.md)
+
+备份基础包数据库及其同目录的 `jieba_userdict.txt`，然后从仓库根目录执行。将示例路径替换为配置实际使用的数据库。
+
+```powershell
+$wikiDb = 'C:\path\to\wiki_root\v3\wiki.v3m.db'
+python kb-pipeline/ingest_extra.py --only install --db $wikiDb
+python kb-pipeline/stage2_index.py --db $wikiDb
+python kv-studio-kb-programming/scripts/kb_search.py "STSGET-2TFI" --db $wikiDb --fast
+```
+
+更新后共有 53,152 个文本块。新增 6 条索引可通过关键词检索，基础包的向量文件可以继续使用。
+
 ### 引用原则
 
 检索结果会带 `source_type`，不同类型证据的效力不同，**不能互相替代**：
@@ -165,7 +180,7 @@ python stage5_vectors.py --db <wiki_root>\v3\wiki.v3m.db --model bge-m3   # 向�
 - `htmlhelp` / `chm` / `pdf`：**手册**，讲语法与约束 —— 是最终依据
 - `textbook`：**教材**，讲方法与步骤（怎么写、怎么组织）
 - `program_example` / `project_snapshot`：**参考实现**，看真实工程里怎么写
-- `kb_note`：库维护者写的说明（命名规范、资料构成、分层结构）
+- `kb_note`：库维护者写的说明和索引，包括命名、资料构成、分层结构和安装示例
 
 注意变量命名规范在资料里是**两套**：教材用 `x/ui/i/r/a/st/fb` + `g/l` 作用域前缀，`KVX样例程序_v100`
 用的是 `b/inst/str` + 中文全局名。回答命名问题时要说明用的是哪一套，`kb_note` 里有对照表。
@@ -336,6 +351,8 @@ KeyenceAgent/
 ### KV Nano 编程与官方范例
 
 Nano 使用梯形图和 KV 脚本。编程技能汇总了容易从其他 PLC 平台带入的假设，包括 R 区 I/O、PLC 与模块首扫、边沿接点、定时单位、数据宽度，以及定位与串口握手。 [KV Nano 编程摘要](keyence-plc-programmer/references/nano-programming.md)
+
+整机新建或重构先确认工艺、I/O、PC 接口和轴参数，再确定模块职责、信号读写方及扫描顺序。Nano 参照 KV-X 的职责划分，用模块名前缀组织程序。联锁、步序、定时和 I/O 按需使用扩展梯形图，命令分派、参数校验和批量赋值优先使用 KV 脚本。执行器分别定义受理、运行、完成与故障结果，并用目标 CPU 支持的反馈逐阶段验证。 [项目本体与行为验证](keyence-plc-programmer/references/project-model.md) · [PLC 代码规范](keyence-plc-programmer/references/plc-code-standard.md)
 
 技能收录 **60 个 KV-N14／N24／N40／N60 官方范例工程的导出文本**，共 **144 个模块和宏**，均已在 KV STUDIO 12.41.0.0 通过离线转换。定位范例按点型保留简体中文版，其他功能沿用官网提供的英文版。可按 CPU 和功能查看梯形图助记符、KV 脚本和宏。KV-3000／5000／5500 的官方编程资料也收录在索引中。 [Nano 范例正文索引](keyence-plc-programmer/references/nano-official-samples/README.md) · [KEYENCE 官方示例索引](docs/keyence-official-samples.md)
 

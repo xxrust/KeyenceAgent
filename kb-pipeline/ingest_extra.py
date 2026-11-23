@@ -418,6 +418,23 @@ def note_chunks() -> list[dict]:
     return out
 
 
+def install_example_notes() -> list[dict]:
+    path = HERE / "kvs-install-examples.md"
+    introduction, *topics = re.split(r"\n(?=## )", path.read_text(encoding="utf-8").strip())
+    source = f"kb-pipeline/{path.name}"
+    rows = []
+    for index, topic in enumerate(topics, 1):
+        heading, _, body = topic.partition("\n")
+        title = heading.removeprefix("## ")
+        cid = f"x:install:kvs1241:{index:02d}"
+        rows.append(dict(chunk_id=cid, parent_id=cid, part=1, parts=1, title=title,
+                         section="KV STUDIO 12.41 安装示例", doc=path.name,
+                         source=f"{source}#{title}", source_type="kb_note", series="",
+                         text=f"{introduction}\n\n{body.strip()}", keywords="2052",
+                         extractor="curated"))
+    return rows
+
+
 # ---------------------------------------------------------------- writer
 def write(rows: list[dict], db: Path, reset_all: bool = True) -> dict:
     """Insert the generated chunks. reset_all wipes every x: row (full run); a partial run only
@@ -449,7 +466,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", type=Path, default=DB)
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--only", choices=["textbook", "program", "snapshot", "note"], default=None)
+    ap.add_argument("--only", choices=["textbook", "program", "snapshot", "note", "install"], default=None)
     a = ap.parse_args()
     rows: list[dict] = []
     if a.only in (None, "textbook"):
@@ -460,6 +477,8 @@ def main():
         rows += snapshot_chunks()
     if a.only in (None, "note"):
         rows += note_chunks()
+    if a.only in (None, "install"):
+        rows += install_example_notes()
     by_type = {}
     for r in rows:
         by_type.setdefault(r["source_type"], []).append(r)
